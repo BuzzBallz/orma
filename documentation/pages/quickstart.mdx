@@ -1,0 +1,426 @@
+---
+title: "Quickstart"
+description: "Clone, prove the toolchain, start the reader against four live Devnet facilities, run the frontend, then bake your own."
+---
+
+Orma is two processes. A Node reader that polls XLS-65 vaults on XRPL Devnet, scores them and
+serves a frozen JSON contract on port 8787, and a Vite frontend that consumes it. Neither needs a
+database. The reader holds its state in memory and re-reads the ledger every four seconds.
+
+This page gets both running against four facilities that already exist on Devnet, then shows you
+how to build your own.
+
+## What you need
+
+| | Version | Note |
+|---|---|---|
+| Node | 24.13.0 | `package.json` declares `engines.node >= 20`. Everything documented here was run on 24.13.0. |
+| npm | bundled | The repository root uses npm and `package-lock.json`. |
+| pnpm | any recent | Only for `app/`, which has its own `pnpm-lock.yaml`. |
+| Network | outbound wss | `wss://s.devnet.rippletest.net:51233`, network id 2. |
+
+Two runtime dependencies, both pinned exactly: `xrpl` at `5.2.0` and `decimal.js` at `10.6.0`.
+
+<Warning>
+Do not run `npm install` or `pnpm install` in the repository root. `node_modules/` ships installed
+and verified, and re-resolving it is the one reliable way to lose a working toolchain. The
+frontend is the exception: `app/` is a separate tree and `pnpm install` there is expected.
+</Warning>
+
+## Why the xrpl pin is exact
+
+`xrpl@5.2.0` was published on 2026-09-11 at 22:20 UTC, roughly five hours before the hackathon
+opened. It matters more than a version number usually does.
+
+Every lending vault on XRPL must be closed-ended. `LoanBrokerSet` returns `tecNO_PERMISSION`
+against an open-ended vault, so a `VaultCreate` carrying `VaultKind: 1`, `SubscriptionDate` and
+`RedemptionDate` is the protocol's own first transaction. Before 5.2.0, the published npm `xrpl`
+could not serialize those three fields: `validate()` rejected them, so the transaction was
+unreachable through the model layer entirely. For six days, `npm install xrpl` returned a library
+that could not build the first transaction of the feature it shipped support for.
+
+5.2.0 fixed two things at once:
+
+- `VaultCreate` with `VaultKind`, `SubscriptionDate` and `RedemptionDate` encodes natively, so
+  `client.submitAndWait` is usable for the whole lending chain.
+- `signLoanSetByCounterparty` emits the correct `CPT\0` (`0x43505400`) prefix, so the manual
+  prefix swap that recon-era code needed is dead.
+
+Two sharp edges survive on 5.2.0, and both are in the shipped code:
+
+- **The `LoanSet` fee must be doubled by hand.** `autofill` warns about the second signature and
+  then does not pay for it. Every baker does `tx.Fee = String(Number(tx.Fee) * 2)`.
+- **`OracleSet` is signed raw.** `validate()` caps `Scale` at 0 to 10 while rippled accepts 0 to
+  20, and demands `Scale` whenever `AssetPrice` is present while rippled forbids an explicit
+  `Scale: 0`. Together those make some legal oracles unreachable through the model layer. See
+  [the oracle publication](/mathematics), section 8, for what ends up on the ledger.
+
+<Note>
+`xrpl-py` is still on 5.1.0 and did not get either fix. Keep Python out of the signing path.
+</Note>
+
+## Step 1: prove the toolchain
+
+Run this first, every session, before trusting anything else. It drives the entire lending chain
+against live Devnet with no workarounds: `VaultCreate` to `VaultDeposit` to `LoanBrokerSet` to
+`LoanBrokerCoverDeposit` to `LoanSet` with a native counterparty signature.
+
+```bash
+npm run verify          # = node tools/verify-toolchain.mjs
+```
+
+```
+[39.2s] vault+deposit+broker+cover all tesSUCCESS, zero workarounds
+For LoanSet transaction the auto calculated Fee accounts for total number of signers the counterparty has to avoid transaction failure.
+[47.1s] LoanSet tesSUCCESS  loan=86C4316664B46577…
+
+CONFIRMED: xrpl@5.2.0 signs the counterparty signature natively. Both recon workarounds are OBSOLETE.
+```
+
+That is one real run. The middle line is `autofill`'s own warning about the second signature, and
+it is the warning described below: it is printed, and then the fee is not doubled. The loan id is
+different every time, because the script builds a fresh vault each run. The elapsed markers move
+with Devnet close times: 44.8 seconds is the figure recorded in the backend spec, the run above
+took 47.1 seconds, and both were all `tesSUCCESS`. It funds two throwaway faucet wallets and
+leaves a vault behind, which is fine: Devnet.
+
+If this fails, stop. Nothing downstream will work and the failure is almost certainly the
+toolchain rather than your code.
+
+## Step 2: start the reader
+
+```bash
+node src/index.mjs
+```
+
+There are no arguments in the common case. On startup the entrypoint reads every `demo/*.json`,
+keeps any file carrying a 64-hex `vaultId`, and serves it under the `label` in the same file.
+Those four files are tracked in git, so a clean clone already knows what to watch.
+
+```
+  serving 4 facility(ies) baked into demo/
+[22:20:18] INFO  [api] api listening {"port":8787,"source":"devnet"}
+[22:20:22] INFO  [main] up {"vaults":4,"api":"http://localhost:8787","publishing":false}
+```
+
+`publishing` is `false` here because publication is off until a seed is given. Step 3 turns it on.
+
+Logs go to **stderr**, as JSON lines by default, so stdout stays clean during a demo. Set
+`LOG_PRETTY=1` for the human-readable form shown above.
+
+<Warning>
+`demo/` and `.env` are resolved as relative paths, so run the reader from the repository root.
+From anywhere else it finds no baked facility and exits with the usage message.
+</Warning>
+
+The four facilities it picks up:
+
+| File | Label | Vault id | What it demonstrates |
+|---|---|---|---|
+| `demo/indexer-race.json` | Meridian Trade Finance I | `864C5A2D…E37E8C835` | The first impairment of a healthy vault, with `PreviousFields: {}` |
+| `demo/ordering-vault.json` | Kestrel Bridge Financing II | `24EAA01A…1E5810089` | Two defaults declared largest first, conduct grade E |
+| `demo/metadata-vault.json` | Calder Structured Credit III | `5763707D…2A96CB0E5` | A share token whose own metadata points at its valuation |
+| `demo/gate-vault.json` | Thorne Senior Secured I | `4A5A8E37…5B00190DF5` | XLS-70 credential plus permissioned domain, entry refused on-ledger |
+
+Explicit arguments win outright over the baked set:
+
+```bash
+node src/index.mjs --vault 864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835:"Meridian Trade Finance I"
+VAULTS=<64-hex id>,<64-hex id> node src/index.mjs
+```
+
+Environment, all optional:
+
+| Variable | Default | Effect |
+|---|---|---|
+| `PORT` | `8787` | API port. |
+| `XRPL_WS` | `wss://s.devnet.rippletest.net:51233` | Upstream node. |
+| `POLL_MS` | `4000` | Re-read interval. The reader re-reads full state, it never diffs `PreviousFields`. |
+| `LOG_PRETTY` | unset | `1` for coloured human-readable logs instead of JSON lines. |
+| `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error`. |
+| `WATCH_ACCOUNTS` | empty | Comma-separated accounts to scan for escrowed share collateral. There is no reverse index from an MPT issuance to the escrows holding it, so a lender must be told where to look. |
+| `RATER_ADDRESS` | from `demo/gate-vault.json` | Whose credential the gate route checks for. |
+| `PUBLISH_SEED` | unset | See below. |
+| `DEMO_KEY` | unset | Operator `POST /api/demo/*` routes are loopback-only without it. |
+
+## Step 3, optional: publish to the ledger
+
+Reading correctly is the product. Publishing is distribution, and a missing seed must never stop
+the reader from starting, so it is off by default.
+
+Create `.env` in the repository root:
+
+```bash
+PUBLISH_SEED=sEd7...
+```
+
+The entrypoint parses `.env` itself in about ten lines, with no dependency and no `--env-file`
+flag to remember. An existing shell variable always wins over the file.
+
+With a seed set, the reader attaches a publish loop that writes six `PriceData` entries per vault
+into a native XLS-47 Oracle object: `NAV`, `HDL`, `LIQ`, `COV`, `CNC` and `DDL`. It publishes on
+material change (the held NAV moved, or the grade moved) plus a 60 second heartbeat, so a stale
+oracle is distinguishable from a dead publisher. `PUBLISH_HEARTBEAT_MS` changes that interval.
+
+```
+[22:20:17] INFO  [main] publishing enabled {"publisher":"rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B","funded":false}
+```
+
+`PUBLISH=faucet` instead of a seed funds a throwaway publisher, and the reader warns that it has
+done so. It works, but every restart publishes under a new account, so the previous oracle objects
+are stranded where they are and the series does not continue. A seed is what keeps the same
+objects across restarts.
+
+<Warning>
+Devnet faucet seeds are worthless and they are still private keys. `.env` and `/.demo-keys.json`
+are gitignored, and `tools/pre-commit` greps the added lines of every staged file for an XRPL
+family seed (`s…` or `sEd…`) and rejects the commit if it finds one. Do not weaken the hook, move
+the seed.
+</Warning>
+
+## Step 4: the frontend
+
+```bash
+cd app
+pnpm install
+pnpm dev
+```
+
+Vite serves on `http://localhost:5173`. The variable that points the app at the reader is
+`VITE_API_BASE`, which defaults to `http://localhost:8787`, so on a laptop with the reader already
+running there is nothing to configure. Three more are read and all three are optional:
+`VITE_XRPL_NETWORK` (which network the wallet side connects to, default `testnet` in the code and
+`devnet` in `app/.env.example`), `VITE_XAMAN_API_KEY` (a public Xaman app key; leave it out and
+Crossmark and GemWallet still work) and `VITE_DOCS_URL` (where the header's docs link points).
+
+Everything under `VITE_` is inlined into the bundle and shipped to every visitor. No secret
+belongs there. On a deployed preview served over https, an
+`http://` API base is blocked by the browser as mixed content before the request leaves the tab.
+The app detects that combination, and after five consecutive failures it caps its polling interval
+at 30 seconds and says so on screen rather than retrying at full rate against an address nobody is
+listening on. It does not stop polling: two requests a minute is a heartbeat, so the page recovers
+on its own if the base starts answering.
+
+## Step 5: the verification walk
+
+Four requests, in order, that prove the whole chain is live.
+
+**Is the reader up and reading?** `ok` stays `false` until the first poll completes, which is
+honest rather than pretending to be ready.
+
+```bash
+curl -s http://localhost:8787/api/health
+```
+
+```json
+{
+  "ok": true,
+  "contractVersion": "1.0.0",
+  "source": "devnet",
+  "network": "devnet",
+  "ledgerIndex": 5263343,
+  "serverTime": "2026-09-12T22:20:22Z",
+  "buildVersion": "3.4.0-rc5"
+}
+```
+
+**Read the grades back.** The list is sorted worst first by `gradeNumeric`, deliberately not by
+divergence: divergence is only non-zero once a loss has been declared, so an undeclared loss reads
+0 bp and would sort the most dangerous facility to the bottom.
+
+```bash
+curl -s http://localhost:8787/api/vaults \
+  | jq -r '.vaults[] | "\(.grade)\t\(.gradeNumeric)\t\(.navNaive)\t\(.navCorrect)\t\(.navDivergenceBps)bp\t\(.label)"'
+```
+
+```
+B	26	0.210000	0.210000	0bp	Kestrel Bridge Financing II
+AA	89	1.000000	0.803922	1961bp	Meridian Trade Finance I
+AA	89	1.000000	0.803922	1961bp	Calder Structured Credit III
+AAA	100	1.000000	1.000000	0bp	Thorne Senior Secured I
+```
+
+Two things to read off that table. Meridian and Calder both report a unit value of `1.000000` and
+hold `0.803922`: 1961 basis points of divergence that an indexer diffing transaction metadata
+never sees, because `LossUnrealized` moved from zero and rippled omits type-default previous
+values from `PreviousFields`. Kestrel shows zero divergence and still grades **B**, because its
+losses were not impaired, they were defaulted, and a realised write-off leaves no provision behind
+to diverge from. The score's memory term is what catches it. Full method at
+[/mathematics](/mathematics), sections 4 to 6.
+
+**Value a pledge from the share token alone.** This is the loop a second broker runs when offered
+vault units as collateral, and it needs nothing from us but a URL the token itself carries.
+
+```bash
+curl -s "http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav?units=1000000" \
+  | jq '{unitValue, pledge}'
+```
+
+```json
+{
+  "unitValue": {
+    "held": "0.803922",
+    "reported": "1.000000",
+    "divergenceBps": 1961,
+    "basis": "assets net of recognised loss, divided by units outstanding"
+  },
+  "pledge": {
+    "units": "1000000",
+    "valueHeld": "803922",
+    "valueReported": "1000000",
+    "overstatement": "196078"
+  }
+}
+```
+
+Amounts are drops. A lender valuing that pledge naively is over by 0.196078 XRP on every XRP of
+stated value. See [/nav-pointer](/nav-pointer) and [the API reference](/api-reference).
+
+**Check who holds the gate.** `DomainID` is not on the `Vault` ledger entry, it is on the share
+issuance, so the obvious lookup returns nothing and reads exactly like "open to everyone".
+
+```bash
+curl -s http://localhost:8787/api/vaults/4A5A8E3716D52E334AEB077ADB09456EF4A941CC26021A8EAD37F95B00190DF5/gate
+```
+
+```json
+{
+  "vaultId": "4A5A8E3716D52E334AEB077ADB09456EF4A941CC26021A8EAD37F95B00190DF5",
+  "gated": true,
+  "private": true,
+  "domainId": "FFBEC89D98B4E7CF52F4F254235086514A90CED0EC531941BDF747AF40C5A2FB",
+  "acceptedCredentials": [
+    { "issuer": "rKQjjU5KFs9RAZCDvYVjcaoVK5gGsCJgkP", "type": "ORMA-IG", "typeHex": "4F524D412D4947" }
+  ],
+  "domainOwner": "rGFFSqqY1R3764FKF7crU5F6bYh9qaD45S",
+  "issuerNamed": true,
+  "raterAddress": "rKQjjU5KFs9RAZCDvYVjcaoVK5gGsCJgkP"
+}
+```
+
+`domainOwner` is the vault owner, not us. We signed nothing to be named there, and we cannot
+refuse. See [/gate](/gate).
+
+## Baking your own facility
+
+Each script in `src/demo/` builds one complete facility on Devnet from faucet wallets, runs the
+measurement through the product's own code, writes a tracked JSON artefact, and exits non-zero if
+the result does not reproduce. None of them takes a key: they fund everything they need.
+
+| Script | Builds | Writes | Wall clock |
+|---|---|---|---|
+| `capture-impair.mjs` | 51 XRP in, 10 lent, 10 impaired. Captures the empty `PreviousFields`. | `demo/indexer-race.json` | ~3 min |
+| `bake-ordering.mjs` | Two loans of 30 and 10 XRP, both defaulted largest first, no impairment. | `demo/ordering-vault.json` | ~3 min |
+| `bake-metadata.mjs` | Same shape as the impair capture plus an MPT share metadata pointer, then resolves it. | `demo/metadata-vault.json` | ~3 min |
+| `bake-gate.mjs` | Credential, domain, private vault, two LPs depositing in one wave, then revocation. | `demo/gate-vault.json` | ~1 min |
+| `rebake-all.mjs` | All four, sequentially, with an 18 hour redemption horizon (`--hours 18`). | all of the above | the sum of the four |
+
+The three minutes are not ours, they are the ledger's. Each of the first three waits 25 seconds
+for `SubscriptionDate` to pass, then waits out `PaymentInterval` (60s) plus `GracePeriod` (60s)
+plus an 8 second buffer, because **a loan may only be impaired once it is already past due**.
+`bake-gate.mjs` has no protocol wait at all, because deposits are only legal during Subscription
+and it never leaves that phase.
+
+```bash
+node src/demo/bake-ordering.mjs --window 3600 --label "Kestrel Bridge Financing II"
+```
+
+```
+  ORDERING, reconstructed from the ledger
+    cover actually consumed  0.50 XRP
+    best for depositors      0.70 XRP   (smallest first)
+    worst for depositors     0.50 XRP   (largest first)
+    cost of the sequence     0.20 XRP
+    sequence score           0.0000
+
+  CONDUCT  E (25/100)
+    [ORDERING_SELF_SERVING]
+    [DEFAULT_WITHOUT_IMPAIRMENT]
+```
+
+Identical losses, identical rates, 0.20 XRP of difference, decided entirely by the order the
+broker chose. That is a 40% swing in what the first-loss capital absorbed, and the remainder lands
+on depositors.
+
+```bash
+node src/demo/capture-impair.mjs
+```
+
+```
+  PreviousFields      {}
+  LossUnrealized      10000000  (was 0)
+  shares              51000000
+  naive NAV           1.000000
+  correct NAV         0.803922
+  divergence          1961 bps
+  tx                  075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3
+
+  -> demo/indexer-race.json
+```
+
+```bash
+node src/demo/bake-gate.mjs --window 3600
+```
+
+```
+    ok   CredentialCreate                   tesSUCCESS  619CC767741EFF1E…
+    ok   CredentialAccept (by the LP)       tesSUCCESS  41F98989B64BD732…
+    ok   PermissionedDomainSet              tesSUCCESS  4C425830675B021E…
+    ok   VaultCreate (private + domain)     tesSUCCESS  3FC79BF77240B0D5…
+    ok   VaultDeposit — graded LP           tesSUCCESS  7FC5C01BD735E9A4…
+    REJ  VaultDeposit — ungraded LP         tecNO_AUTH  E7CF5DB29DFE6528…
+    ok   CredentialDelete (revoke)          tesSUCCESS  E2D6F396F4A92DE4…
+    REJ  VaultDeposit after revocation      tecNO_AUTH  AA25246AE452DF17…
+    ok   VaultWithdraw after revocation     tesSUCCESS  2E71A25973D55E26…
+
+  All four claims held. The grade has teeth.
+```
+
+Every one of those codes is read from **validated** metadata, never from `engine_result`. We have
+observed an engine result of `tecNO_AUTH` go on to validate as `tesSUCCESS`, and on this feature
+that is the difference between "refused" and "admitted".
+
+Restart the reader afterwards so it picks up the new `demo/*.json`.
+
+### Choose the window before you run it
+
+<Warning>
+A closed-ended vault's `VaultKind`, `SubscriptionDate` and `RedemptionDate` are **immutable**.
+There is no transaction that edits them. A facility baked with a fifteen minute window is in its
+Redemption phase an hour later, permanently, and the only remedy is to bake a new one.
+</Warning>
+
+This is not hypothetical. `rebake-all.mjs` exists because three facilities baked with short
+windows had slid into Redemption before they were needed, countdowns went negative, and the phase
+on screen was no longer the phase the demo was about. Pick the horizon first:
+
+```bash
+node src/demo/rebake-all.mjs --hours 18
+```
+
+Two further constraints on the window:
+
+- rippled refuses a `LoanSet` whose full term plus a 60 second buffer overruns `RedemptionDate`
+  with `tecNO_PERMISSION`. So `PaymentInterval × PaymentTotal + 60 < RedemptionDate − SubscriptionDate`.
+  The bakers all originate `PaymentInterval 60, PaymentTotal 3`, which floors the window at 240
+  seconds. Omitting the schedule entirely gives `PaymentInterval 60, PaymentTotal 1` and a floor of
+  120 seconds, but rippled independently requires `RedemptionDate − SubscriptionDate` to be at least
+  180 seconds, so 180 is the hard floor either way.
+- `VaultWithdraw` returns `tecTOO_SOON` for the **entire** Investment phase, regardless of
+  available liquidity. That is a protocol fact, not an error, and the API reports it as
+  `canWithdraw: false`.
+
+`rebake-all.mjs` runs the four bakes sequentially rather than in parallel on purpose. Four at once
+means eight to ten faucet calls in a few seconds, and a rate-limited faucet mid-bake leaves a
+half-built vault whose dates cannot be corrected.
+
+## What this does not do
+
+XLS-65 vaults, XLS-66 lending, XLS-70 credentials and permissioned domains are not on Mainnet.
+Everything here runs on Devnet against rippled 3.4.0-rc5, and the numbers on this page were read
+from that network on 2026-09-12. When the amendments activate on Mainnet the reader needs a
+different `XRPL_WS` and nothing else, but that is a claim about the code, not a deployment.
+
+Grades are advisory. The `/api/vaults/{id}/nav` payload says so in its own body
+(`assessment.advisory: true`). The one place an Orma opinion has force is the permissioned domain,
+and there the force comes from the ledger refusing a deposit, not from us.

@@ -1,0 +1,620 @@
+---
+title: "The mathematics"
+description: "Every number Orma computes, with the ledger fields it reads, the source file that implements it, and the Devnet state it was checked against."
+---
+
+This page is written for someone who wants to reimplement Orma, or to check that it is telling the
+truth. Every formula below is implemented in the file cited under it and was verified against live
+Devnet state during the hackathon. Where a formula differs from a published description, the
+implementation is the authority, because it is what the ledger does.
+
+Nothing here needs privileged access. Every input is a public ledger field.
+
+## Symbols
+
+| symbol | meaning | ledger field |
+|---|---|---|
+| $A$ | total assets held by the vault | `Vault.AssetsTotal` |
+| $A_v$ | assets not currently lent out | `Vault.AssetsAvailable` |
+| $L$ | loss recognised but not yet deducted | `Vault.LossUnrealized` |
+| $S$ | units outstanding | `MPTokenIssuance.OutstandingAmount` |
+| $D$ | broker's total drawn debt | `LoanBroker.DebtTotal` |
+| $C$ | first-loss capital posted | `LoanBroker.CoverAvailable` |
+| $c_{\min}$ | minimum cover rate | `LoanBroker.CoverRateMinimum` |
+| $c_{\text{liq}}$ | liquidation cover rate | `LoanBroker.CoverRateLiquidation` |
+| $p_i$ | principal of exposure $i$ | `Loan.PrincipalOutstanding` |
+
+### Units
+
+All monetary fields are integer drops (1 XRP = $10^6$ drops), carried as decimal strings of up to 19
+significant digits. All arithmetic is done at 40 significant digits with `decimal.js`. `Number()` and
+`parseFloat` are never applied to a monetary value: 19 significant digits do not survive an IEEE-754
+double, and `BigInt("1e17")` throws on the scientific notation rippled sometimes emits. One helper,
+`num()` in `src/num.mjs`, is the single place where "field absent" is coalesced to zero, because
+rippled omits any field equal to its type default.
+
+### Rate scale
+
+$c_{\min}$ and $c_{\text{liq}}$ are expressed in units of $10^{-5}$. A stated `10000` is therefore
+$0.10$. It is not $10000$ and it is not $100$.
+
+```js
+// src/num.mjs
+export const RATE_SCALE = 100000
+export const rateToDec = (r) => num(r).div(RATE_SCALE)
+```
+
+---
+
+## 1. Net asset value, two ways
+
+The naive reading, which is what a metadata-diffing indexer computes:
+
+$$\text{NAV}_{\text{naive}} = \frac{A}{S}$$
+
+The correct reading, net of the loss the manager has already recognised:
+
+$$\text{NAV}_{\text{held}} = \frac{A - L}{S}$$
+
+Both are defined as zero when $S = 0$. Divergence is reported in basis points:
+
+$$\delta = 10^{4} \cdot \frac{\text{NAV}_{\text{naive}} - \text{NAV}_{\text{held}}}{\text{NAV}_{\text{naive}}}$$
+
+The whole product is four lines of `Reader.nav()` in `src/poll.mjs`:
+
+```js
+static nav(vault) {
+  const { assetsTotal, lossUnrealized, sharesOutstanding: s } = vault
+  const naive = s.isZero() ? new Decimal(0) : assetsTotal.div(s)
+  const correct = s.isZero() ? new Decimal(0) : assetsTotal.minus(lossUnrealized).div(s)
+  return {
+    navNaive: naive.toFixed(6),
+    navCorrect: correct.toFixed(6),
+    navDivergenceBps: bps(naive, correct),
+  }
+}
+```
+
+**Measured on Devnet.** Calder Structured Credit III, holding $A = 51{,}000{,}000$ drops,
+$L = 10{,}000{,}000$, $S = 51{,}000{,}000$: naive $1.000000$, held $0.803922$, $\delta = 1961$ bp.
+
+<Note>
+$\delta$ is computed from the full-precision Decimals, not from the rounded six-decimal strings, and
+the integer conversion is a round rather than a truncation: `bps()` in `src/num.mjs` returns
+`Number(a.minus(b).div(a).times(10000).toFixed(0))`, and `Decimal.prototype.toFixed` rounds half up.
+The exact value here is $1960.78\ldots$ bp, so the API reports **1961**. A floor would
+report 1960. If you reimplement this and get 1960, that is the reason.
+</Note>
+
+### Why the naive figure is not merely lazy
+
+rippled omits from `PreviousFields` any field whose previous value was the type default. On the first
+impairment of a healthy vault, $L$ moves from $0$, so `PreviousFields` is emitted **empty**. Under
+cash-basis accounting (`LEVersion = 1`) impairment changes nothing else on the Vault object. An
+indexer that diffs transaction metadata therefore observes no change at all on the vault it is
+watching.
+
+Captured from transaction
+`075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3` (`tesSUCCESS`, Meridian Trade
+Finance I):
+
+```json
+"vaultNode": {
+  "previousFields": {},
+  "finalFields": {
+    "AssetsTotal": "51000000",
+    "AssetsAvailable": "41000000",
+    "LossUnrealized": "10000000"
+  },
+  "healthyBefore": { "AssetsTotal": "51000000", "AssetsAvailable": "41000000", "LossUnrealized": "0" },
+  "sharesOutstanding": "51000000"
+}
+```
+
+<Warning>
+This is why the reader polls full object state every 4 seconds and never diffs `PreviousFields`. A
+diffing reader is not slightly late here. It is silent, until some later transaction happens to touch
+the same field for another reason.
+</Warning>
+
+---
+
+## 2. Cover liquidated on a default
+
+$$T(p) = \min\Big(\big\lceil D \cdot c_{\min} \cdot c_{\text{liq}} \big\rceil,\; p,\; C\Big)$$
+
+Three properties, each of which matters and none of which is obvious from the text:
+
+1. The **double product**. Both rates are $10^{-5}$ units, so both are divided by $10^5$. At
+   $c_{\min} = c_{\text{liq}} = 10000$ the coefficient is $0.10 \times 0.10 = 0.01$. Dividing only
+   once makes the answer 100 times too large.
+2. The result is **ceilinged**, not floored and not rounded.
+3. The base is the broker's **total** book $D$, not the principal $p$ of the exposure that defaulted.
+   The same loan defaulting inside a larger book liquidates more cover.
+
+Implemented in `coverForOrder()` in `src/history.mjs`, which mirrors the ledger step by step:
+
+```js
+export function coverForOrder(principals, startingDebt, cmin, cliq, coverAvailable) {
+  const c = num(cmin).div(100000).times(num(cliq).div(100000))
+  let debt = num(startingDebt)
+  let cover = num(coverAvailable)
+  let total = new Decimal(0)
+  for (const p of principals) {
+    const want = debt.times(c).ceil()
+    const paid = Decimal.min(want, num(p), cover)
+    total = total.plus(paid)
+    cover = cover.minus(paid)
+    debt = Decimal.max(0, debt.minus(num(p)))
+  }
+  return total
+}
+```
+
+Verified against `LoanManage.cpp:146-169`, with $D$ decremented at line 248.
+
+---
+
+## 3. The ordering result
+
+Because $D$ is decremented as each default lands, each default shrinks the base for the next one. The
+total cover paid across a fixed set of losses therefore depends on the **order** they are declared
+in.
+
+Write $c = c_{\min} \cdot c_{\text{liq}}$ and let $D_0$ be the book at the moment of the first
+default. Declaring $k$ defaults in the order $\sigma$ consumes, while cover remains available and each
+$p_i$ is large enough that the $\min$ never binds:
+
+$$T(\sigma, k) = c \left[ k D_0 - \sum_{i=1}^{k} (k - i)\, p_{\sigma(i)} \right]$$
+
+Only the sum depends on $\sigma$. The coefficient $(k-i)$ is decreasing in $i$, so by the
+**rearrangement inequality** the sum is maximised, and therefore $T$ minimised, when $p_{\sigma(i)}$
+is decreasing. Hence:
+
+> Total first-loss capital consumed is **minimised by declaring the largest exposure first**, and
+> **maximised by declaring the smallest first**.
+
+The party who chooses $\sigma$ is the `LoanBroker` owner, who is necessarily the vault owner
+(`LoanBrokerSet.cpp:109`), and is the party whose capital $C$ is consumed. The difference falls on the
+unit holders. This is the second lever: the first is *when* a loss is recognised, this is *in what
+order*. See [/concepts/ordering](/concepts/ordering) for the argument in prose.
+
+**Measured on Devnet.** Kestrel Bridge Financing II, $p = \{30\ \text{XRP},\ 10\ \text{XRP}\}$,
+$D_0 = 40$ XRP, $c_{\min} = c_{\text{liq}} = 10000$:
+
+| order | step 1 | step 2 | total |
+|---|---|---|---|
+| largest first | $\lceil 40 \cdot 0.01 \rceil = 0.40$ | $\lceil 10 \cdot 0.01 \rceil = 0.10$ | **0.50 XRP** |
+| smallest first | $\lceil 40 \cdot 0.01 \rceil = 0.40$ | $\lceil 30 \cdot 0.01 \rceil = 0.30$ | **0.70 XRP** |
+
+A 40% difference in what the first-loss capital absorbed, on identical losses. Three independent
+agreements: the iterative simulation in `coverForOrder()`, the closed form above, and the ledger
+itself.
+
+The closed form drops the ceiling and the $\min$ clamps, which is why it is stated with a proviso and
+why the implementation simulates rather than evaluating it. Use the closed form to understand the
+result, use the simulation to compute it.
+
+### Sequence score
+
+Observed consumption placed between the two extremes:
+
+$$\phi = \frac{T_{\text{observed}} - T_{\min}}{T_{\max} - T_{\min}}, \qquad \phi \in [0, 1]$$
+
+$\phi = 0$ is the sequence worst for investors, $\phi = 1$ the best. It is defined as $1$ when
+$T_{\max} = T_{\min}$, which is the case when the ordering could not have changed anything.
+
+<Note>
+Read the JSON field names carefully before comparing. In `GET /api/vaults/{id}/broker-history` the
+score is the field `fairness`; `worstPossible` is the **smallest** cover number (largest first, worst
+for investors) and `bestPossible` is the **largest**. The names are from the investors' point of
+view, not the arithmetic's.
+</Note>
+
+Reconstructed from ledger history alone for the Kestrel broker, which declared the 30 XRP loan first:
+
+```json
+"ordering": {
+  "applicable": true,
+  "defaultCount": 2,
+  "actualCoverPaid": "500000",
+  "bestPossible": "700000",
+  "worstPossible": "500000",
+  "costToDepositors": "200000",
+  "spread": "200000",
+  "fairness": "0.0000",
+  "fairOrder": ["10000000", "30000000"]
+}
+```
+
+The 0.20 XRP of `costToDepositors` is depositor money. Nothing about recovering it required
+privileged access. Full shape at [/api/broker-history](/api/broker-history).
+
+---
+
+## 4. The five measured factors
+
+Each is scored independently on a 20-step ordinal ladder from AAA to D. **No weights are applied
+anywhere.** A weighted average lets a strong factor pay for a broken one, and that is not the
+question an investor is asking.
+
+**Liquidity.** $A_v / A$. Defined as $1$ when $A = 0$.
+
+**First-loss adequacy.** Liquidatable cover against the exposure it must absorb:
+
+$$\text{adequacy} = \frac{\min\big(\lceil D c_{\min} c_{\text{liq}} \rceil,\; C\big)}{\max\big(L,\; P_{\text{distressed}}\big)}$$
+
+The denominator takes the **larger** of the recognised loss and the distressed principal. Dividing by
+$L$ alone would grade a vault concealing a large overdue exposure as perfectly covered.
+**Concealment must never improve a score.** The ratio is defined as $1$ when the denominator is zero,
+that is, when there is no exposure to absorb.
+
+**Concentration.** $\max_i(p_i) / D$. Reported raw, so higher is worse, and graded on $1 -$ that
+value so higher is better.
+
+**Recognition lag.** Seconds an exposure has been overdue without being declared, taken as the
+maximum over loans with status `overdue` or `defaultable`, floored at zero.
+
+**Redemption cliff.** Projected shortfall at the redemption date:
+
+$$\text{shortfall} = \max\Big(0,\; (A - L) - \big(A_v + R_{\text{performing}} + [P_{\text{distressed}} > 0] \cdot C_{\text{rec}}\big)\Big)$$
+
+where $R_{\text{performing}}$ is the total contractual repayment of performing loans
+(`totalValueOutstanding` summed over statuses `current` and `due_soon`) and
+$C_{\text{rec}} = \min\big(\lceil D c_{\min} c_{\text{liq}} \rceil,\ C\big)$. Performing loans must
+mature before the redemption date, because rippled refuses a `LoanSet` whose term overruns it, so a
+projected shortfall is exactly the non-performing book net of recoverable cover. **Being fully lent
+is not a distress signal.** It is reported as a percentage of claims $A - L$.
+
+### Band tables
+
+The ladder position each raw factor maps to, before any notching. From `src/score.mjs`, evaluated top
+to bottom: the first threshold the value reaches wins, and D if none does.
+
+| factor | graded on | bands |
+|---|---|---|
+| LIQUIDITY | $A_v/A$ | $\ge 0.95$ AAA, $\ge 0.85$ A, $\ge 0.7$ BBB, $\ge 0.5$ BB, $\ge 0.25$ B, $\ge 0.05$ CCC |
+| COVER | adequacy | $\ge 1$ AA, $\ge 0.5$ A-, $\ge 0.2$ BBB-, $\ge 0.05$ BB-, $\ge 0.01$ B- |
+| CONCENT | $1 -$ concentration | $\ge 0.8$ AA, $\ge 0.6$ A-, $\ge 0.4$ BBB-, $\ge 0.2$ BB- |
+| DEADLINE | $1 - \text{shortfall}\%/100$ | $\ge 1$ AAA, $\ge 0.98$ AA, $\ge 0.9$ A, $\ge 0.75$ BBB, $\ge 0.5$ BB, $\ge 0.25$ B, $\ge 0.1$ CCC |
+
+RECOG is a direct cut on seconds rather than a ratio: $\le 0$ AAA, $< 60$ A, $< 300$ BBB, $< 900$ BB,
+otherwise CCC.
+
+---
+
+## 5. Composite grade by ordinal notching
+
+Let $\mathcal{L} = [\text{AAA}, \text{AA+}, \ldots, \text{D}]$, $|\mathcal{L}| = 20$, ordered best to
+worst, and $\text{idx}(g)$ the position of grade $g$.
+
+$$\text{notch}(g, \Delta) = \mathcal{L}\big[\operatorname{clamp}(\text{idx}(g) - \Delta,\; 0,\; 19)\big]$$
+
+```js
+// src/score.mjs
+export const LADDER = ['AAA', 'AA+', 'AA', 'AA-', 'A+', 'A', 'A-', 'BBB+', 'BBB', 'BBB-',
+                       'BB+', 'BB', 'BB-', 'B+', 'B', 'B-', 'CCC', 'CC', 'C', 'D']
+export const notch = (grade, delta) =>
+  LADDER[Math.min(LADDER.length - 1, Math.max(0, LADDER.indexOf(grade) - delta))]
+export const gradeNumeric = (g) => Math.round((1 - LADDER.indexOf(g) / (LADDER.length - 1)) * 100)
+```
+
+A negative $\Delta$ is a downgrade. The ladder runs best to worst, so a worse grade is a higher index,
+which is where the minus sign comes from.
+
+The composite **anchors on the redemption cliff**, because for a fixed-term facility the headline
+question is whether claims can be met at redemption, and is notched from there:
+
+| condition | $\Delta$ |
+|---|---|
+| realised capital destruction $\geq 75\%$ | $-14$ |
+| $\geq 50\%$ | $-12$ |
+| $\geq 25\%$ | $-8$ |
+| $\geq 10\%$ | $-5$ |
+| $\geq 2\%$ | $-3$ |
+| $> 0\%$ | $-1$ |
+| recognition lag $> 300$ s | $-2$ |
+| recognition lag $> 0$ s | $-1$ |
+| largest exposure $\geq 75\%$ of the book | $-1$ |
+| liquidatable cover $< 5\%$ of recognised loss | $-1$ |
+| liquidity exhausted while in Redemption | $-2$ |
+
+The two recognition-lag rules are exclusive, the larger one wins, and the realised-destruction bands
+are exclusive in the same way. The last rule fires when the LIQUIDITY grade is B or worse and the
+vault is in the Redemption phase, which is to say withdrawals are failing now rather than might fail
+later.
+
+Every notch applied is emitted in `notchTrace` on the API response, with `from`, `rule`, `delta` and
+`to`. That trace is the answer to "how did you choose your weights": there are no weights, there are
+notches, and each one is named. Context at [/concepts/scoring](/concepts/scoring).
+
+### Realised capital destruction
+
+Every other factor measures current *exposure*, and a realised loss leaves none behind: the write-off
+removes the asset, the provision is released, and the book reads clean. This term is the score's
+memory:
+
+$$\rho = \max\left(0,\; \frac{S - A}{S}\right)$$
+
+measured against $A$ and **not** against $A - L$. An unrealised loss is a provision against an asset
+the vault still holds and may recover; counting it would punish a manager for disclosing early, which
+is the behaviour the rest of the system exists to reward. Only a write-off, which removes the asset
+from `AssetsTotal` outright, is permanent destruction.
+
+Par is $1.0$ for a closed-ended vault: subscription closes before any lending, so $S$ is capital
+subscribed measured in asset units, and later subscribers join at the same unit value with no profit
+or loss yet accrued. The term would need rethinking for an open-ended vault, where that identity does
+not hold.
+
+**Measured.** A vault that took 50 XRP, defaulted on 40 and holds 10.5: $\rho = 79\%$, so
+$\Delta = -14$ from an anchor of AAA, composite **B**. Without this term the same vault scored
+**AAA**, identical to one that never lost a penny, and because the book sorts worst-first to surface
+danger, the most damaged facility sorted last. That was observed on Devnet, not hypothesised.
+
+### A full worked grade
+
+Calder Structured Credit III at ledger 5263343, from the captured `GET /api/vaults/{id}` response:
+$A = 51{,}000{,}000$, $A_v = 41{,}000{,}000$, $L = 10{,}000{,}000$, $S = 51{,}000{,}000$,
+$D = 10{,}000{,}000$, $C = 5{,}000{,}000$, $c_{\min} = c_{\text{liq}} = 10000$, one impaired loan of
+$p = 10{,}000{,}000$, phase Investment.
+
+| step | value | grade |
+|---|---|---|
+| liquidity | $41/51 = 0.8039$ | BBB |
+| liquidatable cover | $\lceil 10{,}000{,}000 \times 0.01 \rceil = 100{,}000$ | |
+| adequacy | $100{,}000 / \max(10{,}000{,}000,\ 10{,}000{,}000) = 0.0100$ | B- |
+| concentration | $10{,}000{,}000 / 10{,}000{,}000 = 1.0000$ | D |
+| recognition lag | 0 s, the loan is already declared impaired | AAA |
+| claims | $51{,}000{,}000 - 10{,}000{,}000 = 41{,}000{,}000$ | |
+| liquidity at redemption | $41{,}000{,}000 + 0 + 100{,}000 = 41{,}100{,}000$ | |
+| shortfall | $\max(0,\ 41{,}000{,}000 - 41{,}100{,}000) = 0$, so $0.00\%$ | AAA |
+
+Notching: anchor AAA. $\rho = 0$ because $A \ge S$, no notch. Concentration $1.0 \ge 0.75$, $-1$,
+AA+. Adequacy $0.0100 < 0.05$, $-1$, **AA**. Numeric
+$\operatorname{round}\big(100 (1 - 2/19)\big) = 89$.
+
+That matches the served response exactly, `notchTrace` included.
+
+---
+
+## 6. Conduct
+
+A separate ordinal assessment of the manager, not of the book. It starts at 100 and is clamped to
+$[0, 100]$:
+
+| observation | penalty |
+|---|---|
+| $\phi < 0.25$, sequence close to the investor-worst order | $-35$ |
+| $0.25 \le \phi < 0.75$ | $-15$ |
+| a loss written off with no prior impairment | $-20$ each |
+| a withdrawal of first-loss capital | $-10$ each |
+
+Mapped to $A \ge 90$, $B \ge 75$, $C \ge 55$, $D \ge 35$, $E$ below. The Kestrel broker scores
+$100 - 35 - (2 \times 20) = 25$, grade **E**: it declared largest first, and neither loan was impaired
+before it was written off.
+
+<Warning>
+Reconstructing this history requires a join that is not obvious. `LoanManage` carries no
+`LoanBrokerID`, only `LoanID`, and an impairment does not touch the `LoanBroker` object at all, so a
+filter over `account_tx` that matches on the broker node or on a transaction field silently drops
+every impairment. `Loan.FinalFields.LoanBrokerID` in the same metadata closes the join at no extra
+request. Before that fix every default looked unsignalled, and a rule written to reward disclosure
+was penalising it.
+</Warning>
+
+Two further honesty notes on this section. A defaulted loan drops `PrincipalOutstanding` from
+`FinalFields`, so the exposure a default was taken against is read from `PreviousFields` and, failing
+that, from the decrement in `DebtTotal`. And Devnet prunes account history to roughly 29 days, so this
+is a window, not a lifetime. The API says so in a `caveat` field on the `reputation` block of
+`GET /api/vaults/{id}/broker-history`.
+
+Implemented in `src/history.mjs`.
+
+---
+
+## 7. Valuing a pledge
+
+For $u$ units pledged as collateral:
+
+$$V_{\text{held}} = u \cdot \text{NAV}_{\text{held}}, \qquad V_{\text{reported}} = u \cdot \text{NAV}_{\text{naive}}$$
+
+$$\text{overstatement} = V_{\text{reported}} - V_{\text{held}}$$
+
+A lender's own discount $h$ applies to the **held** value:
+
+$$V_{\text{lendable}} = V_{\text{held}} \cdot (1 - h)$$
+
+A haircut absorbs volatility. It does not absorb a misstatement. A 20% haircut applied to a value that
+is 19.61% overstated leaves the lender roughly where they thought they were starting.
+
+**Measured.** $u = 1{,}000{,}000$ units against $\text{NAV}_{\text{held}} = 0.803922$: reported
+$1.000000$ XRP, held $0.803922$ XRP, overstatement $0.196078$ XRP.
+
+Two functions compute this, with deliberately different field names because they answer different
+questions:
+
+- `valuePledge(nav, units)` in `src/nav.mjs`, behind `GET /api/mpt/{issuanceId}/nav?units=N`, returns
+  `units`, `valueHeld`, `valueReported`, `overstatement`. It returns an `unpriced` string rather than
+  throwing when the document it was handed carries no `unitValue`, because a lender's tool has to be
+  able to say "I could not value this".
+- `valuePledge(escrow, navNaive, navCorrect)` in `src/collateral.mjs`, behind
+  `GET /api/vaults/{id}/collateral`, returns `shares`, `valueNaive`, `valueCorrect`, `overstatement`,
+  `overstatementPct`, plus `maxLendable` after the caller's `haircut` query parameter.
+
+Both multiply the published six-decimal NAV strings, so a pledge value is reproducible to the drop
+from the API document alone.
+
+---
+
+## 8. Publication as an oracle object
+
+Six dimensions per vault, one `PriceData` entry each, published as a native XLS-47 Price Oracle. The
+base asset is derived from the vault id, the quote asset is the dimension code.
+
+| code | dimension | scale |
+|---|---|---|
+| `NAV` | loss-adjusted assets per unit | 6 |
+| `HDL` | composite grade, numeric, divided by 100 | 4 |
+| `LIQ` | liquidity ratio | 4 |
+| `COV` | first-loss adequacy | 4 |
+| `CNC` | concentration | 4 |
+| `DDL` | redemption cliff, percent divided by 100 | 4 |
+
+Everything except NAV is clamped to $[0,1]$. NAV is a price and may exceed 1.
+
+A stored value $v$ at scale $s$ decodes to $v \cdot 10^{-s}$. `AssetPrice` is a `UInt64` serialised as
+**hexadecimal**, so writing `"100"` means 256:
+
+```js
+// src/oracle.mjs
+export const encodePrice = (n) => BigInt(n).toString(16).toUpperCase()
+export const decodePrice = (hex) => BigInt(`0x${hex}`)
+```
+
+The base asset is the first 40 hex characters of the vault id, with the leading byte forced non-zero:
+
+```js
+export function vaultToBaseAsset(vaultId) {
+  let hex = vaultId.replace(/^0x/i, '').toUpperCase().slice(0, 40).padEnd(40, '0')
+  if (/^0{2}/.test(hex)) hex = 'A' + hex.slice(1)
+  return hex
+}
+```
+
+Two traps motivate that last line: an all-zero currency code means XRP, and a code whose bytes 12 to
+14 spell ASCII is rendered back by rippled as a three-character code.
+
+### Four invariants
+
+Each of these corrupts data silently rather than erroring.
+
+1. `OracleSet` is **not a merge**. A pair already on the object but omitted from the transaction is
+   kept with its `AssetPrice` and `Scale` stripped, so publishing one dimension blanks the other
+   five. The publisher always resends all six. From the other side, there is no way to remove a pair,
+   so reusing a document id for a different set of assets accumulates stale pairs until the series
+   passes the ledger's ceiling and `OracleSet` returns `tecARRAY_TOO_LARGE`; the only way back is
+   `OracleDelete` then recreate. Document ids come from an explicit table, never from a hash of the
+   vault id, because the id is a `UInt32` scoped to (account, id) and a collision would silently
+   overwrite another vault's scores.
+2. `LastUpdateTime` must **strictly increase**. Equal or lower gives `tecINVALID_UPDATE_TIME`, burning
+   a fee and a sequence number.
+3. A `LastUpdateTime` in the **future bricks** the object until wall clock catches up. Never add a
+   safety margin. The publisher uses ledger close time clamped to `Date.now()`, and skips a tick
+   rather than post ahead of the clock.
+4. Prices are hex, per above.
+
+`LastUpdateTime` is UNIX epoch, not Ripple epoch.
+
+### Read back from the ledger
+
+Decoded from the live Oracle object
+`03C7B0E151129510F11FF92CCE8FBB3E7AD3C55B25EDA6EB414324E3E995078A`, document id 3, for Calder
+Structured Credit III:
+
+| code | raw | scale | decoded | check |
+|---|---|---|---|---|
+| `NAV` | `c4452` | 6 | 0.803922 | $\text{0xC4452} = 803922$ |
+| `HDL` | `22c4` | 4 | 0.8900 | $8900$, the numeric grade 89 over 100 |
+| `LIQ` | `1f67` | 4 | 0.8039 | $\text{0x1F67} = 8039$ |
+| `COV` | `64` | 4 | 0.0100 | $\text{0x64} = 100$ |
+| `CNC` | `2710` | 4 | 1.0000 | $\text{0x2710} = 10000$ |
+| `DDL` | `0` | 4 | 0.0000 | shortfall is zero |
+
+XLS-47 is live on Mainnet today, unlike the lending amendments, and `get_aggregate_price` computes a
+median and standard deviation across independent publishers inside the ledger. That is the point of
+publishing here rather than serving a number over HTTP: a second publisher who disagrees changes the
+aggregate without asking our permission. Orma reports `aggregate: null` honestly while it is the only
+publisher. More at [/publish/oracle](/publish/oracle).
+
+<Note>
+Everything on this page runs on Devnet, at `wss://s.devnet.rippletest.net:51233`, network id 2,
+because XLS-65 vaults and XLS-66 lending are not on Mainnet. The measurement, the scoring and the
+enforcement path are Devnet-only for that reason. The oracle publication is the one component with a
+production path today.
+</Note>
+
+---
+
+## Checking this yourself
+
+Start from the valuation document, which names the ledger state it was computed from precisely so
+that you do not have to trust it. The `provenance` block exists for this.
+
+```bash
+curl -s http://localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5/nav
+```
+
+```json
+"unitValue": {
+  "held": "0.803922",
+  "reported": "1.000000",
+  "divergenceBps": 1961,
+  "basis": "assets net of recognised loss, divided by units outstanding"
+},
+"provenance": {
+  "network": "devnet",
+  "source": "devnet",
+  "assetsTotal": "51000000",
+  "lossUnrealized": "10000000",
+  "unitsOutstanding": "51000000",
+  "recompute": "(assetsTotal - lossUnrealized) / unitsOutstanding",
+  "buildVersion": "3.4.0-rc5"
+}
+```
+
+Recompute both readings and the divergence from those three strings, in decimal arithmetic, not in
+floats:
+
+```js
+import Decimal from 'decimal.js'
+Decimal.set({ precision: 40 })
+
+const p = { assetsTotal: '51000000', lossUnrealized: '10000000', unitsOutstanding: '51000000' }
+const A = new Decimal(p.assetsTotal)
+const L = new Decimal(p.lossUnrealized)
+const S = new Decimal(p.unitsOutstanding)
+
+const naive = A.div(S)              // 1
+const held = A.minus(L).div(S)      // 0.80392156862745098039...
+const bps = naive.minus(held).div(naive).times(10000)
+
+console.log(naive.toFixed(6), held.toFixed(6), Number(bps.toFixed(0)))
+// 1.000000 0.803922 1961
+```
+
+Then check that the provenance itself matches the ledger, which is the step that makes the exercise
+non-circular. Read the Vault object from any Devnet node:
+
+```js
+import { Client } from 'xrpl'
+
+const client = new Client('wss://s.devnet.rippletest.net:51233')
+await client.connect()
+// the parameter is vault_id, NOT vault as XLS-65 section 3.9.1 states
+const r = await client.request({
+  command: 'vault_info',
+  vault_id: '5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5',
+})
+console.log(r.result.vault.AssetsTotal, r.result.vault.LossUnrealized)
+await client.disconnect()
+```
+
+`AssetsTotal` and `LossUnrealized` should equal `provenance.assetsTotal` and
+`provenance.lossUnrealized` as of the `ledgerIndex` on the response envelope. If `LossUnrealized` is
+absent from the node's response, that means zero: rippled omits any field equal to its type default,
+which is the same rule that makes the first impairment invisible to a diffing indexer.
+
+Three further checks, in increasing order of effort:
+
+- **The grade.** Every notch is in `notchTrace` on `GET /api/vaults/{id}`, with the grade before and
+  after. Walk it against the band tables in section 4 and the notch table in section 5.
+- **The cover arithmetic.** `GET /api/vaults/{id}/broker-history` lists every default with
+  `debtBefore` and `coverConsumed`. Check each against
+  $\lceil D \cdot c_{\min} \cdot c_{\text{liq}} \rceil$ using the rates on the broker, then check the
+  total against `coverForOrder` run over the same principals in the two extreme orders.
+- **The oracle.** Fetch the object by its index on the Devnet explorer and decode `AssetPrice`
+  yourself with `BigInt('0x' + raw)` divided by $10^{\text{Scale}}$. It should agree with the API to
+  the last digit, because both come from the same snapshot.
+
+Related: [/api/nav](/api/nav) for the valuation contract, [/concepts/ordering](/concepts/ordering) for
+the ordering argument in prose, [/publish/oracle](/publish/oracle) for the publication path.

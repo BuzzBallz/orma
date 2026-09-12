@@ -1,0 +1,739 @@
+\documentclass[11pt]{article}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{booktabs}
+\usepackage{hyperref}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  citecolor=black,
+  urlcolor=blue,
+  pdftitle={Orma: measuring discretion in on-ledger private credit},
+  pdfauthor={Alexandre Lemiere, Andrea Gonzalez}
+}
+
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\theoremstyle{remark}
+\newtheorem*{remark}{Remark}
+
+\DeclareMathOperator{\round}{round}
+\DeclareMathOperator{\clamp}{clamp}
+\DeclareMathOperator{\idx}{idx}
+
+% Page layout set with plain lengths rather than a geometry package, so the
+% preamble stays portable. Values are safe on both letter and A4.
+\setlength{\oddsidemargin}{-0.15in}
+\setlength{\evensidemargin}{-0.15in}
+\setlength{\textwidth}{6.8in}
+\setlength{\topmargin}{-0.55in}
+\setlength{\headheight}{14pt}
+\setlength{\headsep}{16pt}
+\setlength{\textheight}{9.3in}
+\setlength{\parskip}{0pt}
+\setlength{\abovedisplayskip}{6pt plus 2pt minus 2pt}
+\setlength{\belowdisplayskip}{6pt plus 2pt minus 2pt}
+\setlength{\abovedisplayshortskip}{3pt plus 2pt}
+\setlength{\belowdisplayshortskip}{4pt plus 2pt minus 2pt}
+
+% Tighter heading and theorem spacing, done with the kernel's own hooks rather
+% than a sectioning package, so the preamble stays to the stated dependencies.
+\makeatletter
+\renewcommand\section{\@startsection{section}{1}{\z@}%
+  {-2.4ex \@plus -1ex \@minus -.2ex}{1.3ex \@plus .2ex}{\normalfont\large\bfseries}}
+\renewcommand\subsection{\@startsection{subsection}{2}{\z@}%
+  {-2.0ex \@plus -1ex \@minus -.2ex}{0.9ex \@plus .2ex}{\normalfont\normalsize\bfseries}}
+\renewcommand\paragraph{\@startsection{paragraph}{4}{\z@}%
+  {1.6ex \@plus 1ex \@minus .2ex}{-1em}{\normalfont\normalsize\bfseries}}
+\makeatother
+\setlength{\topsep}{3pt plus 1pt minus 1pt}
+\setlength{\partopsep}{0pt}
+
+\title{Orma: measuring discretion in on-ledger private credit}
+\author{Alexandre Lemiere \and Andrea Gonzalez}
+\date{13 September 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+This is an annex, not a paper. It states the arithmetic behind Orma so a reader can check it
+without reading JavaScript. Every formula is implemented in the repository, and every
+measured figure was read from live XRP Ledger Devnet state during the De Vinci Blockchain
+XRPL Lending Protocol Hackathon, Paris, 12 and 13 September 2026, against \texttt{rippled}
+3.4.0-rc5. The central claim is combinatorial: total first-loss capital consumed across a
+fixed set of defaults depends on the order in which they are declared, that order is chosen
+unilaterally by the party whose capital is consumed, and a closed form makes the size of the
+choice computable from public state. On the measured facility it is worth $0.20$ XRP out of
+$0.70$.
+\end{abstract}
+
+\section{The setting}
+
+\subsection{The objects}
+
+A \emph{Vault} (XLS-65) holds pooled assets and issues a share token. To carry lending it
+must be closed-ended: \texttt{VaultKind} set to $1$, with a \texttt{SubscriptionDate} and a
+\texttt{RedemptionDate}. Without those three fields \texttt{LoanBrokerSet} returns
+\texttt{tecNO\_PERMISSION}, and \texttt{VaultKind} is immutable, so this is decided at
+creation. The vault runs through Subscription, Investment and Redemption, and
+\texttt{VaultWithdraw} returns \texttt{tecTOO\_SOON} for the whole of the Investment phase
+regardless of available liquidity: inability to withdraw then is a protocol fact, not a
+distress signal, and nothing below treats it as one.
+
+A \emph{LoanBroker} (XLS-66) attaches to exactly one vault. It draws capital from the vault,
+originates \emph{Loan} objects, and posts \emph{first-loss capital}, called cover, which is
+liquidated ahead of the vault's own assets when a loan is written off. The broker declares
+the credit events: impairment, un-impairment, default. The share token is an
+\texttt{MPTokenIssuance} whose \texttt{OutstandingAmount} is the unit count and whose
+metadata the issuer may write, which is what lets a share point at its own valuation
+(Section~6).
+
+\subsection{The identity that generates the problem}
+
+Two protocol facts combine into one asymmetry. First, only the \texttt{LoanBroker} owner may
+impair, un-impair or default a loan. Second, the \texttt{LoanBroker} owner is necessarily
+the vault owner: no other account can create the broker, and XLS-75 permission delegation
+returns \texttt{temMALFORMED} across the entire lending suite, so the authority cannot be
+split off to a third party even voluntarily.
+
+Therefore the party who decides \emph{when} a loss is recognised, the party who decides
+\emph{in what order} a set of losses is realised, and the party whose own first-loss capital
+is consumed when they are, are one account. Write $\tau$ for the timing choice and $\sigma$
+for the ordering choice. Section~2 measures what $\tau$ is worth, Section~4 what $\sigma$ is
+worth. Both move value from unit holders to the manager, and neither is visible to a
+consumer using the standard tooling. Orma measures both from public state, publishes the
+result as a native XLS-47 Oracle object and as a pointer inside the share token, and lets an
+independent third party gate subscriptions on it through XLS-70 credentials. The enforcement
+layer contains no arithmetic and is not analysed here.
+
+\subsection{Notation}
+
+\begin{center}
+\begin{tabular}{clc}
+\toprule
+symbol & meaning & ledger field \\
+\midrule
+$A$ & total assets held by the vault & \texttt{Vault.AssetsTotal} \\
+$A_v$ & assets not currently lent out & \texttt{Vault.AssetsAvailable} \\
+$L$ & loss recognised but not yet deducted & \texttt{Vault.LossUnrealized} \\
+$S$ & units outstanding & \texttt{MPTokenIssuance.OutstandingAmount} \\
+$D$ & broker's total drawn debt & \texttt{LoanBroker.DebtTotal} \\
+$C$ & first-loss capital posted & \texttt{LoanBroker.CoverAvailable} \\
+$c_{\min}$ & minimum cover rate & \texttt{LoanBroker.CoverRateMinimum} \\
+$c_{\mathrm{liq}}$ & liquidation cover rate & \texttt{LoanBroker.CoverRateLiquidation} \\
+$p_i$ & principal of exposure $i$ & \texttt{Loan.PrincipalOutstanding} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Units.} Monetary quantities are integer drops, $1$ XRP $= 10^{6}$ drops, carried
+on the wire as decimal strings of up to $19$ significant digits. All arithmetic runs at $40$
+significant digits with \texttt{decimal.js}; no monetary value passes through
+\texttt{Number()} or \texttt{parseFloat}, because a $53$-bit mantissa cannot represent every
+value the protocol admits.
+
+\paragraph{Rate scale.} $c_{\min}$ and $c_{\mathrm{liq}}$ are in units of $10^{-5}$. A
+stated \texttt{10000} means $0.10$. It does not mean $10000$ and it does not mean $100$.
+
+\paragraph{Accounting basis.} All facilities here run \texttt{LEVersion} $=1$, cash basis.
+The consequence that matters is that origination moves \texttt{DebtTotal}, not
+\texttt{AssetsTotal}: lending does not reduce the assets the vault reports holding. This is
+load-bearing for Proposition~\ref{prop:empty}.
+
+\subsection{The measured facilities}
+
+Three live Devnet facilities are used below. Their ids are collected here so the text can
+name them in words and every figure quoted later can be re-derived from public state.
+
+\begin{center}
+\footnotesize
+\begin{tabular}{ll}
+\toprule
+object & id \\
+\midrule
+Meridian Trade Finance I, vault & \texttt{864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835} \\
+Meridian, impairing transaction & \texttt{075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3} \\
+Kestrel Bridge Financing II, vault & \texttt{24EAA01AD4CE70D8ABB4ACB4255DC4C216B8AF3B9E7315DB8052BFC1E5810089} \\
+Kestrel, loan broker & \texttt{8DB104980C31CBE9F196508E7D748E8C31FB783CD4E0A3620AE0B476CBDEA3FA} \\
+Kestrel, first default & \texttt{FB23EC5313F85FA157D56966E0B0B1665068905988D925C70BB0E7C35C3B221B} \\
+Kestrel, second default & \texttt{DE49DF0D6136B96AD28B253CD32100E5715078FD2D0AE6D1DB747AFECB803D1F} \\
+Calder Structured Credit III, broker & \texttt{1C160EFFCA8208DFD8CE9B065A3C3C41CCA80758FBC3099BE27AACFBD1478173} \\
+Calder, share token issuance & \texttt{000000014D667775372D5B78E07FFF294678C7F9CE82AFBC} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+The Kestrel broker owner is \texttt{rD26gw5goDqU784caePMoA82givcJBjStk}.
+
+\section{The two readings of net asset value}
+
+\subsection{Definitions}
+
+\begin{definition}
+The \emph{naive} unit value, which is what a tool reading the headline asset figure
+computes, and the \emph{held} unit value, which is what a holder can redeem against, are
+\[
+  \mathrm{NAV}_{\mathrm{naive}} = \frac{A}{S},
+  \qquad
+  \mathrm{NAV}_{\mathrm{held}} = \frac{A - L}{S},
+\]
+both defined as $0$ when $S = 0$.
+\end{definition}
+
+They agree exactly until a loss is recognised and diverge the instant one is. Divergence is
+reported in basis points,
+\[
+  \delta \;=\; \round\!\left( 10^{4} \cdot
+  \frac{\mathrm{NAV}_{\mathrm{naive}} - \mathrm{NAV}_{\mathrm{held}}}{\mathrm{NAV}_{\mathrm{naive}}} \right)
+  \;=\; \round\!\left( 10^{4} \cdot \frac{L}{A} \right),
+\]
+to the nearest integer basis point, halves away from zero. The second equality holds for
+$S \neq 0$, $A \neq 0$, and shows that divergence does not depend on the unit count at all:
+it is the recognised loss as a fraction of the reported book.
+
+\begin{remark}
+$\mathrm{NAV}_{\mathrm{naive}}$ can \emph{rise} while a vault is emptied, because whenever
+$L > 0$ a withdrawal burns units faster than it removes assets.
+\end{remark}
+
+\subsection{Why the naive reading is not merely lazy}
+
+The obvious objection is that any competent indexer nets the recognised loss, so the naive
+reading is a straw man. It is not, and the reason is a property of the ledger's metadata
+rather than of anyone's code.
+
+\begin{proposition}[The empty change set]
+\label{prop:empty}
+Let $V$ be a Vault under \texttt{LEVersion} $=1$ whose \texttt{LossUnrealized} is $0$ just
+before a \texttt{LoanManage} transaction with the impair flag set, and let that transaction
+succeed and set \texttt{LossUnrealized} to some $L' > 0$. Then the \texttt{PreviousFields}
+object of $V$'s node in that transaction's metadata is empty.
+\end{proposition}
+
+\begin{proof}
+The metadata for a modified node lists in \texttt{PreviousFields} exactly those fields whose
+value before the transaction differs from their value after it, and omits any field whose
+previous value was the default for that field's type. For the amount-valued fields of a
+Vault that default is $0$.
+
+Take each field in turn. \texttt{AssetsTotal} is unchanged: under cash-basis accounting
+origination recorded the principal in \texttt{DebtTotal}, and recognising a loss on an
+outstanding loan writes no asset movement. \texttt{AssetsAvailable} is unchanged: nothing is
+lent, repaid, deposited or withdrawn. The share issuance is untouched, so $S$ is unchanged,
+and every remaining field of the Vault is static configuration. The single field whose value
+differs is \texttt{LossUnrealized}, moving from $0$ to $L'$; but its previous value is $0$,
+the type default, so by the omission rule it is not emitted. No other field differs, hence
+\texttt{PreviousFields} is empty.
+\end{proof}
+
+\begin{corollary}
+\label{cor:blind}
+Let $f$ be any function of the \texttt{PreviousFields} object alone. Then $f$ takes the same
+value on the metadata of the impairing transaction as on the metadata of a transaction that
+changed nothing about the vault. An indexer maintaining vault state by applying metadata
+diffs therefore continues to report
+$\mathrm{NAV}_{\mathrm{naive}} = \mathrm{NAV}_{\mathrm{held}}$ indefinitely after the first
+impairment, and reports no event at all.
+\end{corollary}
+
+The scope is narrow and still damaging. It applies to the \emph{first} impairment of a
+previously healthy vault; on the second, $L$ is already non-zero, the field is emitted
+normally, and a diffing consumer catches up. The blind spot is exactly the transition from
+healthy to impaired, which is the one a lender cares about most. The remedy costs one round
+trip: Orma never diffs \texttt{PreviousFields} but polls each vault object every $4$
+seconds, re-reads it outright and recomputes both readings from the current values.
+\texttt{FinalFields} in the same metadata also carries the correct post-state, so the
+failure is specific to the diff.
+
+\subsection{Measured}
+
+Facility \emph{Meridian Trade Finance I}, impairing transaction as listed in Section~1.4,
+result \texttt{tesSUCCESS}.
+
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+field & healthy, before & final, after \\
+\midrule
+\texttt{AssetsTotal} & $51{,}000{,}000$ & $51{,}000{,}000$ \\
+\texttt{AssetsAvailable} & $41{,}000{,}000$ & $41{,}000{,}000$ \\
+\texttt{LossUnrealized} & $0$ & $10{,}000{,}000$ \\
+\midrule
+\multicolumn{3}{l}{\texttt{PreviousFields} emitted for the Vault node: \texttt{\{\}}} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+With $S = 51{,}000{,}000$ units,
+\[
+  \mathrm{NAV}_{\mathrm{naive}} = \frac{51{,}000{,}000}{51{,}000{,}000} = 1.000000,
+  \qquad
+  \mathrm{NAV}_{\mathrm{held}} = \frac{41{,}000{,}000}{51{,}000{,}000} = 0.803922,
+\]
+the second truncated to the $6$ decimal places the share token is scaled to. The divergence
+is $10^4 \cdot 10{,}000{,}000 / 51{,}000{,}000 = 1960.7843\ldots$, so $\delta = 1961$ bp: the
+reported unit value overstates recoverable value by $19.61\%$. Two readers pointed at the
+same transaction on the same ledger at the same instant return $1.000000$ and $0.803922$.
+
+\section{Cover liquidated on a default}
+
+When the broker declares a default on a loan of principal $p$, the ledger liquidates
+\begin{equation}
+\label{eq:cover}
+  T(p) \;=\; \min\Big( \big\lceil D \cdot c_{\min} \cdot c_{\mathrm{liq}} \big\rceil,\; p,\; C \Big)
+\end{equation}
+of posted cover. Three properties of \eqref{eq:cover} matter and none is obvious from the
+prose specification.
+
+\paragraph{The double product.} Both rates are $10^{-5}$ units, so both are divided by
+$10^5$. At $c_{\min} = c_{\mathrm{liq}} = 10000$ the coefficient is not $0.10$ but
+$0.10 \times 0.10 = 0.01$. Reading one of the two as a plain multiplier overstates
+liquidatable cover tenfold.
+
+\paragraph{The ceiling.} The product is rounded up to whole drops, not truncated. At the
+scales used here the argument is an exact integer and the ceiling is inert, but it is
+implemented because the ledger implements it and it becomes visible at odd rates.
+
+\paragraph{The base.} The base is the broker's \emph{total} outstanding book $D$, not the
+principal $p$ of the exposure that defaulted: a default is charged against the size of the
+whole book at the instant it is declared. That choice is what makes Section~4 non-trivial,
+and it also makes concentration and under-collateralisation one defect seen from two sides,
+since a book of one very large loan liquidates no more cover on its default than a book of
+many small ones liquidates on the first of them.
+
+\paragraph{Worked, from live state.} The \emph{Calder Structured Credit III} broker, with
+$D = 10{,}000{,}000$ drops, $C = 5{,}000{,}000$ drops and
+$c_{\min} = c_{\mathrm{liq}} = 10000$:
+\[
+  c = 0.10 \times 0.10 = 0.01,
+  \qquad
+  \lceil 10{,}000{,}000 \times 0.01 \rceil = 100{,}000 \text{ drops} = 0.10 \text{ XRP}.
+\]
+The broker posted $5$ XRP of cover, of which $0.10$ XRP is reachable by any single default
+at the current book size: the stranded fraction
+$\max(0, C - \lceil D c_{\min} c_{\mathrm{liq}} \rceil)/C$ is $0.98$. The separately defined
+cover \emph{requirement} $\lceil D c_{\min} \rceil = 1{,}000{,}000$ drops is met with room to
+spare, so a consumer checking the requirement alone concludes the facility is well covered.
+
+\section{The ordering result}
+
+\subsection{Statement}
+
+Fix a broker and write $c = c_{\min} \cdot c_{\mathrm{liq}}$. Let $D_0$ be the book at the
+first default, $p_1, \ldots, p_k$ the principals of $k$ exposures that will all be
+defaulted, and $\sigma$ a permutation of $\{1, \ldots, k\}$ giving the order in which the
+broker declares them. \texttt{DebtTotal} is decremented by $p$ as each default settles, so
+the book facing step $i$ is $D_{i-1} = D_0 - \sum_{j < i} p_{\sigma(j)}$. Write
+$T(\sigma, k)$ for total cover consumed across the $k$ declarations, under three regularity
+assumptions that hold on the measured facility and that Section~7 revisits.
+
+\begin{itemize}
+\itemsep2pt
+\item[(A1)] $c \, D_{i-1}$ is an integer number of drops at every step, so the ceiling in
+\eqref{eq:cover} is inert.
+\item[(A2)] Cover never runs out: $C \geq T(\sigma, k)$ for every $\sigma$ considered.
+\item[(A3)] Each principal is at least the step demand, $p_{\sigma(i)} \geq c \, D_{i-1}$,
+so the per-step $\min$ never binds on $p$.
+\end{itemize}
+
+\begin{lemma}[Closed form]
+\label{lem:closed}
+Under (A1) to (A3),
+$\displaystyle T(\sigma, k) = c \left[\, k D_0 - \sum_{i=1}^{k} (k - i)\, p_{\sigma(i)} \right].$
+\end{lemma}
+
+\begin{proof}
+Under the assumptions the amount liquidated at step $i$ is exactly $c \, D_{i-1}$, so
+\[
+  T(\sigma, k) = \sum_{i=1}^{k} c \, D_{i-1}
+  = c \sum_{i=1}^{k} \Big( D_0 - \sum_{j<i} p_{\sigma(j)} \Big)
+  = c \left[ k D_0 - \sum_{i=1}^{k} \sum_{j<i} p_{\sigma(j)} \right].
+\]
+Exchange the order of summation. The term $p_{\sigma(j)}$ appears once for each $i$ with
+$j < i \leq k$, that is $k - j$ times, so
+$\sum_{i=1}^{k} \sum_{j<i} p_{\sigma(j)} = \sum_{j=1}^{k} (k-j)\, p_{\sigma(j)}$, which is
+the claim after renaming the index.
+\end{proof}
+
+Only the second term depends on $\sigma$, and it enters with a minus sign. Minimising total
+cover consumed is therefore the same problem as maximising
+$\Sigma(\sigma) = \sum_i (k-i)\, p_{\sigma(i)}$, a sum of the principals against the fixed,
+strictly decreasing weight vector $(k-1, k-2, \ldots, 1, 0)$.
+
+\begin{theorem}[Ordering]
+\label{thm:order}
+Under (A1) to (A3), $T(\sigma, k)$ is minimised when $\sigma$ declares the exposures in
+non-increasing order of principal, largest first, and maximised when it declares them in
+non-decreasing order, smallest first. The extremal values are
+\[
+  T_{\min} = c \left[ k D_0 - \sum_{i=1}^{k} (k-i)\, p_{(i)}^{\downarrow} \right],
+  \qquad
+  T_{\max} = c \left[ k D_0 - \sum_{i=1}^{k} (k-i)\, p_{(i)}^{\uparrow} \right],
+\]
+where $p^{\downarrow}$ and $p^{\uparrow}$ are the principals sorted decreasing and
+increasing.
+\end{theorem}
+
+\begin{proof}
+By Lemma~\ref{lem:closed} it suffices to show $\Sigma$ is maximised by the decreasing
+arrangement and minimised by the increasing one. This is the rearrangement inequality; the
+exchange argument is given in full because it also yields uniqueness up to ties.
+
+Suppose $\sigma$ is not non-increasing in principal. Then there are adjacent positions $i$
+and $i+1$ with $a = p_{\sigma(i)} < p_{\sigma(i+1)} = b$. Let $\sigma'$ be $\sigma$ with
+those two transposed. Every other position contributes identically, so
+\[
+  \Sigma(\sigma') - \Sigma(\sigma)
+  = \big[(k-i)\,b + (k-i-1)\,a\big] - \big[(k-i)\,a + (k-i-1)\,b\big]
+  = b - a \;>\; 0 ,
+\]
+because the two weights differ by exactly $1$. Every adjacent transposition that repairs an
+inversion therefore strictly increases $\Sigma$ and strictly decreases $T$. A permutation of
+$k$ elements has finitely many inversions and each such transposition removes one, so the
+process terminates, and it can terminate only at an arrangement with no inversions, that is
+the non-increasing one. Hence the decreasing order attains the maximum of $\Sigma$ and no
+other order class does. The minimising case is identical with the inequality reversed.
+\end{proof}
+
+\begin{corollary}[The spread]
+\label{cor:spread}
+$T_{\max} - T_{\min} = c \sum_{i=1}^{k} (k-i) \big( p_{(i)}^{\downarrow} - p_{(i)}^{\uparrow} \big)$.
+For $k = 2$ this collapses to $c\,( p_{\max} - p_{\min} )$.
+\end{corollary}
+
+\begin{corollary}[Stated plainly]
+\label{cor:plain}
+The party who chooses $\sigma$ is the \texttt{LoanBroker} owner, who is necessarily the vault
+owner. The capital consumed by $T(\sigma, k)$ is that same party's posted cover, and every
+drop of cover not consumed is a drop of loss falling instead on the vault's unit holders.
+The party choosing the order is exactly the party whose capital the choice spares, and the
+amount spared, against the investor-optimal order, is $T_{\max} - T(\sigma, k)$.
+\end{corollary}
+
+\subsection{Measured on Devnet}
+
+Facility \emph{Kestrel Bridge Financing II}, ids in Section~1.4. Two loans of $30$ XRP and
+$10$ XRP, $D_0 = 40$ XRP, $C = 10$ XRP posted, $c_{\min} = c_{\mathrm{liq}} = 10000$ so
+$c = 0.01$. The broker declared the large loan first. Both orders, in XRP:
+
+\begin{center}
+\begin{tabular}{llrrrr}
+\toprule
+order & step & book $D_{i-1}$ & principal $p_{\sigma(i)}$ & $\lceil c D_{i-1} \rceil$ & cumulative \\
+\midrule
+largest first    & 1 & $40$ & $30$ & $0.40$ & $0.40$ \\
+(observed)       & 2 & $10$ & $10$ & $0.10$ & $\mathbf{0.50}$ \\
+\addlinespace
+smallest first   & 1 & $40$ & $10$ & $0.40$ & $0.40$ \\
+(counterfactual) & 2 & $30$ & $30$ & $0.30$ & $\mathbf{0.70}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The closed form agrees. With $k = 2$, $D_0 = 40$, $c = 0.01$ and weights $(1,0)$,
+\[
+  T(\text{largest first}) = 0.01\,[\,80 - 30\,] = 0.50,
+  \qquad
+  T(\text{smallest first}) = 0.01\,[\,80 - 10\,] = 0.70,
+\]
+and Corollary~\ref{cor:spread} gives the spread directly as $0.01 \times (30 - 10) = 0.20$
+XRP without computing either endpoint. The ledger agrees too: reconstructed from public
+transaction history alone, across the two default transactions of Section~1.4
+\texttt{CoverAvailable} moved
+$10{,}000{,}000 \rightarrow 9{,}600{,}000 \rightarrow 9{,}500{,}000$ drops, consuming
+$400{,}000$ and $100{,}000$ drops, total $500{,}000$ drops $= 0.50$ XRP. Three independent
+computations agree: the iterative simulation that mirrors the ledger step by step, the
+closed form, and the ledger itself.
+
+Identical losses were realised in both rows; the only difference is the order of two
+transactions eight seconds apart. The $0.20$ XRP, $40\%$ of what the first-loss capital
+would otherwise have absorbed, was borne by the vault's investors, and the party who chose
+the order is the party it spared.
+
+\subsection{Sequence score}
+
+Observed consumption is placed between the two extremes:
+\[
+  \phi \;=\; \frac{T_{\mathrm{observed}} - T_{\min}}{T_{\max} - T_{\min}} \;\in\; [0, 1],
+\]
+defined as $1$ when $T_{\max} = T_{\min}$, which happens when all principals are equal or
+fewer than two defaults have occurred. $\phi = 0$ is the investor-worst sequence and
+$\phi = 1$ the investor-best. For Kestrel,
+$\phi = (0.50 - 0.50)/(0.70 - 0.50) = 0.0000$. A separate ordinal conduct score starts at
+$100$ and penalises $-35$ for $\phi < 0.25$, $-15$ for $0.25 \leq \phi < 0.75$, $-20$ per
+loss written off with no prior impairment and $-10$ per withdrawal of cover; Kestrel scores
+$25$, grade E.
+
+Reconstructing this history needs a join that is easy to miss. A \texttt{LoanManage}
+transaction carries no \texttt{LoanBrokerID}, and an impairment does not touch the
+\texttt{LoanBroker} object at all, so filtering \texttt{account\_tx} on the broker object
+silently drops every impairment and returns a history in which no loss was ever signalled
+before it was taken. The \texttt{Loan} node in the same metadata carries
+\texttt{FinalFields.LoanBrokerID}, which closes the join at no extra request. Before that
+fix, a rule written to reward early disclosure was penalising it.
+
+\section{The scoring model}
+
+\subsection{Five factors, no weights}
+
+Five quantities are measured from ledger state, each mapped independently onto a $20$-step
+ordinal ladder. No weighted average is taken at any stage: a weighted average lets a strong
+factor pay for a broken one, which is precisely the failure mode a credit assessment must
+not have.
+
+\begin{description}
+\itemsep2pt
+\item[Liquidity.] $A_v / A$.
+\item[First-loss adequacy.] Liquidatable cover against the exposure it must absorb,
+\[
+  \mathrm{adequacy} =
+  \frac{\min\big( \lceil D c_{\min} c_{\mathrm{liq}} \rceil,\; C \big)}
+       {\max\big( L,\; P_{\mathrm{distressed}} \big)},
+\]
+defined as $1$ when the denominator is zero. The denominator takes the \emph{larger} of the
+recognised loss and the principal of exposures that are overdue, impaired or defaultable.
+Dividing by $L$ alone would grade a vault concealing a large overdue exposure as perfectly
+covered. Concealment must never improve a score; the $\max$ is what enforces that.
+\item[Concentration.] $\max_i (p_i) / D$, banded on $1$ minus that value so higher is better.
+\item[Recognition lag.] Seconds an exposure has been past due with nothing declared. This is
+the direct measurement of the timing lever $\tau$.
+\item[Redemption cliff.] Projected shortfall of claims over liquidity at redemption,
+\[
+  \mathrm{shortfall} = \max\Big( 0,\; (A - L) - \big( A_v + R_{\mathrm{perf}}
+  + \mathbf{1}[P_{\mathrm{distressed}} > 0] \cdot C_{\mathrm{rec}} \big) \Big),
+\]
+with $R_{\mathrm{perf}}$ the total contractual repayment of performing loans and
+$C_{\mathrm{rec}}$ the recoverable cover
+$\min(\lceil D c_{\min} c_{\mathrm{liq}} \rceil, C)$. \texttt{rippled} refuses a
+\texttt{LoanSet} whose term overruns the vault's \texttt{RedemptionDate}, so every
+performing loan is contractually repaid before redemption and a projected shortfall is
+exactly the non-performing book net of recoverable cover. Being fully lent is not a distress
+signal, and this construction is what stops it reading as one.
+\end{description}
+
+The bands are stated in full so they can be disputed. Each row is a floor: the first
+threshold the value meets or exceeds gives the grade, and a value below every threshold
+grades \texttt{D}.
+
+\begin{center}
+\small
+\begin{tabular}{lll}
+\toprule
+factor & quantity banded & thresholds and grades \\
+\midrule
+Liquidity & $A_v/A$ &
+  $0.95$ AAA, $0.85$ A, $0.70$ BBB, $0.50$ BB, $0.25$ B, $0.05$ CCC \\
+First-loss adequacy & adequacy &
+  $1$ AA, $0.50$ A-, $0.20$ BBB-, $0.05$ BB-, $0.01$ B- \\
+Concentration & $1 - \max_i(p_i)/D$ &
+  $0.80$ AA, $0.60$ A-, $0.40$ BBB-, $0.20$ BB- \\
+Redemption cliff & $1 - \mathrm{shortfall}\%/100$ &
+  $1$ AAA, $0.98$ AA, $0.90$ A, $0.75$ BBB, $0.50$ BB, $0.25$ B, $0.10$ CCC \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Recognition lag is banded on seconds rather than a ratio: $0$ is AAA, under $60$ is A, under
+$300$ is BBB, under $900$ is BB, beyond that CCC.
+
+\subsection{Composite by ordinal notching}
+
+Let $\mathcal{L} = [\text{AAA}, \text{AA+}, \ldots, \text{D}]$ with $|\mathcal{L}| = 20$,
+ordered best to worst, and let $\idx(g)$ be the zero-based position of grade $g$. Define
+\[
+  \mathrm{notch}(g, \Delta) = \mathcal{L}\big[\, \clamp(\idx(g) - \Delta,\; 0,\; 19) \,\big],
+  \qquad
+  \mathrm{numeric}(g) = \round\!\Big( 100 \big( 1 - \idx(g)/19 \big) \Big),
+\]
+so a negative $\Delta$ moves the grade down the ladder and $\mathrm{numeric}$ projects it to
+a sortable number. The composite \emph{anchors} on the redemption cliff, because for a
+fixed-term facility the headline question is whether claims can be met at redemption, then
+notches from there. The realised-destruction rows are mutually exclusive; the rest
+accumulate. Every notch is emitted with its rule, so a grade is reproducible from the
+published trace rather than taken on trust.
+
+\begin{center}
+\begin{tabular}{lr}
+\toprule
+condition & $\Delta$ \\
+\midrule
+realised capital destruction $\rho \geq 75\%$ & $-14$ \\
+$\rho \geq 50\%$ & $-12$ \\
+$\rho \geq 25\%$ & $-8$ \\
+$\rho \geq 10\%$ & $-5$ \\
+$\rho \geq 2\%$ & $-3$ \\
+$\rho > 0\%$ & $-1$ \\
+recognition lag $> 300$ s & $-2$ \\
+recognition lag $> 0$ s and $\leq 300$ s & $-1$ \\
+largest exposure $\geq 75\%$ of the book & $-1$ \\
+liquidatable cover $< 5\%$ of the exposure it must absorb & $-1$ \\
+liquidity band at B or worse while in the Redemption phase & $-2$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Realised capital destruction, and the denominator}
+
+Each of the five factors measures current \emph{exposure}, and a realised loss leaves none
+behind: the write-off removes the asset, the provision is released, and the book reads
+clean. Without a memory term a facility that defaulted on four fifths of its loans scores
+identically to one that never lost anything, the instant the write-off settles. That was
+observed on Devnet, not hypothesised. The term is
+\[
+  \rho \;=\; \max\left( 0,\; \frac{S - A}{S} \right),
+\]
+measured against $A$ and explicitly \emph{not} against $A - L$.
+
+The quantity subtracted is $A$, and that choice carries the whole substance of the rule. An
+unrealised loss $L$ is a provision against an asset the vault still holds and may still
+recover: it has not destroyed capital, it has disclosed that capital may be destroyed.
+Counting $L$ in $\rho$ would notch a manager down at the moment they disclose, punishing the
+exact behaviour the recognition-lag factor exists to reward and rewarding a manager who says
+nothing. Only a write-off, which removes the asset from \texttt{AssetsTotal} outright, is
+permanent destruction, and only that is counted. Par is taken as $1.0$, so $S$ is capital
+subscribed measured in asset units; Section~7 states when that holds.
+
+\subsection{Two worked facilities}
+
+\paragraph{Calder Structured Credit III, composite AA.} Live state: $A = 51{,}000{,}000$,
+$A_v = 41{,}000{,}000$, $L = 10{,}000{,}000$, $S = 51{,}000{,}000$, $D = 10{,}000{,}000$,
+$C = 5{,}000{,}000$, one impaired loan of principal $10{,}000{,}000$. Claims at redemption
+are $A - L = 41{,}000{,}000$ and liquidity at redemption is
+$41{,}000{,}000 + 0 + 100{,}000 = 41{,}100{,}000$, so the shortfall is $0$ and the anchor is
+AAA. Then $\rho = 0$ because $A \geq S$, no notch. Recognition lag is $0$ because the
+exposure is already declared impaired, no notch. Concentration is
+$10^{7}/10^{7} = 1.00 \geq 0.75$, one notch. Adequacy is
+$\min(10^{5}, 5 \cdot 10^{6}) / \max(10^{7}, 10^{7}) = 0.0100 < 0.05$, one notch. So
+$\text{AAA} \rightarrow \text{AA+} \rightarrow \text{AA}$, and
+$\mathrm{numeric}(\text{AA}) = \round(100(1 - 2/19)) = 89$.
+
+\paragraph{Kestrel Bridge Financing II, composite B.} The same broker as Section~4.2, after
+both defaults settled: $A = 10{,}500{,}000$ drops against $S = 50{,}000{,}000$ units
+subscribed. The shortfall is $0$, so the anchor is again AAA, and on the five factors alone
+the facility grades AAA: there is no exposure left to measure, because it was destroyed
+rather than provisioned.
+\[
+  \rho = \frac{50{,}000{,}000 - 10{,}500{,}000}{50{,}000{,}000} = 0.79 = 79\% \geq 75\%
+  \;\Longrightarrow\; \Delta = -14 .
+\]
+$\idx(\text{AAA}) = 0$, so the composite is $\mathcal{L}[14] = \text{B}$ with
+$\mathrm{numeric}(\text{B}) = \round(100(1 - 14/19)) = 26$. Fourteen notches on the strength
+of one term. Without it, the most damaged facility in the book would sort first.
+
+\section{Valuing a pledge}
+
+A holder may pledge units to a second lender, who then holds a token and nothing else. For
+$u$ units,
+\[
+  V_{\mathrm{held}} = u \cdot \mathrm{NAV}_{\mathrm{held}},
+  \qquad
+  V_{\mathrm{reported}} = u \cdot \mathrm{NAV}_{\mathrm{naive}},
+  \qquad
+  \Omega = V_{\mathrm{reported}} - V_{\mathrm{held}} ,
+\]
+with $\Omega$ the overstatement the second lender carries if they price the collateral off
+the reported figure. By the identity in Section~2,
+$\Omega = u L / S = (\delta/10^4) \cdot V_{\mathrm{reported}}$ up to the rounding of
+$\delta$. The lender reaches $\mathrm{NAV}_{\mathrm{held}}$ from the token alone in five
+steps, none requiring trust in whoever computed it: read the \texttt{MPTokenIssuance},
+decode its metadata, check conformance, find the valuation pointer the issuer declared,
+follow it. The instrument carries the address of its own valuation basis.
+
+\subsection{The haircut applies to the held value}
+
+A lender's policy discount $h \in [0,1)$ applies to the held value,
+$V_{\mathrm{lendable}} = V_{\mathrm{held}} (1 - h)$. This is not a matter of taste. A
+haircut is calibrated to the volatility of a correctly measured value: it answers how far a
+true value might fall before the lender can liquidate. Applying it to
+$V_{\mathrm{reported}}$ instead gives
+\[
+  V_{\mathrm{reported}} (1 - h) = \big( V_{\mathrm{held}} + \Omega \big)(1 - h)
+  = V_{\mathrm{lendable}} + \Omega (1 - h),
+\]
+so a residual $\Omega(1-h)$ of pure misstatement survives into the lender's book, scaled
+down but never removed. Equivalently, the haircut that merely undoes the misstatement,
+lending nothing against volatility at all, is
+$h^{*} = 1 - V_{\mathrm{held}}/V_{\mathrm{reported}} = \delta/10^{4}$. A haircut absorbs
+volatility. It does not absorb a misstatement.
+
+Against $\mathrm{NAV}_{\mathrm{held}} = 0.803922$ and
+$\mathrm{NAV}_{\mathrm{naive}} = 1.000000$, a pledge of $u = 1{,}000{,}000$ units:
+
+\begin{center}
+\begin{tabular}{lr}
+\toprule
+quantity & XRP \\
+\midrule
+$V_{\mathrm{reported}}$ & $1.000000$ \\
+$V_{\mathrm{held}}$ & $0.803922$ \\
+overstatement $\Omega$ & $\mathbf{0.196078}$ \\
+\addlinespace
+$V_{\mathrm{lendable}}$ at $h = 0.20$, correctly applied & $0.643137$ \\
+haircut misapplied to $V_{\mathrm{reported}}$ & $0.800000$ \\
+residual misstatement $\Omega(1-h)$ & $0.156862$ \\
+\addlinespace
+break-even haircut $h^{*}$ & $19.61\%$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+A conventional $20\%$ haircut on the reported figure is, on this instrument, almost exactly
+consumed by the misstatement alone. It leaves $0.39$ percentage points of protection against
+everything else that could go wrong.
+
+\section{Limitations}
+
+\paragraph{Devnet only.} Every figure here was measured on the XRP Ledger Devnet, network id
+$2$, against \texttt{rippled} 3.4.0-rc5. The lending amendments this depends on, XLS-65 for
+vaults and XLS-66 for the broker and loan objects, are not active on Mainnet, so there is no
+production facility to measure and no claim is made about one. The arithmetic is a property
+of the protocol rules rather than of Devnet and should carry over unchanged if the
+amendments activate. The hashes will not: Devnet is periodically reset.
+
+\paragraph{A $29$ day history window.} The conduct score and the sequence score $\phi$ are
+reconstructed from public transaction history, which the Devnet cluster retains for roughly
+$29$ days. Behaviour before that window is invisible, so every conduct figure is a lower
+bound on observable misconduct over a bounded window, not a statement about a manager's
+whole record. A facility with a clean score may simply be younger than the window.
+
+\paragraph{Par at $1.0$.} $\rho$ compares $A$ against $S$ and so assumes one unit was issued
+per unit of asset subscribed. For a closed-ended vault this holds structurally rather than
+by convention: subscription closes before any lending is permitted, so no profit or loss can
+accrue between the first subscriber and the last, every subscriber enters at the same unit
+value, and $S$ is exactly capital subscribed measured in asset units. \texttt{VaultKind} is
+immutable, so a facility cannot leave that regime later. The assumption fails for an
+open-ended vault, where subscribers enter at different unit values and $\rho$ would need the
+full subscription cash-flow history rather than $S$ alone; Orma declines to compute $\rho$
+there rather than compute it wrongly.
+
+\paragraph{The closed form is not the implementation.} Lemma~\ref{lem:closed} drops the
+ceiling and the per-step $\min$ under (A1) to (A3). Where a step is capped by the defaulting
+principal or by remaining cover, the closed form is no longer exact, although
+Theorem~\ref{thm:order} stays directionally valid because a cap can only reduce a step. The
+implementation therefore always evaluates the iterative recursion, which mirrors the ledger
+step for step including the ceiling and both caps, and uses the closed form only as an
+independent check. On the measured facility the two agree exactly, which is the point of
+computing both.
+
+\paragraph{Rounding, and the bands.} $\delta$ is an integer basis point rounded to nearest,
+so $1960.78$ is published as $1961$; unit values are truncated to the share token's $6$
+decimal places, and oracle values to the dimension's scale, $6$ decimals for NAV and $4$ for
+the other five. No figure here depends on a digit below those scales. The thresholds and
+penalties in Section~5 are not derived from anything: they are a stated, ordinal,
+reproducible judgement, published in full precisely so a reader who disagrees can say where
+and by how much. The two results that are not judgements are Proposition~\ref{prop:empty}
+and Theorem~\ref{thm:order}, which follow from the protocol rules and hold whatever anyone
+thinks of the bands.
+
+\end{document}

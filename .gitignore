@@ -107,3 +107,8 @@ Thumbs.db
 
 # Ground-truth briefs assembled for the overnight documentation run. Derived material.
 /.nightbrief/
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.toc
+documentation/site/

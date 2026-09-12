@@ -1,0 +1,387 @@
+---
+title: "Concepts"
+description: "Closed-ended vaults, their three phases, first-loss capital, cash-basis accounting, and the two levers the vault owner holds over investor money."
+---
+
+Orma measures credit risk in XLS-65 vaults and XLS-66 lending on the XRP Ledger. This page explains
+the ledger mechanics the rest of the documentation assumes. It is written for a reader who
+understands credit funds and does not yet know XRPL.
+
+Everything below was measured on Devnet during the De Vinci Blockchain XRPL Lending Protocol
+Hackathon in Paris, 12 to 13 September 2026, against rippled `3.4.0-rc5` at
+`wss://s.devnet.rippletest.net:51233`. The lending amendments are not live on Mainnet, so every
+transaction hash on this page resolves on Devnet only.
+
+## The vault is a ledger object, not a contract
+
+A vault is a native object on the XRP Ledger. There is no contract code to read. Depositors send
+`VaultDeposit`, receive units of a share token, and the object carries the fund's balance sheet in a
+handful of fields:
+
+| Field | Meaning |
+|---|---|
+| `AssetsTotal` | Everything the vault counts as an asset, cash plus loans at book |
+| `AssetsAvailable` | The part not currently lent out |
+| `LossUnrealized` | Loss the manager has recognised but not yet written off |
+| `MPTokenIssuance.OutstandingAmount` | Units outstanding. There is no `SharesTotal` field on the Vault |
+| `Owner` | The account that created the vault and controls it |
+| `Account` | The vault's pseudo-account, which actually holds the funds |
+
+Two of those deserve attention immediately. `AssetsTotal` does **not** net `LossUnrealized`, and
+units outstanding live on a different ledger object entirely, the share token's `MPTokenIssuance`.
+A tool that reads `AssetsTotal` and divides by units is reading the fund before provisions.
+
+<Warning>
+rippled omits any field whose value equals the type default. A vault with no recognised loss has no
+`LossUnrealized` key at all, not `"0"`. Absent means zero everywhere, and confusing "absent because
+zero" with "absent because deleted" is a real source of wrong numbers. See `src/num.mjs`.
+</Warning>
+
+## Open-ended and closed-ended
+
+An **open-ended** vault has no calendar. Deposits and withdrawals are legal at any time, subject to
+liquidity. It cannot be used for lending: attaching a `LoanBroker` to one returns `tecNO_PERMISSION`.
+
+A **closed-ended** vault is created with `VaultKind: 1` plus a `SubscriptionDate` and a
+`RedemptionDate`. It is a fixed-term fund: capital is raised, deployed, then returned.
+
+<Note>
+`VaultKind` is immutable. A vault created open-ended can never become a lending vault. If you plan
+to lend, you decide that at `VaultCreate` and never again.
+</Note>
+
+## The three phases
+
+Phase is derived, not stored. It is a comparison between the validated ledger's `close_time` and the
+two dates on the object. This is the whole of it, from `src/xrpl.mjs`:
+
+```js
+export function vaultPhase(vault, closeTime) {
+  if (Number(vault.VaultKind ?? 0) !== 1) return PHASE.OPEN
+  const sub = Number(vault.SubscriptionDate ?? 0)
+  const red = Number(vault.RedemptionDate ?? 0)
+  if (closeTime < sub) return PHASE.SUBSCRIPTION
+  if (closeTime < red) return PHASE.INVESTMENT
+  return PHASE.REDEMPTION
+}
+```
+
+The clock is the validated ledger close time, not wall clock. Devnet close time lags wall clock by
+up to ten seconds, and a countdown computed against the wrong clock goes negative on stage.
+
+**Subscription** runs until `SubscriptionDate`. Capital comes in and may leave freely. No lending is
+possible yet.
+
+**Investment** runs from `SubscriptionDate` to `RedemptionDate`. The book is locked. Loans are
+originated here, and they are impaired and defaulted here. Investors cannot deposit and cannot
+withdraw for the entire phase.
+
+**Redemption** begins at `RedemptionDate`. Withdrawals reopen, deposits stay closed, and no new loan
+can be written. Under the default `WithdrawalPolicy: 1`, redemption is first come first served, so
+the order investors queue in matters when liquidity is short.
+
+## The phase rejection matrix
+
+We walked one closed-ended vault through all three phases and attempted `VaultDeposit`,
+`VaultWithdraw` and `LoanSet` in each, next to controls that succeed where the action is legal.
+Without the controls a rejection proves nothing: it could be a malformed transaction. Script:
+`src/demo/phase-matrix.mjs`. Closed-ended vault
+`2ABEF788EA69A4E09D2F9F1E3897DEBC7FDBDD8A8902ED3D9613A5C7A11ED6F9`. The three `OpenEnded` rows below
+ran against a separate open-ended vault,
+`C10D1813DECEFA75B23D9436AE1F9E24406EDB7AF038DF09E088A270036F649C`.
+
+| Phase | Transaction | Expected | Measured result |
+|---|---|---|---|
+| OpenEnded | `VaultDeposit` (control) | succeed | `tesSUCCESS` |
+| OpenEnded | `VaultWithdraw` (control) | succeed | `tesSUCCESS` |
+| OpenEnded | `LoanBrokerSet` on an open vault | reject | `tecNO_PERMISSION` |
+| Subscription | `VaultDeposit` (control) | succeed | `tesSUCCESS` |
+| Subscription | `VaultWithdraw` (control) | succeed | `tesSUCCESS` |
+| Subscription | `LoanSet` before subscription closes | reject | `tecTOO_SOON` |
+| Investment | `VaultDeposit` | reject | `tecEXPIRED` |
+| Investment | `VaultWithdraw` | reject | `tecTOO_SOON` |
+| Investment | `LoanSet` (control) | succeed | `tecNO_PERMISSION`, see below |
+| Redemption | `VaultDeposit` | reject | `tecEXPIRED` |
+| Redemption | `VaultWithdraw` (control) | succeed | `tesSUCCESS` |
+| Redemption | `LoanSet` after redemption opens | reject | `tecEXPIRED` |
+
+Full transaction hashes for the six rejections, all on Devnet:
+
+```text
+tecNO_PERMISSION  LoanBrokerSet, open vault   CE477E29A099A6BBC30EBA52F3E09AB2A450CDB05F338AE517EDAAC0584827AB
+tecTOO_SOON       LoanSet, Subscription       E1121DED12D4A320FB58F77D02549429885D8A826B794F2B2539EC936BE39011
+tecEXPIRED        VaultDeposit, Investment    7A10D8053FEE687A008F17E2AD98121EE08553CBDEAAE92DDEC3C2798A1CB15B
+tecTOO_SOON       VaultWithdraw, Investment   CC104682C298DFB3619EE4C15F0112ACE2B6A95B4971CA0A0AC748F9B5B6617A
+tecEXPIRED        VaultDeposit, Redemption    DEA67094F92657625C795FD34B46DF751F2E54B3ECEA1B686777D5C141CAA670
+tecEXPIRED        LoanSet, Redemption         8A09A988DD3C5433B30E92F5E7B42086D6B17CEB51C6C05572E7A74552B9DAE1
+```
+
+Read the codes as a sentence about time rather than about permission. Deposits are early-only, so
+after the window they are `tecEXPIRED`. Withdrawals are bracketed, so inside the lockup they are
+`tecTOO_SOON` and after redemption opens they succeed. `LoanSet` is mid-only, so it is `tecTOO_SOON`
+before and `tecEXPIRED` after.
+
+The one row that did not do what we expected is `LoanSet` in Investment
+(`A926030097C2AD2F8ED4D1D6899200B27D2C75DF200A5A2EBEA8EBF88339F63E`). It is legal there, and three of
+our four live facilities have loans written in Investment. The fourth, Thorne Senior Secured I, is
+still in Subscription and carries no loans. In this particular matrix run the loan's scheduled
+maturity, `PaymentInterval` 60 seconds times `PaymentTotal` 2, plus the 60 second
+`kLoanRedemptionBuffer` that `LoanSet.cpp` requires on top of it, overran the vault's remaining
+`RedemptionDate` window, and rippled refused it. The rule is
+`StartDate + PaymentInterval × PaymentTotal + 60 ≤ RedemptionDate`. `GracePeriod` is not part of it.
+
+<Warning>
+`tecNO_PERMISSION` on `LoanSet` is overloaded. It is returned both for "this vault is not
+closed-ended" and for "this loan matures after the vault's `RedemptionDate`". We confirmed this by
+holding everything constant except the term: a 180 second loan succeeded and a 1200 second loan on
+the same vault and broker returned `tecNO_PERMISSION`. Script: `src/dev/check-loanset-overload.mjs`.
+</Warning>
+
+## `canWithdraw: false` is a protocol fact
+
+The single most misread state in this system. During Investment, `VaultWithdraw` returns
+`tecTOO_SOON` for the entire phase, regardless of how much cash the vault is holding. We measured it
+with 80 XRP of `AssetsAvailable` sitting idle. It is a phase predicate, not a liquidity check.
+
+```js
+// src/poll.mjs
+canWithdraw: !inInvestment,
+withdrawBlockedReason: inInvestment ? 'tecTOO_SOON' : null,
+```
+
+Orma reports it as a fact with a reason attached, never as an error. From
+`GET /api/vaults/{vaultId}` on Calder Structured Credit III:
+
+```json
+"phaseInfo": {
+  "phase": "Investment",
+  "canDeposit": false,
+  "canWithdraw": false,
+  "withdrawBlockedReason": "tecTOO_SOON",
+  "nextBoundaryAt": "2026-09-13T15:11:47Z",
+  "secondsToNextBoundary": 60686,
+  "claimsAtRedemption": "41000000",
+  "liquidityAtRedemption": "41100000",
+  "projectedShortfall": "0"
+}
+```
+
+<Note>
+Because the exit is closed for the whole of Investment, a credit signal published during Investment
+cannot be acted on by selling. That is why the redemption cliff anchors the composite grade rather
+than sitting as one factor among five, and why Orma publishes where a third party can act on the
+signal instead of only displaying it. See [/scoring](/scoring).
+</Note>
+
+## The LoanBroker and first-loss capital
+
+Loans are not made by the vault. They are made through a `LoanBroker`, a separate ledger object that
+points at the vault. The broker posts **cover**: its own capital, held on the broker's
+pseudo-account, that absorbs losses before the vault's assets do. This is first-loss capital in the
+ordinary structured credit sense, and it is the only thing standing between a borrower default and
+the depositors.
+
+| Field | Meaning |
+|---|---|
+| `DebtTotal` | Principal currently drawn across all loans under this broker |
+| `DebtMaximum` | Ceiling on that |
+| `CoverAvailable` | First-loss capital posted and not yet consumed |
+| `CoverRateMinimum` | Cover the broker must hold, as a fraction of `DebtTotal` |
+| `CoverRateLiquidation` | Fraction of that cover which is actually liquidated on a default |
+
+Both rates are expressed in units of $10^{-5}$. A stated `10000` means $0.10$, which is ten percent.
+Both are divided by $10^5$, and that **double product** is the detail that makes the cover formula
+look a hundred times larger than it is. Cover consumed on a single default is
+
+$$T(p) = \min\Big(\big\lceil D \cdot c_{\min} \cdot c_{\text{liq}} \big\rceil,\; p,\; C\Big)$$
+
+where $D$ is `DebtTotal`, $p$ the principal of the loan that defaulted, and $C$ is `CoverAvailable`.
+At $c_{\min} = c_{\text{liq}} = 10000$ the coefficient is $0.10 \times 0.10 = 0.01$. One percent of
+the book, not ten.
+
+Note what the base is. The formula is keyed to the broker's **total** book $D$, not to the principal
+of the loan that failed. A broker with a shrinking book liquidates less cover on each successive
+default, and a single loan that is most of the book liquidates cover keyed to that whole book once
+and then leaves nothing behind it. Calder Structured Credit III shows the scale of the gap: 10 XRP
+of debt, 5 XRP of cover posted, and 0.1 XRP of that cover reachable on a default.
+
+```json
+"broker": {
+  "debtTotal": "10000000",
+  "coverAvailable": "5000000",
+  "coverRateMinimum": 10000,
+  "coverRateLiquidation": 10000,
+  "coverRequired": "1000000",
+  "maxLiquidatableNow": "100000",
+  "strandedCoverFraction": "0.9800"
+}
+```
+
+98 percent of the posted cover cannot be reached by any single default at the current book. Orma
+reports that as `strandedCoverFraction` rather than reporting `CoverAvailable` as though all of it
+were loss-absorbing.
+
+## The broker owner is the vault owner
+
+This is a protocol fact, not a configuration choice. `LoanBrokerSet` requires the submitting account
+to be the vault's `Owner` (`LoanBrokerSet.cpp:109`), so the party who posts first-loss capital and
+the party who manages the fund are necessarily the same account. On Calder both read
+`rGMo2ke9of3GEqJwWAzDmFjrm6SwYowTsB`.
+
+Only that owner may impair, unimpair or default a loan (`LoanManage.cpp:124-129`). There is no
+independent servicer, no trustee, no rating committee.
+
+<Warning>
+Delegation does not fix this. XLS-75 permission delegation returns `temMALFORMED` for the entire
+lending transaction suite, so the credit decisions cannot be handed to another account even if a
+manager wanted to.
+</Warning>
+
+The consequence runs through everything else on this page. Credit events are declared by the party
+whose own capital those declarations consume.
+
+## Cash-basis accounting, `LEVersion = 1`
+
+Under `LEVersion: 1` the vault keeps cash-basis books. The practical consequences:
+
+- **Origination moves `DebtTotal`, not `AssetsTotal`.** Lending out cash is not a gain or a loss,
+  and the vault's asset total does not move when a loan is written.
+- **Impairment moves only `LossUnrealized`.** Nothing else on the Vault object changes.
+- **Default moves assets.** The loss is realised: the asset is written off, the provision is
+  released, cover is liquidated, and the book reads clean afterwards.
+
+### Impairment against default
+
+| | Impairment | Default |
+|---|---|---|
+| Transaction | `LoanManage` with flag `0x20000` | `LoanManage` with flag `0x10000` |
+| Precondition | The loan must already be past due | Past due plus `GracePeriod` elapsed |
+| Reversible | Yes, unimpair is flag `0x40000` | No |
+| Loan object | Gains flag `131072` | Gains flag `65536`, and rippled **deletes** `PrincipalOutstanding` and `NextPaymentDueDate` |
+| `Vault.LossUnrealized` | Increases by the exposure | Released for that exposure |
+| `Vault.AssetsTotal` | Unchanged | Decreases by the amount written off |
+| `LoanBroker.CoverAvailable` | Unchanged | Decreases by $T(p)$ |
+| `LoanBroker.DebtTotal` | Unchanged | Decreases by the principal |
+
+<Note>
+Test loan flags by bit, never by equality. A loan can carry more than one, and `Flags === 131072`
+silently stops matching the day it does. `src/num.mjs` exposes `hasFlag` for exactly this.
+</Note>
+
+An impairment is a disclosure. It says "this exposure is in trouble" without moving a single asset.
+A default is a write-off. Both are the vault owner's unilateral decision, and neither has a deadline
+attached.
+
+Realisation is also why a clean-looking book is not evidence of a clean history. Kestrel Bridge
+Financing II took 50 XRP of subscriptions, defaulted on 40 XRP, and now holds 10.5 XRP with
+`lossUnrealized` of `"0"` and a NAV divergence of 0 basis points. Nothing in the current object
+records the loss. Its naive and correct unit values agree at `0.210000`, and only the 79 percent gap
+between units outstanding and assets held says what happened.
+
+## Lever one: when to recognise
+
+The manager chooses the moment `LossUnrealized` moves. Until they act, `AssetsTotal` carries the
+troubled loan at book and a naive reader sees a fund at par.
+
+$$\text{NAV}_{\text{naive}} = \frac{A}{S}, \qquad \text{NAV}_{\text{held}} = \frac{A - L}{S}$$
+
+Meridian Trade Finance I, measured live: $A = 51{,}000{,}000$ drops, $L = 10{,}000{,}000$,
+$S = 51{,}000{,}000$. Naive reads $1.000000$ and held reads $0.803922$, a divergence of 1961 basis
+points. Same object, same instant, two answers.
+
+The delay is not merely invisible to careless tools. It is invisible to careful ones that watch
+transaction metadata. rippled omits from `PreviousFields` any field whose previous value was the
+type default. On the first impairment of a healthy vault, `LossUnrealized` moves from zero, and
+under cash basis nothing else on the Vault changes. So the metadata reads:
+
+```json
+"vaultNode": {
+  "previousFields": {},
+  "finalFields": {
+    "AssetsTotal": "51000000",
+    "AssetsAvailable": "41000000",
+    "LossUnrealized": "10000000"
+  }
+}
+```
+
+`PreviousFields` is empty. An indexer that diffs metadata sees no change at all on the most
+important credit event the protocol has. Captured in transaction
+`075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3`, result `tesSUCCESS`.
+
+<Tip>
+This is why Orma is a four second poller that re-reads full object state, and never a metadata
+differ. Re-reading cannot miss a field that was never diffed. See `src/poll.mjs`, and
+[/api/nav](/api/nav) for the reading it publishes.
+</Tip>
+
+Delay also flatters the manager directly. `CoverRateMinimum` is keyed to `DebtTotal`, so the cover
+they must hold, and the cover actually liquidated when they finally act, both shrink with the book.
+
+## Lever two: in what order to realise
+
+Because $T$ is keyed to `DebtTotal` at the instant of the default, and `DebtTotal` is decremented as
+each default lands, every default shrinks the base for the next one. Total cover consumed across a
+fixed set of defaults therefore depends on the **order** they are declared in.
+
+With $c = c_{\min} c_{\text{liq}}$, $D_0$ the book at the first default, and $k$ defaults in order
+$\sigma$:
+
+$$T(\sigma, k) = c \left[ k D_0 - \sum_{i=1}^{k} (k - i)\, p_{\sigma(i)} \right]$$
+
+Only the sum depends on $\sigma$, and its coefficient $(k-i)$ decreases in $i$. By the rearrangement
+inequality the sum is largest, and therefore $T$ smallest, when the principals are declared in
+decreasing order.
+
+> Total first-loss capital consumed is minimised by declaring the largest exposure first, and
+> maximised by declaring the smallest first.
+
+Kestrel Bridge Financing II did exactly that on Devnet, with two loans of 30 and 10 XRP at ten
+percent and ten percent, reconstructed from public history alone:
+
+| Declared | Principal | `DebtTotal` before | Cover consumed |
+|---|---|---|---|
+| 2026-09-12T21:11:02Z | 30 XRP | 40 XRP | 0.40 XRP |
+| 2026-09-12T21:11:10Z | 10 XRP | 10 XRP | 0.10 XRP |
+| | | **total** | **0.50 XRP** |
+
+Declaring the small loan first would have consumed 0.70 XRP. Identical losses, a 40 percent
+difference in what the first-loss capital absorbed, and the 0.20 XRP difference falls on the unit
+holders. Orma places the observed sequence between the two extremes as a sequence score:
+
+$$\phi = \frac{T_{\text{observed}} - T_{\min}}{T_{\max} - T_{\min}}$$
+
+$\phi = 0$ is the investor-worst sequence and $\phi = 1$ the investor-best. Kestrel scored
+$\phi = 0.0000$. Reconstruction and scoring live in `src/history.mjs`, served at
+[/api/broker-history](/api/broker-history).
+
+<Note>
+Reconstructing this history needs a join that is not obvious. `LoanManage` carries no
+`LoanBrokerID`, and an impairment does not touch the `LoanBroker` object at all, so a filter over
+`account_tx` on the broker silently drops every impairment. `Loan.FinalFields.LoanBrokerID` in the
+same metadata closes the gap. Before that fix every default looked unsignalled, and a rule written
+to reward disclosure was penalising it.
+</Note>
+
+## One asymmetry, two levers, then enforcement
+
+The vault owner and the broker owner are the same account. That single asymmetry gives one party two
+levers over investor money: **when** a loss is recognised, and **in what order** losses are realised.
+Both are discretionary, both move money, and neither leaves a signal that a metadata-diffing tool
+would see.
+
+Orma does three things about it, each on its own page:
+
+- **Measure** both levers from public ledger state, with no privileged access. See [/scoring](/scoring).
+- **Publish** the result where it can be acted on: a native XLS-47 Oracle object carrying six
+  dimensions, plus a pointer inside the share token's own metadata. See [/oracle](/oracle).
+- **Enforce** it with XLS-70 credentials and a permissioned domain, so an independent rater decides
+  who may subscribe. See [/gate](/gate).
+
+## What this runs on
+
+Devnet, `network_id` 2, `wss://s.devnet.rippletest.net:51233`, rippled `3.4.0-rc5` at the time of
+capture. The XLS-65 and XLS-66 amendments are not live on Mainnet, so nothing here is production
+infrastructure and none of these hashes resolve on a Mainnet explorer. The measurement, the oracle
+publication and the domain gate are real transactions against a real consensus network, but the
+network is a test one.

@@ -1,0 +1,434 @@
+---
+title: "AI agents"
+description: "Consuming Orma from an autonomous agent with nothing but a token id, and the traps an agentic coding assistant hits when building on XLS-65 and XLS-66."
+---
+
+This page has two audiences.
+
+The first is an **agent consuming Orma**. A machine holding a vault share, and nothing else,
+needs a valuation. `GET /api/mpt/:mptId/nav` exists for exactly that case: no API key, no
+account, no prior relationship, no documentation required, because the token itself says where
+its valuation lives.
+
+The second is a **developer building on Orma with a coding assistant**. XLS-65 and XLS-66 have
+several behaviours that produce code which runs, returns numbers, and is wrong. An assistant
+writes those bugs confidently. The checklist in the second half is written to be pasted into
+`CLAUDE.md`, `AGENTS.md` or a system prompt.
+
+---
+
+## Part 1: Orma as a tool an agent can call
+
+### Why the token is the entry point
+
+An agent is handed vault shares as collateral. What it has is an MPT issuance id, 48 hex
+characters. It does not know the vault id, the owner, the broker, or that Orma exists.
+
+Share metadata is written once and can never be corrected. `MPTokenMetadata` is accepted on
+`VaultCreate`, rejected at deserialization on `VaultSet`, and `MPTokenIssuanceSet` returns
+`tecNO_PERMISSION` because the issuer is the vault pseudo-account, which carries
+`lsfDisableMaster` and has no regular key. A price written into that blob would be wrong within
+one ledger. A **pointer** stays true for the life of the vault, so that is what goes in:
+
+```json
+"orma": {
+  "v": 1,
+  "instrument": "vault-share",
+  "nav_url": "http://localhost:8787/api/mpt/{mpt_issuance_id}/nav",
+  "nav_url_param": "{mpt_issuance_id}",
+  "nav_basis": "assets net of recognised loss, divided by units outstanding",
+  "doc": "https://orma.credit/nav"
+}
+```
+
+The pointer is a template, and not by preference. `MPTokenMetadata` is only settable on
+`VaultCreate`, which is submitted before the vault and its share issuance exist, so neither the
+`VaultID` nor the `MPTokenIssuanceID` is knowable at the moment the pointer has to be written.
+It does not need to be. Whoever reads the metadata got there by holding the token, so they
+already have the id to substitute. The whole object must fit in 1024 bytes.
+
+### The call
+
+```js
+const BASE = 'http://localhost:8787'
+const MPT = '000000014D667775372D5B78E07FFF294678C7F9CE82AFBC'
+
+const res = await fetch(`${BASE}/api/mpt/${MPT}/nav`, {
+  headers: { accept: 'application/json' },
+})
+const nav = await res.json()
+
+// Guard before using it. A 200 is not proof of a valuation: an early version of the
+// pointer route resolved to the diagnostic instead, returned a perfectly good 200 with
+// no unitValue on it, and crashed the caller.
+if (nav.schema !== 'orma.nav/1' || !nav.unitValue?.held) {
+  throw new Error('not a valuation document')
+}
+
+nav.unitValue.held          // "0.803922"  <- the number to lend against
+nav.unitValue.reported      // "1.000000"  <- what a metadata-diffing indexer shows
+nav.unitValue.divergenceBps // 1961
+nav.asOf                    // "2026-09-12T22:20:22Z"
+nav.ledgerIndex             // 5263343
+```
+
+The response carries `Access-Control-Allow-Origin: *` and `Cache-Control: public, max-age=4`.
+Four seconds is the poller's interval, so a cached answer is never more than one cycle stale.
+An unknown share token returns `404` with
+`{"error":{"code":"SHARE_NOT_TRACKED","message":"No facility on this service issues that share token","retryable":false}}`.
+
+### Valuing a pledge
+
+Two ways. Server side, add `units`:
+
+```
+GET /api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav?units=1000000
+```
+
+which adds a `pledge` block to the same document:
+
+```json
+"pledge": {
+  "units": "1000000",
+  "valueHeld": "803922",
+  "valueReported": "1000000",
+  "overstatement": "196078"
+}
+```
+
+`units` is the unit count; the other three are integer drops as strings. 1,000,000 units of
+this facility are worth 0.803922 XRP, not the 1.000000 XRP a naive reader reports. The
+overstatement, 0.196078 XRP, is the part a haircut does not cover: a haircut absorbs
+volatility, it does not absorb a misstatement.
+
+Client side, if the agent prefers to do its own arithmetic:
+
+```js
+import Decimal from 'decimal.js'
+Decimal.set({ precision: 40 })
+
+const units = new Decimal('1000000')
+const held = units.times(nav.unitValue.held)       // 803922 drops
+const reported = units.times(nav.unitValue.reported)
+const overstatement = reported.minus(held)          // 196078 drops
+
+// A lender's own discount applies to the HELD value, never to the reported one.
+const haircut = new Decimal('0.15')
+const lendable = held.times(new Decimal(1).minus(haircut))
+```
+
+<Warning>
+`Number("803922")` happens to work. `Number()` on a 19 significant digit XRPL `NUMBER` does
+not, and it fails silently. Keep monetary values as strings end to end.
+</Warning>
+
+### Why both readings, and why a provenance block
+
+The document deliberately carries two numbers that disagree.
+
+```
+NAV_naive = A / S
+NAV_held  = (A - L) / S
+```
+
+where `A` is `Vault.AssetsTotal`, `L` is `Vault.LossUnrealized` and `S` is
+`MPTokenIssuance.OutstandingAmount`. Handing over only the honest number asks the consumer to
+take our word for it. Handing over both, with the gap named in basis points, shows them what
+the obvious computation would have told them. The finding is that those two numbers differ and
+that one of them is silently wrong, so the document has to show both or it hides its own point.
+
+`provenance` names the exact ledger integers the figure came from, so a consumer can recompute
+rather than trust:
+
+```json
+"provenance": {
+  "network": "devnet",
+  "source": "devnet",
+  "assetsTotal": "51000000",
+  "lossUnrealized": "10000000",
+  "unitsOutstanding": "51000000",
+  "recompute": "(assetsTotal - lossUnrealized) / unitsOutstanding",
+  "buildVersion": "3.4.0-rc5"
+}
+```
+
+An agent that verifies before acting should do this:
+
+```js
+import Decimal from 'decimal.js'
+Decimal.set({ precision: 40 })
+
+const p = nav.provenance
+const check = new Decimal(p.assetsTotal).minus(p.lossUnrealized).div(p.unitsOutstanding)
+if (check.toFixed(6) !== nav.unitValue.held) {
+  throw new Error(`stated ${nav.unitValue.held}, recomputes to ${check.toFixed(6)}`)
+}
+```
+
+Those three integers are readable from any public Devnet node with `ledger_entry`, so the check
+is independent of us. `assessment` is labelled `advisory: true` on purpose: `unitValue` is a
+measurement, the grade is an opinion, and they are separated so a consumer can take one without
+the other. `assessment` is `null` when the score could not be derived; the valuation is still
+served.
+
+### Resolving from the token alone
+
+If the agent does not know Orma's base URL, it walks the pointer itself. Three steps, all of
+them on the ledger or on a URL the ledger names:
+
+```js
+import { Client } from 'xrpl'
+
+const client = new Client('wss://s.devnet.rippletest.net:51233')
+await client.connect()
+
+// 1. read the MPTokenIssuance
+const { result } = await client.request({
+  command: 'ledger_entry',
+  mpt_issuance: MPT,
+})
+const node = result.node
+
+// 2. decode the metadata
+const meta = JSON.parse(Buffer.from(node.MPTokenMetadata, 'hex').toString('utf8'))
+
+// 3. substitute this token's own id into the template, then follow it
+const url = meta.orma.nav_url.replaceAll(meta.orma.nav_url_param, MPT)
+const nav = await fetch(url, { headers: { accept: 'application/json' } }).then((r) => r.json())
+
+await client.disconnect()
+```
+
+`/api/mpt/:mptId/resolve` runs that same loop and reports every step, including the failures,
+because "this collateral is opaque" is a legitimate answer to give a lender and a better one
+than an exception:
+
+```json
+"steps": [
+  { "step": "read MPTokenIssuance", "ok": true, "detail": "issuer r3hE8HanpccSZdgmeHCfYFEkwxFjdDmmvt, 51000000 units outstanding" },
+  { "step": "decode metadata", "ok": true, "detail": "valid JSON" },
+  { "step": "XLS-89 conformance", "ok": true, "detail": "asset_class rwa" },
+  { "step": "find valuation pointer", "ok": true, "detail": "http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav" },
+  { "step": "follow pointer", "ok": true, "detail": "unit value 0.803922" }
+]
+```
+
+Two rules that module follows and that any agent following a third-party pointer should copy:
+only `http:` and `https:` are followed, and the fetch is bounded at 2500 ms with an
+`AbortController`. The URL was written by someone else.
+
+### The schema field and the stability promise
+
+Every valuation document carries `"schema": "orma.nav/1"`.
+
+The contract behind it is effectively permanent, and not out of politeness. The URL is written
+into write-once token metadata, so there is no migration path: no redirect we can publish, no
+version bump we can push to holders, no way to tell an existing token that the shape moved.
+
+| change | allowed |
+|---|---|
+| add a field | yes |
+| add a value to an existing enum | yes |
+| rename a field | never |
+| change a field's type | never |
+| remove a field | never |
+| change what a field means | never |
+
+A breaking change would need a new `schema` value and a new URL, which in practice means new
+tokens. So an agent can hard-code `nav.unitValue.held` and expect it to be there, and should
+still treat unknown fields as additive rather than erroring on them.
+
+<Note>
+`assessment.methodVersion` (`"1.0.0"`) versions the grading opinion, not the wire format. The
+grade can be recalibrated without touching the schema. `health.contractVersion` versions the
+wider API, which has no such write-once constraint. See [the NAV pointer](/nav-pointer).
+</Note>
+
+### Limits an agent should state out loud
+
+- This runs on **Devnet**. XLS-65 and XLS-66 are not on Mainnet, so there is no production
+  deployment to point at. `provenance.network` says `devnet` and `health.buildVersion` reports
+  the node, `3.4.0-rc5` at the time of capture.
+- `unitValue.held` is net of **recognised** loss. A loss the manager has not yet declared is,
+  by construction, not in `L`. The grade partly exists to price that gap.
+- There is no reverse index from an MPT issuance to the escrows holding it, so collateral
+  discovery needs a list of accounts to look at. That is reported as a protocol feedback item,
+  not solved here.
+
+---
+
+## Part 2: building on Orma with a coding assistant
+
+Everything below has been written wrong at least once in this codebase. Each one compiles, runs,
+and produces a plausible number.
+
+### 1. Never `Number()` a monetary value
+
+XRPL `NUMBER` fields carry up to 19 significant digits and can arrive in scientific notation
+(`"1e17"`). `Number()` destroys them silently, `parseFloat` the same, and `BigInt("1e17")`
+throws.
+
+```js
+// wrong
+const assets = Number(vault.AssetsTotal)
+
+// right
+import Decimal from 'decimal.js'
+Decimal.set({ precision: 40 })
+const assets = new Decimal(vault.AssetsTotal ?? 0)
+```
+
+Also: rippled omits any field whose value equals the type default. A vault with no unrealised
+loss has **no `LossUnrealized` key at all**, not `"0"`. Coalesce absent to zero in one helper so
+a call site cannot forget.
+
+### 2. Never diff `PreviousFields`
+
+`PreviousFields` omits any field whose previous value was the type default. On the first
+impairment of a healthy vault, `LossUnrealized` moves up from 0, so it is omitted, and under
+cash-basis accounting (`LEVersion = 1`) impairment changes nothing else on the Vault object.
+The Vault node's `PreviousFields` is emitted **empty**. An indexer that diffs metadata sees no
+change at all.
+
+Transaction `075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3` on Devnet is that
+case. Always re-read the object. Orma polls full state every 4000 ms for this reason.
+
+### 3. `DomainID` is on the share issuance, not the vault
+
+Reading the `Vault` ledger entry to find out whether a vault is gated returns nothing, which
+reads exactly like "open to everyone". The field lives on the share `MPTokenIssuance`.
+
+```js
+// wrong: DomainID is not a Vault field
+const domain = vaultNode.DomainID
+
+// right: read the share issuance. The vault names it in ShareMPTID.
+const iss = await client.request({ command: 'ledger_entry', mpt_issuance: vaultNode.ShareMPTID })
+const domain = iss.result.node.DomainID
+```
+
+And `tfVaultPrivate` (`0x00010000`) is required on `VaultCreate` alongside `DomainID`. A
+`DomainID` without the flag gates nothing. See [the gate](/gate).
+
+### 4. `LoanManage` carries no `LoanBrokerID`
+
+It carries `LoanID` only, and an impairment does not touch the `LoanBroker` object at all. A
+history filter that matches on the broker node or on `tx.LoanBrokerID` therefore drops **every
+impairment** on the floor. In Orma that silently inverted a reputation rule: brokers who
+impaired before defaulting looked like brokers who never warned anyone, and the rule written to
+reward disclosure was penalising it.
+
+The `Loan` node in the same metadata closes the join at no extra request:
+
+```js
+const nodes = (meta.AffectedNodes ?? [])
+  .map((n) => n.ModifiedNode ?? n.DeletedNode)
+  .filter(Boolean)
+
+const brokerNode = nodes.find(
+  (n) => n.LedgerEntryType === 'LoanBroker'
+    && (n.LedgerIndex === brokerId || n.FinalFields?.index === brokerId),
+)
+const loanNode = nodes.find((n) => n.LedgerEntryType === 'Loan')
+const loanBroker = loanNode?.FinalFields?.LoanBrokerID ?? loanNode?.PreviousFields?.LoanBrokerID
+
+if (!brokerNode && tx.LoanBrokerID !== brokerId && loanBroker !== brokerId) continue
+```
+
+Related, same family: on a **default** the ledger deletes `PrincipalOutstanding` from the loan,
+so `FinalFields` carries nothing and the obvious read returns zero. Fall back to
+`PreviousFields.PrincipalOutstanding`, then to the broker's book movement.
+
+### 5. Both cover rates are 1e-5 units, so divide **both** by 1e5
+
+```
+cover = min(
+  ceil( DebtTotal * CoverRateMinimum/1e5 * CoverRateLiquidation/1e5 ),
+  principalOfTheDefaultedLoan,
+  CoverAvailable,
+)
+```
+
+At `CoverRateMinimum = CoverRateLiquidation = 10000` the coefficient is 0.10 x 0.10 = 0.01,
+not 0.10. Dividing once makes the answer 100x too large and it still looks like a plausible
+cover figure.
+
+```js
+const RATE_SCALE = 100000
+const c = new Decimal(broker.CoverRateMinimum).div(RATE_SCALE)
+  .times(new Decimal(broker.CoverRateLiquidation).div(RATE_SCALE))
+const consumed = Decimal.min(
+  new Decimal(broker.DebtTotal).times(c).ceil(),  // ceil, and the base is the TOTAL book
+  principalOfTheDefaultedLoan,
+  new Decimal(broker.CoverAvailable),
+)
+```
+
+Three things an assistant gets wrong here beyond the scale: the result is **ceilinged**, the
+base is the broker's **total** `DebtTotal` rather than the principal of the loan that defaulted,
+and `DebtTotal` is decremented as each default lands, which is what makes the total order
+dependent.
+
+While on flags: test loan flags by **bit**, never by equality. A loan can carry more than one.
+
+```js
+const IMPAIRED = 0x20000   // 131072
+const DEFAULTED = 0x10000  // 65536
+const isImpaired = (Number(loan.Flags ?? 0) & IMPAIRED) === IMPAIRED
+```
+
+### 6. `OracleSet` is not a merge
+
+A `(base, quote)` pair already on the object but omitted from the transaction is **kept with its
+price stripped**. Publishing one dimension blanks the other five. Reusing a document id for
+different assets accumulates stale pairs until the series exceeds the ledger ceiling and nothing
+can be published at all. Always send the full set of `PriceData` entries you want the object to
+hold.
+
+Three more on the same object:
+
+- `LastUpdateTime` must **strictly increase**. Equal or lower is rejected.
+- A `LastUpdateTime` in the future **bricks** the object until wall clock catches up.
+- `AssetPrice` is a `UInt64` serialised as **hexadecimal**. Writing `"100"` means 256.
+
+```js
+const encodePrice = (n) => BigInt(n).toString(16).toUpperCase()
+const decodePrice = (hex) => BigInt(`0x${hex}`)
+```
+
+`LastUpdateTime` is UNIX epoch, not Ripple epoch. The six dimensions are `NAV`, `HDL`, `LIQ`,
+`COV`, `CNC` and `DDL`. Scale is 6 for `NAV` and 4 for the other five, so a stored value `v` at
+scale `s` decodes to `v * 10^-s`.
+
+### The checklist, ready to paste
+
+```md
+## XLS-65 / XLS-66 rules (non-negotiable)
+1. Monetary values are decimal strings up to 19 significant digits. Use decimal.js at
+   precision 40. Never Number(), never parseFloat, never BigInt() on a value that may be
+   in scientific notation.
+2. An absent ledger field means zero, not missing. rippled omits type defaults.
+3. Never diff PreviousFields. It omits any field whose previous value was the default, so
+   the first impairment of a healthy vault emits PreviousFields: {}. Re-read the object.
+4. DomainID lives on the share MPTokenIssuance, not on the Vault. tfVaultPrivate
+   (0x00010000) is required alongside it or nothing is gated.
+5. LoanManage carries LoanID only, no LoanBrokerID, and an impairment does not touch the
+   LoanBroker object. Join through Loan.FinalFields.LoanBrokerID in the same metadata.
+6. A defaulted loan loses PrincipalOutstanding from FinalFields. Read PreviousFields.
+7. CoverRateMinimum and CoverRateLiquidation are both 1e-5 units. Divide BOTH by 1e5.
+   Ceil the product. The base is LoanBroker.DebtTotal, not the defaulted principal.
+8. Test loan Flags by bit (& 0x20000), never by equality.
+9. OracleSet is not a merge: an omitted pair is kept with its price stripped. Send every
+   PriceData entry every time. LastUpdateTime must strictly increase, is UNIX epoch, and
+   must never be in the future. AssetPrice is hex.
+10. MPTokenMetadata is write-once: settable on VaultCreate, rejected on VaultSet,
+    tecNO_PERMISSION on MPTokenIssuanceSet. Max 1024 bytes. Put a pointer there, not a
+    number.
+```
+
+<Tip>
+If an assistant writes ledger-reading code that has not been run against a live node, treat the
+output as unverified. Two research agents contradicted each other during this project's recon
+and only live execution settled it. `npm run verify` proves the full lending chain on Devnet in
+about 45 seconds.
+</Tip>

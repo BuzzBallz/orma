@@ -1,0 +1,1016 @@
+---
+title: "API reference"
+description: "The eleven routes Orma serves, the question each one answers, its parameters, and a real Devnet response."
+---
+
+Orma exposes eleven `GET` routes over plain HTTP. The server is `src/api.mjs`: `node:http`, no
+framework, no middleware stack. The default listen address is `http://localhost:8787`, overridable
+with `PORT`.
+
+Every response body on this page was captured from the running service against XRPL Devnet on
+2026-09-12, server build `3.4.0-rc5`. All of them were taken at ledger `5263343` except the
+`/api/demo/state` capture, which is from ledger `5263439` a few minutes later. Responses are
+trimmed for length where noted, never rewritten.
+
+<Warning>
+This runs on Devnet, not Mainnet. XLS-65 vaults and XLS-66 lending are not amended into Mainnet, so
+there is no production deployment to point at. `network` is hard-coded to `"devnet"` in
+`src/api.mjs`, and `health.source` reports where the data came from: `"devnet"` for live reads,
+`"fixtures"` for the recorded ring.
+</Warning>
+
+## Rules that bind every response
+
+These are contract-level, not per-route. They are what makes the responses safe to consume.
+
+### 1. Money is a decimal string in drops
+
+One XRP is $10^{6}$ drops. Every monetary quantity leaves the API as a plain decimal string of
+drops, never a JSON number.
+
+XRPL `NUMBER` fields carry up to 19 significant digits and may arrive in scientific notation. A
+JSON parse into a JS `number` destroys them silently, and `BigInt("1e17")` throws outright.
+
+```js
+// wrong, both of these
+const nav = Number(body.navCorrect)
+const assets = parseFloat(body.assetsTotal)
+
+// right
+import Decimal from 'decimal.js'
+Decimal.set({ precision: 40 })
+const assets = new Decimal(body.assetsTotal)   // "51000000" drops
+```
+
+Internally every amount is a `Decimal` at precision 40, and every serialisation goes through
+`str()` in `src/num.mjs`, which emits `toFixed()` and therefore never scientific notation. A real
+captured value that breaks a float: `"periodicPayment": "3333346.017258355048"`.
+
+For chart pixel positions, `Number(x)` after dividing to a human scale is acceptable. For anything
+displayed as a figure, it is not.
+
+### 2. Absent means zero, and the API normalises it away
+
+rippled omits any field whose value equals the type default. A vault carrying no unrealised loss
+has **no `LossUnrealized` key at all**, not `"0"`. That single behaviour is the root of the finding
+this whole project is built on, and it is handled in exactly one place: `num()` in `src/num.mjs`,
+which maps `undefined`, `null` and `""` to zero.
+
+Consumers may rely on presence. Every numeric field in every response below is always emitted,
+defaulting to `"0"`.
+
+<Note>
+Two deliberate exceptions, both of which use `null` to mean "not known" rather than "zero".
+
+On `broker-history`, `debtBefore`, `debtAfter`, `coverBefore` and `coverAfter` are `null`, not
+`"0"`, when `brokerStateKnown` is `false`. An impairment does not touch the `LoanBroker` object at
+all, so that transaction genuinely does not report the book. Emitting `"0"` would read as an empty
+book, which is a different and much worse claim.
+
+On the `pledge` block of `/api/mpt/:mptId/nav` and `/api/mpt/:mptId/resolve`, `valueHeld`,
+`valueReported` and `overstatement` are `null` when the resolved document carries no `unitValue`,
+alongside an `unpriced` explanation. Same reasoning: an unvaluable pledge is not a pledge worth
+zero.
+</Note>
+
+### 3. Every 200 carries a ledger stamp
+
+`serverTime` and `ledgerIndex` are prepended to every successful body by `stamp()`. `GET /api/health`
+is the one body that does not go through `stamp()`, because it builds the same two fields itself.
+`serverTime` is the **ledger close time** converted from the Ripple epoch (offset `946684800`), not
+the server's wall clock, so two fields read in the same response come from the same ledger.
+
+### 4. The default list order is worst first, by grade
+
+`GET /api/vaults` sorts by `gradeNumeric` **ascending**. It does **not** sort by
+`navDivergenceBps`.
+
+$$\delta = \operatorname{round}\left( 10^{4}\cdot\frac{\text{NAV}_{\text{naive}} - \text{NAV}_{\text{held}}}{\text{NAV}_{\text{naive}}}\right)$$
+
+Rounded to the nearest basis point, not truncated: `bps()` in `src/num.mjs` ends in `toFixed(0)`,
+which is half-up under `decimal.js`. The captured divergence of `1961` is $1960.7843\ldots$ rounded,
+and truncation would report `1960`.
+
+Divergence only becomes non-zero once a loss has been **declared**. A manager sitting on an overdue
+book who has declared nothing reports $L = 0$, so $\delta = 0$, so a divergence sort puts the most
+dangerous facility at the bottom of the list. In the live capture below, `Kestrel Bridge Financing
+II` sorts first at `gradeNumeric: 26` with `navDivergenceBps: 0`, above `Meridian Trade Finance I`
+at `gradeNumeric: 89` with `navDivergenceBps: 1961`. That inversion is the thesis, not a sorting
+bug: Meridian declared its loss and holds cash against every remaining claim, Kestrel has two
+distressed loans and reports par.
+
+### 5. Errors
+
+```json
+{
+  "error": {
+    "code": "VAULT_NOT_FOUND",
+    "message": "No vault with that id",
+    "retryable": false
+  }
+}
+```
+
+| code | status | retryable | raised when |
+|---|---|---|---|
+| `VAULT_NOT_FOUND` | 404 | false | the id is well formed but no snapshot exists for it |
+| `NO_SHARE_MPT` | 404 | false | the vault has no share issuance, so there is nothing to value |
+| `NO_BROKER` | 404 | false | the vault has no `LoanBroker`, so there is no conduct to reconstruct |
+| `SHARE_NOT_TRACKED` | 404 | false | no facility on this service issues that MPT |
+| `NOT_FOUND` | 404 | false | no route matched, or the demo capture file is missing |
+| `FORBIDDEN` | 403 | false | an operator `POST` from something other than loopback |
+| `INTERNAL` | 500 | true | anything unhandled |
+
+A vault id must match `[A-Fa-f0-9]{64}` and an MPT issuance id `[A-Fa-f0-9]{48}`. Lowercase hex is
+accepted and upper-cased before lookup. A path that matches no pattern returns
+`{"error":{"code":"NOT_FOUND","message":"No route GET /api/nope","retryable":false}}`.
+
+### 6. CORS, and which two routes are deliberately public
+
+Every response carries `Access-Control-Allow-Origin: *`, `Access-Control-Allow-Headers: *` and
+`Access-Control-Allow-Methods: GET,POST,OPTIONS`, set unconditionally at the top of the request
+handler so the local demo frontend works from any origin. `OPTIONS` returns `204`.
+
+The meaningful distinction is caching, and it is opt-in per route. The default is
+`Cache-Control: no-store`. Three routes pass `{ cors: true }` and get `Cache-Control: public,
+max-age=4` instead:
+
+- `GET /api/vaults/:vaultId/nav`
+- `GET /api/mpt/:mptId/nav`
+- `GET /api/mpt/:mptId/resolve`
+
+The first two exist to be called by a party with no relationship to us. That is the entire point of
+writing a URL into a token: a second broker handed vault shares as collateral holds an MPT issuance
+id and nothing else, has no access to the facility's reporting, and has no reason to ask us for
+permission first. Both serve read-only public ledger state, so there is nothing to protect, and
+`max-age=4` matches `POLL_MS`, the reader's 4000 ms poll interval in `src/poll.mjs`, so a cache
+cannot serve a figure older than one reader tick. `GET /api/mpt/:mptId/resolve` carries the flag as
+well, because it is the diagnostic a lender runs against those same two routes.
+
+<Warning>
+The metadata that carries the NAV URL is written into the `MPTokenIssuance` at creation and can
+never be rewritten. The contract at the end of those two routes is therefore effectively permanent:
+fields may be added, nothing may ever be renamed, retyped or removed.
+</Warning>
+
+---
+
+## Route index
+
+| method and path | answers |
+|---|---|
+| `GET /api/health` | is the reader connected, and how old is the data |
+| `GET /api/vaults` | which facilities are tracked, worst first |
+| `GET /api/vaults/:vaultId` | everything about one facility |
+| `GET /api/vaults/:vaultId/nav` | what is one unit actually worth |
+| `GET /api/vaults/:vaultId/gate` | is this facility gated, and by whom |
+| `GET /api/vaults/:vaultId/collateral` | what are the pledged shares worth to a lender |
+| `GET /api/vaults/:vaultId/broker-history` | what did this manager actually do |
+| `GET /api/mpt/:mptId/nav` | the same valuation, keyed by the token |
+| `GET /api/mpt/:mptId/resolve` | can a stranger get from the token to a valuation |
+| `GET /api/indexer-race` | proof the first impairment is invisible to metadata diffing |
+| `GET /api/demo/state` | which facilities are baked and live |
+
+---
+
+## GET /api/health
+
+Is the reader up, which ledger is it on, and is it currently degraded. No parameters.
+
+`ok` is `false` until the first poll tick completes. The API starts listening before the reader
+connects, which is honest rather than pretending to be ready.
+
+```bash
+curl -s http://localhost:8787/api/health
+```
+
+```json
+{
+  "ok": true,
+  "contractVersion": "1.0.0",
+  "source": "devnet",
+  "network": "devnet",
+  "ledgerIndex": 5263343,
+  "serverTime": "2026-09-12T22:20:22Z",
+  "buildVersion": "3.4.0-rc5"
+}
+```
+
+Two fields appear only while upstream is unhappy: `degraded: true` and
+`lastLedgerAgeSeconds: <number>`. They are additive, and `source` never flips automatically. On a
+failed read the reader keeps the last good snapshot rather than blanking, so a consumer should show
+stale data with an age banner rather than an empty screen.
+
+`buildVersion` is reported, never asserted. Devnet moves.
+
+---
+
+## GET /api/vaults
+
+Which facilities are tracked, and which one needs attention first. No parameters.
+
+Sorted by `gradeNumeric` ascending. See rule 4 above for why not by divergence.
+
+```bash
+curl -s http://localhost:8787/api/vaults
+```
+
+```jsonc
+{
+  "serverTime": "2026-09-12T22:20:22Z",
+  "ledgerIndex": 5263343,
+  "vaults": [
+    {
+      "vaultId": "24EAA01AD4CE70D8ABB4ACB4255DC4C216B8AF3B9E7315DB8052BFC1E5810089",
+      "label": "Kestrel Bridge Financing II",
+      "owner": "rD26gw5goDqU784caePMoA82givcJBjStk",
+      "pseudoAccount": "rP3Z27Qb2HXg8ArLZ6VQkkjwYCWpmadN49",
+      "asset": { "kind": "XRP", "currency": "XRP", "issuer": null, "mptIssuanceId": null },
+      "vaultKind": "ClosedEnded",
+      "phase": "Investment",
+      "grade": "B",
+      "gradeNumeric": 26,
+      "trend": "stable",
+      "assetsTotal": "10500000",
+      "assetsAvailable": "10500000",
+      "lossUnrealized": "0",
+      "navNaive": "0.210000",
+      "navCorrect": "0.210000",
+      "navDivergenceBps": 0,
+      "redemptionAt": "2026-09-13T15:08:35Z",
+      "secondsToRedemption": 60494,
+      "loanCount": 2,
+      "distressedLoanCount": 2,
+      "oraclePublished": true
+    },
+    {
+      "vaultId": "864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835",
+      "label": "Meridian Trade Finance I",
+      // ... same shape
+      "grade": "AA",
+      "gradeNumeric": 89,
+      "assetsTotal": "51000000",
+      "assetsAvailable": "41000000",
+      "lossUnrealized": "10000000",
+      "navNaive": "1.000000",
+      "navCorrect": "0.803922",
+      "navDivergenceBps": 1961,
+      "loanCount": 1,
+      "distressedLoanCount": 1,
+      "oraclePublished": true
+    }
+    // ... Calder Structured Credit III (AA, 89), Thorne Senior Secured I (AAA, 100)
+  ]
+}
+```
+
+Kestrel shows the case the whole system exists to catch: `lossUnrealized: "0"`, divergence zero, NAV
+reporting `0.210000` on both readings, and two distressed loans behind it. `gradeNumeric: 26` is the
+score's memory of realised capital destruction, which no NAV reading carries.
+
+<Note>
+`trend` is `"stable"` until the API has seen a vault twice, and the previous NAV is only recorded by
+the detail route. A consumer polling the list alone will see `"stable"` forever. Poll
+`/api/vaults/:vaultId` for the vault in focus if the trend matters. All four rows in the capture
+above read `"stable"` for exactly this reason.
+</Note>
+
+`secondsToRedemption` is computed against the ledger close time and goes negative once the
+redemption date has passed.
+
+---
+
+## GET /api/vaults/:vaultId
+
+Everything about one facility: the vault, its broker, the score with its full notch trace, every
+loan, the phase and redemption cliff, the on-chain oracle, and the alerts.
+
+| parameter | in | required | notes |
+|---|---|---|---|
+| `vaultId` | path | yes | 64 hex characters, case insensitive |
+
+```bash
+curl -s http://localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5
+```
+
+```jsonc
+{
+  "serverTime": "2026-09-12T22:20:22Z",
+  "ledgerIndex": 5263343,
+  "vault": {
+    // every field from the list row, plus:
+    "vaultId": "5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5",
+    "label": "Calder Structured Credit III",
+    "shareMptId": "000000014D667775372D5B78E07FFF294678C7F9CE82AFBC",
+    "sharesOutstanding": "51000000",
+    "scale": 0,
+    "withdrawalPolicy": "FirstComeFirstServe",
+    "isPrivate": false,
+    "domainId": null,
+    "subscriptionAt": "2026-09-12T21:11:47Z",
+    "leVersion": "CashBasis",
+    "explorerUrl": "https://devnet.xrpl.org/accounts/r3hE8HanpccSZdgmeHCfYFEkwxFjdDmmvt"
+  },
+  "broker": {
+    "loanBrokerId": "1C160EFFCA8208DFD8CE9B065A3C3C41CCA80758FBC3099BE27AACFBD1478173",
+    "owner": "rGMo2ke9of3GEqJwWAzDmFjrm6SwYowTsB",
+    "pseudoAccount": "rUUomEsKraSfCYppP9nZx7k7aAzEe7CY3B",
+    "debtTotal": "10000000",
+    "debtMaximum": "45000000",
+    "coverAvailable": "5000000",
+    "coverRateMinimum": 10000,
+    "coverRateLiquidation": 10000,
+    "managementFeeRate": 1000,
+    "coverRequired": "1000000",
+    "coverShortfall": "0",
+    "maxLiquidatableNow": "100000",
+    "strandedCoverFraction": "0.9800"
+  },
+  "score": {
+    "grade": "AA",
+    "gradeNumeric": 89,
+    "computedAt": "2026-09-12T22:20:21Z",
+    "methodVersion": "1.0.0",
+    // array order is LIQUIDITY, COVER, CONCENT, RECOG, DEADLINE, HEADLINE.
+    // Only the third is shown here.
+    "dimensions": [
+      {
+        "key": "CONCENT",
+        "label": "Concentration",
+        "value": "1.0000",
+        "unit": "ratio",
+        "grade": "D",
+        "notches": 0,
+        "explain": "Largest loan is 100.0% of broker debt. Cover is keyed to total debt, so one large default consumes disproportionately little cover.",
+        "worseIsHigher": true
+      }
+    ],
+    "notchTrace": [
+      { "from": "AAA", "rule": "anchor on DEADLINE (can claims be met at redemption)", "delta": 0, "to": "AAA" },
+      { "from": "AAA", "rule": "single loan >= 75% of broker debt (cover is keyed to total debt, not loan size)", "delta": -1, "to": "AA+" },
+      { "from": "AA+", "rule": "liquidatable cover < 5% of recognised loss", "delta": -1, "to": "AA" }
+    ]
+  },
+  "loans": [
+    {
+      "loanId": "D6979E3A3FD90234A8BE80FCB37589204C691D0AC1C741C4A780D02D5073F252",
+      "borrower": "raxskEENwfnRay2VaQroMoV4XYFUurggL5",
+      "status": "impaired",
+      "principalOutstanding": "10000000",
+      "totalValueOutstanding": "10000039",
+      "managementFeeOutstanding": "0",
+      "periodicPayment": "3333346.017258355048",
+      "interestRate": 100000,
+      "lateInterestRate": 20000,
+      "paymentInterval": 60,
+      "gracePeriod": 60,
+      "paymentRemaining": 3,
+      "nextPaymentDueAt": "2026-09-12T21:13:10Z",
+      "secondsUntilDue": -4031,
+      "secondsUntilDefaultable": -3971,
+      "shareOfDebtTotal": "1.0000",
+      "impairable": false,
+      "explorerUrl": "https://devnet.xrpl.org/transactions/D6979E3A3FD90234A8BE80FCB37589204C691D0AC1C741C4A780D02D5073F252"
+    }
+  ],
+  "phaseInfo": {
+    "phase": "Investment",
+    "canDeposit": false,
+    "canWithdraw": false,
+    "withdrawBlockedReason": "tecTOO_SOON",
+    "nextBoundaryAt": "2026-09-13T15:11:47Z",
+    "secondsToNextBoundary": 60686,
+    "claimsAtRedemption": "41000000",
+    "liquidityAtRedemption": "41100000",
+    "projectedShortfall": "0",
+    "shortfallPct": "0.00"
+  },
+  "oracle": {
+    "published": true,
+    "oracleDocumentId": 3,
+    "publisher": "rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B",
+    "objectIndex": "03C7B0E151129510F11FF92CCE8FBB3E7AD3C55B25EDA6EB414324E3E995078A",
+    "baseAssetHex": "5763707D11EA19D1B5FF04E4EBA4F9336057955C",
+    "lastUpdateAt": "2026-09-12T22:20:02Z",
+    "ageSeconds": 11,
+    "stale": false,
+    "dimensionsOnChain": [
+      { "key": "CNC", "raw": "2710",  "value": "1.0000",   "scale": 4 },
+      { "key": "COV", "raw": "64",    "value": "0.0100",   "scale": 4 },
+      { "key": "DDL", "raw": "0",     "value": "0.0000",   "scale": 4 },
+      { "key": "HDL", "raw": "22c4",  "value": "0.8900",   "scale": 4 },
+      { "key": "LIQ", "raw": "1f67",  "value": "0.8039",   "scale": 4 },
+      { "key": "NAV", "raw": "c4452", "value": "0.803922", "scale": 6 }
+    ],
+    "aggregate": null
+  },
+  "alerts": [
+    {
+      "code": "NAV_DIVERGENCE",
+      "severity": "high",
+      "title": "Reported NAV overstates recoverable value by 19.61%",
+      "detail": "AssetsTotal does not net LossUnrealized. Tools reading AssetsTotal alone report par.",
+      "sinceAt": null
+    },
+    {
+      "code": "CONCENTRATION_HIGH",
+      "severity": "medium",
+      "title": "Largest loan is 100% of broker debt",
+      "detail": "Cover is keyed to total broker debt, not to the defaulting loan, so a single large default liquidates disproportionately little cover.",
+      "sinceAt": null
+    }
+  ]
+}
+```
+
+Things in there that are easy to misread:
+
+- `oracle.dimensionsOnChain[].raw` is **hexadecimal**, because `AssetPrice` on an XLS-47 `PriceData`
+  is a `UInt64` serialised as hex. `c4452` is 803922, which at `scale: 6` decodes to `0.803922`.
+  Writing `"100"` into that field means 256, not one hundred. Full detail on /oracle.
+- `coverRateMinimum` and `coverRateLiquidation` are in units of $10^{-5}$. A stated `10000` is
+  $0.10$. **Both** are divided by $10^{5}$, which is why `maxLiquidatableNow` is
+  $\lceil 10{,}000{,}000 \times 0.10 \times 0.10 \rceil = 100{,}000$ drops against a
+  `coverAvailable` of `"5000000"`. `strandedCoverFraction: "0.9800"` is the 98% of posted cover that
+  cannot be reached at the current book size.
+- `canWithdraw: false` with `withdrawBlockedReason: "tecTOO_SOON"` is **not an error**.
+  `VaultWithdraw` returns `tecTOO_SOON` for the entire Investment phase of a closed-ended vault
+  regardless of liquidity. It is a phase predicate, verified on Devnet with 80 XRP of
+  `AssetsAvailable` sitting in the vault.
+- `impairable: false` on an already-impaired loan is correct. A loan may only be impaired once it is
+  already past due, and only once.
+- `score.notchTrace` is the entire derivation. No weights are applied anywhere. See /scoring.
+
+---
+
+## GET /api/vaults/:vaultId/nav
+
+What is one unit of this facility actually worth. This is the small, stable document a token's own
+metadata points at, keyed by vault id.
+
+| parameter | in | required | notes |
+|---|---|---|---|
+| `vaultId` | path | yes | 64 hex characters |
+
+Sends `Cache-Control: public, max-age=4`.
+
+```bash
+curl -s http://localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5/nav
+```
+
+```json
+{
+  "serverTime": "2026-09-12T22:20:22Z",
+  "ledgerIndex": 5263343,
+  "schema": "orma.nav/1",
+  "asOf": "2026-09-12T22:20:22Z",
+  "instrument": {
+    "kind": "vault-share",
+    "vaultId": "5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5",
+    "shareMptId": "000000014D667775372D5B78E07FFF294678C7F9CE82AFBC",
+    "unitsOutstanding": "51000000",
+    "asset": { "kind": "XRP", "currency": "XRP", "issuer": null, "mptIssuanceId": null },
+    "vaultKind": "ClosedEnded",
+    "phase": "Investment",
+    "redemptionAt": "2026-09-13T15:11:47Z"
+  },
+  "unitValue": {
+    "held": "0.803922",
+    "reported": "1.000000",
+    "divergenceBps": 1961,
+    "basis": "assets net of recognised loss, divided by units outstanding"
+  },
+  "valuation": {
+    "currency": "XRP",
+    "scale": 6,
+    "perUnitHeld": "0.803922",
+    "perUnitReported": "1.000000"
+  },
+  "assessment": {
+    "grade": "AA",
+    "gradeNumeric": 89,
+    "methodVersion": "1.0.0",
+    "advisory": true
+  },
+  "provenance": {
+    "network": "devnet",
+    "source": "devnet",
+    "assetsTotal": "51000000",
+    "lossUnrealized": "10000000",
+    "unitsOutstanding": "51000000",
+    "recompute": "(assetsTotal - lossUnrealized) / unitsOutstanding",
+    "buildVersion": "3.4.0-rc5"
+  }
+}
+```
+
+Both readings are returned on purpose:
+
+$$\text{NAV}_{\text{naive}} = \frac{A}{S} \qquad \text{NAV}_{\text{held}} = \frac{A - L}{S}$$
+
+Handing over only the honest number asks the consumer to take our word for it. Handing over both,
+with the gap named in basis points, lets them see what the obvious computation would have told them.
+`provenance` names the three ledger fields so they can recompute it without trusting us:
+$(51{,}000{,}000 - 10{,}000{,}000) / 51{,}000{,}000 = 0.803922$.
+
+`assessment` is labelled `advisory: true` and can be `null`. The valuation is a measurement, the
+grade is an opinion, and the grade failing to compute must never take the valuation down with it.
+
+---
+
+## GET /api/vaults/:vaultId/gate
+
+Is this facility gated, and by whom. This is enforcement, not advice: an LP without an accepted
+credential from a named issuer cannot deposit at all, and the ledger is what refuses them.
+
+| parameter | in | required | notes |
+|---|---|---|---|
+| `vaultId` | path | yes | 64 hex characters |
+
+Cached 30 seconds per vault. A domain changes when someone edits it, not every four seconds, and the
+lookup costs two extra ledger reads.
+
+```bash
+curl -s http://localhost:8787/api/vaults/4A5A8E3716D52E334AEB077ADB09456EF4A941CC26021A8EAD37F95B00190DF5/gate
+```
+
+```json
+{
+  "serverTime": "2026-09-12T22:20:22Z",
+  "ledgerIndex": 5263343,
+  "vaultId": "4A5A8E3716D52E334AEB077ADB09456EF4A941CC26021A8EAD37F95B00190DF5",
+  "gated": true,
+  "private": true,
+  "domainId": "FFBEC89D98B4E7CF52F4F254235086514A90CED0EC531941BDF747AF40C5A2FB",
+  "acceptedCredentials": [
+    {
+      "issuer": "rKQjjU5KFs9RAZCDvYVjcaoVK5gGsCJgkP",
+      "type": "ORMA-IG",
+      "typeHex": "4F524D412D4947"
+    }
+  ],
+  "domainOwner": "rGFFSqqY1R3764FKF7crU5F6bYh9qaD45S",
+  "note": null,
+  "issuerNamed": true,
+  "raterAddress": "rKQjjU5KFs9RAZCDvYVjcaoVK5gGsCJgkP"
+}
+```
+
+An ungated facility answers with the same shape and a populated `note`:
+
+```json
+{
+  "vaultId": "5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5",
+  "gated": false,
+  "private": false,
+  "domainId": null,
+  "acceptedCredentials": [],
+  "domainOwner": null,
+  "note": "open to any depositor",
+  "issuerNamed": false,
+  "raterAddress": "rKQjjU5KFs9RAZCDvYVjcaoVK5gGsCJgkP"
+}
+```
+
+<Warning>
+`DomainID` is **not** stored on the `Vault` ledger entry. It lives on the share `MPTokenIssuance`.
+Reading the `Vault` object to find out whether a vault is gated returns nothing, which reads exactly
+like "open to everyone". This route reads the issuance.
+</Warning>
+
+`gated` is true only when `private` **and** at least one accepted credential is present.
+`tfVaultPrivate` (`0x00010000`) is required alongside `DomainID` at `VaultCreate`: a `DomainID`
+without the flag enforces nothing, and `note` says so rather than silently reporting `gated: false`.
+
+`issuerNamed` answers the rater's own question, am I cited in this domain, without asking the vault
+owner. The vault owner signs `PermissionedDomainSet` naming our issuer. We sign nothing, we are not
+consulted, and we cannot decline. That is the correct shape for a rating. More on /gate.
+
+---
+
+## GET /api/vaults/:vaultId/collateral
+
+What are the pledged shares of this facility actually worth. This is the route a second broker calls
+before lending against a pledge.
+
+| parameter | in | required | default | notes |
+|---|---|---|---|---|
+| `vaultId` | path | yes | | 64 hex characters |
+| `accounts` | query | no | `WATCH_ACCOUNTS` plus the vault owner | comma separated addresses to scan for escrows. Added to the default set, not a replacement for it |
+| `haircut` | query | no | `0` | the lender's own discount, in percent |
+
+```bash
+curl -s "http://localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5/collateral?haircut=20"
+```
+
+```json
+{
+  "serverTime": "2026-09-12T22:20:22Z",
+  "ledgerIndex": 5263343,
+  "shareMptId": "000000014D667775372D5B78E07FFF294678C7F9CE82AFBC",
+  "navNaive": "1.000000",
+  "navCorrect": "0.803922",
+  "pledgeCount": 0,
+  "totalShares": "0",
+  "totalValueNaive": "0",
+  "totalValueCorrect": "0",
+  "totalOverstatement": "0",
+  "totalOverstatementPct": "0.00",
+  "pledges": []
+}
+```
+
+`haircut` is echoed per pledge as `haircutPct`, never at the top level, so this capture is byte for
+byte the same with and without `?haircut=20`: no pledge was standing against Calder at that ledger.
+
+Each element of `pledges`, when there are any, carries `escrowId`, `pledgor`, `beneficiary`,
+`shares`, `valueNaive`, `valueCorrect`, `overstatement`, `overstatementPct`, `haircutPct`,
+`maxLendable`, `finishAfter`, `cancelAfter` and `explorerUrl` (`presentCollateral` in
+`src/collateral.mjs`).
+
+The haircut applies to the **honest** value, never to the reported one:
+
+$$V_{\text{lendable}} = u \cdot \text{NAV}_{\text{held}} \cdot (1 - h)$$
+
+A haircut absorbs volatility. It does not absorb a misstatement. Marking a pledge at `valueNaive`
+and then taking 20% off leaves a lender who believes they are 20% over-collateralised and is in fact
+short.
+
+<Note>
+Vault shares are MPTs, and XLS-85 TokenEscrow accepts MPT amounts, so the pledge can sit on the
+ledger where anyone can read it. Confirmed on Devnet: `EscrowCreate` with
+`Amount: { mpt_issuance_id, value }` returns `tesSUCCESS`. What does not exist is a reverse index
+from an `mpt_issuance_id` to the escrows holding it, so a lender has to be told which accounts to
+scan. That is what `accounts` is for. An `Escrow` does appear in the owner directory of both the
+pledgor and the beneficiary with the same object index, so a lender can enumerate pledges made in
+their favour from their own account, and the API dedupes by escrow index so one pledge is not counted
+once per account scanned. The missing global index is filed as developer feedback.
+</Note>
+
+---
+
+## GET /api/vaults/:vaultId/broker-history
+
+What did this manager actually do, what would the fair sequence have paid depositors, and what
+should they do next.
+
+| parameter | in | required | notes |
+|---|---|---|---|
+| `vaultId` | path | yes | 64 hex characters. The first `LoanBroker` on the vault is used |
+
+Cached 15 seconds per broker. Reconstructing the history is many round trips.
+
+```bash
+curl -s http://localhost:8787/api/vaults/24EAA01AD4CE70D8ABB4ACB4255DC4C216B8AF3B9E7315DB8052BFC1E5810089/broker-history
+```
+
+```jsonc
+{
+  "serverTime": "2026-09-12T22:20:22Z",
+  "ledgerIndex": 5263343,
+  "loanBrokerId": "8DB104980C31CBE9F196508E7D748E8C31FB783CD4E0A3620AE0B476CBDEA3FA",
+  "owner": "rD26gw5goDqU784caePMoA82givcJBjStk",
+  "events": [
+    {
+      "kind": "default",
+      "at": "2026-09-12T21:11:02Z",
+      "hash": "FB23EC5313F85FA157D56966E0B0B1665068905988D925C70BB0E7C35C3B221B",
+      "loanId": "3D830C8049389AD0E7037933D21443635F35077D3A462A2C9783647354A644FE",
+      "brokerStateKnown": true,
+      "debtBefore": "40000000",
+      "debtAfter": "10000000",
+      "coverBefore": "10000000",
+      "coverAfter": "9600000",
+      "coverConsumed": "400000",
+      "principal": "30000000",
+      "exposure": "30000000"
+    },
+    {
+      "kind": "default",
+      "at": "2026-09-12T21:11:10Z",
+      "hash": "DE49DF0D6136B96AD28B253CD32100E5715078FD2D0AE6D1DB747AFECB803D1F",
+      "loanId": "74402C23FE8E2B30ACAC4A5001AF8D491DFC8A38924125798511618331B452C7",
+      "brokerStateKnown": true,
+      "debtBefore": "10000000",
+      "debtAfter": "0",
+      "coverBefore": "9600000",
+      "coverAfter": "9500000",
+      "coverConsumed": "100000",
+      "principal": "10000000",
+      "exposure": "10000000"
+    }
+    // ... preceded by one cover_deposit event at 2026-09-12T21:08:32Z
+  ],
+  "ordering": {
+    "applicable": true,
+    "defaultCount": 2,
+    "actualCoverPaid": "500000",
+    "bestPossible": "700000",
+    "worstPossible": "500000",
+    "costToDepositors": "200000",
+    "spread": "200000",
+    "fairness": "0.0000",
+    // observedOrder repeats the two defaults above as {loanId, at, hash, principal,
+    // debtBefore, coverConsumed}, in the sequence the broker actually declared them.
+    "fairOrder": ["10000000", "30000000"]
+  },
+  "reputation": {
+    "grade": "E",
+    "score": 25,
+    "observations": {
+      "defaults": 2,
+      "impairments": 0,
+      "defaultsWithoutPriorImpairment": 2,
+      "coverWithdrawals": 0,
+      "eventsRetained": 3
+    },
+    "findings": [
+      {
+        "code": "ORDERING_SELF_SERVING",
+        "detail": "Declared losses in an order close to the one that minimises their own first-loss contribution (sequence score 0.0000). The choice cost investors 0.200000 XRP against the fair order."
+      },
+      {
+        "code": "DEFAULT_WITHOUT_IMPAIRMENT",
+        "detail": "2 exposures were written off with no prior warning, so the loss was never signalled before it was taken."
+      }
+    ],
+    "caveat": "Reconstructed from the public record only, which is retained for roughly 29 days. Conduct before that window is not visible here."
+  },
+  "recommendation": {
+    "applicable": false,
+    "reason": "fewer than two distressed loans",
+    "candidates": 0
+  }
+}
+```
+
+This is the second lever, measured. Cover liquidated on one default is
+
+$$T(p) = \min\Big(\big\lceil D \cdot c_{\min} \cdot c_{\text{liq}} \big\rceil,\; p,\; C\Big)$$
+
+with $D$ the broker's **total** book, not the principal of the exposure that defaulted, and $D$
+decremented as each default lands. Declaring the largest exposure first therefore consumes the least
+first-loss capital. In this capture, 30 XRP first then 10 XRP consumed `"500000"` drops of cover.
+10 XRP first then 30 XRP would have consumed `"700000"`. The 200,000 drop difference falls on the
+unit holders, on identical losses.
+
+`bestPossible` is best for depositors, meaning the most cover consumed. `worstPossible` is the
+least. `fairness` is the observed consumption placed between them:
+
+$$\phi = \frac{T_{\text{observed}} - T_{\min}}{T_{\max} - T_{\min}}$$
+
+`"0.0000"` is the investor-worst sequence, `"1.0000"` the best, and it is defined as `"1.0000"` when
+the two extremes coincide. `recommendation` is the same arithmetic pointed forwards, and is only
+`applicable` with two or more distressed loans. Derivation on /ordering.
+
+<Note>
+`LoanManage` carries no `LoanBrokerID`, and an impairment does not touch the `LoanBroker` object at
+all, so a naive filter over `account_tx` silently drops every impairment. The join that closes it is
+`Loan.FinalFields.LoanBrokerID` in the same transaction metadata. Before that fix every default
+looked unsignalled, and the rule written to reward disclosure was penalising it.
+</Note>
+
+---
+
+## GET /api/mpt/:mptId/nav
+
+The same valuation as `/api/vaults/:vaultId/nav`, keyed by the share token instead of the vault,
+because the issuance id is the only identifier a holder has. This is the route the token's own
+metadata resolves to.
+
+| parameter | in | required | notes |
+|---|---|---|---|
+| `mptId` | path | yes | 48 hex characters |
+| `units` | query | no | value a specific pledge of N units |
+
+Sends `Cache-Control: public, max-age=4`. Returns `SHARE_NOT_TRACKED` (404) if no tracked facility
+issues that token.
+
+```bash
+curl -s "http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav?units=1000000"
+```
+
+The body is identical to `/api/vaults/:vaultId/nav` above, `schema: "orma.nav/1"`, plus one block
+when `units` is given:
+
+```json
+{
+  "pledge": {
+    "units": "1000000",
+    "valueHeld": "803922",
+    "valueReported": "1000000",
+    "overstatement": "196078"
+  }
+}
+```
+
+The `units` parameter exists so a lender does not have to reimplement decimal arithmetic to use the
+figure. One million units against a held NAV of `0.803922` is worth `803922` drops. A tool reading
+`AssetsTotal` alone marks the same pledge at `1000000`, an overstatement of `196078` drops, which is
+19.61%.
+
+This route never follows a metadata pointer itself. It is what a pointer points at, and a route that
+followed one would be a loop.
+
+---
+
+## GET /api/mpt/:mptId/resolve
+
+Can a stranger holding nothing but a token get to a valuation. This is the diagnostic that runs the
+whole loop a second broker runs and reports every step, including the failures.
+
+| parameter | in | required | default | notes |
+|---|---|---|---|---|
+| `mptId` | path | yes | | 48 hex characters |
+| `resolve` | query | no | `true` | `false` stops before following the pointer |
+| `units` | query | no | | value a pledge against whatever was resolved |
+
+```bash
+curl -s http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/resolve
+```
+
+```jsonc
+{
+  "serverTime": "2026-09-12T22:20:22Z",
+  "ledgerIndex": 5263343,
+  "issuanceId": "000000014D667775372D5B78E07FFF294678C7F9CE82AFBC",
+  "issuer": "r3hE8HanpccSZdgmeHCfYFEkwxFjdDmmvt",
+  "unitsOutstanding": "51000000",
+  "resolved": true,
+  "navUrl": "http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav",
+  "steps": [
+    { "step": "read MPTokenIssuance", "ok": true, "detail": "issuer r3hE8HanpccSZdgmeHCfYFEkwxFjdDmmvt, 51000000 units outstanding" },
+    { "step": "decode metadata", "ok": true, "detail": "valid JSON" },
+    { "step": "XLS-89 conformance", "ok": true, "detail": "asset_class rwa" },
+    { "step": "find valuation pointer", "ok": true, "detail": "http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav" },
+    { "step": "follow pointer", "ok": true, "detail": "unit value 0.803922" }
+  ],
+  "metadata": {
+    "present": true,
+    "meta": {
+      "ticker": "ORMA-CSC3",
+      "name": "Calder Structured Credit III",
+      "asset_class": "rwa",
+      "issuer_name": "Orma",
+      "desc": "Redeemable claim on a closed-ended private credit facility. Valuation is net of recognised loss.",
+      "orma": {
+        "v": 1,
+        "instrument": "vault-share",
+        "nav_url": "http://localhost:8787/api/mpt/{mpt_issuance_id}/nav",
+        "nav_url_param": "{mpt_issuance_id}",
+        "nav_basis": "assets net of recognised loss, divided by units outstanding",
+        "doc": "https://orma.credit/nav"
+      }
+    },
+    "conformance": {
+      "conformant": true,
+      "missing": [],
+      "assetClassValid": true,
+      "assetClass": "rwa",
+      "taxonomyNote": "No XLS-89 asset_class describes a yield-bearing pooled claim; rwa is the closest. See orma.instrument."
+    }
+  },
+  "nav": { /* the full orma.nav/1 document from the route above */ }
+}
+```
+
+The pointer stored on chain is a **template**, `.../mpt/{mpt_issuance_id}/nav`. The token's own id is
+substituted at resolve time, so one metadata blob is correct for every issuance that uses it.
+
+This route never throws. Every step reports what it found, and a failure is data rather than an
+exception, because "this collateral is opaque" is a legitimate and useful answer to give a lender. On
+failure the response carries `resolved: false`, the steps that did run, and `nav: null`, with
+`opaque: true` when the metadata could not be decoded at all.
+
+<Tip>
+Two failure modes worth knowing about. A pointer that answers HTTP 200 with a document carrying no
+`unitValue` is reported as `ok: false` with `"answered, but the document carries no unitValue"`, not
+as a success. And when a pledge cannot be valued, the `pledge` block is still returned with null
+values plus an `unpriced` explanation, rather than crashing the caller. Both rules exist because an
+early version of the pointer resolved to this diagnostic instead of to the valuation, returned a
+perfectly good 200 with no `unitValue` on it, and took the caller down.
+</Tip>
+
+Following the pointer is bounded by a 2500 ms `AbortController` timeout. It is a URL written by a
+third party, and it is the only step that leaves the ledger.
+
+---
+
+## GET /api/indexer-race
+
+The captured proof that the first impairment of a healthy vault is invisible to metadata diffing. No
+parameters. Served from `demo/indexer-race.json`, falling back to `fixtures/indexer-race.json`.
+
+```bash
+curl -s http://localhost:8787/api/indexer-race
+```
+
+```jsonc
+{
+  "serverTime": "2026-09-12T22:20:22Z",
+  "ledgerIndex": 5263343,
+  "capturedAt": "2026-09-12T21:07:56Z",
+  "capturedDuring": "XRPL Lending Protocol Hackathon, Paris, 12-13 September 2026",
+  "network": "devnet",
+  "label": "Meridian Trade Finance I",
+  "buildVersion": "3.4.0-rc5",
+  "transactionHash": "075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3",
+  "transactionResult": "tesSUCCESS",
+  "finding": "The first impairment of a previously-healthy vault is invisible to metadata diffing.",
+  "why": "LossUnrealized was 0 (the type default) so rippled omits it from PreviousFields. Under cash-basis accounting impairment changes nothing else on the Vault, so PreviousFields is entirely {} while FinalFields carries a non-zero LossUnrealized.",
+  "vaultId": "864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835",
+  "loanBrokerId": "41BD2EA81CD03ED9EAC612BFFC6179AC742120FC4A5E0DD1D3E4DCE7DB5B2F38",
+  "loanId": "60C170A9F1096E7200196E2DBC5849A5D8991C2F630123E77FF359B68F2B4188",
+  "vaultNode": {
+    "previousFields": {},
+    "finalFields": {
+      "AssetsTotal": "51000000",
+      "AssetsAvailable": "41000000",
+      "LossUnrealized": "10000000"
+    },
+    "healthyBefore": {
+      "AssetsTotal": "51000000",
+      "AssetsAvailable": "41000000",
+      "LossUnrealized": "0"
+    },
+    "sharesOutstanding": "51000000"
+  },
+  "loanNode": {
+    "previousFields": { "Flags": 0 },
+    "finalFieldsFlags": 131072
+  },
+  "readings": {
+    "naive":   { "formula": "AssetsTotal / sharesOutstanding", "value": "1.000000" },
+    "correct": { "formula": "(AssetsTotal - LossUnrealized) / sharesOutstanding", "value": "0.803922" },
+    "divergenceBps": 1961
+  },
+  "verdict": "PreviousFields is empty. An indexer diffing metadata sees no change on this vault."
+}
+```
+
+`previousFields: {}` on the `Vault` node is the entire finding. `LossUnrealized` moved from zero, and
+rippled omits from `PreviousFields` any field whose previous value was the type default. Under
+cash-basis accounting (`LEVersion = 1`) impairment moves nothing else on the `Vault`, so the diff is
+empty while `FinalFields` carries a recognised loss of 10 XRP. The only signal anywhere in the
+metadata is the `Loan` node's flags going from `0` to `131072`, on a different object.
+
+This is why the reader in `src/poll.mjs` re-reads full state every 4 seconds and never diffs
+`PreviousFields`. Test flags by bit, not by equality: a loan can carry more than one flag, and
+`Flags === 131072` stops matching the day it does.
+
+---
+
+## GET /api/demo/state
+
+Which facilities are baked and which one the demo is pointed at. Operator route, read-only, no
+parameters. A consumer should not depend on it.
+
+```bash
+curl -s http://localhost:8787/api/demo/state
+```
+
+```jsonc
+{
+  "serverTime": "2026-09-12T22:25:31Z",
+  "ledgerIndex": 5263439,
+  "bakedVaults": [
+    {
+      "vaultId": "4A5A8E3716D52E334AEB077ADB09456EF4A941CC26021A8EAD37F95B00190DF5",
+      "label": "Thorne Senior Secured I",
+      "phase": "Subscription",
+      "redemptionAt": "2026-09-14T09:15:20Z"
+    },
+    {
+      "vaultId": "864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835",
+      "label": "Meridian Trade Finance I",
+      "phase": "Investment",
+      "redemptionAt": "2026-09-13T15:05:25Z"
+    },
+    // ... Calder Structured Credit III and Kestrel Bridge Financing II, same shape
+  ],
+  "activeVaultId": "4A5A8E3716D52E334AEB077ADB09456EF4A941CC26021A8EAD37F95B00190DF5",
+  "phase": "Subscription"
+}
+```
+
+Note the ordering difference against `GET /api/vaults`: this route reports the reader's own insertion
+order, which follows the filenames in `demo/` sorted alphabetically. The vault list route sorts by
+grade.
+
+The four facilities are baked by the scripts in `src/demo/` and their ids are written to
+`demo/*.json`, which is how `npm start` finds them without anyone copying a 64-character hex id by
+hand while someone is watching.
+
+---
+
+## Operator routes
+
+There is one further family, `POST /api/demo/:action`, which mutates ledger state: baking a facility,
+impairing a loan, declaring a default, revoking a credential. It is not part of the read API and it
+is not documented per action here, because the actions available depend on what the running instance
+was started with.
+
+It is bound to loopback. A request whose remote address is neither `127.0.0.1` nor `::1` is refused
+with `403 FORBIDDEN` unless it carries an `X-Demo-Key` header matching the `DEMO_KEY` environment
+variable. An endpoint that can default a loan should not be reachable from venue wifi in a room full
+of hackers.

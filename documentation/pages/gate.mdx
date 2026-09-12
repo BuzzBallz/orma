@@ -1,0 +1,373 @@
+---
+title: "The gate"
+description: "Enforcement with XLS-70 credentials and an XLS-80 permissioned domain: the four transactions, the two limited partners, the revocation asymmetry, and the three traps that hide whether a gate is working at all."
+---
+
+Everything else Orma does measures a facility and publishes the measurement. This page is the part that
+makes a measurement bind. A limited partner holding a credential we issued deposits into a gated vault and
+the transaction succeeds. A limited partner without one submits the same transaction, for the same amount,
+in the same wave, and the ledger returns `tecNO_AUTH`. Orma is not in the loop at the moment that happens.
+Nobody has to read our report, agree with it, or act on it.
+
+The measurement is on [the score](/scoring) and the [oracle](/oracle). This page is only about enforcement.
+
+<Note>
+Devnet only. XLS-65 vaults and XLS-66 lending are not on Mainnet, so every hash below is a Devnet hash,
+taken on network id 2 at `wss://s.devnet.rippletest.net:51233` against the build the bake recorded,
+rippled `3.4.0-rc5`. The two standards the gate itself is built from, XLS-70 credentials and XLS-80
+permissioned domains, are live on Mainnet; what keeps this page Devnet-only is the vault underneath. The
+transactions are real. The network they ran on is not the one that holds anyone's money.
+</Note>
+
+## The chain
+
+Four transactions, signed by three different parties, none of whom has to trust the others.
+
+| # | transaction | signed by | result | hash |
+|---|---|---|---|---|
+| 1 | `CredentialCreate` | the rater (us) | `tesSUCCESS` | `619CC767741EFF1EA4DD8AD36F7CB400AE2175540CEC600751E565A73891B26B` |
+| 2 | `CredentialAccept` | **the subject**, the LP | `tesSUCCESS` | `41F98989B64BD7329118B29B5FCB3AD148DF5520171A3A94259AC4CB51C9ED07` |
+| 3 | `PermissionedDomainSet` | the vault owner, alone | `tesSUCCESS` | `4C425830675B021EB8A74904783D1DBDE516C74534C76E84A2899695DF3D87F9` |
+| 4 | `VaultCreate` with `tfVaultPrivate` and `DomainID` | the vault owner | `tesSUCCESS` | `3FC79BF77240B0D52148428DABEAC0A5F4971957ABEC1D429ABDF297470F2461` |
+
+The facility that came out of it is **Thorne Senior Secured I**, vault
+`4A5A8E3716D52E334AEB077ADB09456EF4A941CC26021A8EAD37F95B00190DF5`, domain
+`FFBEC89D98B4E7CF52F4F254235086514A90CED0EC531941BDF747AF40C5A2FB`.
+
+### 1. CredentialCreate: we issue, and nothing happens yet
+
+The issuer names a subject and a type. The type is a hex blob of 1 to 64 bytes; outside that range rippled
+returns `temMALFORMED`, so the encoding is not optional decoration.
+
+```js
+// src/credentials.mjs
+export const hexType = (s) => Buffer.from(s, 'utf8').toString('hex').toUpperCase()
+
+export const issueCredential = (client, issuer, subject, type) =>
+  submitValidated(client, issuer, {
+    TransactionType: 'CredentialCreate',
+    Subject: subject,
+    CredentialType: hexType(type),
+  })
+```
+
+`ORMA-IG` is 7 bytes and encodes to `4F524D412D4947`. We key the credential to the **bar it certifies**,
+not to a facility:
+
+| bar | credential type | what it asserts |
+|---|---|---|
+| `ORMA-IG` | `4F524D412D4947` | may enter facilities graded BBB- or better |
+| `ORMA-SPEC` | `4F524D412D53504543` | may enter speculative-grade facilities |
+
+One credential per facility would be a whitelist wearing a credential's clothes. Keyed to the bar, the same
+credential is reusable in every domain that names our issuer, which is the point of having a domain at all.
+
+### 2. CredentialAccept: the subject opts in, or the credential grants nothing
+
+This is the step that is easy to skip when reading the spec, and it is the one that decides whether the
+gate works. After `CredentialCreate` alone the credential exists on the ledger and the LP's deposit is
+still `tecNO_AUTH`. The subject must sign.
+
+```js
+export const acceptCredential = (client, subject, issuerAddress, type) =>
+  submitValidated(client, subject, {
+    TransactionType: 'CredentialAccept',
+    Issuer: issuerAddress,
+    CredentialType: hexType(type),
+  })
+```
+
+A credential is not something that can be done **to** someone. The rater asserts, the subject accepts, and
+only both together admit anyone anywhere.
+
+### 3. PermissionedDomainSet: we are cited, and we are not asked
+
+The vault owner builds a domain listing the issuers they will accept. Orma signs nothing here. We are not
+consulted. We cannot decline.
+
+```js
+export async function createDomain(client, owner, accepted) {
+  const r = await submitValidated(client, owner, {
+    TransactionType: 'PermissionedDomainSet',
+    AcceptedCredentials: accepted.map((a) => ({
+      Credential: { Issuer: a.issuer, CredentialType: hexType(a.type) },
+    })),
+  })
+  if (!r.ok) return r
+  const node = (r.meta.AffectedNodes ?? [])
+    .map((n) => n.CreatedNode)
+    .find((n) => n?.LedgerEntryType === 'PermissionedDomain')
+  return { ...r, domainId: node?.LedgerIndex ?? null }
+}
+```
+
+The domain id is not returned as a field. It is the `LedgerIndex` of the `PermissionedDomain` node created
+in the transaction metadata, which is why the helper digs it out of `AffectedNodes`.
+
+Being cited without consent is the correct shape for a rating, and it is how an unsolicited rating works:
+a prospectus can reference a rating the agency was never asked about. It also means the rater
+cannot sell placement in a domain, because they do not control who lists them.
+
+### 4. VaultCreate: the flag without which the domain is inert
+
+```js
+export const TF_VAULT_PRIVATE = 0x00010000 // 65536
+
+await submitValidated(client, vaultOwner, {
+  TransactionType: 'VaultCreate',
+  Asset: { currency: 'XRP' },
+  VaultKind: 1,                 // closed-ended, required for XLS-66 lending
+  SubscriptionDate: SUB,
+  RedemptionDate: RED,
+  WithdrawalPolicy: 1,
+  Flags: TF_VAULT_PRIVATE,      // REQUIRED alongside DomainID
+  DomainID: dom.domainId,
+})
+```
+
+<Warning>
+`DomainID` without `tfVaultPrivate` does not gate anything. The vault is created, the domain is attached,
+every read shows the domain, and every depositor is admitted. There is no error and no warning. Orma's gate
+reader treats that state as its own outcome rather than as "gated", and says so in its `note` field:
+`carries a domain but is not flagged private, so nothing is enforced`.
+</Warning>
+
+## The measured outcome
+
+Two limited partners, funded from the same faucet, depositing 20 XRP each into the same vault, submitted
+concurrently with `Promise.all` so neither can be said to have gone first.
+
+```js
+const [good, bad] = await Promise.all([
+  submitValidated(c, lpGood, { TransactionType: 'VaultDeposit', VaultID: vaultId, Amount: '20000000' }),
+  submitValidated(c, lpBad,  { TransactionType: 'VaultDeposit', VaultID: vaultId, Amount: '20000000' }),
+])
+```
+
+| depositor | address | amount | validated result | hash |
+|---|---|---|---|---|
+| holds `ORMA-IG`, accepted | `rnc7dQyrcFyXE9nyYbRaJ8tV3CZcFNEsfq` | 20 XRP | `tesSUCCESS` | `7FC5C01BD735E9A41A0AC6ACFA4B6994B1347A8FA06DAEF8012A62B0E1DF98AF` |
+| no credential | `ramrvatE3yCyW7S7Ry3rCTC5eXaaHEG1tn` | 20 XRP | `tecNO_AUTH` | `E7CF5DB29DFE652801F4936C11D50A493EB3C474D6EEDFE9FC24394E8DD26101` |
+
+The second transaction was refused by the ledger, not by Orma. No Orma process was consulted when it was
+evaluated, and no API of ours was in the path. That is the whole difference between a grade and a gate.
+
+## Revocation is asymmetric, and that is deliberate
+
+`CredentialDelete` removes the credential. The next deposit from that LP bounces. Their existing position
+is untouched and withdraws in full.
+
+| step | transaction | validated result | hash |
+|---|---|---|---|
+| revoke | `CredentialDelete` | `tesSUCCESS` | `E2D6F396F4A92DE4F36BDF6FD360EC8C849D4ED9DFDF8585998161098DE8C86D` |
+| try to add 3 XRP | `VaultDeposit` | `tecNO_AUTH` | `AA25246AE452DF1719751E4F03BAD8B6C286250DE8FB65EC2B7FBBFE272ADDBF` |
+| take 5 XRP out | `VaultWithdraw` | `tesSUCCESS` | `2E71A25973D55E26C8AECFDFDF1EF3BF0571B8FB4DD9D524B6A8C750994F39FE` |
+
+```js
+export const revokeCredential = (client, issuer, subject, type) =>
+  submitValidated(client, issuer, {
+    TransactionType: 'CredentialDelete',
+    Subject: subject,
+    CredentialType: hexType(type),
+  })
+```
+
+The gate controls who may **enter**. It never controls who may leave.
+
+This is the only acceptable design, and the reason is the thesis of the whole project. Orma exists because
+one party, the LoanBroker owner who is necessarily the vault owner, holds discretion over other people's
+money: they choose when a loss is recognised and in what order losses are realised, and both choices move
+money from investors to them. A rater who could revoke a credential and thereby trap an LP's capital inside
+a vault would be a second party with exactly that shape of power, created by the tool built to expose the
+first. It would be a worse problem than the one being solved.
+
+Symmetric revocation would also invert the incentive at the moment it matters most. A rater who downgrades
+a deteriorating facility should be making it harder for new money to walk in, not harder for existing money
+to walk out. Entry-only revocation means the worst thing a hostile or mistaken rater can do is deny someone
+an allocation. That is a cost an LP can price. Being unable to redeem is not.
+
+<Note>
+The asymmetry is a property of XLS-70 and XLS-65 composing, not something Orma implements. There is no Orma
+code path that could make withdrawal conditional on a credential even if we wanted one. We verified it
+holds rather than assuming it, because the whole claim depends on it.
+</Note>
+
+## Two traps
+
+### Trap 1: DomainID is not on the Vault
+
+The obvious way to ask whether a vault is gated is to read the Vault ledger entry and look for `DomainID`.
+It is not there. The field lives on the **share `MPTokenIssuance`**, and the obvious lookup returns
+`undefined`, which reads exactly like "open to everyone".
+
+```js
+// src/credentials.mjs: gateStatus(), the correct lookup
+const issuance = await xrpl.mptIssuance(vault.shareMptId)   // ledger_entry, mpt_issuance
+const domainId = issuance.DomainID ?? null
+if (!domainId) { /* genuinely ungated */ }
+const dom = await xrpl.req({ command: 'ledger_entry', index: domainId })
+out.domainOwner = dom.result.node.Owner ?? null
+out.acceptedCredentials = (dom.result.node.AcceptedCredentials ?? []).map((a) => ({
+  issuer: a.Credential?.Issuer ?? null,
+  type: a.Credential?.CredentialType ? readType(a.Credential.CredentialType) : null,
+  typeHex: a.Credential?.CredentialType ?? null,
+}))
+out.gated = out.private && out.acceptedCredentials.length > 0
+```
+
+<Warning>
+This failure mode is silent and it points the wrong way. A wrong answer that says "gated" when a vault is
+open is visibly wrong the moment someone deposits successfully. A wrong answer that says "open" when a
+vault is gated looks correct until a deposit is refused, and then looks like the ledger is broken. Orma
+resolves `gated` from two independent reads, the private flag on the Vault and the accepted credential
+list on the domain, and never from the absence of a field.
+</Warning>
+
+The trap is visible in Orma's own API surface, and we left it visible rather than papering over it. The
+vault detail payload at `/api/vaults/{vaultId}` carries `domainId` copied from the normalised Vault entry,
+so it reads `null` even for a gated facility. `/api/vaults/{vaultId}/gate` is the route that reads the
+issuance. If you want to know whether a facility is gated, that is the route that answers.
+
+### Trap 2: engine_result is not the answer
+
+`submit` returns a provisional `engine_result`. We observed an `engine_result` of `tecNO_AUTH` go on to
+validate as `tesSUCCESS`. On any other feature that is a nuisance. On this one it is the difference between
+"the ledger refused them" and "the ledger let them in", reported with full confidence, in the wrong
+direction.
+
+```js
+// src/credentials.mjs: every gate transaction goes through submitValidated()
+const engine = sub.result.engine_result
+const hash = signed.hash
+if (!(engine === 'tesSUCCESS' || String(engine).startsWith('tec'))) {
+  return { ok: false, code: engine, error: sub.result.engine_result_message, hash }
+}
+while (Date.now() - t0 < timeoutMs) {                 // timeoutMs defaults to 45000
+  await new Promise((r) => setTimeout(r, 1000))
+  const r = await client.request({ command: 'tx', transaction: hash })
+  if (r.result.validated) {
+    const code = r.result.meta.TransactionResult      // the answer
+    return { ok: code === 'tesSUCCESS', code, hash, meta: r.result.meta, engine }
+  }
+}
+```
+
+Every result code on this page was read from `meta.TransactionResult` on a validated transaction. The
+provisional `engine_result` is kept in the return value for comparison and is never used to decide
+anything.
+
+<Tip>
+`tem` codes never reach that loop. rippled's local-check layer throws on a malformed transaction rather
+than returning a result, so a `temMALFORMED` credential type surfaces as an exception from `submit`, not
+as a result code you can read back from metadata.
+</Tip>
+
+## The phase trap: run the whole sequence inside Subscription
+
+A closed-ended vault has three phases, and two of the phase rules mask the credential rule rather than
+composing with it:
+
+- `VaultDeposit` outside Subscription returns `tecEXPIRED`. The credential is never consulted.
+- `VaultWithdraw` during the entire Investment phase returns `tecTOO_SOON`, regardless of liquidity.
+
+Our first run used a 25 second subscription window. The deposit came back `tecEXPIRED` and the withdrawal
+`tecTOO_SOON`, and neither code says anything at all about the gate. A reader could easily mistake either
+for evidence that credentials do not work.
+
+```js
+// src/demo/bake-gate.mjs
+const SUB = now + Math.max(900, Number(process.env.GATE_SUBSCRIPTION_SECONDS ?? 900))
+const RED = SUB + WINDOW   // WINDOW defaults to 3600 seconds
+```
+
+900 seconds is the floor the sequence needs. A live demonstration wants more, so the orchestrator raises it
+through `GATE_SUBSCRIPTION_SECONDS`. Either way the deposits, the revocation and the withdrawal all land
+inside Subscription, where `tecNO_AUTH` and `tesSUCCESS` mean what they appear to mean.
+
+<Note>
+A refused deposit is not proof of a gate unless you know the phase. When you read `tecNO_AUTH` you have
+learned something about credentials. When you read `tecEXPIRED` or `tecTOO_SOON` you have learned
+something about the calendar.
+</Note>
+
+## Reading the gate back
+
+```bash
+curl -s http://localhost:8787/api/vaults/4A5A8E3716D52E334AEB077ADB09456EF4A941CC26021A8EAD37F95B00190DF5/gate
+```
+
+```json
+{
+  "serverTime": "2026-09-12T22:20:22Z",
+  "ledgerIndex": 5263343,
+  "vaultId": "4A5A8E3716D52E334AEB077ADB09456EF4A941CC26021A8EAD37F95B00190DF5",
+  "gated": true,
+  "private": true,
+  "domainId": "FFBEC89D98B4E7CF52F4F254235086514A90CED0EC531941BDF747AF40C5A2FB",
+  "acceptedCredentials": [
+    {
+      "issuer": "rKQjjU5KFs9RAZCDvYVjcaoVK5gGsCJgkP",
+      "type": "ORMA-IG",
+      "typeHex": "4F524D412D4947"
+    }
+  ],
+  "domainOwner": "rGFFSqqY1R3764FKF7crU5F6bYh9qaD45S",
+  "note": null,
+  "issuerNamed": true,
+  "raterAddress": "rKQjjU5KFs9RAZCDvYVjcaoVK5gGsCJgkP"
+}
+```
+
+`issuerNamed` is the rater's own question, answered without asking the vault owner: am I cited in this
+domain. It is `true` here, and `rGFFSqqY1R3764FKF7crU5F6bYh9qaD45S` never signed anything of ours to make
+it so. `raterAddress` comes from the `RATER_ADDRESS` environment variable, or from `demo/gate-vault.json`
+when that file is present.
+
+`note` is non-null exactly when the answer needs a caveat:
+
+| `note` | what happened |
+|---|---|
+| `no share issuance to read a domain from` | the vault has no share `MPTokenIssuance` to read |
+| `open to any depositor` | no `DomainID` on the issuance, and not private |
+| `marked private but carries no domain, so nothing is enforced` | `tfVaultPrivate` set, no domain attached |
+| `carries a domain but is not flagged private, so nothing is enforced` | the inert-domain case from step 4 |
+
+The route costs two extra ledger reads, the issuance and the domain, so its answer is cached for 30
+seconds. A domain changes when someone edits it, not every four seconds like the vault state behind
+[`/api/nav`](/api/nav).
+
+## Running it yourself
+
+```bash
+node src/demo/bake-gate.mjs --window 3600 --label "Thorne Senior Secured I"
+```
+
+The script funds four Devnet accounts, runs all nine transactions, reads the gate back through the same
+`gateStatus()` the API uses, and writes `demo/gate-vault.json`. It exits non-zero unless all four claims
+hold:
+
+```js
+verdict: {
+  gradedAdmitted: good.ok,
+  ungradedRefused: !bad.ok && bad.code === 'tecNO_AUTH',
+  entryClosedAfterRevocation: !bounced.ok && bounced.code === 'tecNO_AUTH',
+  exitStayedOpen: exit.ok,
+}
+```
+
+The four Devnet seeds are written separately to `.demo-keys.json`, which is gitignored, so the gate can be
+replayed live rather than only recounted. Faucet keys on a test network are worthless and they are still
+private keys, so they stay out of the committed artefact. A pre-commit hook checks staged content for seeds
+by checksum and refuses the commit if one appears.
+
+## What this does not do
+
+- It does not run on Mainnet. XLS-65 and XLS-66 are not available there, so the vault this gate protects
+  cannot exist on Mainnet yet. XLS-70 credentials and XLS-80 permissioned domains are live on Mainnet, so
+  the enforcement half has a production path ahead of the measurement half.
+- It does not make Orma's grade authoritative. A vault owner chooses whether to name our issuer, and can
+  remove us from the domain with a single `PermissionedDomainSet` we never see coming and cannot contest.
+  The grade binds only where someone has decided it should.
+- It does not restrict withdrawal, by design, and there is no configuration that would change that.
+- It does not certify a facility. The credential is issued to an **LP** and asserts what that LP may enter.
+  The measurement of the facility itself is published separately as an [oracle object](/oracle).

@@ -1,0 +1,520 @@
+---
+title: "What building this taught us"
+description: "Seven findings from building a credit oracle on XLS-65 and XLS-66, taken from a 40-finding register and its appendices, verified on Devnet with transaction hashes."
+---
+
+Orma exists because a number we expected to be easy to read turned out not to be readable at all by the
+obvious method. Getting from there to a working measurement, publication and enforcement layer meant
+originating real loans on Devnet, servicing them, impairing them, defaulting them, liquidating first-loss
+cover, and reading every result back. This page is what that cost.
+
+The full register is `FEEDBACK-APPENDIX.md` at the repository root: **40 findings, 7 P0, 19 P1, 14 P2**,
+plus three we withdrew after re-verification and listed anyway. The three-page report written from it is
+`FEEDBACK.md`. Every claim in both carries a transaction hash, a file and line, a verbatim error string, or
+a registry timestamp. This page picks seven, in the order a developer meets them: five of the forty, and two
+from the register's appendices.
+
+| | |
+|---|---|
+| Network | XRPL **Devnet**, `wss://s.devnet.rippletest.net:51233`, `network_id` **2** |
+| Server | rippled **3.4.0-rc5**, 89 amendments including `LendingProtocolV1_1` and `fixCleanup3_4_0` |
+| Libraries | `xrpl` **5.2.0** with `ripple-binary-codec` **2.11.0**, Node **24.13.0** |
+| Re-verification | every finding below re-verified live on 2026-09-12; several hashes come from reconnaissance runs on 2026-09-10 and 2026-09-11 that were re-proved on rc5 |
+
+<Note>
+This runs on Devnet because it has to. `SingleAssetVault`, `LendingProtocol` and `LendingProtocolV1_1` are
+not on Mainnet, so nothing here is a production deployment. XLS-47 Price Oracle **is** live on Mainnet, so
+the publication rail is the one component with a production path today. The measurement and the gate both
+read or bind a vault object, so neither is deployable until the lending amendments ship.
+</Note>
+
+The severity rubric, stated before it is used:
+
+| | |
+|---|---|
+| **P0** | No supported path exists in the published tooling, or the documented path cannot succeed. The cost is a lost day, and the developer has no way to know the fault is not theirs. |
+| **P1** | Costs hours and has a non-obvious workaround. Silent wrong-value bugs live here regardless of how small the fix is, because the cost is the hours before you know you have a problem. |
+| **P2** | Friction, or a documentation inaccuracy. You lose minutes, or you are told something untrue and find out cheaply. |
+
+Eighteen findings are marked NEW after searching `rippled`, `clio`, `xrpl.js`, `xrpl-py`, `xrpl-dev-portal`
+and `XRPL-Standards`. Where a search found prior art we cite it instead, including on our own lead finding,
+which we had marked NEW and should not have.
+
+---
+
+## 1. The rule that stops everyone, and no standard states it (D1, P0)
+
+**What a developer expects.** `LoanBrokerSet` is documented as requiring the submitter to be the vault
+owner. You create a vault, you own it, you attach a broker.
+
+**What actually happens.** `tecNO_PERMISSION`, on a vault you own. The missing rule is that under
+`LendingProtocolV1_1` a loan broker may only be attached to a **closed-ended** vault. We proved it by
+exhaustion, holding the owner constant and varying only the vault kind:
+
+| Submitter | Vault kind | Result | Hash |
+|---|---|---|---|
+| non-owner | open-ended | `tecNO_PERMISSION` | `A260515D…` |
+| non-owner | closed-ended | `tecNO_PERMISSION` | `FCF6DC50…` |
+| **vault owner** | **open-ended** | **`tecNO_PERMISSION`** | `86AC8182A100EEDA32495706C06CDAC6D522B0E0772F5F65696064B6F3C0E5ED` |
+| **vault owner** | **closed-ended** | **`tesSUCCESS`** | `CFC576DF9DCF7DB12059C559F93BE6F6094011820796859A1E814586C0E4AD5F` |
+
+The rule is written down, in C++. `LoanBrokerSet.cpp` lines 149 to 161 at commit
+`421af6db796631da4ff8b78f5d3bafae0fd3ca32` carry both the check and a comment explaining exactly the
+confusion it causes, ending in `JLOG(ctx.j.warn()) << "LoanBroker requires a closed-ended Vault.";`. rippled
+computes that sentence and then discards it.
+
+Across the published `XLS-0065`, `XLS-0065/65.1` and `XLS-0066` documents on `master`, the strings
+`VaultKind`, `SubscriptionDate`, `RedemptionDate`, `LEVersion` and "closed-ended" each occur **zero** times.
+The closed-ended vault is specified in `XRPL-Standards` PR #587 (open since 2026-07-21), cash-basis
+accounting in PR #582 (2026-07-16), two-step loan creation in PR #570 (80 days). The library maintainers
+cite #587 as their source, so they can read it and application developers cannot.
+
+**What it cost.** Two hours, ending in reading the transactor source. It is worse than that for anyone who
+does not: `VaultKind` is immutable, `VaultSet` rejects it at deserialization with
+`Field 'VaultKind' found in disallowed location.`, and there is no conversion. A developer who follows the
+published documentation builds an open-ended vault, issues its share MPT, takes deposits into it, and then
+discovers the whole thing has to be torn down. The cost of the missing paragraph is a rebuild, not a read.
+
+**Cheapest fix.** One line. Add an eleventh protocol-level failure condition to XLS-66 §3.3.3.2, in the
+create branch: *"`Vault(VaultID).VaultKind` is not `ClosedEnded` (`tecNO_PERMISSION`), requires
+`LendingProtocolV1_1`."* The behaviour is already agreed (`rippled#8076`, merged 2026-08-26) and already
+documented downstream in the open `xrpl-dev-portal#3923`, which targets `release-3.4.0` and so is not on
+xrpl.org yet.
+
+---
+
+## 2. The first impairment of a healthy vault is invisible (X1, P0)
+
+This is the finding the whole project is built on.
+
+**What a developer expects.** `Vault.LossUnrealized` moves from 0 to 10,000,000 drops. Transaction metadata
+records changes, so an indexer that diffs `PreviousFields` against `FinalFields`, which is the standard way
+to build one, sees it.
+
+**What actually happens.** `PreviousFields` is an empty object. Verbatim, from `LoanManage` with
+`tfLoanImpair` (Flags 131072), transaction
+`8B9657E31D9130FE557682FE33E779789243EACEB0E0D97D83F5D6A3F477A1D5`:
+
+```json
+{
+  "ModifiedNode": {
+    "FinalFields": {
+      "Account": "rhCcvBkBsg9Wm5kXSndxpcCcEQB6GZtvah",
+      "Asset": { "currency": "XRP" },
+      "AssetsAvailable": "41000000",
+      "AssetsTotal": "51000000",
+      "LEVersion": 1,
+      "LossUnrealized": "10000000",
+      "Owner": "rhQUhoAdLNCizws6NP8WD88o5Ks4ppJ5F3",
+      "RedemptionDate": 842552594,
+      "ShareMPTID": "0000000128362A77C7F5D3FD8BC2E9F7E6936E5B9004FC42",
+      "SubscriptionDate": 842466494,
+      "VaultKind": 1,
+      "WithdrawalPolicy": 1
+    },
+    "LedgerEntryType": "Vault",
+    "LedgerIndex": "6717B5115871C2C1A5552C62B68F52A55C9C58086BD1FDC78D7DCE43ACDD773C",
+    "PreviousFields": {},
+    "PreviousTxnID": "7C00D94F373DB05D9D895FF66EA68F5143867C9E8BBCC25FCEF816340534E795",
+    "PreviousTxnLgrSeq": 5233047
+  }
+}
+```
+
+rippled omits from `PreviousFields` any field whose previous value equalled the type default.
+`LossUnrealized` defaults to 0, so there is nothing to record. Under cash-basis accounting an impairment
+changes nothing else on the Vault: `AssetsTotal` and `AssetsAvailable` are untouched. The net result is a
+`ModifiedNode` that reads as touched but unchanged.
+
+**What it cost.** The vault above holds 51,000,000 drops against 51,000,000 shares outstanding.
+
+| Reading | Value |
+|---|---|
+| `AssetsTotal / OutstandingAmount` | **1.000000** |
+| `(AssetsTotal - LossUnrealized) / OutstandingAmount` | **0.803922** |
+| Divergence | **1,961 bps** |
+
+A metadata-diffing indexer reports no change across a 19.61% fall in net asset value, on the single most
+important credit event the protocol has. Across a sequence of impairments we watched the exchange rate go
+1.0 to 0.803922 to 0.631678 while `AssetsTotal` never moved once.
+
+The reason it survives casual testing is that it is asymmetric. Same field, three outcomes:
+
+| Event | Previous value | `PreviousFields` | Visible to a diff |
+|---|---|---|---|
+| First impairment of a healthy vault | 0, the type default | `{}` | **No** |
+| `tfLoanUnimpair` | 10000000 | `{"LossUnrealized":"10000000"}` | Yes |
+| Second impairment while one is outstanding | 2000000 | `{"LossUnrealized":"2000000"}` | Yes |
+
+Un-impairment evidence `32454E10D0B2BAA13367AD7AC06EFC9B9E3A5D85C2C2F7BD740575BEB0B746CA`, accumulation
+evidence `968D2C735E3214B50073E0BCB6E682B4260CACFF3E3E2D54AA94E033FF09385F`. An indexer author who tests the
+reversal, or a second impairment, sees correct metadata and concludes the system works. The only case that
+breaks is the transition from healthy to distressed.
+
+<Warning>
+The same rule hides the first non-zero `DebtTotal`, the first `CoverAvailable`, the first `AssetsTotal`.
+`LossUnrealized` is only where it hurts most. There is a matching trap at the other end of the lifecycle:
+`tfLoanDefault` **deletes** `PrincipalOutstanding`, `TotalValueOutstanding`, `PaymentRemaining` and
+`NextPaymentDueDate` from the `Loan` object, so `loan.PrincipalOutstanding` after a default is `undefined`,
+not `"0"`. That crashed our own reader once before we guarded it.
+</Warning>
+
+**Prior art, and why it is the strongest evidence in the register.** `XRPLF/rippled#6487`, opened
+2026-03-05 by `zgrguric` of XRPLWin, an XRPL explorer operator, reports exactly this with a live Devnet
+reproduction. He closed it himself the same day with one comment: "Not a bug." No maintainer replied. The
+behaviour is unchanged six months later on 3.4.0-rc5, re-confirmed by
+`BF3C131BFCDB0BA867DDA4A3AC2F99360A7E4D7AA196F35BEB0906CA4FF9A94C`. The person this trap is built for hit
+it, could not distinguish a silent correctness bug from intended behaviour, and filed it away as his own
+misunderstanding. That closure is the finding.
+
+**Cheapest fix.** One paragraph on the transaction-metadata page: *"`PreviousFields` omits any field whose
+previous value equalled the type default. Do not infer 'unchanged' from an empty `PreviousFields`."* The
+correct fix, emitting the default into `PreviousFields` when a field is created on an existing node, changes
+the metadata format and needs an amendment. The paragraph does not.
+
+**What we shipped instead.** Never diff. Re-read the `Vault` SLE after every `LoanManage`, coalesce absent
+to zero in exactly one place, and parse with `decimal.js` at precision 40. From `src/num.mjs`:
+
+```js
+/** Read a ledger amount. Absent, null, empty string and undefined all mean zero. */
+export function num(v) {
+  if (v === undefined || v === null || v === '') return new Decimal(0)
+  if (v instanceof Decimal) return v
+  // ... object form for MPT and IOU amounts, then new Decimal(String(v))
+}
+```
+
+The live demo is a two-indexer race on transaction
+`075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3` against vault
+`864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835`: the naive indexer reports 1.000000, the
+correct one reports 0.803922, and both are reading the same ledger. `GET /api/indexer-race` serves it, and
+`GET /api/vaults/:vaultId/nav` serves the corrected reading; both are in
+[the API reference](/api-reference).
+
+---
+
+## 3. Both standards state the arithmetic and evaluate none of it (D11, P1)
+
+**What a developer expects.** A specification that gives a formula gives one worked number with it.
+
+**What actually happens.** Neither XLS-65 nor XLS-66 contains a single evaluated example. Not a NAV, not a
+share price, not a cover liquidation, not an interest accrual. Every rule is an expression over named
+fields, and no expression is ever applied to values.
+
+Cover liquidation is given as:
+
+```
+min( DebtTotal x CoverRateMinimum x CoverRateLiquidation, DefaultAmount, CoverAvailable )
+```
+
+Three things about that line are invisible until you substitute numbers:
+
+1. **Both** rates are in $10^{-5}$ units, so **both** are divided by $10^5$. Nothing on the page says so.
+   The only written-down source we found is a constant inside `node_modules`. Read naively, "10%" reads as
+   `10000` and the product is wrong by a factor of $10^{10}$.
+2. The result is **ceilinged**. The prose does not mention it, and XLS-66's own two statements of this
+   formula (§3.10.5 and Appendix A-2 equation 35) disagree with each other.
+3. The base is the broker's **total** book at that instant, not the principal of the loan that defaulted.
+
+What the ledger actually does, reproduced to the drop and verified against `LoanManage.cpp` lines 146 to
+169:
+
+$$T(p) = \min\Big(\big\lceil D \cdot c_{\min} \cdot c_{\text{liq}} \big\rceil,\; p,\; C\Big)$$
+
+**What it cost, and the part that matters.** Roughly two hours on points (1) and (2). Point (3) is not a
+rounding detail. `DebtTotal` is decremented as each default lands (`LoanManage.cpp` line 248), so the base
+shrinks with every declaration, and therefore **the total cover paid across a fixed set of defaults depends
+on the order they are declared in**. Measured on Devnet with loans of 30 and 10 XRP at `CoverRateMinimum`
+10000 and `CoverRateLiquidation` 10000, so a coefficient of $0.10 \times 0.10 = 0.01$:
+
+| Order | Step 1 | Step 2 | Total cover consumed |
+|---|---|---|---|
+| largest first | $\lceil 40 \times 0.01 \rceil = 0.40$ | $\lceil 10 \times 0.01 \rceil = 0.10$ | **0.50 XRP** |
+| smallest first | $\lceil 40 \times 0.01 \rceil = 0.40$ | $\lceil 30 \times 0.01 \rceil = 0.30$ | **0.70 XRP** |
+
+Same losses, same rates, a 40% difference in what the first-loss capital absorbed. The difference lands on
+the unit holders. By the rearrangement inequality this generalises: total cover is minimised by declaring
+the largest exposure first and maximised by declaring the smallest first. The party who chooses the order is
+the `LoanBroker` owner, who is necessarily the vault owner, and whose capital is the capital being consumed.
+
+That behaviour is fully determined by the specification as written. Finding it required no undocumented
+rule and no source reading, only substituting two numbers. As far as we can establish nobody had done that,
+because nothing in the document invites you to. **An unevaluated rule reads as a rule with no consequences.**
+
+<Tip>
+The lever we measure in `GET /api/vaults/:vaultId/broker-history`, documented in
+[the API reference](/api-reference), was found by putting numbers into a formula that was already
+published. If you are reading a standard and it never shows you a result, that is where to look.
+</Tip>
+
+**Cheapest fix.** One worked example per formula, inline, in the section that states it. Cover
+liquidation, share price on deposit, share price on withdrawal, interest accrual, management fee. Five
+examples, five lines each. Then one end-to-end worked lifecycle on the docs portal: a vault takes 50 XRP,
+lends 40 across two loans, one defaults, every intermediate figure shown. And state units at the field, so
+`CoverRateMinimum` reads "1e-5 units, 10000 = 10%" where it is defined.
+
+---
+
+## 4. A broker's action history cannot be reconstructed by filtering (M5, P1)
+
+This one shipped a wrong answer in our own code before we caught it.
+
+**What a developer expects.** To assess a manager you need what they did: when they flagged an exposure,
+when they declared a loss, when they moved first-loss capital. The obvious reconstruction is to walk
+`account_tx` for the broker owner and keep the transactions that concern this broker. There are exactly two
+ways to decide that, and on an impairment both fail.
+
+**What actually happens.**
+
+1. **The transaction does not name the broker.** `LoanManage` carries `LoanID`. It has no `LoanBrokerID`
+   field at all, on any flag.
+2. **The broker object is not modified.** We expected an impairment to touch `LoanBroker`, since it is the
+   object whose loss-absorbing obligation the impairment speaks to. It does not. The complete affected-node
+   set of `9CFF971F35A9D162CE3A54C71961E64694A83A79321EB05DED8A36EEFAD14106`, an impairment on a funded
+   closed-ended vault with a broker and cover in place, is:
+
+| Node | Type |
+|---|---|
+| `ModifiedNode` | `Loan` |
+| `ModifiedNode` | `AccountRoot` |
+| `ModifiedNode` | `Vault` |
+
+So a filter on either the transaction field or the broker node returns cover deposits and defaults and
+**silently drops every impairment**. Defaults survive only because a default decrements `DebtTotal` and
+therefore does touch `LoanBroker`. The record comes back complete, in the right order, with correct figures,
+and missing precisely the events that show a manager behaving well.
+
+**What it cost.** Our conduct assessment counts impairments to decide whether a loss was signalled before it
+was realised. With impairments invisible, every default looked unsignalled, and the rule written to reward
+disclosure was penalising it, 20 points per loss, on exactly the managers it exists to protect. Nothing
+failed. No result code, no exception, no empty response. The reconstruction returned a plausible history
+that a reviewer would accept. We found it only because we baked a vault whose sole action was an impairment
+and noticed the record said one event where we had submitted two.
+
+That is the shape worth naming. A missing capability announces itself. A filter that quietly under-reports
+does not, and every consumer of it is wrong in the same direction: too kind to managers who conceal, too
+harsh on managers who disclose.
+
+**The workaround.** The join is free. The `Loan` node in the same metadata carries
+`FinalFields.LoanBrokerID`. From `src/history.mjs`:
+
+```js
+const brokerNode = nodes.find(
+  (n) => n.LedgerEntryType === 'LoanBroker' &&
+         (n.LedgerIndex === brokerId || n.FinalFields?.index === brokerId))
+
+const loanNode = nodes.find((n) => n.LedgerEntryType === 'Loan')
+const loanBroker = loanNode?.FinalFields?.LoanBrokerID ?? loanNode?.PreviousFields?.LoanBrokerID
+if (!brokerNode && tx.LoanBrokerID !== brokerId && loanBroker !== brokerId) continue
+```
+
+Sixteen characters of condition, once you know it is required. The second consequence is that on those
+transactions the broker's book is genuinely unchanged but this transaction does not report it, so the API
+says so rather than reporting zero. Zero would read as an empty book:
+
+```json
+{
+  "kind": "impair",
+  "brokerStateKnown": false,
+  "debtBefore": null,
+  "debtAfter": null,
+  "coverBefore": null,
+  "coverAfter": null
+}
+```
+
+**Cheapest fix**, in order. Add `LoanBrokerID` to `LoanManage`: it is knowable at submission, already on the
+`Loan`, and makes the transaction self-describing. Or touch `LoanBroker` on impairment, which is the larger
+and more useful change because it makes current state readable without replaying history. Failing both,
+publish the affected-node set per flag, so an indexer author gets this right by reading rather than by
+discovering.
+
+---
+
+## 5. `tecNO_PERMISSION` means four different things (U1, P1)
+
+**What a developer expects.** A result code names a cause.
+
+**What actually happens.** On the lending path, one code carries four meanings across three transaction
+types, two of which are reachable within sixty seconds of each other while originating a single loan:
+
+| Transaction | What `tecNO_PERMISSION` meant | Evidence |
+|---|---|---|
+| `LoanBrokerSet` | the vault is not closed-ended | `86AC8182…`, owner plus open-ended |
+| `LoanBrokerSet` | you are not the vault owner | `A260515D…`, `FCF6DC50…` |
+| `LoanSet` | the loan matures after the vault's `RedemptionDate` | `055E2AE47EF09A12D776C4729FC543A35011490813A41DD02D4682165E21F068` |
+| `LoanManage` | the loan is already impaired, `tfLoanImpair` is not idempotent | `F392154FAF4E20502A914B9EB6C2A941A12F85327DF7C841C23FB6E7E5D91571` |
+
+**What it cost.** We nearly filed a false bug report. One probe submitted a `LoanSet` with the broker as
+`Account`, got `tecNO_PERMISSION`, and concluded the role order was reversed. It was not: the tutorial says
+explicitly that those fields can be swapped, and two other probes of ours succeeded with the broker as
+`Account`. The actual cause was the loan's maturity overrunning `RedemptionDate`. It is recorded as W3 in
+the register's withdrawn section rather than deleted, because a report you cannot audit is worth nothing.
+
+We then re-derived the same cell by accident, on a different vault, on a different build, varying the term
+instead of the payment interval, while satisfying an unrelated requirement. On a vault with a 900 second
+redemption window:
+
+| Loan term | Window remaining | Result |
+|---|---|---|
+| 180 s | 888 s | `tesSUCCESS` |
+| 1200 s | 879 s | **`tecNO_PERMISSION`** |
+
+Two independent isolations, two builds, one cause. A single probe hitting an overloaded code can always be a
+mistake in the probe, which is exactly what happened to us once already. Two cannot.
+
+**Cheapest fix, and it is half built.** Distinct result codes where one is available, and otherwise surface
+the transactor's existing `JLOG` reason. rippled already computes
+`"LoanBroker requires a closed-ended Vault."` and throws it away. `XRPLF/rippled#7848`, open since
+2026-07-22, threads that line into a new `engine_result_reason` field on `submit` and `simulate`. Applied to
+`LoanBrokerSet` it would have turned our two-hour session into one read. Our only ask on top of it is that
+`tec` results carry the reason into **metadata** as well, so it survives for anyone reading the transaction
+back later and not only for the submitter.
+
+---
+
+## 6. Share metadata is write-once, permanently (Appendix D1, P1)
+
+A Ripple developer advocate suggested putting a pointer to an off-ledger valuation service in the share
+token's own metadata, so that valuation travels with the token. We measured it within minutes. The idea
+works. It is also permanent.
+
+<Note>
+This finding is `D1` in Appendix D of the register, which is a different item from register finding D1 in
+§4 above. The register numbers its appendices separately.
+</Note>
+
+**What a developer expects.** `DynamicMPT` is enabled on the same network, so `MPTokenIssuanceSet` updates
+an issuance's metadata.
+
+**What actually happens.**
+
+| Step | Result |
+|---|---|
+| `MPTokenMetadata` set at `VaultCreate` | `tesSUCCESS`, persists on the share `MPTokenIssuance` |
+| `VaultSet` with `MPTokenMetadata` | rejected at deserialization: *"Field 'MPTokenMetadata' found in disallowed location."* |
+| `MPTokenIssuanceSet` by the vault owner | **`tecNO_PERMISSION`** |
+
+The share token's issuer is the **vault pseudo-account**, which carries `lsfDisableMaster` and has no
+regular key, so it cannot sign an update to its own token. The vault owner is not the issuer, so
+`MPTokenIssuanceSet` refuses them. There is no third path. The metadata is immutable for the life of the
+vault.
+
+**What it cost.** Nothing directly, because we found it before writing anything into a token. It changed the
+design instead, and for the better: whatever goes in there must be a **stable pointer, never a value**. A
+number written there would be a lie within one ledger. It also means a URL placed at creation has no
+migration path if the service ever moves, which is a real constraint on anyone building this pattern. Our
+share metadata on `000000014D667775372D5B78E07FFF294678C7F9CE82AFBC` carries a templated path rather than a
+resolved one for that reason:
+
+```json
+{
+  "ticker": "ORMA-CSC3",
+  "name": "Calder Structured Credit III",
+  "asset_class": "rwa",
+  "issuer_name": "Orma",
+  "orma": {
+    "v": 1,
+    "instrument": "vault-share",
+    "nav_url": "http://localhost:8787/api/mpt/{mpt_issuance_id}/nav"
+  }
+}
+```
+
+Two adjacent findings came out of the same measurement session. rippled warned us, unprompted, that metadata not
+shaped per XLS-89 "might not be discoverable by Explorers and Indexers in the XRPL ecosystem", and named the
+fields it expects. The warning is good and we would not have known about XLS-89 without it, but nothing
+upstream points a vault creator at it: XLS-65 does not mention XLS-89 and `MPTokenMetadata` is optional on
+`VaultCreate`, so a vault created the obvious way ships a share token explorers will not list. And XLS-89's
+permitted `asset_class` values are `rwa`, `memes`, `wrapped`, `gaming`, `defi` and `other`. None describes a
+yield-bearing redeemable claim on a pool of assets, which is the exact instrument XLS-65 exists to create.
+We use `rwa` and carry the precise thing under our own namespace.
+
+**Cheapest fix.** Admit `MPTokenMetadata` on `VaultSet`, which already authenticates the vault owner and is
+the natural place for it. Failing that, state in XLS-65 that share metadata is write-once, because the
+reasonable assumption on a network with `DynamicMPT` enabled is that `MPTokenIssuanceSet` will work.
+Separately, reference XLS-89 from the XLS-65 `VaultCreate` field table and add an `asset_class` value for a
+pooled claim.
+
+---
+
+## 7. `OracleSet` is not a merge, and the failure is cumulative (Appendix C5)
+
+An Oracle is a first-class ledger object that any node serves, and `get_aggregate_price` computes a median
+and standard deviation across independent publishers inside the ledger, so a published number is
+contestable by construction. A REST API cannot be contested, only trusted. The documentation frames XLS-47
+purely as a price feed, and it accepts a non-price payload without complaint: ours carries six dimensions
+per vault with `AssetClass: "risk"` and a 40-hex `BaseAsset` derived from the vault id.
+
+**What a developer expects.** `OracleSet` writes the `PriceDataSeries` you give it.
+
+**What actually happens.** Four behaviours, each of which corrupts data silently rather than erroring:
+
+1. **`OracleSet` is not a merge.** A `(BaseAsset, QuoteAsset)` pair already on the object but omitted from
+   the transaction is **kept, with its `AssetPrice` and `Scale` stripped**. Publishing one dimension blanks
+   the other five. There is no operation that removes a pair.
+2. `LastUpdateTime` must **strictly increase**, or `tecINVALID_UPDATE_TIME` burns a fee and a sequence
+   number. One update per second per object, maximum.
+3. A `LastUpdateTime` in the **future bricks the object** until wall clock catches up. Never add a safety
+   margin: a clock-skewed laptop on stage takes the oracle offline.
+4. `AssetPrice` is a `UInt64` serialised as **hexadecimal**. Writing `"100"` means 256.
+
+**What it cost.** Behaviour (1) compounds into a failure that only appears after repeated use. Because an
+omitted pair is kept rather than removed, reusing an `OracleDocumentID` for a different set of assets, which
+is exactly what happens when demo vaults are rebaked against a stable publishing account, accumulates the
+old pairs under the new ones until the series passes the ledger's ceiling and `OracleSet` returns
+`tecARRAY_TOO_LARGE`. At that point **nothing at all can be published to that document**. The object is not
+corrupt, it is full of ghosts, and the only way back is to delete and recreate it. From `src/oracle.mjs`:
+
+```js
+if (result === 'tecARRAY_TOO_LARGE') {
+  log.warn('document id carries stale pairs, recreating', { docId })
+  await this.client.submitAndWait(
+    { TransactionType: 'OracleDelete', Account: this.wallet.address, OracleDocumentID: docId },
+    { wallet: this.wallet, autofill: true },
+  )
+  r = await this.client.submitAndWait(tx, { wallet: this.wallet, autofill: true })
+}
+```
+
+The two rules we follow as a result: always resend the full six-dimension series, and take
+`OracleDocumentID` from an explicit table rather than from a hash of the vault id, since the id is a
+`UInt32` scoped to the account and a collision silently overwrites another vault's scores.
+
+**Cheapest fix.** Put all four behaviours in the `OracleSet` reference page, and say plainly that the
+transaction replaces the document rather than merging into it. Then document the non-price use, because
+`AssetClass` is a free string and the aggregation is generic, and an ecosystem that knows this will publish
+more than prices.
+
+---
+
+## What we did not test
+
+Stated so nobody builds on a claim we did not make.
+
+- **Non-XRP vault assets.** Everything above uses XRP, so `Vault.Scale` is 0 and all arithmetic is in
+  integer drops. With an IOU or MPT asset and a non-zero scale the precision and dust paths become far more
+  active and several exact numbers will shift. For an RLUSD-denominated deployment this is the first thing
+  we would re-run.
+- **The `min()` clamps in the cover formula.** In four defaults the double product was always far below both
+  `DefaultAmount` and `CoverAvailable`, so only the first term ever bound.
+- **`LoanDelete`, `LoanBrokerDelete`, `VaultDelete`, `LoanBrokerCoverClawback`, `tfLoanFullPayment`**, and
+  the fee and rate fields attached to loan closure. Impairment authority itself is not on this list: four
+  signers against three flags across two vault sets, 24 cells, all non-owners rejected.
+- **`OracleSet` under a loaded ledger or a regular-key account.** Devnet `load_factor` was 1 throughout.
+
+---
+
+## Where these findings live
+
+The findings are filed upstream. Where a search found an existing issue we comment there with our
+lending-specific reproduction rather than open a duplicate, which is the case for X1 on
+`XRPLF/rippled#6487` and for fourteen others. Where an open pull request already implements the fix we ask
+for, we say so and support it rather than ask twice: `rippled#7848` for U1, `rippled#7950` for the
+withdrawal codes, `xrpl-dev-portal#3923` and `XRPL-Standards#587`, `#582` and `#570` for D1. Three findings
+were withdrawn after re-verification and are listed rather than deleted.
+
+The complete register is `FEEDBACK-APPENDIX.md` at the repository root: 40 findings with transaction
+hashes, file and line references, verbatim error strings, upstream issue and pull request numbers, and the
+severity rubric above applied one finding at a time. The three-page report written from it is `FEEDBACK.md`.
+Every hash in both is on XRPL Devnet and viewable at `https://devnet.xrpl.org/transactions/<hash>`.

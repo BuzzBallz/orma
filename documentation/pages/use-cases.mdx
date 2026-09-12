@@ -1,0 +1,423 @@
+---
+title: "Use cases"
+description: "Four worked cases against three of the four live Devnet facilities: choosing between two managers, pricing a pledge of vault units, attracting capital by being measured, and gating deposits with XLS-70 credentials."
+---
+
+Every ledger figure on this page was read from the running API at ledger `5263343`,
+`2026-09-12T22:20:22Z`, against Devnet `rippled 3.4.0-rc5`. Nothing here is a projection.
+The two haircut figures in case 2 are arithmetic on that reading rather than a captured
+response body, and case 2 says so where they appear.
+
+The thesis the four cases share: the party who decides **when** a vault recognises a loss
+is the same party who decides **in what order** those losses are realised. The
+`LoanBroker` owner is necessarily the vault owner, a protocol fact and not a configuration
+choice. Both decisions move money from unit holders to that party. Orma measures both from
+public ledger state, publishes the result where it can be acted on, and lets a third party
+enforce it.
+
+<Warning>
+All four facilities run on Devnet. XLS-65 (vaults), XLS-66 (lending) and XLS-70
+(permissioned domains) are not live on Mainnet, so none of this can be pointed at a
+production facility today. Every transaction hash below resolves on `devnet.xrpl.org`.
+</Warning>
+
+---
+
+## 1. An LP choosing between two facilities
+
+Two closed-ended XRP facilities, both in the Investment phase, both scored by the same
+code path with no weights applied anywhere.
+
+| | Kestrel Bridge Financing II | Calder Structured Credit III |
+|---|---|---|
+| `vaultId` | `24EAA01A...E5810089` | `5763707D...A96CB0E5` |
+| Vault grade | **B** (26 / 100) | **AA** (89 / 100) |
+| Conduct grade | **E** (25 / 100) | **A** (100 / 100) |
+| `assetsTotal` | `10500000` drops | `51000000` drops |
+| `lossUnrealized` | `0` | `10000000` drops |
+| `navNaive` | `0.210000` | `1.000000` |
+| `navCorrect` | `0.210000` | `0.803922` |
+| `navDivergenceBps` | **0** | **1961** |
+| Defaults on record | 2 | 0 |
+| Impairments on record | 0 | 1 |
+
+The two columns disagree with each other in exactly the way that matters.
+
+Kestrel reports **zero** NAV divergence. Calder reports 19.61%. A screener that ranks by
+divergence puts Kestrel on top. Kestrel is the worse facility by a wide margin, and the
+reason is mechanical: divergence only becomes non-zero once a manager has **declared** a
+loss. Kestrel's manager never declared one. They went straight to default, at which point
+the loss was realised, `LossUnrealized` never moved off zero, and the book read clean
+again. This is why `GET /api/vaults` sorts by `gradeNumeric` ascending and not by
+divergence.
+
+### What Kestrel's manager actually did
+
+Reconstructed from three transactions on the public record, via
+`GET /api/vaults/24EAA01A.../broker-history`:
+
+| event | time | hash | principal | `debtBefore` | cover consumed |
+|---|---|---|---|---|---|
+| `cover_deposit` | 21:08:32Z | `E979EB6D...` | `0` | `0` | `0` |
+| `default` | 21:11:02Z | `FB23EC53...` | `30000000` | `40000000` | `400000` |
+| `default` | 21:11:10Z | `DE49DF0D...` | `10000000` | `10000000` | `100000` |
+
+The 30 XRP loan was declared first, then the 10 XRP loan. Cover liquidated on a default is
+
+$$T(p) = \min\Big(\big\lceil D \cdot c_{\min} \cdot c_{\text{liq}} \big\rceil,\; p,\; C\Big)$$
+
+with $D$ the broker's **total** book, not the defaulting loan's principal, and $D$
+decremented after each default. At $c_{\min} = c_{\text{liq}} = 10000$ (both in $10^{-5}$
+units, so the coefficient is $0.10 \times 0.10 = 0.01$) the two orders give:
+
+| order | step 1 | step 2 | total cover consumed |
+|---|---|---|---|
+| largest first (what happened) | `400000` | `100000` | **`500000`** |
+| smallest first | `400000` | `300000` | **`700000`** |
+
+The manager's own first-loss capital absorbed 0.50 XRP instead of 0.70 XRP. The 0.20 XRP
+difference did not disappear. It fell on the unit holders. The API reports it as
+`ordering.costToDepositors: "200000"` with `fairness: "0.0000"`, the sequence sitting
+exactly at the investor-worst end of the range.
+
+Conduct score: 100, minus 35 for a sequence score below 0.25, minus 20 for each of two
+exposures written off with no prior impairment, giving **25 and a grade of E**.
+
+The facility now holds 10.5 XRP against 50,000,000 units outstanding. Realised capital
+destruction is
+
+$$\rho = \max\left(0,\; \frac{S - A}{S}\right) = \frac{50{,}000{,}000 - 10{,}500{,}000}{50{,}000{,}000} = 79\%$$
+
+which notches the composite down 14 steps from its AAA anchor to **B**. Without that term
+the vault scores AAA, because after a write-off the asset is gone, the provision is
+released and every current-exposure factor reads clean.
+
+### What Calder's manager actually did
+
+One loan, 10 XRP, went past due. The manager impaired it
+(`BD18EFB94490CA540E7A9C249971740C1228D1FBC3ED97C9BA9F4908F52D5F4F`), which moved
+`LossUnrealized` from `0` to `10000000` and took the honest unit value from 1.000000 down
+to 0.803922. No default has been declared. The ordering rule needs two defaults before it
+applies, no exposure was written off without warning, and no first-loss capital has been
+withdrawn, so nothing deducts from the starting 100 and the conduct grade is **A**.
+
+The vault itself is graded **AA**, not AAA, and the notch trace says why:
+
+```json
+"notchTrace": [
+  { "from": "AAA", "rule": "anchor on DEADLINE (can claims be met at redemption)", "delta": 0, "to": "AAA" },
+  { "from": "AAA", "rule": "single loan >= 75% of broker debt (cover is keyed to total debt, not loan size)", "delta": -1, "to": "AA+" },
+  { "from": "AA+", "rule": "liquidatable cover < 5% of recognised loss", "delta": -1, "to": "AA" }
+]
+```
+
+Both notches are about structure, not about the disclosure. Disclosing the loss cost
+Calder 1961 bp on its published unit value and cost its conduct grade nothing.
+
+### Who this is for
+
+An LP with capital to allocate and no way to tell a manager who has taken a loss from a
+manager who has hidden one. `AssetsTotal` is the field every generic tool reads, and it
+answers neither question. Calder reads `51000000` against 51,000,000 units outstanding, a
+naive unit value of exactly `1.000000`, with the 10 XRP loss its manager has already
+recognised nowhere in the number. Kestrel reads a divergence of zero because its manager
+skipped the recognition step altogether. On conduct, which is the record of what each
+manager did, the two are four grades apart: E against A.
+
+```bash
+# every tracked facility, worst grade first
+curl -s localhost:8787/api/vaults \
+  | jq '.vaults[] | {label, grade, gradeNumeric, navDivergenceBps}'
+
+# the manager's record, reconstructed from account_tx
+curl -s localhost:8787/api/vaults/24EAA01AD4CE70D8ABB4ACB4255DC4C216B8AF3B9E7315DB8052BFC1E5810089/broker-history \
+  | jq '{ordering, reputation}'
+```
+
+<Note>
+Conduct is reconstructed from `account_tx`, which Devnet retains for roughly 29 days. The
+API returns that caveat in the response body rather than burying it in a footnote. Conduct
+before the retention window is not visible and is not claimed to be.
+</Note>
+
+---
+
+## 2. A second broker asked to lend against pledged units
+
+An LP holds units of Calder's share token and wants to borrow against them from a
+different broker. The units are escrowed on-ledger: XLS-85 `TokenEscrow` accepts MPT
+amounts, and vault shares are MPTs, so `EscrowCreate` with
+`Amount: { mpt_issuance_id, value }` returns `tesSUCCESS`. The pledge is then a public
+object. What it is worth is the open question.
+
+The second broker starts from the only identifier they have, the issuance id, and runs the
+resolution loop. Every step is on the ledger or on a URL the ledger names:
+
+```bash
+curl -s "localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/resolve?units=1000000"
+```
+
+```json
+"steps": [
+  { "step": "read MPTokenIssuance", "ok": true, "detail": "issuer r3hE8HanpccSZdgmeHCfYFEkwxFjdDmmvt, 51000000 units outstanding" },
+  { "step": "decode metadata", "ok": true, "detail": "valid JSON" },
+  { "step": "XLS-89 conformance", "ok": true, "detail": "asset_class rwa" },
+  { "step": "find valuation pointer", "ok": true, "detail": "http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav" },
+  { "step": "follow pointer", "ok": true, "detail": "unit value 0.803922" }
+]
+```
+
+Nothing in that loop required the borrower's cooperation, and nothing required a
+relationship with Orma. The pointer template
+`http://localhost:8787/api/mpt/{mpt_issuance_id}/nav` was written into `MPTokenMetadata`
+at `VaultCreate`. The broker substitutes the token's own id and follows it.
+
+### The number
+
+A pledge of 1,000,000 units, priced both ways. Returned as integer strings in the vault's
+asset base unit, drops for an XRP vault:
+
+```json
+"pledge": {
+  "units": "1000000",
+  "valueHeld": "803922",
+  "valueReported": "1000000",
+  "overstatement": "196078"
+}
+```
+
+In XRP: reported 1.000000, held 0.803922, **overstatement 0.196078, or 19.61%**. The
+lender who prices on the reported figure is over-collateralised on paper by 0.196078 XRP
+per 1,000,000 units, and short by that amount in reality.
+
+### Why a haircut does not save you
+
+A haircut applies to the **held** value, never to the reported one:
+
+$$V_{\text{lendable}} = V_{\text{held}} \cdot (1 - h)$$
+
+At $h = 0.20$ on this pledge, `maxLendable` is `643138` drops. A lender applying the same
+20% to the reported value lends `800000` drops against collateral genuinely worth
+`803922`. They intended a 20% cushion. They have 3,922 drops of it, 0.49% of the true
+value. The haircut was consumed entirely by the misstatement before it absorbed a single
+tick of volatility.
+
+No escrow of Calder units was outstanding at the capture above, so `/collateral` returned
+`pledgeCount: 0`. Those last two figures are the arithmetic the route performs on the
+valuation, not a captured response body.
+
+The diagnostic reports every step including failure, because "this collateral is opaque"
+is a legitimate answer to give a lender. An early version of the pointer resolved to the
+diagnostic rather than to the valuation, returned a perfectly good HTTP 200 with no
+`unitValue` on it, and crashed the caller. `valuePledge` now returns an explicit
+`unpriced` string instead of throwing.
+
+```bash
+# a lender's own escrows, valued both ways, with their policy discount applied to the honest value
+curl -s "localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5/collateral?haircut=20&accounts=rEXAMPLE" \
+  | jq '{navNaive, navCorrect, totalOverstatement, totalOverstatementPct, pledges}'
+```
+
+### Who this is for
+
+The second broker, whose alternative is to price the collateral on the borrower's word or
+to refuse it outright. The first option costs 19.61% of the stated notional on this
+facility. The second costs the borrower their access to credit, and costs the vault the
+argument that its units are collateral at all.
+
+<Warning>
+No global index exists from an `mpt_issuance_id` to the escrows holding it, so the
+`/collateral` route has to be handed a list of accounts to scan. An escrow does appear in
+the owner directory of both pledgor and beneficiary with the same object index, so a
+lender can enumerate pledges made in their own favour by scanning their own objects, which
+is the question that actually matters. We dedupe by index because the same escrow comes
+back once per account scanned. This is filed as developer feedback, not solved.
+</Warning>
+
+---
+
+## 3. A vault manager who wants to attract capital
+
+Being measured looks adversarial and is not. The chain is short:
+
+1. The share token carries a pointer to an honest valuation.
+2. Any counterparty can price the units without asking the holder, the manager, or us.
+3. Units that can be priced are usable as collateral elsewhere.
+4. Units that are usable elsewhere are worth more to hold.
+5. A facility whose units are worth more to hold raises capital more easily.
+
+Calder's manager did step 1 by writing 502 bytes of JSON into `MPTokenMetadata` at
+`VaultCreate`:
+
+```json
+{
+  "ticker": "ORMA-CSC3",
+  "name": "Calder Structured Credit III",
+  "icon": "http://localhost:8787/assets/mark.svg",
+  "asset_class": "rwa",
+  "issuer_name": "Orma",
+  "desc": "Redeemable claim on a closed-ended private credit facility. Valuation is net of recognised loss.",
+  "orma": {
+    "v": 1,
+    "instrument": "vault-share",
+    "nav_url": "http://localhost:8787/api/mpt/{mpt_issuance_id}/nav",
+    "nav_url_param": "{mpt_issuance_id}",
+    "nav_basis": "assets net of recognised loss, divided by units outstanding",
+    "doc": "https://orma.credit/nav"
+  }
+}
+```
+
+<Warning>
+This is write-once, permanently. `MPTokenMetadata` is accepted on `VaultCreate`, rejected
+at deserialization on `VaultSet`, and `MPTokenIssuanceSet` returns `tecNO_PERMISSION`
+because the issuer is the vault pseudo-account, which carries `lsfDisableMaster` and has
+no regular key. Nobody can ever update it, including the manager, including us.
+
+That is why the field holds a **pointer** and never a number: a number written there is a
+lie within one ledger. It is also why the hackathon build shipped a `localhost` URL into
+the metadata of a live Devnet token, which we cannot correct and are stating rather than
+hiding. The ceiling is 1024 bytes, and exceeding it is `temMALFORMED`, not a warning.
+</Warning>
+
+### The grade is the asset, not the threat
+
+Calder's manager holds a conduct score of **100 / 100, grade A**, earned by impairing a
+loan rather than sitting on it. That grade has three properties an honest manager wants:
+
+- **It is not self-reported.** It is rebuilt from transaction hashes anyone can fetch. A
+  competitor cannot claim it, and a manager cannot be talked out of it.
+- **Disclosure does not cost it.** Realised capital destruction is measured against $A$
+  and deliberately not against $A - L$. An unrealised loss is a provision against an asset
+  the vault still holds and may recover. Counting it would punish a manager for disclosing
+  early, which is the behaviour the rest of the system exists to reward. Kestrel, which
+  disclosed nothing, carries 79% realised destruction, a vault grade of B and a conduct
+  grade of E. Similarly, first-loss adequacy divides by
+  $\max(L, P_{\text{distressed}})$ rather than by $L$ alone, so concealing a large overdue
+  exposure cannot improve a score.
+- **It is the passport to gated capital.** See case 4. An allocator who deposits only
+  where a trusted issuer has certified the counterparties is an allocator a grade A
+  manager can reach and a grade E manager cannot.
+
+The measurement also hands the manager something they can use. When two or more distressed
+exposures are outstanding, `recommendation` in the broker-history response names the
+declaration order that applies the most first-loss capital on the investors' behalf, with
+`coverIfFair`, `coverIfSelfServing` and `atStakeForDepositors`. On Calder it currently
+returns `applicable: false, reason: "fewer than two distressed loans"`, which is the right
+answer rather than a fabricated one.
+
+### Who this is for
+
+A manager running a facility on fundamentals, who is currently priced identically to one
+who is not, because `AssetsTotal` is the field every generic tool reads and recognising a
+loss does not move it. Under cash-basis accounting an impairment changes nothing else on
+the Vault object either, so the disclosure is invisible to anything reading that field
+alone.
+
+---
+
+## 4. A protocol or treasury gating capital
+
+Everything above is measurement, and measurement is advice. This is the part that binds.
+The ledger refuses the transaction. Nobody has to read a report, agree with it, or act on
+it.
+
+Thorne Senior Secured I, `4A5A8E37...B00190DF5`, verified end to end on Devnet:
+
+| step | transaction | result | hash |
+|---|---|---|---|
+| 1 | `CredentialCreate`, we issue `ORMA-IG` to an LP | `tesSUCCESS` | `619CC767...` |
+| 2 | `CredentialAccept`, the LP opts in | `tesSUCCESS` | `41F98989...` |
+| 3 | `PermissionedDomainSet`, the vault owner names our issuer | `tesSUCCESS` | `4C425830...` |
+| 4 | `VaultCreate` with `tfVaultPrivate` and `DomainID` | `tesSUCCESS` | `3FC79BF7...` |
+| 5 | `VaultDeposit`, graded LP | `tesSUCCESS` | `7FC5C01B...` |
+| 6 | `VaultDeposit`, ungraded LP | **`tecNO_AUTH`** | `E7CF5DB2...` |
+| 7 | `CredentialDelete`, we revoke | `tesSUCCESS` | `E2D6F396...` |
+| 8 | `VaultDeposit` after revocation | **`tecNO_AUTH`** | `AA25246A...` |
+| 9 | `VaultWithdraw` after revocation | `tesSUCCESS` | `2E71A259...` |
+
+Resulting state, from `GET /api/vaults/4A5A8E37.../gate`:
+
+```json
+{
+  "gated": true,
+  "private": true,
+  "domainId": "FFBEC89D98B4E7CF52F4F254235086514A90CED0EC531941BDF747AF40C5A2FB",
+  "acceptedCredentials": [
+    { "issuer": "rKQjjU5KFs9RAZCDvYVjcaoVK5gGsCJgkP", "type": "ORMA-IG", "typeHex": "4F524D412D4947" }
+  ],
+  "domainOwner": "rGFFSqqY1R3764FKF7crU5F6bYh9qaD45S",
+  "issuerNamed": true,
+  "raterAddress": "rKQjjU5KFs9RAZCDvYVjcaoVK5gGsCJgkP"
+}
+```
+
+### Why this is a rating and not a private arrangement
+
+Step 3 is signed by the **vault owner alone**. We sign nothing, we are not consulted, and
+we cannot decline to be cited. `issuerNamed: true` in the response above is us answering a
+question about ourselves that we were never asked in the first place. That asymmetry is
+the difference between a rating and a bilateral deal, and it is how the incumbent rating
+agencies work: an issuer references a rating, and the agency gets no veto over being
+referenced.
+
+Step 2 is the mirror asymmetry. Issuance alone grants nothing. Without `CredentialAccept`
+the deposit is still `tecNO_AUTH`, so a credential is not something that can be done **to**
+someone.
+
+<Note>
+Credentials are keyed to the **bar**, not to the facility. `ORMA-IG` says "may enter
+facilities graded BBB- or better" and is reusable across every vault that names our
+issuer. One credential per facility would be a whitelist wearing a credential's clothes.
+`CredentialType` is a hex blob of 1 to 64 bytes; `ORMA-IG` serialises to `4F524D412D4947`.
+</Note>
+
+### Revocation is one-directional, on purpose
+
+Steps 8 and 9 are the sharpest pair in the sequence. After `CredentialDelete`, the LP's
+next deposit bounces immediately and their existing position is untouched: they withdraw
+in full, `tesSUCCESS`. The gate controls who may **enter**, never who may leave. The
+alternative design is a rater who can trap capital, which nobody should accept and which
+we did not build.
+
+### Two things that will cost you a day if you do not know them
+
+<Warning>
+`DomainID` is **not** stored on the Vault ledger entry. It lives on the share
+`MPTokenIssuance`. Reading the Vault object to find out whether a vault is gated returns
+nothing, which reads exactly like "open to everyone". `gateStatus()` reads the issuance.
+
+`tfVaultPrivate` (`0x00010000`) is **required** alongside `DomainID` on `VaultCreate`. A
+`DomainID` without the flag gates nothing at all, and the API reports that case explicitly
+as `"carries a domain but is not flagged private, so nothing is enforced"` rather than
+showing it as protected.
+</Warning>
+
+<Tip>
+Every gate transaction is submitted and then read back from the **validated** result, not
+from `engine_result`. We observed an engine result of `tecNO_AUTH` go on to validate as
+`tesSUCCESS`. On this feature specifically, reporting the provisional answer is the
+difference between "the ledger refused them" and "the ledger let them in".
+</Tip>
+
+### Who this is for
+
+A treasury, DAO or protocol that wants an allocation policy enforced by the ledger rather
+than by a spreadsheet and a promise. The policy is expressed once, as a domain naming an
+issuer, and every deposit is then checked against it by consensus.
+
+---
+
+## Limits
+
+- Devnet only. XLS-65, XLS-66 and XLS-70 are not on Mainnet.
+- Conduct history is bounded by `account_tx` retention, roughly 29 days.
+- The credential bar is a fixed threshold, `ORMA-IG` at BBB- or better. Nothing
+  automatically reissues or revokes when a grade moves.
+- The pointer written into Calder's metadata is a `localhost` URL and cannot be changed.
+- Grades are advisory. `assessment.advisory` is `true` on every valuation response. The
+  only thing that binds is the domain in case 4.
+
+Full field-by-field responses are in the API reference: [/api/nav](/api/nav),
+[/api/vaults](/api/vaults), [/api/broker-history](/api/broker-history),
+[/api/collateral](/api/collateral), [/api/gate](/api/gate).
