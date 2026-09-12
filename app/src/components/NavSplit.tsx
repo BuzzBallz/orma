@@ -65,7 +65,7 @@ export function NavSplit({ vault }: { vault: VaultDetailFields }) {
       <div style={{ textAlign: 'center', marginTop: 32 }}>
         <div className="label">divergence</div>
         <div className="row" style={{ justifyContent: 'center', alignItems: 'baseline', gap: 16, marginTop: 8 }}>
-          <span className="num" style={{ fontSize: 'var(--t-xxl)', color: tone }}>
+          <span className="num figure-in" style={{ fontSize: 'var(--t-xxl)', color: tone }}>
             {vault.navDivergenceBps}
           </span>
           <span className="num mute" style={{ fontSize: 'var(--t-lg)' }}>bps</span>

@@ -16,10 +16,11 @@ function Band({ n, beat, children, footer }: {
   const lit = beat === 0 || beat === n
   return (
     <section
-      className="panel"
+      className="panel moment-band"
       style={{
         height: HEIGHTS[n - 1],
-        opacity: lit ? 1 : 0.35,
+        opacity: lit ? 1 : 0.28,
+        transform: beat === n ? 'translateY(-2px)' : 'none',
         outline: beat === n ? '1px solid var(--accent)' : undefined,
         outlineOffset: beat === n ? '-1px' : undefined,
         transition: 'opacity 200ms linear',
@@ -85,7 +86,7 @@ export function Moment({ d, receivedAt, tick }: { d: Detail; receivedAt: number;
           <Reader title="indexer a — the obvious reading" value={d.vault.navNaive}
             formula={naiveFormula} pair="pair-naive" />
           <div style={{ flex: '0 0 auto', textAlign: 'center', padding: '0 16px' }}>
-            <div className="num" style={{ fontSize: 'var(--t-hero)', lineHeight: 1, color: d.vault.navDivergenceBps === 0 ? 'var(--fg-mute)' : 'var(--bad)' }}>
+            <div className="num figure-in" style={{ fontSize: 'var(--t-hero)', lineHeight: 1, color: d.vault.navDivergenceBps === 0 ? 'var(--fg-mute)' : 'var(--bad)' }}>
               {d.vault.navDivergenceBps}
             </div>
             <div className="caption num">bps · {bpsToPct(d.vault.navDivergenceBps)}</div>

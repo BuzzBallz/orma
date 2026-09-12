@@ -47,8 +47,8 @@ function GhostRow({ n }: { n: number }) {
   )
 }
 
-function Row({ v, receivedAt, tick, onOpen }: {
-  v: VaultRow; receivedAt: number; tick: number; onOpen: (id: string) => void
+function Row({ v, i, receivedAt, tick, onOpen }: {
+  v: VaultRow; i: number; receivedAt: number; tick: number; onOpen: (id: string) => void
 }) {
   // Flashes only when the ledger actually moved these figures. Never on a timer.
   const bpsMoved = useFlash(v.navDivergenceBps)
@@ -56,7 +56,7 @@ function Row({ v, receivedAt, tick, onOpen }: {
   return (
     <tr
       className={RAIL[gradeTone(v.grade)]}
-      style={{ cursor: 'pointer' }}
+      style={{ cursor: 'pointer', ['--i' as string]: i }}
       tabIndex={0}
       aria-label={`open ${v.label ?? v.vaultId}`}
       onClick={() => onOpen(v.vaultId)}
@@ -169,8 +169,8 @@ export function VaultList({ vaults, receivedAt, tick, onOpen }: {
           <tbody>
             {rows.length === 0
               ? GHOSTS.map(n => <GhostRow key={n} n={n} />)
-              : rows.map(v => (
-                <Row key={v.vaultId} v={v} receivedAt={receivedAt} tick={tick} onOpen={onOpen} />
+              : rows.map((v, i) => (
+                <Row key={v.vaultId} v={v} i={i} receivedAt={receivedAt} tick={tick} onOpen={onOpen} />
               ))}
           </tbody>
         </table>

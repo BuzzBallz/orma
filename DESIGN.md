@@ -64,8 +64,30 @@ décision explicite. La motion ajoutée reste bornée et documentée :
 | pulse `defaultable` (spec) | 2 s infinite | statut du prêt |
 | opacité des bandes S3 (spec §S3) | 200 ms | beat |
 
+### Second passage motion — 12/09 ~14:00, sur demande explicite de Dev B
+
+« Rends le tout moins sobre. » Ajouté, toujours en CSS pur, sans lib, sans chiffre inventé :
+
+| motion | durée | déclencheur |
+|---|---|---|
+| les lignes du book se distribuent en cascade | 320 ms, décalage 45 ms | arrivée du premier payload (montage, pas à chaque poll) |
+| les panneaux s'assemblent en séquence | 300 ms, décalage 0→210 ms | changement de route |
+| la sparkline se trace de gauche à droite | 900 ms | montage — **par un `clip-path`, jamais par `stroke-dasharray`** |
+| le chiffre se soulève quand il change | 260 ms + flash 420 ms | changement réel d'une valeur HTTP |
+| panneau qui répond au pointeur (bordure + fond) | 200 ms | survol |
+| la photo se désature et zoome légèrement | 420 / 900 ms | survol |
+| les chips se soulèvent d'1px | 160 ms | survol de ligne |
+| anneau qui pulse autour du point de santé | 1.6 s infinite | **feed DOWN uniquement** |
+| le verdict arrive en resserrant son tracking | 420 ms | montage |
+| la bande S3 active avance de 2px | 220 ms | beat |
+
+**Un piège rencontré et corrigé :** la première version traçait la sparkline avec
+`stroke-dasharray`, ce qui **supprimait les pointillés de la lecture naïve**. Le contrat §6
+fixe cette paire — naïf pointillé, correct plein — et interdit de l'inverser. Le tracé passe
+maintenant par un `clip-path` sur un `<g>`, qui ne touche pas aux traits.
+
 Toujours interdit et absent : bounce, spring, fade-in de page au mount, skeleton shimmer,
-spinner, webfont, nouvelle lib. Tout tombe sous `prefers-reduced-motion: reduce`.
+spinner, webfont non self-hostée, nouvelle lib. Tout tombe sous `prefers-reduced-motion: reduce`.
 
 Le blotter fantôme (5 slots `Vault 1…5`) est **structurel** : chaque figure est un tiret cadratin.
 Aucun id, aucun montant, aucun countdown n'y est inventé — un backend live peut servir d'autres

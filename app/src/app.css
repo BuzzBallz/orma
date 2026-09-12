@@ -546,3 +546,86 @@ tr.ghost:hover td > *{ transform: none; }
 
 /* S3 owns one viewport: trim the chrome on that route only. */
 .page.tight{ padding-top: 12px; padding-bottom: 0; }
+
+/* ============================================================
+   MOTION PACK — added on Dev B's call, 12/09 ~14:00.
+   The brief moved from "restrained" to "alive": the desk should feel switched on.
+   Everything here is CSS, carries no invented value, and dies under
+   prefers-reduced-motion. Durations stay in the 120-420ms band.
+   ============================================================ */
+
+/* --- 1. The book deals itself. Rows cascade in when the payload first lands.
+       They mount once (keyed by vaultId), so this does not replay every poll. --- */
+@keyframes dealIn {
+  from { opacity: 0; transform: translateY(6px) }
+  to   { opacity: 1; transform: none }
+}
+table.tbl tbody tr:not(.ghost){
+  animation: dealIn 320ms cubic-bezier(.2,.7,.2,1) both;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+/* --- 2. The desk assembles. Panels arrive in sequence on a route change, not as
+       one page-wide fade. --- */
+@keyframes panelIn {
+  from { opacity: 0; transform: translateY(8px) }
+  to   { opacity: 1; transform: none }
+}
+.view .panel, .view .ops, .view .runline{
+  animation: panelIn 300ms cubic-bezier(.2,.7,.2,1) both;
+}
+.view .stack > *:nth-child(1), .view .grid12 > *:nth-child(1){ animation-delay: 0ms }
+.view .stack > *:nth-child(2), .view .grid12 > *:nth-child(2){ animation-delay: 60ms }
+.view .stack > *:nth-child(3), .view .grid12 > *:nth-child(3){ animation-delay: 110ms }
+.view .stack > *:nth-child(4), .view .grid12 > *:nth-child(4){ animation-delay: 150ms }
+.view .stack > *:nth-child(5), .view .grid12 > *:nth-child(5){ animation-delay: 185ms }
+.view .stack > *:nth-child(6), .view .grid12 > *:nth-child(6){ animation-delay: 210ms }
+
+/* --- 3. The sparkline draws itself, left to right. Done with a clip, NOT with
+       stroke-dasharray: the dashes are contract §6's way of telling the naive reading
+       from the correct one, and a draw animation must not touch them. --- */
+@keyframes wipeIn { from { clip-path: inset(0 100% 0 0) } to { clip-path: inset(0 0 0 0) } }
+.spark-draw{ animation: wipeIn 900ms cubic-bezier(.4,0,.2,1) both; }
+
+/* --- 4. A figure that moves, moves. On a real HTTP change the cell flashes AND the
+       number lifts a couple of pixels — never on a timer. --- */
+@keyframes liftIn { from { transform: translateY(4px); opacity: .45 } to { transform: none; opacity: 1 } }
+.flash{ animation: flash 420ms ease-out 1; }
+.flash .num, .flash b, .flash > span{ animation: liftIn 260ms cubic-bezier(.2,.7,.2,1) 1; display: inline-block; }
+
+/* --- 5. Panels answer the pointer. Border and ground only — no shadow, no scale:
+       a panel that grows under the cursor reads as a toy. --- */
+.panel{ transition: border-color 200ms ease, background-color 200ms ease; }
+.panel:hover{ border-color: var(--line-2); background: color-mix(in srgb, var(--bg-2) 45%, var(--bg-1)); }
+.ops{ transition: border-color 200ms ease; }
+.ops img{ transition: filter 420ms ease, transform 900ms cubic-bezier(.2,.7,.2,1); }
+.ops:hover img{ filter: grayscale(.3) brightness(.62) contrast(1.05); transform: scale(1.03); }
+
+/* --- 6. Chips settle in when a grade changes, and lift under the pointer. --- */
+.chip{ transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease; }
+tr:hover .chip, .picker-list li:hover .chip{ transform: translateY(-1px); }
+
+/* --- 7. The health pill breathes a ring while the feed is down — the dot alone was
+       easy to miss across a room. --- */
+@keyframes ring {
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--pill-tone) 55%, transparent) }
+  70%  { box-shadow: 0 0 0 7px color-mix(in srgb, var(--pill-tone) 0%, transparent) }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--pill-tone) 0%, transparent) }
+}
+.pill .dot.waiting{ animation: waiting 1.6s ease-in-out infinite, ring 1.6s ease-out infinite; }
+
+/* --- 8. The verdict arrives. One stroke, on mount. --- */
+@keyframes verdictIn { from { opacity: 0; letter-spacing: .04em } to { opacity: 1; letter-spacing: -.03em } }
+.watch .verdict{ animation: verdictIn 420ms cubic-bezier(.2,.7,.2,1) both; }
+
+/* --- 9. S3 beats: the lit band comes forward, the others fall back further. --- */
+.moment-band{ transition: opacity 220ms ease, transform 220ms ease, border-color 220ms ease; }
+
+/* --- 10. The divergence figure counts itself in on mount. --- */
+@keyframes figureIn { from { opacity: 0; transform: translateY(10px) scale(.97) } to { opacity: 1; transform: none } }
+.figure-in{ animation: figureIn 420ms cubic-bezier(.2,.7,.2,1) both; }
+
+/* Everything above, off. */
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{ animation: none !important; transition: none !important }
+}

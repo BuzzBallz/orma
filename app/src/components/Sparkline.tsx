@@ -9,7 +9,7 @@ export function Sparkline({ samples, height = 120 }: { samples: Sample[]; height
   const box = (
     child: React.ReactNode,
   ) => (
-    <svg viewBox="0 0 600 120" preserveAspectRatio="none" style={{ width: '100%', height }}>
+    <svg className="spark" viewBox="0 0 600 120" preserveAspectRatio="none" style={{ width: '100%', height }}>
       {child}
     </svg>
   )
@@ -51,7 +51,7 @@ export function Sparkline({ samples, height = 120 }: { samples: Sample[]; height
         <span><i className="sw correct" /> correct</span>
       </span>
       {box(
-    <>
+    <g className="spark-draw">
       <polyline
         fill="none" vectorEffect="non-scaling-stroke" strokeWidth="2"
         stroke="var(--muted)" strokeDasharray="4 3" points={line(s => s.naive)}
@@ -60,7 +60,7 @@ export function Sparkline({ samples, height = 120 }: { samples: Sample[]; height
         fill="none" vectorEffect="non-scaling-stroke" strokeWidth="2"
         stroke="var(--accent)" points={line(s => s.correct)}
       />
-    </>,
+    </g>,
   )}
     </div>
   )
