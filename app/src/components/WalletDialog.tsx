@@ -73,10 +73,7 @@ export function SignInDialog({ open, onOpenChange }: {
         )}
 
         {!XAMAN_CONFIGURED && (
-          <span className="wnote wxaman">
-            The mobile route is not configured on this deployment. The two desktop
-            applications are unaffected.
-          </span>
+          <span className="wnote wxaman">Mobile sign-in is not available here.</span>
         )}
 
         <Separator className="dlg-sep" />

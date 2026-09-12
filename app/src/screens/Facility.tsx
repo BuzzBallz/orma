@@ -191,7 +191,7 @@ export function Facility({ d }: { d: VaultDetail }) {
 
             {d.alerts.length > 0 && (
               <div className="op-box">
-                <div className="label">On watch</div>
+                <div className="label">Alerts</div>
                 <ul className="op-watch">
                   {d.alerts.slice(0, 4).map(a => (
                     <li key={a.code} data-sev={a.severity}>{creditText(a.title)}</li>
@@ -337,8 +337,7 @@ export function Facility({ d }: { d: VaultDetail }) {
         </div>
 
         <footer className="op-foot">
-          This note does not announce a rating action. Figures are as supplied by the
-          calculation agent at the time stated; nothing on this page is estimated.
+          This note does not announce a rating action.
         </footer>
       </div>
     </article>

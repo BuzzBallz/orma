@@ -11,10 +11,7 @@ import { Portfolio } from './screens/Portfolio'
 import { Facility } from './screens/Facility'
 import { Event } from './screens/Event'
 import { Methodology } from './screens/Methodology'
-import { facilityName } from './lib/credit'
-import { fmtIso } from './lib/format'
 import { Tabs, TabsContent } from '@/components/ui/tabs'
-import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -42,8 +39,6 @@ function Note({ heading, tone, said, aside, facts, action }: {
       <CardHeader className="rail-head">
         <span className="rail-dot" aria-hidden />
         <CardTitle className="rail-code">{heading}</CardTitle>
-        <span className="spacer" />
-        <span className="label">status</span>
       </CardHeader>
       <CardContent className="rail-body">
         <p className="said">{said}</p>
@@ -69,7 +64,6 @@ function FacilityPlaceholder() {
       <h2 className="panel-title">credit opinion</h2>
       <div className="slot-big">
         <span className="slot-dash">—</span>
-        <span className="slot-say">no facility selected</span>
       </div>
       <dl className="slot-grid">
         {['internal score', 'outlook', 'status', 'reported vs held', 'coverage', 'remaining term'].map(k => (
@@ -114,7 +108,6 @@ function Desk() {
   const detail = usePoll<Detail>(vaultId ? `/api/vaults/${vaultId}` : null, POLL_MS, slow)
 
   const rows = vaults.data?.vaults ?? []
-  const withheld = !vaults.data || vaults.fails > 0
 
   // The keys still work for anyone who finds them; they are not advertised as a feature.
   useEffect(() => {
@@ -169,7 +162,7 @@ function Desk() {
 
   function body() {
     if (path === '/methodology') {
-      return <Methodology methodVersion={detail.data?.score.methodVersion} />
+      return <Methodology />
     }
 
     if (path === '/') {
@@ -179,12 +172,8 @@ function Desk() {
             {vaults.fails > 0 && (
               <Note
                 heading="Figures withheld" tone="var(--bad)"
-                said={<>We have not been sent figures. The five facilities are on file; we do not put a number on screen until the figures arrive.</>}
-                aside={<>The service keeps asking on its own. Nothing needs to be done here.</>}
-                facts={[
-                  ['last received', vaults.ageMs > 0 ? `${Math.round(vaults.ageMs / 1000)}s ago` : 'not yet'],
-                  ['attempts', String(vaults.fails)],
-                ]}
+                said={<>The five facilities are on file. No figure is shown until one is received.</>}
+                facts={[['last received', vaults.ageMs > 0 ? `${Math.round(vaults.ageMs / 1000)}s ago` : 'not yet']]}
               />
             )}
             <Portfolio
@@ -212,14 +201,13 @@ function Desk() {
           <Note
             heading="No facility selected" tone="var(--fg-dim)"
             said={path === '/facility'
-              ? <>A credit opinion covers one facility. Choose one from the portfolio and the note is written from the figures on file for it.</>
-              : <>The calendar covers one facility. Choose one from the portfolio to see what falls due and when.</>}
-            aside={<>Nothing on this page is estimated: every date and figure comes from the set we were last sent.</>}
+              ? <>A credit opinion covers one facility. Choose one from the portfolio.</>
+              : <>The calendar covers one facility. Choose one from the portfolio.</>}
             action={
               <Button variant="outline" size="sm" className="btn-term" onClick={() => navigate('/', null)}>
                 <ArrowLeft size={12} strokeWidth={2.25} /> portfolio
               </Button>}
-            facts={[['facilities on file', rows.length ? String(rows.length) : '—']]}
+            facts={rows.length ? [['facilities on file', String(rows.length)]] : []}
           />
         </div>
       )
@@ -231,8 +219,7 @@ function Desk() {
           {path === '/facility' ? <FacilityPlaceholder /> : <EventPlaceholder />}
           <Note
             heading="Not on file" tone="var(--warn)"
-            said={<>There is no facility on file under that reference. Either it is not covered by this service, or it has not been opened yet.</>}
-            aside={<>The reference is kept in case it appears.</>}
+            said={<>No facility on file under that reference.</>}
             action={
               <Button variant="outline" size="sm" className="btn-term" onClick={() => navigate('/', null)}>
                 <ArrowLeft size={12} strokeWidth={2.25} /> portfolio
@@ -250,9 +237,8 @@ function Desk() {
           {path === '/facility' ? <FacilityPlaceholder /> : <EventPlaceholder />}
           <Note
             heading="Figures withheld" tone="var(--bad)"
-            said={<>We have not been sent figures for this facility. It is on file; we will not show a number we were not given.</>}
-            aside={<>The service keeps asking. It fills itself in when the figures arrive.</>}
-            facts={[['attempts', String(detail.fails)]]}
+            said={<>This facility is on file. No figure is shown until one is received.</>}
+            facts={[]}
           />
         </div>
       )
@@ -299,10 +285,7 @@ function Desk() {
           <Alert className="wbanner" onClick={wallet.dismissMissing}>
             <KeyRound size={14} strokeWidth={2} aria-hidden />
             <AlertTitle>{WALLETS.find(w => w.kind === wallet.missing)?.name} is not available in this browser</AlertTitle>
-            <AlertDescription>
-              Nothing on these pages is behind a sign-in. Signing in only records who is
-              reading; every figure is shown either way.
-            </AlertDescription>
+            <AlertDescription>Every figure is shown either way.</AlertDescription>
           </Alert>
         )}
 
@@ -312,28 +295,6 @@ function Desk() {
         </main>
       </TabsContent>
 
-      <div className="hints">
-        <span className="h">
-          <span className="label">status</span>
-          <b>{withheld ? 'figures withheld' : 'figures received'}</b>
-        </span>
-        <Separator orientation="vertical" className="hint-sep" />
-        <span className="h">
-          <span className="label">as of</span>
-          <b>{stamp?.serverTime ? fmtIso(stamp.serverTime) : '—'}</b>
-        </span>
-        {vaultId && rows.length > 0 && <>
-          <Separator orientation="vertical" className="hint-sep" />
-          <span className="h optional">
-            <span className="label">facility</span>
-            <b>{facilityName(rows.find(r => r.vaultId === vaultId))}</b>
-          </span>
-        </>}
-        <span className="who">
-          Figures as supplied by the calculation agent. This service does not announce
-          rating actions.
-        </span>
-      </div>
     </Tabs>
     </TooltipProvider>
   )

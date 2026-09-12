@@ -4,7 +4,6 @@ import type { VaultRow } from '../lib/types'
 import { Chip } from '../components/Chip'
 import { Countdown } from '../components/Countdown'
 import { gradeTone, gradeIndex, GRADE_LADDER } from '../lib/grades'
-import { fmtIso } from '../lib/format'
 import { useFlash } from '../lib/useFlash'
 import { facilityName, outlookOf } from '../lib/credit'
 import { Button } from '@/components/ui/button'
@@ -86,7 +85,9 @@ function Row({ v, i, receivedAt, tick, onOpen }: {
       <TableCell>
         <span className="inst">
           <span className="name">{facilityName(v)}</span>
-          <span className="id">{v.loanCount} exposures · {v.distressedLoanCount} non-performing</span>
+          <span className="id">
+            {v.loanCount} exposure{v.loanCount === 1 ? '' : 's'} · {v.distressedLoanCount} non-performing
+          </span>
         </span>
       </TableCell>
       <TableCell>
@@ -192,28 +193,16 @@ export function Portfolio({ vaults, receivedAt, tick, stamp, status, onOpen }: {
 
       <p className="caption blotter-say">
         Reported value is what the facility states; held value is what it owns once a
-        recognised loss is taken off. A zero gap is agreement between the two figures, not
-        a sound facility — a loss nobody has recognised reads clean on both sides.
+        recognised loss is taken off.
       </p>
 
       <div className="tbl-fill" aria-hidden />
 
-      <div className="readstamp">
-        {stamp
-          ? <>figures received {fmtIso(stamp.serverTime)} · every number above came from that one set</>
-          : <>
-              <span className="label">last received</span>{' '}
-              <b>{status && status.ageMs > 0 ? `${Math.round(status.ageMs / 1000)}s ago` : 'not yet'}</b>
-              <span className="rs-sep" />
-              <span className="label">attempts</span>{' '}
-              <b>{status?.fails ?? 0}</b>
-              {!status?.railOnScreen && <>
-                <span className="rs-sep" />
-                <span className="label">status</span>{' '}
-                <b>figures withheld</b>
-              </>}
-            </>}
-      </div>
+      {!stamp && !status?.railOnScreen && (
+        <div className="readstamp">
+          <span className="label">status</span> <b>figures withheld</b>
+        </div>
+      )}
     </section>
   )
 }

@@ -76,6 +76,9 @@ window.uiAudit = async function uiAudit(opts = {}) {
         'gemwallet', 'xaman', 'mint', 'tvl', 'defi', 'smart contract', 'oracle',
         'on-chain', 'onchain', 'gas fee', 'seed phrase', 'fixture', 'localhost',
         'vite_', 'polling', 'node tools', 'devnet', 'mainnet', 'drops', 'vault',
+        // an analyst does not read a changelog: no versions, no infrastructure, no counters
+        'v1.0.0', 'contract v', 'build ', 'endpoint', 'api base', 'failed poll',
+        'attempts', 'still asking', 'on watch', 'hackathon', 'methodology note',
       ]
       const seen = document.body.innerText.toLowerCase() + ' ' + location.pathname.toLowerCase()
       const found = BANNED.filter(wd => seen.includes(wd))

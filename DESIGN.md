@@ -715,3 +715,43 @@ le chemin, sur chaque écran. Vérifié à la main sur les 5 facilities × 2 vue
 
 Treize fichiers d'écrans d'avant la refonte supprimés — ils étaient morts et portaient
 l'ancien vocabulaire.
+
+## Peigne fin — ce qui a été retiré (12/09)
+
+Règle appliquée : si ça n'aide pas à juger le crédit d'une facility, ça sort.
+
+### Strings supprimées
+
+| où | string |
+|---|---|
+| barre du bas | **la barre entière** — elle répétait `status` et `as of`, déjà dans le chrome, puis ajoutait « Figures as supplied by the calculation agent. This service does not announce rating actions. » |
+| rail (portfolio) | « We have not been sent figures. » · « The service keeps asking on its own. Nothing needs to be done here. » · fait `attempts: N` |
+| rail (facility) | « It is on file; we will not show a number we were not given. » · « The service keeps asking. It fills itself in when the figures arrive. » · fait `attempts: N` |
+| rail (aucune facility) | « and the note is written from the figures on file for it » · « Nothing on this page is estimated: every date and figure comes from the set we were last sent. » · fait `facilities on file: —` |
+| rail (introuvable) | « Either it is not covered by this service, or it has not been opened yet. » · « The reference is kept in case it appears. » |
+| rail — en-tête | l'étiquette **`STATUS`** sous le code d'état : le code *est* l'état |
+| bandeau figures | « attempts since N » · « still asking » |
+| sous le tableau | « · every number above came from that one set » · ligne `LAST POLL / ATTEMPTS / CAUSE / CONTRACT` |
+| légende portfolio | 2 phrases sur 3 (il en reste **une**) |
+| placeholder facility | « no facility selected » (dit aussi par le rail, 20 cm plus haut) |
+| methodology | **« Methodology note 2.1.0 »** — la seule version encore à l'écran |
+| methodology | 4 paragraphes sur 8 ; 2 200 → **1 284 caractères** |
+| facility — encadré | **`ON WATCH`** → `Alerts` |
+| facility — pied | « Figures are as supplied by the calculation agent at the time stated; nothing on this page is estimated. » (le disclaimer technique ; la ligne d'action de notation reste) |
+| dialog sign-in | 3 phrases raccourcies à 3 fragments |
+| bandeau sign-in | 2 phrases → « Every figure is shown either way. » |
+
+### Mesuré
+
+| écran | avant | après |
+|---|---|---|
+| portfolio, chiffres reçus | 1 090 | **832** |
+| portfolio, chiffres non reçus | 1 180 | **503** |
+| facility, aucune sélection | 690 | **268** |
+| event, aucune sélection | 640 | **235** |
+| methodology | 2 205 | **1 284** |
+
+**0 version, 0 endpoint, 0 compteur de retry** sur les quatre vues, chiffres reçus comme
+non reçus. Onze termes de plus dans la liste de l'audit — `v1.0.0`, `contract v`, `build `,
+`endpoint`, `api base`, `failed poll`, `attempts`, `still asking`, `on watch`, `hackathon`,
+`methodology note` — pour que ça ne revienne pas.
