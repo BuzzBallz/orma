@@ -611,3 +611,45 @@ commande et le bouton copy vivent dans **la** barre du bas, avec les touches ; s
 garde `1–5` et on jette le reste. `Roboto` sort de la pile sans-serif (Plex est auto-hébergé
 en woff2, la retombée est `system-ui`). Le tracking ne reste que sur les labels — mesuré :
 **0 bouton** avec un `letter-spacing`.
+
+## Revue du bundle de prod, API branchée — 12/09
+
+Le preview déployé ne peut pas lire le fixture server d'un laptop (`ERR_BLOCKED_BY_CLIENT`).
+Pour regarder **le même artefact** avec des données, le `dist/` est servi en local
+(`vite preview`, port 4173) contre l'API réelle — bundle identique à celui de Vercel, seule
+l'origine change.
+
+Trois choses clochaient encore. Toutes les trois venaient du patch 1.
+
+### Le vide était déplacé, pas tué
+
+La statusline collée au bas du panneau laissait **516px** de noir entre la dernière rangée
+et elle. Le trou était juste passé à l'intérieur du cadre.
+
+Un blotter garde son **réglage** sous les rangées : `.tbl-fill` prolonge la trame à 27px
+(26px de cellule + son filet), avec un masque qui l'estompe vers le bas. Aucune rangée
+inventée, rien à lire, rien à cliquer — c'est la place qu'il reste au book, pas un trou.
+
+### La statusline répétait le rail
+
+Rail : `READING FROM http://localhost:8787` / `IT SAID Failed to fetch` / `CONTRACT v1.0.0`.
+Statusline, 30 cm plus loin : `CAUSE Failed to fetch` / `CONTRACT v1.0.0`. Les mêmes faits
+deux fois sur un écran.
+
+La statusline porte maintenant **la cadence** (`last poll`, `failed`) et ne reprend la cause
+et le contrat que **s'il n'y a pas de rail** — `railOnScreen` le lui dit.
+
+### La phrase du book était coincée dans l'en-tête
+
+« Sorted worst first. Divergence is the gap… » vivait sur la ligne de titre, à droite, en
+deux lignes serrées. Un en-tête est une ligne : la phrase est passée dessous, sur son propre
+filet, en pleine largeur.
+
+### Ce qui ne cloche pas, vérifié
+
+Zéro débordement, zéro texte tronqué, zéro `NaN`/`undefined`, et **zéro ambre égaré** hors
+des trois usages autorisés sur les quatre desks. Les plus gros caractères de l'app sont
+`8571` (96px sur `/moment`, 72px sur `/vault`) et les deux lectures de NAV à 56px — **tous
+des chiffres HTTP**, pas un poster.
+
+`uiAudit` **92/92** sur le bundle de production, API branchée.

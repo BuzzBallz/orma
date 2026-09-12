@@ -463,7 +463,23 @@ table.tbl th:nth-child(4), table.tbl td:nth-child(4){ padding-left: 20px; }
    loudest tell that this was a page, not a desk. Only when it IS alone: inside a
    .deskgrid (feed down) it goes back to its content height. */
 .blotter{ display: flex; flex-direction: column; }
-.blotter .readstamp{ margin-top: auto; }
+/* The ruling continues under the rows: 27px to match a row (26px cell + its hairline).
+   It is the blotter's own grid, so a short book reads as a book with room, not a void. */
+/* The book's sentence is a line under the header, not a paragraph wedged beside it. */
+.blotter-say{
+  margin: -6px 0 14px; max-width: 88ch;
+  padding-bottom: 12px; border-bottom: 1px solid var(--line);
+}
+
+.blotter .tbl-fill{
+  flex: 1 1 auto; min-height: 0;
+  margin: 0 -20px; 
+  background-image: repeating-linear-gradient(to bottom,
+    transparent 0 26px, var(--line) 26px 27px);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 55%, transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 0, #000 55%, transparent 100%);
+}
+.blotter .readstamp{ margin-top: 0; }
 .view > .blotter{ flex: 1 0 auto; }   /* alone on the desk, grow into it; never shrink */
 
 /* The reading stamp sits under the rows, quieter than a caption. */

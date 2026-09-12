@@ -163,7 +163,11 @@ export function VaultList({ vaults, receivedAt, tick, stamp, status, onOpen }: {
   vaults: VaultRow[]; receivedAt: number; tick: number
   stamp?: { ledgerIndex: number; serverTime: string }
   /** Drives the status line that closes the panel — it is never allowed to be empty. */
-  status?: { ageMs: number; fails: number; error: string | null; contract: string }
+  status?: {
+    ageMs: number; fails: number; error: string | null; contract: string
+    /** True when a rail beside the book is already printing the cause and the contract. */
+    railOnScreen?: boolean
+  }
   onOpen: (vaultId: string) => void
 }) {
   const down = vaults.length === 0
@@ -198,11 +202,11 @@ export function VaultList({ vaults, receivedAt, tick, stamp, status, onOpen }: {
           </Button>
         )}
         <span className="spacer" />
-        <span className="caption">
-          Sorted worst first. Divergence is the gap between what a vault reports and what it
-          holds — and zero is not safety: a loss nobody has declared reads fine on both sides.
-        </span>
       </div>
+      <p className="caption blotter-say">
+        Sorted worst first. Divergence is the gap between what a vault reports and what it
+        holds — and zero is not safety: a loss nobody has declared reads fine on both sides.
+      </p>
       <div className="tbl-scroll">
         <Table className="tbl">
           <TableHeader>
@@ -237,6 +241,11 @@ export function VaultList({ vaults, receivedAt, tick, stamp, status, onOpen }: {
         </Table>
       </div>
 
+      {/* The book is five instruments by contract, and the desk is taller than five rows.
+          The space left over keeps the ruling — that is the room the book has, not a hole.
+          Lines only: no invented rows, nothing to read, nothing to click. */}
+      <div className="tbl-fill" aria-hidden />
+
       {/* The panel always closes on a line. An empty black half-screen under five slots
           says nothing; this says when we last heard, why not, and against what contract. */}
       <div className="readstamp">
@@ -244,14 +253,18 @@ export function VaultList({ vaults, receivedAt, tick, stamp, status, onOpen }: {
           ? <>read at ledger <b>{stamp.ledgerIndex}</b> · {fmtIso(stamp.serverTime)} · every figure above came from that one response</>
           : <>
               <span className="label">last poll</span>{' '}
-              <b>{status && status.ageMs > 0 ? `${Math.round(status.ageMs / 1000)}s ago` : '—'}</b>
+              <b>{status && status.ageMs > 0 ? `${Math.round(status.ageMs / 1000)}s ago` : 'never'}</b>
               <span className="rs-sep" />
-              <span className="label">cause</span>{' '}
-              <b>{status?.error ?? 'no answer yet'}</b>
-              {status && status.fails > 0 && <> · {status.fails} failed</>}
-              <span className="rs-sep" />
-              <span className="label">contract</span>{' '}
-              <b>v{status?.contract ?? '—'}</b>
+              <span className="label">failed</span>{' '}
+              <b>{status?.fails ?? 0}</b>
+              {!status?.railOnScreen && <>
+                <span className="rs-sep" />
+                <span className="label">cause</span>{' '}
+                <b>{status?.error ?? 'no answer yet'}</b>
+                <span className="rs-sep" />
+                <span className="label">contract</span>{' '}
+                <b>v{status?.contract ?? '—'}</b>
+              </>}
             </>}
       </div>
     </section>

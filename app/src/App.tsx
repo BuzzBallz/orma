@@ -271,7 +271,7 @@ function Desk() {
           />
           <VaultList
             vaults={[]} receivedAt={0} tick={tick}
-            status={{ ageMs: vaults.ageMs, fails: vaults.fails, error: vaults.error, contract: EXPECTED_CONTRACT }}
+            status={{ ageMs: vaults.ageMs, fails: vaults.fails, error: vaults.error, contract: EXPECTED_CONTRACT, railOnScreen: true }}
             onOpen={() => navigate('/vault', null)}
           />
         </div>
@@ -311,7 +311,7 @@ function Desk() {
             )}
             <VaultList
               vaults={[]} receivedAt={0} tick={tick}
-              status={{ ageMs: vaults.ageMs, fails: vaults.fails, error: vaults.error, contract: EXPECTED_CONTRACT }}
+              status={{ ageMs: vaults.ageMs, fails: vaults.fails, error: vaults.error, contract: EXPECTED_CONTRACT, railOnScreen: true }}
               onOpen={() => navigate('/vault', null)}
             />
           </div>
