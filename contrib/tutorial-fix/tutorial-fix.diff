@@ -1,0 +1,118 @@
+diff --git a/_code-samples/lending-protocol/js/lendingSetup.js b/_code-samples/lending-protocol/js/lendingSetup.js
+index fdb5a89..c77d80f 100644
+--- a/_code-samples/lending-protocol/js/lendingSetup.js
++++ b/_code-samples/lending-protocol/js/lendingSetup.js
+@@ -8,6 +8,16 @@ process.stdout.write('Setting up tutorial: 0/7\r')
+ const client = new xrpl.Client('wss://s.devnet.rippletest.net:51233')
+ await client.connect()
+ 
++// Fail with the ledger's own result code instead of crashing later on an
++// undefined lookup. submitAndWait resolves for tec* results; it does not throw.
++function checkResult (response, label) {
++  const result = response.result.meta.TransactionResult
++  if (result !== 'tesSUCCESS') {
++    throw new Error(`${label} failed: ${result} (tx ${response.result.hash})`)
++  }
++  return response
++}
++
+ // Create and fund wallets
+ const [
+   { wallet: loanBroker },
+@@ -196,6 +206,18 @@ await Promise.all([
+ 
+ process.stdout.write('Setting up tutorial: 4/7\r')
+ 
++// Since the LendingProtocolV1_1 amendment, a LoanBroker can only be attached to a
++// close-ended vault (`VaultKind: 1`), which requires both dates below.
++// Times are in seconds since the Ripple Epoch (2000-01-01T00:00:00Z).
++const RIPPLE_EPOCH_OFFSET = 946684800
++const nowInRippleTime = Math.floor(Date.now() / 1000) - RIPPLE_EPOCH_OFFSET
++// Deposits are only accepted before SubscriptionDate, which must still be in the
++// future when the transaction is applied, so leave room for it to be validated.
++const subscriptionDate = nowInRippleTime + 45
++// RedemptionDate must be at least 180 seconds after SubscriptionDate, and must
++// outlast every loan's final payment. The loans below run for 30 days.
++const redemptionDate = subscriptionDate + 60 * 60 * 24 * 60
++
+ // Create private vault and distribute MPT to accounts
+ const [vaultCreateResponse] = await Promise.all([
+   client.submitAndWait({
+@@ -205,7 +227,10 @@ const [vaultCreateResponse] = await Promise.all([
+       mpt_issuance_id: mptID
+     },
+     Flags: xrpl.VaultCreateFlags.tfVaultPrivate,
+-    DomainID: domainID
++    DomainID: domainID,
++    VaultKind: 1,
++    SubscriptionDate: subscriptionDate,
++    RedemptionDate: redemptionDate
+   }, { wallet: loanBroker, autofill: true }),
+   client.submitAndWait({
+     TransactionType: 'Payment',
+@@ -231,6 +256,8 @@ const [vaultCreateResponse] = await Promise.all([
+   }, { wallet: depositor, autofill: true })
+ ])
+ 
++checkResult(vaultCreateResponse, 'VaultCreate')
++
+ const vaultID = vaultCreateResponse.result.meta.AffectedNodes.find(node =>
+   node.CreatedNode?.LedgerEntryType === 'Vault'
+ ).CreatedNode.LedgerIndex
+@@ -238,7 +265,7 @@ const vaultID = vaultCreateResponse.result.meta.AffectedNodes.find(node =>
+ process.stdout.write('Setting up tutorial: 5/7\r')
+ 
+ // Create LoanBroker and deposit MPT into vault
+-const [loanBrokerSetResponse] = await Promise.all([
++const [loanBrokerSetResponse, vaultDepositResponse] = await Promise.all([
+   client.submitAndWait({
+     TransactionType: 'LoanBrokerSet',
+     Account: loanBroker.address,
+@@ -255,6 +282,9 @@ const [loanBrokerSetResponse] = await Promise.all([
+   }, { wallet: depositor, autofill: true })
+ ])
+ 
++checkResult(loanBrokerSetResponse, 'LoanBrokerSet')
++checkResult(vaultDepositResponse, 'VaultDeposit')
++
+ const loanBrokerID = loanBrokerSetResponse.result.meta.AffectedNodes.find(node =>
+   node.CreatedNode?.LedgerEntryType === 'LoanBroker'
+ ).CreatedNode.LedgerIndex
+@@ -292,11 +322,24 @@ async function createLoan (ticketSequence) {
+   return submitResponse
+ }
+ 
++// A close-ended vault only accepts LoanSet during its investment period, which
++// starts when the validated ledger's close time passes SubscriptionDate. Earlier
++// than that, LoanSet returns tecTOO_SOON. Poll the ledger rather than trusting
++// the local clock.
++while (true) {
++  const ledger = await client.request({ command: 'ledger', ledger_index: 'validated' })
++  if (ledger.result.ledger.close_time > subscriptionDate) break
++  await new Promise(resolve => setTimeout(resolve, 2000))
++}
++
+ const [submitResponse1, submitResponse2] = await Promise.all([
+   createLoan(lbTickets[2]),
+   createLoan(lbTickets[3])
+ ])
+ 
++checkResult(submitResponse1, 'LoanSet')
++checkResult(submitResponse2, 'LoanSet')
++
+ const loanID1 = submitResponse1.result.meta.AffectedNodes.find(node =>
+   node.CreatedNode?.LedgerEntryType === 'Loan'
+ ).CreatedNode.LedgerIndex
+diff --git a/_code-samples/lending-protocol/js/package.json b/_code-samples/lending-protocol/js/package.json
+index b709e19..ef2a0d7 100644
+--- a/_code-samples/lending-protocol/js/package.json
++++ b/_code-samples/lending-protocol/js/package.json
+@@ -2,7 +2,7 @@
+   "name": "lending-protocol-examples",
+   "description": "Example code for creating and managing loans.",
+   "dependencies": {
+-    "xrpl": "^4.6.0"
++    "xrpl": "^5.2.0"
+   },
+   "type": "module"
+ }
