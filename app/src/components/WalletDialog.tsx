@@ -5,7 +5,7 @@ import { Separator } from '@/components/ui/separator'
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
-import { WALLETS, useWallet, type WalletKind } from '../lib/wallet'
+import { WALLETS, XAMAN_CONFIGURED, useWallet, type WalletKind } from '../lib/wallet'
 
 const ICON: Record<WalletKind, typeof Puzzle> = {
   crossmark: Puzzle, gemwallet: Puzzle, xaman: Smartphone,
@@ -21,7 +21,7 @@ const ICON: Record<WalletKind, typeof Puzzle> = {
 export function WalletDialog({ open, onOpenChange }: {
   open: boolean; onOpenChange: (v: boolean) => void
 }) {
-  const { detected, connect, connectReadOnly } = useWallet()
+  const { detected, connect, connectReadOnly, qr, state } = useWallet()
   const [paste, setPaste] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -40,6 +40,7 @@ export function WalletDialog({ open, onOpenChange }: {
           {WALLETS.map(w => {
             const here = detected[w.kind]
             const Icon = ICON[w.kind]
+            const busy = state.status === 'connecting' && state.kind === w.kind
             return (
               <div className="wrow" key={w.kind} data-here={here}>
                 <Icon size={14} strokeWidth={2} aria-hidden />
@@ -47,7 +48,8 @@ export function WalletDialog({ open, onOpenChange }: {
                 <span className="wnote">{w.note}</span>
                 <span className="spacer" />
                 <span className="wstate">
-                  {here ? 'detected'
+                  {busy ? 'waiting…'
+                    : here ? 'detected'
                     : w.kind === 'xaman' ? 'no api key'
                     : 'not installed'}
                 </span>
@@ -55,6 +57,7 @@ export function WalletDialog({ open, onOpenChange }: {
                   variant={here ? 'outline' : 'ghost'}
                   size="xs"
                   className="btn-term"
+                  disabled={busy}
                   onClick={() => connect(w.kind)}
                 >
                   {w.kind === 'xaman' && here
@@ -65,6 +68,20 @@ export function WalletDialog({ open, onOpenChange }: {
             )
           })}
         </div>
+
+        {qr && (
+          <div className="wqr">
+            <img src={qr} alt="Xaman sign-in QR code" width={180} height={180} />
+            <span className="wnote">scan with xaman · the code is minted by xaman, not by us</span>
+          </div>
+        )}
+
+        {!XAMAN_CONFIGURED && (
+          <span className="wnote wxaman">
+            Xaman: add VITE_XAMAN_API_KEY to issue a sign-in QR. Crossmark and GemWallet
+            work without it.
+          </span>
+        )}
 
         {/* B8 */}
         <Separator className="dlg-sep" />

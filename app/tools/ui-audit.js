@@ -62,7 +62,8 @@ window.uiAudit = async function uiAudit(opts = {}) {
       }
       if (path === '/moment') {
         record('layout', `${label} · one viewport, no scroll`,
-          de.scrollHeight <= de.clientHeight, `${de.scrollHeight}/${de.clientHeight}`)
+          de.scrollHeight <= de.clientHeight,
+          `at ${innerWidth}x${innerHeight}: needs ${de.scrollHeight} (spec §S3 budgets 1440x900)`)
         const over = [...document.querySelectorAll('main section.panel')]
           .filter(b => b.scrollHeight > b.clientHeight + 1).length
         record('layout', `${label} · no band overflows`, over === 0, `${over} band(s) overflowing`)
@@ -237,6 +238,7 @@ window.uiAudit = async function uiAudit(opts = {}) {
   // --------------------------------------------------------------- summary --
   const failed = results.filter(r => !r.pass)
   console.log('%c\n' + '─'.repeat(60), 'color:#232C3B')
+  console.log(`%cviewport ${innerWidth}x${innerHeight}`, 'color:#79828B')
   console.log(`%c${results.length - failed.length}/${results.length} passed`,
     `color:${failed.length ? '#D29922' : '#3FB950'};font-weight:600;font-size:14px`)
   if (failed.length) console.table(failed.map(({ section, name, detail }) => ({ section, name, detail })))

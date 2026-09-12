@@ -432,3 +432,60 @@ Déconnexion → toast, `localStorage` vidé, bouton Connect de retour.
 
 Aucun « connect to unlock » nulle part : rien sur ce desk n'est derrière un wallet, et le
 dialog le dit — *« The desk reads the ledger with or without you. »*
+
+## Étape 3 — les vrais adapters XRPL (12/09)
+
+`xrpl-connect@0.8.2` (MIT, XRPL Commons) + `xrpl@5.2.0`.
+
+### Deux choses que le paquet ne dit pas
+
+1. **Il importe `xrpl` sans le déclarer.** Ni `dependencies` ni `peerDependencies` : un
+   `npm install xrpl-connect` seul échoue au résolveur. `xrpl` est donc une dépendance
+   directe ici, comme le README le fait sans l'expliquer.
+2. **Il ne livre aucun `.d.ts`**, malgré le badge « Type Safe ». `src/types/xrpl-connect.d.ts`
+   déclare exactement la surface utilisée, **vérifiée contre le vrai module dans le
+   navigateur**, pas devinée dans la doc : `WalletManager(connect/disconnect/autoConnect/
+   getAvailableWallets/on/off)`, les trois adapters, `WalletErrorCode`.
+
+### L'API réelle, relevée et pas supposée
+
+- `WalletManager extends EventEmitter` → `on` / `off` vivent sur le prototype parent,
+  pas sur le sien.
+- `connect(walletId, options?)` où `walletId` est l'`id` de l'adapter :
+  `crossmark` / `gemwallet` / `xaman`.
+- `XamanAdapter.connect({ apiKey, onQRCode, onDeepLink })` — **le QR arrive par
+  `onQRCode`**. C'est celui que Xaman a frappé pour cette session ; on n'en compose aucun.
+- `WalletErrorCode` : `WALLET_NOT_AVAILABLE` → « not detected », `CONNECTION_REJECTED` /
+  `SIGN_REJECTED` → « request rejected ».
+- `autoConnect` est appelé **à la main, après** avoir attaché les listeners. Laissé au
+  constructeur il peut émettre `connect` avant que quoi que ce soit n'écoute — le README
+  le dit lui-même, et une session restaurée que personne n'entend est un wallet qui
+  n'apparaît pas.
+
+### Le poids, et où il ne tombe pas
+
+Le toolkit pèse **1 468 kB** (407 kB gzip). Il est en `import()` dynamique :
+
+| | chunk principal | chunk toolkit |
+|---|---|---|
+| premier paint | **472 kB** | **0 requête** |
+| ouverture du dialog | 472 kB | chargé (préchargé au survol du bouton) |
+| restauration lecture seule | 472 kB | **0 requête** |
+| restauration session toolkit | 472 kB | chargé à t+132ms, **après** les 5 rangées |
+
+Personne n'attend un bundle de wallet pour lire le book. Mesuré dans les quatre cas.
+
+### Vérifié
+
+- Crossmark → chemin librairie réel → `WALLET_NOT_AVAILABLE` → toast + **le** bandeau.
+- GemWallet → idem, via l'`isInstalled()` asynchrone de `@gemwallet/api`.
+- Xaman sans clé → *« Set VITE_XAMAN_API_KEY … Crossmark and GemWallet are unaffected »*.
+  Les deux autres rangées continuent de marcher, comme demandé.
+- Lecture seule → `Following read-only | rsuUjf…NK5Z · testnet`, restaurée au rechargement.
+- Déconnexion → `manager.disconnect()` pour une session toolkit, storage vidé pour une
+  session lecture seule, toast dans les deux cas.
+
+**Non vérifiable ici** : le succès d'une connexion d'extension et le rejet utilisateur.
+Aucune extension n'est installée dans ce navigateur. Le câblage est fait contre les codes
+d'erreur réels de la librairie et `WALLET_NOT_AVAILABLE` est prouvé de bout en bout ; les
+deux autres branches demandent une extension sur la machine de l'owner.

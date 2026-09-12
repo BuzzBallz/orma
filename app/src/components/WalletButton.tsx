@@ -18,7 +18,7 @@ import { WalletDialog } from './WalletDialog'
  * with the full address a hover away (B7) and two real actions behind it (B5).
  */
 export function WalletButton() {
-  const { state, network, disconnect } = useWallet()
+  const { state, network, disconnect, prefetch } = useWallet()
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
 
@@ -27,7 +27,9 @@ export function WalletButton() {
       <>
         <Button
           variant="outline" size="xs" className="btn-term btn-press"
-          onClick={() => setOpen(true)}
+          onMouseEnter={prefetch}
+          onFocus={prefetch}
+          onClick={() => { prefetch(); setOpen(true) }}
         >
           <Wallet size={12} strokeWidth={2.25} /> connect
         </Button>
