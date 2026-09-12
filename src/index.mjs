@@ -126,9 +126,18 @@ if (process.env.PUBLISH_SEED || process.env.PUBLISH === 'faucet') {
 // Accounts to scan for escrowed share collateral. There is no reverse index from an
 // MPT issuance to the escrows holding it, so a lender must be told where to look.
 const watchAccounts = (process.env.WATCH_ACCOUNTS ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+// The rater's own address, so the gate route can answer "am I cited in this domain".
+// Read from the baked gate facility, which recorded who issued its credential, and
+// overridable for anyone running their own issuer.
+let raterAddress = process.env.RATER_ADDRESS ?? null
+if (!raterAddress && existsSync(join('demo', 'gate-vault.json'))) {
+  try { raterAddress = JSON.parse(readFileSync(join('demo', 'gate-vault.json'), 'utf8')).accounts?.rater ?? null } catch { /* optional */ }
+}
+
 const api = createApi(reader, {
   source: 'devnet',
   watchAccounts,
+  raterAddress,
   oracleFor: (id) => publishLoop?.oracleFor(id) ?? null,
 })
 

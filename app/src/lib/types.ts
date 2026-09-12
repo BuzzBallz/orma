@@ -248,3 +248,19 @@ export interface Resolution extends Stamped {
   nav: NavDocument | null
   pledge?: NavDocument['pledge']
 }
+
+// --- Exhibit 6: who may enter ----------------------------------------------
+// Read off the SHARE ISSUANCE, not the facility record: the domain reference does not
+// live on the facility itself, so the obvious lookup reads like "open to everyone".
+export interface AcceptedCredential { issuer: string; type: string | null; typeHex: string | null }
+
+export interface Gate extends Stamped {
+  vaultId: string
+  gated: boolean; private: boolean
+  domainId: string | null; domainOwner: string | null
+  acceptedCredentials: AcceptedCredential[]
+  note: string | null
+  /** Whether this service's own issuer is cited in that domain. Null if unknown. */
+  issuerNamed: boolean | null
+  raterAddress: string | null
+}

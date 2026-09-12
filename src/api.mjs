@@ -11,6 +11,7 @@ import { presentVault, presentRow, setLabel } from './present.mjs'
 import { findShareEscrows, presentCollateral } from './collateral.mjs'
 import { fetchBrokerHistory, analyseOrdering, reputation, recommendOrder } from './history.mjs'
 import { presentNav, resolveFromIssuance, valuePledge } from './nav.mjs'
+import { gateStatus, isNamedIn } from './credentials.mjs'
 import { deriveScoreInputs, buildScore } from './score.mjs'
 import { logger } from './log.mjs'
 
@@ -28,6 +29,8 @@ export function createApi(reader, opts = {}) {
   const prevNav = new Map()
   /** history is many round trips; 15s is well inside a 4s UI poll */
   const historyCache = new Map()
+  /** a domain changes when someone edits it, not every four seconds */
+  const gateCache = new Map()
 
   const stamp = (body) => ({
     serverTime: reader.serverTime ?? new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
@@ -189,6 +192,32 @@ export function createApi(reader, opts = {}) {
           asOf: reader.serverTime ?? null,
           ledgerIndex: reader.ledgerIndex ?? null,
         })), { cors: true })
+      }
+
+      // Is this facility gated, and by whom?
+      //
+      // Reads the SHARE ISSUANCE, not the Vault: DomainID is not on the Vault ledger
+      // entry, so the obvious lookup returns nothing and reads exactly like "open to
+      // everyone". Cached: a domain changes when someone edits it, not every four
+      // seconds, and this costs two extra ledger reads.
+      const gm = url.pathname.match(/^\/api\/vaults\/([A-Fa-f0-9]{64})\/gate$/)
+      if (gm && req.method === 'GET') {
+        const snap = reader.get(gm[1].toUpperCase()) ?? reader.get(gm[1])
+        if (!snap) return fail(404, 'VAULT_NOT_FOUND', 'No vault with that id', false)
+        const key = snap.vault.vaultId
+        const cached = gateCache.get(key)
+        if (cached && Date.now() - cached.at < 30000) return send(200, stamp(cached.body))
+        const status = await gateStatus(reader.xrpl, snap.vault)
+        const body = {
+          vaultId: key,
+          ...status,
+          // The rater's own question: am I cited here? Answered without asking them,
+          // which is the point -- they were never consulted in the first place.
+          issuerNamed: opts.raterAddress ? isNamedIn(status, opts.raterAddress) : null,
+          raterAddress: opts.raterAddress ?? null,
+        }
+        gateCache.set(key, { at: Date.now(), body })
+        return send(200, stamp(body))
       }
 
       // THE ROUTE THE TOKEN POINTS AT. Same valuation, keyed by the share token instead

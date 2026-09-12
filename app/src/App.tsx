@@ -4,7 +4,7 @@ import { API_MIXED_ORIGIN, SUSPECT_AFTER_FAILS, SUSPECT_BACKOFF_MS } from './lib
 import { usePoll } from './lib/usePoll'
 import { useTick } from './lib/useTick'
 import { useRoute, type RoutePath } from './lib/useRoute'
-import type { BrokerHistory, Collateral, Health, IndexerRace, Resolution, VaultDetail as Detail, VaultsResponse } from './lib/types'
+import type { BrokerHistory, Collateral, Gate, Health, IndexerRace, Resolution, VaultDetail as Detail, VaultsResponse } from './lib/types'
 import { HeaderBar } from './components/HeaderBar'
 import { StaleBar } from './components/StaleBar'
 import { Portfolio } from './screens/Portfolio'
@@ -149,6 +149,8 @@ function Desk() {
   const resolution = usePoll<Resolution>(
     shareId ? `/api/mpt/${shareId}/resolve?units=1000000` : null, 60000)
   const collateral = usePoll<Collateral>(collPath, 20000)
+  // An admission rule changes when its owner edits it, not every four seconds.
+  const gate = usePoll<Gate>(path === '/facility' && vaultId ? `/api/vaults/${vaultId}/gate` : null, 30000)
 
   const race = usePoll<IndexerRace>(path === '/evidence' ? '/api/indexer-race' : null, 30000)
 
@@ -288,7 +290,9 @@ function Desk() {
       const rz = resolution.data && d.vault.shareMptId
         && resolution.data.issuanceId?.toUpperCase() === d.vault.shareMptId.toUpperCase()
         ? resolution.data : null
-      return <Facility d={d} history={h} collateral={c} resolution={rz} />
+      const gt = gate.data && gate.data.vaultId?.toUpperCase() === d.vault.vaultId.toUpperCase()
+        ? gate.data : null
+      return <Facility d={d} history={h} collateral={c} resolution={rz} gate={gt} />
     }
     return <Event d={detail.data} tick={tick} />
   }
