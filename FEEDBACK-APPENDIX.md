@@ -1991,3 +1991,64 @@ Re-frame friction point 3 to lead with C1–C4 — a composition we completed, w
 exposed — and keep the state-proof ask as a short closing paragraph rather than the headline. "We combined six
 amendments and here is where the documentation stopped" is the answer to the question the jury actually asked;
 "we could not combine two amendments that live on different devnets" is not.
+
+---
+
+# Appendix D — Vault share token metadata (the distribution channel)
+
+Measured Sat 12 Sept ~15:00, directly after a Ripple developer advocate suggested using the share token's own
+metadata to carry a pointer to an off-ledger NAV service, so that valuation travels with the token. Three
+findings, all reproduced on Devnet, all filed to the capture hook.
+
+### D1 · Share metadata is write-once and can never be updated by anyone
+**P1 · XLS-65 · protocol · NEW**
+
+| step | result |
+|---|---|
+| `MPTokenMetadata` set at `VaultCreate` | `tesSUCCESS`, persists on the share `MPTokenIssuance` |
+| `VaultSet` with `MPTokenMetadata` | rejected at deserialization: *"Field 'MPTokenMetadata' found in disallowed location."* |
+| `MPTokenIssuanceSet` by the vault owner | **`tecNO_PERMISSION`** |
+
+The share token's issuer is the **vault pseudo-account**, which carries `lsfDisableMaster` and has no regular
+key, so it cannot sign an update to its own token. The vault owner is not the issuer, so `MPTokenIssuanceSet`
+refuses them. There is no third path. The metadata is therefore immutable for the life of the vault.
+
+This does not break the idea, it disciplines it: anything embedded there must be a **stable pointer**, never a
+value. But it also means a URL placed at creation has **no migration path** if the service ever moves.
+
+**Proposal.** Admit `MPTokenMetadata` on `VaultSet`, which already authenticates the vault owner and is the
+natural place for it. Failing that, state in XLS-65 that share metadata is write-once — the reasonable
+assumption, with `DynamicMPT` enabled on the same network, is that `MPTokenIssuanceSet` will work.
+
+### D2 · Every vault share is XLS-89 non-compliant by default, so explorers cannot index it
+**P2 · XLS-65 / XLS-89 · docs · NEW**
+
+`VaultCreate` accepted our metadata and rippled then returned, unprompted:
+
+> *"MPTokenMetadata is not properly formatted as JSON as per the XLS-89 standard. While adherence to this
+> standard is not mandatory, such non-compliant MPToken's might not be discoverable by Explorers and Indexers
+> in the XRPL ecosystem."* — followed by the expected fields: `ticker`, `name`, `icon`, `asset_class`,
+> `issuer_name`.
+
+The warning is genuinely good and we would not have known about XLS-89 without it. The gap is that **nothing
+upstream points a vault creator at it**: XLS-65 does not mention XLS-89, `MPTokenMetadata` is optional on
+`VaultCreate`, and a vault created the obvious way therefore ships a share token that explorers will not list.
+
+**Proposal.** Reference XLS-89 from the XLS-65 `VaultCreate` field table, and give one compliant example
+blob for a vault share.
+
+### D3 · No `asset_class` value describes a yield-bearing vault claim
+**P2 · XLS-89 · docs · NEW**
+
+The permitted values are `rwa`, `memes`, `wrapped`, `gaming`, `defi`, `other`. A vault share is a
+yield-bearing, redeemable claim on a pool of assets whose value moves with credit performance. `defi` is
+closest and tells a downstream consumer almost nothing; `other` is worse. Given XLS-65 exists specifically to
+tokenise pooled claims, the taxonomy has a hole exactly where the new primitive sits.
+
+**Proposal.** Add a `vault-share` (or `pooled-claim`) class, and consider a reserved optional field for a
+valuation endpoint, since a redeemable claim has a price that the token itself cannot carry.
+
+### Why these three matter together
+They are the difference between a vault share being an opaque MPT and being a **self-describing collateral
+instrument**. A broker who receives one as collateral should be able to read, from the token, what it is and
+where its honest valuation lives. Today they can read neither.
