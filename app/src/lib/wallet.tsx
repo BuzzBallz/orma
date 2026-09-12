@@ -11,10 +11,15 @@ export type WalletState =
   | { status: 'connecting'; kind: Via }
   | { status: 'connected'; address: string; via: Via }
 
+/**
+ * The three signing applications. They are named so a reader can tell which one they are
+ * choosing — a sign-in that hides the provider is not a sign-in — but they appear only
+ * inside the dialog, never in the chrome, and each is described by what it does.
+ */
 export const WALLETS: { kind: WalletKind; name: string; note: string; site: string }[] = [
-  { kind: 'crossmark', name: 'Crossmark', note: 'browser extension', site: 'https://crossmark.io' },
-  { kind: 'gemwallet', name: 'GemWallet', note: 'browser extension', site: 'https://gemwallet.app' },
-  { kind: 'xaman',     name: 'Xaman',     note: 'phone, by QR',      site: 'https://xaman.app' },
+  { kind: 'crossmark', name: 'Crossmark', note: 'signing application', site: 'https://crossmark.io' },
+  { kind: 'gemwallet', name: 'GemWallet', note: 'signing application', site: 'https://gemwallet.app' },
+  { kind: 'xaman',     name: 'Xaman',     note: 'signing app, by code', site: 'https://xaman.app' },
 ]
 
 /** Configuration, not a reading: the network the wallet side is pointed at. */
@@ -129,8 +134,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const onConnect = useCallback((address: string, via: WalletKind) => {
     setQr(null); setMissing(null)
     setState({ status: 'connected', address, via })
-    toast.success(`Connected with ${WALLETS.find(w => w.kind === via)?.name ?? via}`, {
-      description: `${shortAddress(address)} · ${WALLET_NETWORK}`,
+    toast.success('Signed in', {
+      description: `${shortAddress(address)} · ${WALLETS.find(w => w.kind === via)?.name ?? via}`,
     })
   }, [])
 
@@ -161,8 +166,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const connect = useCallback(async (kind: WalletKind) => {
     if (kind === 'xaman' && !XAMAN_CONFIGURED) {
       setMissing('xaman')
-      toast.error('Xaman is not configured', {
-        description: 'Set VITE_XAMAN_API_KEY to issue a sign-in QR. Crossmark and GemWallet are unaffected.',
+      toast.error('Mobile sign-in is not configured', {
+        description: 'This deployment cannot issue a sign-in code. The desktop applications are unaffected.',
       })
       return
     }
@@ -181,17 +186,17 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
       if (code === 'WALLET_NOT_AVAILABLE' || code === 'WALLET_NOT_INSTALLED' || code === 'WALLET_NOT_FOUND') {
         setMissing(kind)
-        toast.error(`${name} not detected`, {
-          description: `Install the ${name} extension, then reload this page.`,
+        toast.error(`${name} is not available here`, {
+          description: 'Install it and reload, or continue as view only.',
         })
         return
       }
       if (code === 'CONNECTION_REJECTED' || code === 'SIGN_REJECTED' || code === 'SIGN_FAILED') {
-        toast.error('Request rejected', { description: `${name} closed without connecting.` })
+        toast.error('Request declined', { description: `${name} closed without signing in.` })
         return
       }
-      toast.error(`${name} could not connect`, {
-        description: (e as Error)?.message ?? 'the wallet did not say why',
+      toast.error(`${name} could not sign in`, {
+        description: (e as Error)?.message ?? 'no reason was given',
       })
     }
   }, [onConnect, onDisconnect])
@@ -199,12 +204,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const connectReadOnly = useCallback(async (raw: string) => {
     const check = await validateClassicAddress(raw)
     if (!check.ok) {
-      toast.error('Not a classic address', { description: check.reason })
+      toast.error('That reference is not valid', { description: check.reason })
       return false
     }
     const next: WalletState = { status: 'connected', address: check.address, via: 'read-only' }
     setState(next); remember(next); setMissing(null)
-    toast.success('Following read-only', { description: `${shortAddress(check.address)} · ${WALLET_NETWORK}` })
+    toast.success('Reading as view only', { description: shortAddress(check.address) })
     return true
   }, [])
 
@@ -214,7 +219,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     remember({ status: 'disconnected' })
     setQr(null)
     if (!wasReadOnly && managerPromise) managerPromise.then(m => m.disconnect()).catch(() => {})
-    toast('Disconnected', { description: 'The desk keeps reading the ledger.' })
+    toast('Signed out', { description: 'Every figure is still shown.' })
   }, [state])
 
   const prefetch = useCallback(() => {

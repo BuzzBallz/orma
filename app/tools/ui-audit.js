@@ -27,7 +27,7 @@ window.uiAudit = async function uiAudit(opts = {}) {
   const run = s => !only || only.includes(s)
 
   const go = async (path, vault) => {
-    history.pushState(null, '', path + (vault ? '?vault=' + vault : ''))
+    history.pushState(null, '', path + (vault ? '?facility=' + vault : ''))
     dispatchEvent(new PopStateEvent('popstate'))
     await wait(POLL)
   }
@@ -40,7 +40,7 @@ window.uiAudit = async function uiAudit(opts = {}) {
   } catch { /* feed down: the layout and a11y sections still run */ }
 
   const SCREENS = VAULTS.length
-    ? [['/', null], ...VAULTS.flatMap(v => [['/vault', v], ['/moment', v]])]
+    ? [['/', null], ['/methodology', null], ...VAULTS.flatMap(v => [['/facility', v], ['/event', v]])]
     : [['/', null]]
 
   // ---------------------------------------------------------------- layout --
@@ -60,7 +60,7 @@ window.uiAudit = async function uiAudit(opts = {}) {
         record('layout', `${label} · content inside its box`,
           view.scrollHeight <= box + 1, `content ${view.scrollHeight} vs box ${box}`)
       }
-      if (path === '/moment') {
+      if (path === '/event') {
         record('layout', `${label} · one viewport, no scroll`,
           de.scrollHeight <= de.clientHeight,
           `at ${innerWidth}x${innerHeight}: needs ${de.scrollHeight} (spec §S3 budgets 1440x900)`)
@@ -68,6 +68,20 @@ window.uiAudit = async function uiAudit(opts = {}) {
           .filter(b => b.scrollHeight > b.clientHeight + 1).length
         record('layout', `${label} · no band overflows`, over === 0, `${over} band(s) overflowing`)
       }
+      // The reader is a credit analyst. Any word they would not meet in a rating note or
+      // on a loans blotter is a word that loses them, wherever it appears — a heading, a
+      // toast, an empty state, the address bar. This list is the owner's, verbatim.
+      const BANNED = [
+        'blockchain', 'xrpl', 'xrp', 'xls-66', 'xls', 'ledger', 'wallet', 'crossmark',
+        'gemwallet', 'xaman', 'mint', 'tvl', 'defi', 'smart contract', 'oracle',
+        'on-chain', 'onchain', 'gas fee', 'seed phrase', 'fixture', 'localhost',
+        'vite_', 'polling', 'node tools', 'devnet', 'mainnet', 'drops', 'vault',
+      ]
+      const seen = document.body.innerText.toLowerCase() + ' ' + location.pathname.toLowerCase()
+      const found = BANNED.filter(wd => seen.includes(wd))
+      record('consistency', `${label} · no word outside the reader's vocabulary`,
+        found.length === 0, found.length ? found.join(', ') : `${BANNED.length} terms checked, none present`)
+
       // A cyan ring means keyboard focus and nothing else. Anything else wearing the
       // focus colour as an outline reads as a stray selection box to everyone who sees it.
       const probe = document.createElement('i')
@@ -114,7 +128,7 @@ window.uiAudit = async function uiAudit(opts = {}) {
   // -------------------------------------------------------------- contract --
   // The few visual facts the frozen contract fixes. These are not taste.
   if (run('contract') && VAULTS.length) {
-    await go('/moment', VAULTS[0])
+    await go('/event', VAULTS[0])
     await wait(7000)                                   // let the sparkline get two samples
     const [naive, correct] = document.querySelectorAll('.spark polyline')
     if (naive && correct) {
@@ -123,14 +137,18 @@ window.uiAudit = async function uiAudit(opts = {}) {
       record('contract', 'correct reading is solid (§6)',
         getComputedStyle(correct).strokeDasharray === 'none', getComputedStyle(correct).strokeDasharray)
     }
-    await go('/vault', VAULTS[0])
-    const bars = [...document.querySelectorAll('.bar.bar-sm i')].map(i => i.style.width)
-    record('contract', 'dimension bars are grade-driven, not value-driven (§S1.3)',
-      bars.length === 6 && bars.every(w => /%$/.test(w)), bars.join(' '))
-    const order = [...document.querySelectorAll('.bar.bar-sm')]
-      .map(b => b.parentElement.querySelector('.label')?.textContent)
-    record('contract', 'six dimensions in the API order (§4.2)',
+    await go('/facility', VAULTS[0])
+    // Exhibit 2 carries every measured factor, in the order the calculation agent sends
+    // them. Exhibit 1 groups them for the committee; §4.2 is upheld by the ungrouped one.
+    const order = [...document.querySelectorAll('.op-tbl.factors tbody tr')].map(r => r.dataset.dim)
+    record('contract', 'every measured factor, in the API order (§4.2)',
       order.join() === 'LIQUIDITY,COVER,CONCENT,RECOG,DEADLINE,HEADLINE', order.join(' '))
+    // §S1.3: a factor is presented by its SCORE, never by a bar whose length comes from
+    // the raw value — a 0.00% and a 100.0% must not read as the same severity.
+    const scored = [...document.querySelectorAll('.op-tbl.factors tbody tr')]
+      .map(r => r.querySelector('.chip')?.textContent).filter(Boolean)
+    record('contract', 'each factor is presented by its score (§S1.3)',
+      scored.length === order.length && order.length === 6, scored.join(' '))
   }
 
   // ---------------------------------------------------------------- a11y ----
@@ -232,7 +250,7 @@ window.uiAudit = async function uiAudit(opts = {}) {
       const m = u.match(/api\/vaults\/(\w{6})/); if (m) hits.push(m[1])
       return orig(i, init)
     }
-    await go('/vault', VAULTS[0])
+    await go('/facility', VAULTS[0])
     for (const k of ['1','2','3','4','5']) {
       document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }))
       await wait(180)

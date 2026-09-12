@@ -645,6 +645,125 @@ kbd{
 }
 .hints .who{ margin-left: auto; letter-spacing: 0.06em; text-transform: none; font-family: var(--mono); }
 
+/* ---------- credit opinion ----------
+   The shape of a rating note: a wide column of prose and exhibits, a narrow rail of boxed
+   figures beside it, everything on rules. Two pages, and the second one starts a sheet of
+   its own when this is printed. Little colour — the only tone on the page is the score. */
+
+.opinion{ display: flex; flex-direction: column; gap: 20px; max-width: 1200px; }
+
+.op-page{
+  background: color-mix(in srgb, var(--bg-1) 92%, transparent);
+  border: 1px solid var(--line);
+  padding: 24px 28px 20px;
+}
+
+.op-top{ border-bottom: 2px solid var(--amber-dim); padding-bottom: 14px; margin-bottom: 18px; }
+.op-top.slim{ display: flex; align-items: baseline; justify-content: space-between; border-bottom-width: 1px; }
+.op-kind{ display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.op-date{ font: var(--t-xs) var(--mono); color: var(--fg-mute); }
+.op-title{
+  margin: 10px 0 4px; font: 500 26px/1.15 var(--sans);
+  letter-spacing: -0.01em; color: var(--fg);
+}
+.op-sub{ margin: 0; font: var(--t-sm)/1.5 var(--mono); color: var(--fg-dim); }
+
+.op-grid{ display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 24px; align-items: start; }
+.op-main{ min-width: 0; display: flex; flex-direction: column; gap: 20px; }
+.op-side{ min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+
+.op-sec{ break-inside: avoid; }
+.op-h{
+  margin: 0 0 8px; padding-bottom: 5px; border-bottom: 1px solid var(--line-2);
+  font: 500 var(--t-xs)/1.2 var(--mono); letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--fg-idle);
+}
+.op-sec p{ margin: 0 0 9px; font-size: var(--t-base); line-height: 1.62; color: var(--fg-dim); max-width: 78ch; }
+.op-sec p:last-child{ margin-bottom: 0; }
+.op-sec.tight p{ font-size: var(--t-sm); }
+
+.op-two{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.op-list{ margin: 0; padding-left: 16px; }
+.op-list li{ font-size: var(--t-sm); line-height: 1.55; color: var(--fg-dim); margin-bottom: 7px; }
+.op-list b{ color: var(--fg); font-weight: 500; }
+
+.op-tbl{ width: 100%; border-collapse: collapse; font-size: var(--t-sm); }
+.op-tbl th{
+  text-align: left; padding: 0 8px 6px; border-bottom: 1px solid var(--line-2);
+  font: 500 var(--t-2xs)/1.2 var(--mono); letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--fg-idle);
+}
+.op-tbl th.rt, .op-tbl td.rt{ text-align: right; }
+.op-tbl td{
+  padding: 7px 8px; border-bottom: 1px solid var(--line); color: var(--fg-dim);
+  vertical-align: top;
+}
+.op-tbl td.num{ font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--fg); }
+.op-tbl td b{ color: var(--fg); font-weight: 500; }
+.op-says{ color: var(--fg-mute); }
+
+.op-box{ border: 1px solid var(--line-2); padding: 12px 14px; }
+.op-box > .label{ display: block; padding-bottom: 7px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+.op-ratings{ margin: 0; }
+.kv{ display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 5px 0; }
+.kv + .kv{ border-top: 1px solid var(--line); }
+.kv dt{ font-size: var(--t-2xs); }
+.kv dd{ margin: 0; text-align: right; font-size: var(--t-sm); color: var(--fg); }
+.kv-note{ color: var(--fg-mute); font-size: var(--t-2xs); }
+
+.op-watch{ margin: 0; padding-left: 15px; }
+.op-watch li{ font-size: var(--t-sm); line-height: 1.5; color: var(--fg-dim); margin-bottom: 6px; }
+.op-watch li[data-sev="critical"], .op-watch li[data-sev="high"]{ color: var(--bad); }
+.op-watch li[data-sev="medium"]{ color: var(--warn); }
+
+.op-profile{ margin: 0; font-size: var(--t-sm); line-height: 1.6; color: var(--fg-dim); }
+
+.op-foot{
+  margin-top: 20px; padding-top: 10px; border-top: 1px solid var(--line-2);
+  font: var(--t-xs)/1.5 var(--mono); color: var(--fg-mute); max-width: 90ch;
+}
+
+@media (max-width: 1100px){
+  .op-grid{ grid-template-columns: minmax(0, 1fr); }
+  .op-two{ grid-template-columns: 1fr; }
+}
+
+/* ---------- the forward calendar ---------- */
+.ev-lead{
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;
+  border-top: 1px solid var(--line); padding-top: 14px;
+}
+.ev-what{ font: 500 24px/1.2 var(--sans); color: var(--fg); margin-top: 6px; }
+.ev-who{ font: var(--t-sm) var(--mono); color: var(--fg-mute); margin-top: 4px; }
+.ev-when{ text-align: right; }
+.ev-in{ font-size: 32px; line-height: 1.1; color: var(--fg); }
+
+.meth{ max-width: 86ch; margin: 0 0 10px; }
+.meth b{ color: var(--fg); font-weight: 500; }
+.meth-note{ margin-top: 12px; color: var(--fg-mute); font-size: var(--t-xs); }
+
+/* ---------- print: two A4 pages, black on white ---------- */
+@media print{
+  @page{ size: A4 portrait; margin: 14mm 13mm; }
+  html, body{ background: #fff !important; color: #111 !important; }
+  .topbar, .hints, .feedbar, .wbanner, .ground, .veil, .veil-grain,
+  .toaster, [data-sonner-toaster], .desks, .picker, .wallet{ display: none !important; }
+  main.page{ padding: 0 !important; }
+  .opinion{ gap: 0; max-width: none; }
+  .op-page{ background: #fff !important; border: 0; padding: 0; }
+  .op-break{ break-before: page; padding-top: 0; }
+  .op-title{ color: #000; font-size: 22px; }
+  .op-top{ border-bottom-color: #000; }
+  .op-sec p, .op-list li, .op-tbl td, .op-profile{ color: #222; font-size: 9.5pt; line-height: 1.45; }
+  .op-h, .op-tbl th, .label{ color: #555 !important; }
+  .op-box{ border-color: #999; }
+  .op-tbl td{ border-bottom-color: #ddd; }
+  .kv + .kv{ border-top-color: #ddd; }
+  .op-says, .op-date, .op-foot{ color: #666 !important; }
+  .chip{ border-color: #666 !important; background: none !important; color: #000 !important; }
+  .op-grid{ grid-template-columns: minmax(0, 1fr) 62mm; gap: 8mm; }
+}
+
 /* ---------- the desks that stand without a feed ---------- */
 
 .slotdesk{ display: flex; flex-direction: column; gap: 18px; }

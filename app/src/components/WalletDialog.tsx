@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { KeyRound, Puzzle, QrCode, Smartphone } from 'lucide-react'
+import { KeyRound, QrCode, ShieldCheck, Smartphone } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import {
@@ -7,18 +7,16 @@ import {
 } from '@/components/ui/dialog'
 import { WALLETS, XAMAN_CONFIGURED, useWallet, type WalletKind } from '../lib/wallet'
 
-const ICON: Record<WalletKind, typeof Puzzle> = {
-  crossmark: Puzzle, gemwallet: Puzzle, xaman: Smartphone,
+const ICON: Record<WalletKind, typeof ShieldCheck> = {
+  crossmark: ShieldCheck, gemwallet: ShieldCheck, xaman: Smartphone,
 }
 
 /**
- * B2 — three rows, and only three. Each says what it is and whether it is actually here;
- * an extension that is not installed is stated, never hidden and never guessed at.
- * Below the rule, the read-only path: a judge with no extension pastes an address and
- * follows the desk. The address is checked against the ledger's own base58 + checksum
- * before anything is shown.
+ * Sign in. Three signing applications, and a view-only route for anyone who has none.
+ * Each row says whether it is actually available here; an application that is not
+ * installed is stated, never hidden and never guessed at.
  */
-export function WalletDialog({ open, onOpenChange }: {
+export function SignInDialog({ open, onOpenChange }: {
   open: boolean; onOpenChange: (v: boolean) => void
 }) {
   const { detected, connect, connectReadOnly, qr, state } = useWallet()
@@ -29,10 +27,10 @@ export function WalletDialog({ open, onOpenChange }: {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="dlg" showCloseButton>
         <DialogHeader className="dlg-head">
-          <DialogTitle className="dlg-title">choose a wallet</DialogTitle>
+          <DialogTitle className="dlg-title">sign in</DialogTitle>
           <DialogDescription className="dlg-sub">
-            The desk reads the ledger with or without you. Connecting only puts your
-            account on screen — nothing is signed and nothing is sent.
+            Nothing on these pages is behind a sign-in. It records who is reading, and
+            authorises nothing: no instruction is sent and no amount is moved.
           </DialogDescription>
         </DialogHeader>
 
@@ -40,7 +38,7 @@ export function WalletDialog({ open, onOpenChange }: {
           {WALLETS.map(w => {
             const here = detected[w.kind]
             const Icon = ICON[w.kind]
-            const busy = state.status === 'connecting' && state.kind === w.kind
+            const busyRow = state.status === 'connecting' && state.kind === w.kind
             return (
               <div className="wrow" key={w.kind} data-here={here}>
                 <Icon size={14} strokeWidth={2} aria-hidden />
@@ -48,21 +46,19 @@ export function WalletDialog({ open, onOpenChange }: {
                 <span className="wnote">{w.note}</span>
                 <span className="spacer" />
                 <span className="wstate">
-                  {busy ? 'waiting…'
-                    : here ? 'detected'
-                    : w.kind === 'xaman' ? 'no api key'
+                  {busyRow ? 'waiting…'
+                    : here ? 'available'
+                    : w.kind === 'xaman' ? 'not configured'
                     : 'not installed'}
                 </span>
                 <Button
                   variant={here ? 'outline' : 'ghost'}
-                  size="xs"
-                  className="btn-term"
-                  disabled={busy}
+                  size="xs" className="btn-term" disabled={busyRow}
                   onClick={() => connect(w.kind)}
                 >
                   {w.kind === 'xaman' && here
-                    ? <><QrCode size={11} strokeWidth={2.25} /> qr</>
-                    : 'connect'}
+                    ? <><QrCode size={11} strokeWidth={2.25} /> code</>
+                    : 'use'}
                 </Button>
               </div>
             )
@@ -71,19 +67,18 @@ export function WalletDialog({ open, onOpenChange }: {
 
         {qr && (
           <div className="wqr">
-            <img src={qr} alt="Xaman sign-in QR code" width={180} height={180} />
-            <span className="wnote">scan with xaman · the code is minted by xaman, not by us</span>
+            <img src={qr} alt="sign-in code" width={180} height={180} />
+            <span className="wnote">scan with the signing application on your phone</span>
           </div>
         )}
 
         {!XAMAN_CONFIGURED && (
           <span className="wnote wxaman">
-            Xaman: add VITE_XAMAN_API_KEY to issue a sign-in QR. Crossmark and GemWallet
-            work without it.
+            The mobile route is not configured on this deployment. The two desktop
+            applications are unaffected.
           </span>
         )}
 
-        {/* B8 */}
         <Separator className="dlg-sep" />
 
         <form
@@ -97,20 +92,20 @@ export function WalletDialog({ open, onOpenChange }: {
           }}
         >
           <label className="label" htmlFor="ro-addr">
-            <KeyRound size={11} strokeWidth={2.25} aria-hidden /> no extension — follow read-only
+            <KeyRound size={11} strokeWidth={2.25} aria-hidden /> no signing application — read as view only
           </label>
           <div className="wpaste-row">
             <input
               id="ro-addr" className="wfield" spellCheck={false} autoComplete="off"
-              placeholder="r… classic address"
+              placeholder="account reference"
               value={paste} onChange={e => setPaste(e.target.value)}
             />
             <Button type="submit" size="xs" className="btn-term" variant="outline" disabled={busy}>
-              follow
+              continue
             </Button>
           </div>
           <span className="wnote">
-            Checked against the ledger's base58 and checksum. Read-only: no key, no signing.
+            The reference is checked before it is accepted. View only: nothing can be signed.
           </span>
         </form>
       </DialogContent>

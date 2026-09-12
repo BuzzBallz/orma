@@ -653,3 +653,65 @@ des trois usages autorisés sur les quatre desks. Les plus gros caractères de l
 des chiffres HTTP**, pas un poster.
 
 `uiAudit` **92/92** sur le bundle de production, API branchée.
+
+## Refonte globale — terminal de recherche crédit (12/09)
+
+Le lecteur n'est ni dev ni crypto : c'est un analyste crédit. S'il croise un mot qu'il ne
+lirait pas chez une agence de notation, il est perdu. Tout le site est repris.
+
+### Le dictionnaire, appliqué partout
+
+| avant | après |
+|---|---|
+| vault | facility |
+| the book / LIST | portfolio |
+| oracle | calculation agent |
+| NO FEED / FEED LOST | figures withheld |
+| divergence | reported vs held |
+| grade | internal score |
+| moment | next event |
+| Connect | sign in |
+| Vault Fragility Oracle · XLS-66 | **Facility Monitor** |
+
+Les routes suivent : `/facility`, `/event`, `/methodology`, et le paramètre est
+`?facility=`. Les anciennes adresses redirigent, la barre d'URL est réécrite.
+
+### Le problème que personne n'anticipe : les chaînes du backend
+
+Le backend possède ses libellés de facteurs, ses titres d'alerte et ses règles de notching,
+et **ils portent le vocabulaire du registre** : « Vault NAV still reports par », `AssetsTotal`,
+`tecINSUFFICIENT_FUNDS`, `drops`. Quatorze chaînes dans un seul payload.
+
+`lib/credit.ts` les **réétiquette au rendu** — `creditText()`, une table de synonymes stricts.
+On ne paraphrase pas : ce serait mettre des mots dans la bouche du backend. Chaque paire est
+un synonyme, pas un adoucissement.
+
+### Les quatre vues
+
+1. **Portfolio** — blotter de facilities, colonnes analyste seulement : facility, internal
+   score, status, reported vs held, next event, outlook. Cinq lignes structurelles, tirets
+   quand rien n'est reçu.
+2. **Facility** — credit opinion en **deux pages**, structure d'agence : boîte Ratings,
+   summary, strengths / challenges, Exhibit 1 (Capital / Asset performance / Liquidity),
+   puis outlook, déclencheurs de dégradation, key indicators, profile et trois blocs courts.
+   Impression A4 = deux feuilles, noir sur blanc.
+3. **Event** — le calendrier de la facility : échéances, fin de période, date de redemption.
+4. **Methodology** — un écran, trois blocs : comment le score est construit, ce que veut dire
+   reported vs held, ce qu'on fait quand les chiffres ne sont pas reçus.
+
+### Ce qui a failli passer
+
+Les « credit strengths » prenaient les trois meilleurs facteurs. Sur une facility notée D,
+ça imprimait *« credit strength : scored CCC »* — le genre de phrase qui fait jeter une note.
+Un point fort doit être **strictement meilleur que la note de la facility**. Quand rien ne
+l'est, la note le dit ; et quand la facility est en haut de l'échelle, elle dit ça aussi.
+Les challenges sont toujours les deux plus faibles, quelle que soit la note.
+
+### L'application de la règle
+
+Nouveau contrôle dans l'audit : **27 termes interdits** cherchés dans le texte rendu et dans
+le chemin, sur chaque écran. Vérifié à la main sur les 5 facilities × 2 vues plus les
+4 vues sans sélection : **0 occurrence**.
+
+Treize fichiers d'écrans d'avant la refonte supprimés — ils étaient morts et portaient
+l'ancien vocabulaire.

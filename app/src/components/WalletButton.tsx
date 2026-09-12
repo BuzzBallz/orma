@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, Copy, LogOut, Wallet } from 'lucide-react'
+import { Check, Copy, LogOut, UserRound } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -10,15 +10,14 @@ import {
 import { toast } from 'sonner'
 import { useWallet } from '../lib/wallet'
 import { shortAddress } from '../lib/xrpl-address'
-import { WalletDialog } from './WalletDialog'
+import { SignInDialog } from './WalletDialog'
 
 /**
- * Topbar, far right. Disconnected it is one button — never "connect to unlock", because
- * nothing on this desk is locked. Connected it is the account and the network, stated,
- * with the full address a hover away (B7) and two real actions behind it (B5).
+ * Top right, and deliberately quiet. Nothing on these pages is behind it: signing in
+ * records who is reading, and every figure is shown either way.
  */
-export function WalletButton() {
-  const { state, network, disconnect, prefetch } = useWallet()
+export function SignInButton() {
+  const { state, disconnect, prefetch } = useWallet()
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
 
@@ -31,9 +30,9 @@ export function WalletButton() {
           onFocus={prefetch}
           onClick={() => { prefetch(); setOpen(true) }}
         >
-          <Wallet size={12} strokeWidth={2.25} /> connect
+          <UserRound size={12} strokeWidth={2.25} /> sign in
         </Button>
-        <WalletDialog open={open} onOpenChange={setOpen} />
+        <SignInDialog open={open} onOpenChange={setOpen} />
       </>
     )
   }
@@ -43,10 +42,7 @@ export function WalletButton() {
     <span className="wallet" data-picker onKeyDown={e => e.stopPropagation()}>
       <Badge variant="outline" className="pill wpill" style={{ ['--pill-tone' as string]: 'var(--ok)' }}>
         <span className="dot" />
-        {state.via === 'read-only' ? 'read-only' : 'connected'}
-      </Badge>
-      <Badge variant="outline" className="chip wnet" style={{ ['--chip-tone' as string]: 'var(--read-correct)' }}>
-        {network}
+        {state.via === 'read-only' ? 'view only' : 'signed in'}
       </Badge>
 
       <DropdownMenu>
@@ -56,28 +52,27 @@ export function WalletButton() {
               <span className="num">{label}</span>
             </DropdownMenuTrigger>
           </TooltipTrigger>
-          {/* B7 — the whole address, because a truncation is not an address. */}
           <TooltipContent className="tip" side="bottom">{state.address}</TooltipContent>
         </Tooltip>
 
         <DropdownMenuContent align="end" sideOffset={6} data-picker className="picker-list">
           <DropdownMenuLabel className="label">
-            {state.via === 'read-only' ? 'followed read-only' : `via ${state.via}`} · {network}
+            {state.via === 'read-only' ? 'view only' : 'session'}
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onSelect={() => {
               navigator.clipboard?.writeText(state.address).then(() => {
                 setCopied(true); setTimeout(() => setCopied(false), 1200)
-                toast.success('Address copied', { description: shortAddress(state.address) })
+                toast.success('Reference copied', { description: shortAddress(state.address) })
               }, () => toast.error('Could not reach the clipboard'))
             }}
           >
             {copied ? <Check size={12} strokeWidth={2.5} /> : <Copy size={12} strokeWidth={2.25} />}
-            copy address
+            copy reference
           </DropdownMenuItem>
           <DropdownMenuItem data-danger onSelect={disconnect}>
-            <LogOut size={12} strokeWidth={2.25} /> disconnect
+            <LogOut size={12} strokeWidth={2.25} /> sign out
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
