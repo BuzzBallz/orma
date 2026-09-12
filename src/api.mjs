@@ -148,9 +148,12 @@ export function createApi(reader, opts = {}) {
         return send(200, stamp(body))
       }
 
+      // Demo 1. `demo/` is TRACKED and `fixtures/` is not, so the tracked capture must be
+      // tried first: served from fixtures alone, this route 404s on a clean clone and the
+      // most important demo in the pitch dies in front of the judges.
       if (key === 'GET /api/indexer-race') {
-        const path = 'fixtures/indexer-race.json'
-        if (!existsSync(path)) return fail(404, 'NOT_FOUND', 'no capture available', false)
+        const path = ['demo/indexer-race.json', 'fixtures/indexer-race.json'].find((f) => existsSync(f))
+        if (!path) return fail(404, 'NOT_FOUND', 'no capture available', false)
         return send(200, stamp(JSON.parse(readFileSync(path, 'utf8'))))
       }
 

@@ -1,0 +1,47 @@
+{
+  "capturedAt": "2026-09-12T16:05:57Z",
+  "capturedDuring": "XRPL Lending Protocol Hackathon, Paris, 12-13 September 2026",
+  "network": "devnet",
+  "buildVersion": "3.4.0-rc5",
+  "transactionHash": "9CFF971F35A9D162CE3A54C71961E64694A83A79321EB05DED8A36EEFAD14106",
+  "transactionResult": "tesSUCCESS",
+  "finding": "The first impairment of a previously-healthy vault is invisible to metadata diffing.",
+  "why": "LossUnrealized was 0 (the type default) so rippled omits it from PreviousFields. Under cash-basis accounting impairment changes nothing else on the Vault, so PreviousFields is entirely {} while FinalFields carries a non-zero LossUnrealized.",
+  "vaultId": "F8941703977DDC15ACC7C8758C8609A9EDC60A43ADAF234AE0A175D14C78087A",
+  "loanBrokerId": "3B10D891C30244EB9C12E902143FD25737B4B92121589F5C8E066EB8E538CDB1",
+  "loanId": "24B77C167B48F89F81BDC0D94E0D3472D151D294232C46A030811BEADE39DE48",
+  "vaultNode": {
+    "ledgerIndex": "F8941703977DDC15ACC7C8758C8609A9EDC60A43ADAF234AE0A175D14C78087A",
+    "previousFields": {},
+    "finalFields": {
+      "AssetsTotal": "51000000",
+      "AssetsAvailable": "41000000",
+      "LossUnrealized": "10000000"
+    },
+    "healthyBefore": {
+      "AssetsTotal": "51000000",
+      "AssetsAvailable": "41000000",
+      "LossUnrealized": "0"
+    },
+    "sharesOutstanding": "51000000"
+  },
+  "loanNode": {
+    "ledgerIndex": "24B77C167B48F89F81BDC0D94E0D3472D151D294232C46A030811BEADE39DE48",
+    "previousFields": {
+      "Flags": 0
+    },
+    "finalFieldsFlags": 131072
+  },
+  "readings": {
+    "naive": {
+      "formula": "AssetsTotal / sharesOutstanding",
+      "value": "1.000000"
+    },
+    "correct": {
+      "formula": "(AssetsTotal - LossUnrealized) / sharesOutstanding",
+      "value": "0.803922"
+    },
+    "divergenceBps": 1961
+  },
+  "verdict": "PreviousFields is empty. An indexer diffing metadata sees no change on this vault."
+}
