@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Use cases — Orma</title>
+<meta name="description" content="Four worked cases against three of the four live Devnet facilities: choosing between two managers, pricing a pledge of vault units, attracting capital by being measured, and gating deposits with XLS-70 credentials.">
+<style>
+:root{--bg:#0A0B0E;--panel:#0E1015;--raised:#15171D;--fg:#EAE0CE;--dim:#B3AA99;--mute:#8C8578;
+--gold:#C9A45F;--line:#1F222A;--line2:#2C313B;--ok:#35D64A;--bad:#FF4A4A;
+--mono:"Plex Mono",ui-monospace,"SF Mono",Consolas,Menlo,monospace;
+--sans:"Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.62;font-size:16px}
+.wrap{display:grid;grid-template-columns:250px minmax(0,1fr);max-width:1180px;margin:0 auto;gap:48px;padding:0 24px}
+nav{position:sticky;top:0;align-self:start;height:100vh;overflow:auto;padding:32px 0;border-right:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:9px;font:600 15px/1 var(--mono);letter-spacing:.09em;
+text-transform:uppercase;color:var(--fg);margin-bottom:28px;text-decoration:none}
+.brand svg{width:22px;height:22px;flex:0 0 auto}
+nav a{display:block;padding:7px 12px 7px 0;color:var(--dim);text-decoration:none;font-size:14.5px;border-left:2px solid transparent;padding-left:12px}
+nav a:hover{color:var(--fg)}
+nav a.on{color:var(--gold);border-left-color:var(--gold)}
+main{padding:48px 0 120px;min-width:0}
+h1{font-size:34px;line-height:1.18;letter-spacing:-.02em;margin:0 0 6px}
+h2{font-size:23px;margin:44px 0 12px;padding-top:20px;border-top:1px solid var(--line);letter-spacing:-.01em}
+h3{font-size:17.5px;margin:30px 0 8px;color:var(--fg)}
+h4{font-size:15px;margin:22px 0 6px;color:var(--dim);font-family:var(--mono);letter-spacing:.03em}
+.lede{color:var(--mute);font-size:17px;margin:0 0 32px}
+p{margin:0 0 15px}
+a{color:var(--gold)}
+code{font-family:var(--mono);font-size:.88em;background:var(--raised);padding:1.5px 5px;border-radius:3px;color:var(--gold)}
+pre.code{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:15px 17px;overflow-x:auto;margin:0 0 17px;position:relative}
+pre.code code{background:none;padding:0;color:var(--fg);font-size:13.2px;line-height:1.62}
+pre.code[data-lang]::after{content:attr(data-lang);position:absolute;top:7px;right:11px;
+font:500 10px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}
+.tw{overflow-x:auto;margin:0 0 18px}
+table{border-collapse:collapse;width:100%;font-size:14.2px}
+th{text-align:left;font:500 11px var(--mono);letter-spacing:.09em;text-transform:uppercase;
+color:var(--mute);padding:8px 12px 8px 0;border-bottom:1px solid var(--line2)}
+td{padding:9px 12px 9px 0;border-bottom:1px solid var(--line);vertical-align:top;color:var(--dim)}
+td:first-child{color:var(--fg)}
+ul,ol{margin:0 0 16px;padding-left:21px}li{margin:0 0 6px;color:var(--dim)}
+blockquote{margin:0 0 18px;padding:2px 0 2px 17px;border-left:2px solid var(--gold);color:var(--dim)}
+blockquote p:last-child{margin:0}
+hr{border:0;border-top:1px solid var(--line);margin:34px 0}
+.callout{display:flex;gap:13px;border:1px solid var(--line2);border-radius:6px;padding:13px 16px;margin:0 0 18px;background:var(--panel)}
+.callout .ck{font:500 10px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--mute);flex:0 0 62px;padding-top:3px}
+.callout p:last-child{margin:0}
+.callout.warning{border-color:var(--bad)}.callout.warning .ck{color:var(--bad)}
+.callout.tip{border-color:var(--ok)}.callout.tip .ck{color:var(--ok)}
+.callout.note .ck{color:var(--gold)}
+.foot{margin-top:64px;padding-top:22px;border-top:1px solid var(--line);color:var(--mute);font-size:13.5px}
+@media(max-width:820px){.wrap{grid-template-columns:1fr;gap:0}
+nav{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)}main{padding:28px 0 80px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <a class="brand" href="introduction.html"><svg viewBox="0 0 64 64" fill="none" aria-hidden="true"><path d="M32 6c10.5 0 18 8.9 18 21.5S42.5 49 32 49 14 40.1 14 27.5 21.5 6 32 6Zm0 4.6c-5.6 0-8.9 6.6-8.9 16.9s3.3 16.9 8.9 16.9 8.9-6.6 8.9-16.9S37.6 10.6 32 10.6Z" fill="#EAE0CE"/><path d="M7 54.2c5.6-3.6 9.9-3.6 14.5-.9 5.2 3 8.4 3.1 12.9.4 5.5-3.3 9.7-3.4 14.8-.6 3.2 1.8 6 1.9 8.8.4" stroke="#EAE0CE" stroke-width="2.1" stroke-linecap="round"/><path d="M11 59.6c5.3-2.6 9.4-2.6 13.7-.4 4.9 2.5 8 2.5 12.2.1 5.2-2.9 9.2-3 14-.6" stroke="#C9A45F" stroke-width="2.1" stroke-linecap="round"/></svg> Orma</a>
+      <a href="introduction.html">Orma</a>
+      <a href="concepts.html">Concepts</a>
+      <a href="quickstart.html">Quickstart</a>
+      <a href="mathematics.html">The mathematics</a>
+      <a href="nav-pointer.html">The NAV pointer: a self-describing collateral instrument</a>
+      <a href="gate.html">The gate</a>
+      <a href="api-reference.html">API reference</a>
+      <a href="ai-agents.html">AI agents</a>
+      <a href="use-cases.html" class="on">Use cases</a>
+      <a href="findings.html">What building this taught us</a>
+  </nav>
+  <main>
+    <h1>Use cases</h1>
+    <p class="lede">Four worked cases against three of the four live Devnet facilities: choosing between two managers, pricing a pledge of vault units, attracting capital by being measured, and gating deposits with XLS-70 credentials.</p>
+    <p>Every ledger figure on this page was read from the running API at ledger <code>5263343</code>, <code>2026-09-12T22:20:22Z</code>, against Devnet <code>rippled 3.4.0-rc5</code>. Nothing here is a projection. The two haircut figures in case 2 are arithmetic on that reading rather than a captured response body, and case 2 says so where they appear.</p>
+<p>The thesis the four cases share: the party who decides <b>when</b> a vault recognises a loss is the same party who decides <b>in what order</b> those losses are realised. The <code>LoanBroker</code> owner is necessarily the vault owner, a protocol fact and not a configuration choice. Both decisions move money from unit holders to that party. Orma measures both from public ledger state, publishes the result where it can be acted on, and lets a third party enforce it.</p>
+<div class="callout warning"><span class="ck">Warning</span><div><p>All four facilities run on Devnet. XLS-65 (vaults) and XLS-66 (lending) are not live on</p><p>Mainnet, so none of this can be pointed at a production facility today. XLS-70</p><p>(credentials) and XLS-80 (permissioned domains), which case 4 is built from, <b>are</b> live</p><p>on Mainnet; what keeps case 4 Devnet-only is the vault underneath it. Every transaction</p><p>hash below resolves on <code>devnet.xrpl.org</code>.</p></div></div>
+<hr>
+<h2 id="1-an-lp-choosing-between-two-facilities">1. An LP choosing between two facilities</h2>
+<p>Two closed-ended XRP facilities, both in the Investment phase, both scored by the same code path with no weights applied anywhere.</p>
+<div class="tw"><table><thead><tr><th></th><th>Kestrel Bridge Financing II</th><th>Calder Structured Credit III</th></tr></thead><tbody><tr><td><code>vaultId</code></td><td><code>24EAA01A...E5810089</code></td><td><code>5763707D...A96CB0E5</code></td></tr><tr><td>Vault grade</td><td><b>B</b> (26 / 100)</td><td><b>AA</b> (89 / 100)</td></tr><tr><td>Conduct grade</td><td><b>E</b> (25 / 100)</td><td><b>A</b> (100 / 100)</td></tr><tr><td><code>assetsTotal</code></td><td><code>10500000</code> drops</td><td><code>51000000</code> drops</td></tr><tr><td><code>lossUnrealized</code></td><td><code>0</code></td><td><code>10000000</code> drops</td></tr><tr><td><code>navNaive</code></td><td><code>0.210000</code></td><td><code>1.000000</code></td></tr><tr><td><code>navCorrect</code></td><td><code>0.210000</code></td><td><code>0.803922</code></td></tr><tr><td><code>navDivergenceBps</code></td><td><b>0</b></td><td><b>1961</b></td></tr><tr><td>Defaults on record</td><td>2</td><td>0</td></tr><tr><td>Impairments on record</td><td>0</td><td>1</td></tr></tbody></table></div>
+<p>The two columns disagree with each other in exactly the way that matters.</p>
+<p>Kestrel reports <b>zero</b> NAV divergence. Calder reports 19.61%. A screener that ranks by divergence puts Kestrel on top. Kestrel is the worse facility by a wide margin, and the reason is mechanical: divergence only becomes non-zero once a manager has <b>declared</b> a loss. Kestrel's manager never declared one. They went straight to default, at which point the loss was realised, <code>LossUnrealized</code> never moved off zero, and the book read clean again. This is why <code>GET /api/vaults</code> sorts by <code>gradeNumeric</code> ascending and not by divergence.</p>
+<h3 id="what-kestrel-s-manager-actually-did">What Kestrel's manager actually did</h3>
+<p>Reconstructed from three transactions on the public record, via <code>GET /api/vaults/24EAA01A.../broker-history</code>:</p>
+<div class="tw"><table><thead><tr><th>event</th><th>time</th><th>hash</th><th>principal</th><th><code>debtBefore</code></th><th>cover consumed</th></tr></thead><tbody><tr><td><code>cover_deposit</code></td><td>21:08:32Z</td><td><code>E979EB6D...</code></td><td><code>0</code></td><td><code>0</code></td><td><code>0</code></td></tr><tr><td><code>default</code></td><td>21:11:02Z</td><td><code>FB23EC53...</code></td><td><code>30000000</code></td><td><code>40000000</code></td><td><code>400000</code></td></tr><tr><td><code>default</code></td><td>21:11:10Z</td><td><code>DE49DF0D...</code></td><td><code>10000000</code></td><td><code>10000000</code></td><td><code>100000</code></td></tr></tbody></table></div>
+<p>The 30 XRP loan was declared first, then the 10 XRP loan. Cover liquidated on a default is</p>
+<p>$$T(p) = \min\Big(\big\lceil D \cdot c_{\min} \cdot c_{\text{liq}} \big\rceil,\; p,\; C\Big)$$</p>
+<p>with $D$ the broker's <b>total</b> book, not the defaulting loan's principal, and $D$ decremented after each default. At $c_{\min} = c_{\text{liq}} = 10000$ (both in $10^{-5}$ units, so the coefficient is $0.10 \times 0.10 = 0.01$) the two orders give:</p>
+<div class="tw"><table><thead><tr><th>order</th><th>step 1</th><th>step 2</th><th>total cover consumed</th></tr></thead><tbody><tr><td>largest first (what happened)</td><td><code>400000</code></td><td><code>100000</code></td><td><b><code>500000</code></b></td></tr><tr><td>smallest first</td><td><code>400000</code></td><td><code>300000</code></td><td><b><code>700000</code></b></td></tr></tbody></table></div>
+<p>The manager's own first-loss capital absorbed 0.50 XRP instead of 0.70 XRP. The 0.20 XRP difference did not disappear. It fell on the unit holders. The API reports it as <code>ordering.costToDepositors: "200000"</code> with <code>fairness: "0.0000"</code>, the sequence sitting exactly at the investor-worst end of the range.</p>
+<p>Conduct score: 100, minus 35 for a sequence score below 0.25, minus 20 for each of two exposures written off with no prior impairment, giving <b>25 and a grade of E</b>.</p>
+<p>The facility now holds 10.5 XRP against 50,000,000 units outstanding. Realised capital destruction is</p>
+<p>$$\rho = \max\left(0,\; \frac{S - A}{S}\right) = \frac{50{,}000{,}000 - 10{,}500{,}000}{50{,}000{,}000} = 79\%$$</p>
+<p>which notches the composite down 14 steps from its AAA anchor to <b>B</b>. Without that term the vault scores AAA, because after a write-off the asset is gone, the provision is released and every current-exposure factor reads clean.</p>
+<h3 id="what-calder-s-manager-actually-did">What Calder's manager actually did</h3>
+<p>One loan, 10 XRP, went past due. The manager impaired it (<code>BD18EFB94490CA540E7A9C249971740C1228D1FBC3ED97C9BA9F4908F52D5F4F</code>), which moved <code>LossUnrealized</code> from <code>0</code> to <code>10000000</code> and took the honest unit value from 1.000000 down to 0.803922. No default has been declared. The ordering rule needs two defaults before it applies, no exposure was written off without warning, and no first-loss capital has been withdrawn, so nothing deducts from the starting 100 and the conduct grade is <b>A</b>.</p>
+<p>The vault itself is graded <b>AA</b>, not AAA, and the notch trace says why:</p>
+<pre class="code" data-lang="json"><code>"notchTrace": [
+  { "from": "AAA", "rule": "anchor on DEADLINE (can claims be met at redemption)", "delta": 0, "to": "AAA" },
+  { "from": "AAA", "rule": "single loan &gt;= 75% of broker debt (cover is keyed to total debt, not loan size)", "delta": -1, "to": "AA+" },
+  { "from": "AA+", "rule": "liquidatable cover &lt; 5% of recognised loss", "delta": -1, "to": "AA" }
+]</code></pre>
+<p>Both notches are about structure, not about the disclosure. Disclosing the loss cost Calder 1961 bp on its published unit value and cost its conduct grade nothing.</p>
+<h3 id="who-this-is-for">Who this is for</h3>
+<p>An LP with capital to allocate and no way to tell a manager who has taken a loss from a manager who has hidden one. <code>AssetsTotal</code> is the field every generic tool reads, and it answers neither question. Calder reads <code>51000000</code> against 51,000,000 units outstanding, a naive unit value of exactly <code>1.000000</code>, with the 10 XRP loss its manager has already recognised nowhere in the number. Kestrel reads a divergence of zero because its manager skipped the recognition step altogether. On conduct, which is the record of what each manager did, the two are four grades apart: E against A.</p>
+<pre class="code" data-lang="bash"><code># every tracked facility, worst grade first
+curl -s localhost:8787/api/vaults \
+  | jq '.vaults[] | {label, grade, gradeNumeric, navDivergenceBps}'
+
+# the manager's record, reconstructed from account_tx
+curl -s localhost:8787/api/vaults/24EAA01AD4CE70D8ABB4ACB4255DC4C216B8AF3B9E7315DB8052BFC1E5810089/broker-history \
+  | jq '{ordering, reputation}'</code></pre>
+<div class="callout note"><span class="ck">Note</span><div><p>Conduct is reconstructed from <code>account_tx</code>, which Devnet retains for roughly 29 days. The</p><p>API returns that caveat in the response body rather than burying it in a footnote. Conduct</p><p>before the retention window is not visible and is not claimed to be.</p></div></div>
+<hr>
+<h2 id="2-a-second-broker-asked-to-lend-against-pledged-units">2. A second broker asked to lend against pledged units</h2>
+<p>An LP holds units of Calder's share token and wants to borrow against them from a different broker. The units are escrowed on-ledger: XLS-85 <code>TokenEscrow</code> accepts MPT amounts, and vault shares are MPTs, so <code>EscrowCreate</code> with <code>Amount: { mpt_issuance_id, value }</code> returns <code>tesSUCCESS</code>. The pledge is then a public object. What it is worth is the open question.</p>
+<p>The second broker starts from the only identifier they have, the issuance id, and runs the resolution loop. Every step is on the ledger or on a URL the ledger names:</p>
+<pre class="code" data-lang="bash"><code>curl -s "localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/resolve?units=1000000"</code></pre>
+<pre class="code" data-lang="json"><code>"steps": [
+  { "step": "read MPTokenIssuance", "ok": true, "detail": "issuer r3hE8HanpccSZdgmeHCfYFEkwxFjdDmmvt, 51000000 units outstanding" },
+  { "step": "decode metadata", "ok": true, "detail": "valid JSON" },
+  { "step": "XLS-89 conformance", "ok": true, "detail": "asset_class rwa" },
+  { "step": "find valuation pointer", "ok": true, "detail": "http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav" },
+  { "step": "follow pointer", "ok": true, "detail": "unit value 0.803922" }
+]</code></pre>
+<p>Nothing in that loop required the borrower's cooperation, and nothing required a relationship with Orma. The pointer template <code>http://localhost:8787/api/mpt/{mpt_issuance_id}/nav</code> was written into <code>MPTokenMetadata</code> at <code>VaultCreate</code>. The broker substitutes the token's own id and follows it.</p>
+<h3 id="the-number">The number</h3>
+<p>A pledge of 1,000,000 units, priced both ways. Returned as integer strings in the vault's asset base unit, drops for an XRP vault:</p>
+<pre class="code" data-lang="json"><code>"pledge": {
+  "units": "1000000",
+  "valueHeld": "803922",
+  "valueReported": "1000000",
+  "overstatement": "196078"
+}</code></pre>
+<p>In XRP: reported 1.000000, held 0.803922, <b>overstatement 0.196078, or 19.61%</b>. The lender who prices on the reported figure is over-collateralised on paper by 0.196078 XRP per 1,000,000 units, and short by that amount in reality.</p>
+<h3 id="why-a-haircut-does-not-save-you">Why a haircut does not save you</h3>
+<p>A haircut applies to the <b>held</b> value, never to the reported one:</p>
+<p>$$V_{\text{lendable}} = V_{\text{held}} \cdot (1 - h)$$</p>
+<p>At $h = 0.20$ on this pledge, <code>maxLendable</code> is <code>643138</code> drops. A lender applying the same 20% to the reported value lends <code>800000</code> drops against collateral genuinely worth <code>803922</code>. They intended a 20% cushion. They have 3,922 drops of it, 0.49% of the true value. The haircut was consumed entirely by the misstatement before it absorbed a single tick of volatility.</p>
+<p>No escrow of Calder units was outstanding at the capture above, so <code>/collateral</code> returned <code>pledgeCount: 0</code>. Those last two figures are the arithmetic the route performs on the valuation, not a captured response body.</p>
+<p>The diagnostic reports every step including failure, because "this collateral is opaque" is a legitimate answer to give a lender. An early version of the pointer resolved to the diagnostic rather than to the valuation, returned a perfectly good HTTP 200 with no <code>unitValue</code> on it, and crashed the caller. <code>valuePledge</code> now returns an explicit <code>unpriced</code> string instead of throwing.</p>
+<pre class="code" data-lang="bash"><code># a lender's own escrows, valued both ways, with their policy discount applied to the honest value
+curl -s "localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5/collateral?haircut=20&amp;accounts=rEXAMPLE" \
+  | jq '{navNaive, navCorrect, totalOverstatement, totalOverstatementPct, pledges}'</code></pre>
+<h3 id="who-this-is-for">Who this is for</h3>
+<p>The second broker, whose alternative is to price the collateral on the borrower's word or to refuse it outright. The first option costs 19.61% of the stated notional on this facility. The second costs the borrower their access to credit, and costs the vault the argument that its units are collateral at all.</p>
+<div class="callout warning"><span class="ck">Warning</span><div><p>No global index exists from an <code>mpt_issuance_id</code> to the escrows holding it, so the</p><p><code>/collateral</code> route has to be handed a list of accounts to scan. An escrow does appear in</p><p>the owner directory of both pledgor and beneficiary with the same object index, so a</p><p>lender can enumerate pledges made in their own favour by scanning their own objects, which</p><p>is the question that actually matters. We dedupe by index because the same escrow comes</p><p>back once per account scanned. This is filed as developer feedback, not solved.</p></div></div>
+<hr>
+<h2 id="3-a-vault-manager-who-wants-to-attract-capital">3. A vault manager who wants to attract capital</h2>
+<p>Being measured looks adversarial and is not. The chain is short:</p>
+<ol><li>The share token carries a pointer to an honest valuation.</li><li>Any counterparty can price the units without asking the holder, the manager, or us.</li><li>Units that can be priced are usable as collateral elsewhere.</li><li>Units that are usable elsewhere are worth more to hold.</li><li>A facility whose units are worth more to hold raises capital more easily.</li></ol>
+<p>Calder's manager did step 1 by writing 502 bytes of JSON into <code>MPTokenMetadata</code> at <code>VaultCreate</code>. Five XLS-89 fields so explorers will list the token, then one namespaced block that does the work:</p>
+<pre class="code" data-lang="json"><code>"orma": {
+  "v": 1,
+  "instrument": "vault-share",
+  "nav_url": "http://localhost:8787/api/mpt/{mpt_issuance_id}/nav",
+  "nav_url_param": "{mpt_issuance_id}",
+  "nav_basis": "assets net of recognised loss, divided by units outstanding",
+  "doc": "https://orma.credit/nav"
+}</code></pre>
+<div class="callout warning"><span class="ck">Warning</span><div><p>This is write-once, permanently: no transaction and no key can update it, including the</p><p>manager's and including ours. That is why the field holds a <b>pointer</b> and never a number,</p><p>and it is why the hackathon build shipped a <code>localhost</code> URL into the metadata of a live</p><p>Devnet token, which we cannot correct and are stating rather than hiding. The full object,</p><p>the three transactions that establish the immutability, and the 1024-byte ceiling are on</p><p><a href="nav-pointer.html">the NAV pointer page</a>.</p></div></div>
+<h3 id="the-grade-is-the-asset-not-the-threat">The grade is the asset, not the threat</h3>
+<p>Calder's manager holds a conduct score of <b>100 / 100, grade A</b>, earned by impairing a loan rather than sitting on it. That grade has three properties an honest manager wants:</p>
+<ul><li><b>It is not self-reported.</b> It is rebuilt from transaction hashes anyone can fetch. A</li></ul>
+<p>  competitor cannot claim it, and a manager cannot be talked out of it.</p>
+<ul><li><b>Disclosure does not cost it.</b> Realised capital destruction is measured against $A$</li></ul>
+<p>  and deliberately not against $A - L$. An unrealised loss is a provision against an asset   the vault still holds and may recover. Counting it would punish a manager for disclosing   early, which is the behaviour the rest of the system exists to reward. Kestrel, which   disclosed nothing, carries 79% realised destruction, a vault grade of B and a conduct   grade of E. Similarly, first-loss adequacy divides by   $\max(L, P_{\text{distressed}})$ rather than by $L$ alone, so concealing a large overdue   exposure cannot improve a score.</p>
+<ul><li><b>It is the passport to gated capital.</b> See case 4. An allocator who deposits only</li></ul>
+<p>  where a trusted issuer has certified the counterparties is an allocator a grade A   manager can reach and a grade E manager cannot.</p>
+<p>The measurement also hands the manager something they can use. When two or more distressed exposures are outstanding, <code>recommendation</code> in the broker-history response names the declaration order that applies the most first-loss capital on the investors' behalf, with <code>coverIfFair</code>, <code>coverIfSelfServing</code> and <code>atStakeForDepositors</code>. On Calder it currently returns <code>applicable: false, reason: "fewer than two distressed loans"</code>, which is the right answer rather than a fabricated one.</p>
+<h3 id="who-this-is-for">Who this is for</h3>
+<p>A manager running a facility on fundamentals, who is currently priced identically to one who is not, because <code>AssetsTotal</code> is the field every generic tool reads and recognising a loss does not move it. Under cash-basis accounting an impairment changes nothing else on the Vault object either, so the disclosure is invisible to anything reading that field alone.</p>
+<hr>
+<h2 id="4-a-protocol-or-treasury-gating-capital">4. A protocol or treasury gating capital</h2>
+<p>Everything above is measurement, and measurement is advice. This is the part that binds. The ledger refuses the transaction. Nobody has to read a report, agree with it, or act on it.</p>
+<p>Thorne Senior Secured I, <code>4A5A8E37...B00190DF5</code>, verified end to end on Devnet:</p>
+<div class="tw"><table><thead><tr><th>step</th><th>transaction</th><th>result</th><th>hash</th></tr></thead><tbody><tr><td>1</td><td><code>CredentialCreate</code>, we issue <code>ORMA-IG</code> to an LP</td><td><code>tesSUCCESS</code></td><td><code>619CC767...</code></td></tr><tr><td>2</td><td><code>CredentialAccept</code>, the LP opts in</td><td><code>tesSUCCESS</code></td><td><code>41F98989...</code></td></tr><tr><td>3</td><td><code>PermissionedDomainSet</code>, the vault owner names our issuer</td><td><code>tesSUCCESS</code></td><td><code>4C425830...</code></td></tr><tr><td>4</td><td><code>VaultCreate</code> with <code>tfVaultPrivate</code> and <code>DomainID</code></td><td><code>tesSUCCESS</code></td><td><code>3FC79BF7...</code></td></tr><tr><td>5</td><td><code>VaultDeposit</code>, graded LP</td><td><code>tesSUCCESS</code></td><td><code>7FC5C01B...</code></td></tr><tr><td>6</td><td><code>VaultDeposit</code>, ungraded LP</td><td><b><code>tecNO_AUTH</code></b></td><td><code>E7CF5DB2...</code></td></tr><tr><td>7</td><td><code>CredentialDelete</code>, we revoke</td><td><code>tesSUCCESS</code></td><td><code>E2D6F396...</code></td></tr><tr><td>8</td><td><code>VaultDeposit</code> after revocation</td><td><b><code>tecNO_AUTH</code></b></td><td><code>AA25246A...</code></td></tr><tr><td>9</td><td><code>VaultWithdraw</code> after revocation</td><td><code>tesSUCCESS</code></td><td><code>2E71A259...</code></td></tr></tbody></table></div>
+<p>Resulting state, from <code>GET /api/vaults/4A5A8E37.../gate</code>:</p>
+<pre class="code" data-lang="json"><code>{
+  "gated": true,
+  "private": true,
+  "domainId": "FFBEC89D98B4E7CF52F4F254235086514A90CED0EC531941BDF747AF40C5A2FB",
+  "acceptedCredentials": [
+    { "issuer": "rKQjjU5KFs9RAZCDvYVjcaoVK5gGsCJgkP", "type": "ORMA-IG", "typeHex": "4F524D412D4947" }
+  ],
+  "domainOwner": "rGFFSqqY1R3764FKF7crU5F6bYh9qaD45S",
+  "issuerNamed": true,
+  "raterAddress": "rKQjjU5KFs9RAZCDvYVjcaoVK5gGsCJgkP"
+}</code></pre>
+<h3 id="why-this-is-a-rating-and-not-a-private-arrangement">Why this is a rating and not a private arrangement</h3>
+<p>Step 3 is signed by the <b>vault owner alone</b>. We sign nothing, we are not consulted, and we cannot decline to be cited. <code>issuerNamed: true</code> in the response above is us answering a question about ourselves that we were never asked in the first place. That asymmetry is the difference between a rating and a bilateral deal, and it is how the incumbent rating agencies work: an issuer references a rating, and the agency gets no veto over being referenced.</p>
+<p>Step 2 is the mirror asymmetry. Issuance alone grants nothing. Without <code>CredentialAccept</code> the deposit is still <code>tecNO_AUTH</code>, so a credential is not something that can be done <b>to</b> someone.</p>
+<div class="callout note"><span class="ck">Note</span><div><p>Credentials are keyed to the <b>bar</b>, not to the facility. <code>ORMA-IG</code> says "may enter</p><p>facilities graded BBB- or better" and is reusable across every vault that names our</p><p>issuer. One credential per facility would be a whitelist wearing a credential's clothes.</p><p><code>CredentialType</code> is a hex blob of 1 to 64 bytes; <code>ORMA-IG</code> serialises to <code>4F524D412D4947</code>.</p></div></div>
+<h3 id="revocation-is-one-directional-on-purpose">Revocation is one-directional, on purpose</h3>
+<p>Steps 8 and 9 are the sharpest pair in the sequence. After <code>CredentialDelete</code>, the LP's next deposit bounces immediately and their existing position is untouched: they withdraw in full, <code>tesSUCCESS</code>. The gate controls who may <b>enter</b>, never who may leave. The alternative design is a rater who can trap capital, which nobody should accept and which we did not build.</p>
+<h3 id="two-things-that-will-cost-you-a-day-if-you-do-not-know-them">Two things that will cost you a day if you do not know them</h3>
+<div class="callout warning"><span class="ck">Warning</span><div><p><code>DomainID</code> is <b>not</b> stored on the Vault ledger entry. It lives on the share</p><p><code>MPTokenIssuance</code>. Reading the Vault object to find out whether a vault is gated returns</p><p>nothing, which reads exactly like "open to everyone". <code>gateStatus()</code> reads the issuance.</p><p><code>tfVaultPrivate</code> (<code>0x00010000</code>) is <b>required</b> alongside <code>DomainID</code> on <code>VaultCreate</code>. A</p><p><code>DomainID</code> without the flag gates nothing at all, and the API reports that case explicitly</p><p>as <code>"carries a domain but is not flagged private, so nothing is enforced"</code> rather than</p><p>showing it as protected.</p></div></div>
+<div class="callout tip"><span class="ck">Tip</span><div><p>Every gate transaction is submitted and then read back from the <b>validated</b> result, not</p><p>from <code>engine_result</code>. We observed an engine result of <code>tecNO_AUTH</code> go on to validate as</p><p><code>tesSUCCESS</code>. On this feature specifically, reporting the provisional answer is the</p><p>difference between "the ledger refused them" and "the ledger let them in".</p></div></div>
+<h3 id="who-this-is-for">Who this is for</h3>
+<p>A treasury, DAO or protocol that wants an allocation policy enforced by the ledger rather than by a spreadsheet and a promise. The policy is expressed once, as a domain naming an issuer, and every deposit is then checked against it by consensus.</p>
+<hr>
+<h2 id="limits">Limits</h2>
+<ul><li>Devnet only, because XLS-65 and XLS-66 are not on Mainnet. XLS-70 credentials and</li></ul>
+<p>  XLS-80 permissioned domains are, so the enforcement half of case 4 has a production   path ahead of the measurement half.</p>
+<ul><li>Conduct history is bounded by <code>account_tx</code> retention, roughly 29 days.</li><li>The credential bar is a fixed threshold, <code>ORMA-IG</code> at BBB- or better. Nothing</li></ul>
+<p>  automatically reissues or revokes when a grade moves.</p>
+<ul><li>The pointer written into Calder's metadata is a <code>localhost</code> URL and cannot be changed.</li><li>Grades are advisory. <code>assessment.advisory</code> is <code>true</code> on every valuation response. The</li></ul>
+<p>  only thing that binds is the domain in case 4.</p>
+<p>Full field-by-field responses for every route used above, namely <code>/api/vaults</code>, <code>/api/vaults/{vaultId}/nav</code>, <code>/api/vaults/{vaultId}/broker-history</code>, <code>/api/vaults/{vaultId}/collateral</code>, <code>/api/vaults/{vaultId}/gate</code> and <code>/api/mpt/{mptId}/resolve</code>, are in <a href="api-reference.html">the API reference</a>.</p>
+    <div class="foot">
+      Orma — built at the XRPL Lending Protocol Hackathon, Paris, 12-13 September 2026,
+      by Alexandre Lemiere and Andrea Gonzalez. Devnet only.
+    </div>
+  </main>
+</div>
+</body>
+</html>
