@@ -11,7 +11,9 @@
     "fixtures": "node tools/fixture-server.mjs",
     "verify": "node tools/verify-toolchain.mjs",
     "check:reader": "node src/dev/check-reader.mjs",
-    "check:score": "node src/dev/check-score.mjs"
+    "check:score": "node src/dev/check-score.mjs",
+    "start": "node src/index.mjs",
+    "check:contract": "node src/dev/check-contract.mjs"
   },
   "dependencies": {
     "decimal.js": "10.6.0",

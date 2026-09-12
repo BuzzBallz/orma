@@ -32,6 +32,8 @@ export class Xrpl {
     this._backoff = 500
     this.lastLedger = null
     this.lastCloseTime = null
+    // Reported by the server, never asserted. Devnet moved rc4 -> rc5 mid-event.
+    this.buildVersion = null
     this.client.on('disconnected', (code) => {
       this.connected = false
       log.warn('disconnected', { code })
@@ -50,7 +52,11 @@ export class Xrpl {
         if (!this.client.isConnected()) await this.client.connect()
         this.connected = true
         this._backoff = 500
-        log.info('connected', { url: this.url })
+        try {
+          const si = await this.client.request({ command: 'server_info' })
+          this.buildVersion = si.result.info.build_version ?? null
+        } catch { /* non-fatal: the badge is cosmetic */ }
+        log.info('connected', { url: this.url, build: this.buildVersion })
         return
       } catch (e) {
         log.warn('connect failed, retrying', { err: String(e).slice(0, 120), inMs: this._backoff })
