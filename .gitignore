@@ -112,3 +112,7 @@ paper/*.log
 paper/*.out
 paper/*.toc
 documentation/site/
+
+# Demo start logs. Noise, regenerated on every run.
+/.demo-backend.log
+/.demo-frontend.log
