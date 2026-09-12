@@ -492,6 +492,16 @@ tr.row-dead td{ text-decoration: line-through; opacity: 0.55; }
    signals. Never a bounce, never a spring, never a fade-in of the whole page on
    mount, never a shimmer. Everything here still dies under prefers-reduced-motion. */
 
+/* The last step of a notch trace is where the grade landed. It is marked by weight and
+   by a faint amber wash on its row — amber is chrome, it points — and never by a ring.
+   On this desk a 2px cyan ring means one thing: this element has keyboard focus. */
+.notch-final{ background: color-mix(in srgb, var(--amber) 6%, transparent); }
+.notch-final .chip{
+  background: color-mix(in srgb, var(--chip-tone, var(--fg-dim)) 22%, transparent);
+  border-color: var(--chip-tone, var(--fg-dim));
+  font-weight: 600;
+}
+
 :where(a, button, input, [tabindex], .picker-btn, .picker-list [data-slot="dropdown-menu-item"], tr):focus-visible{
   outline: 2px solid var(--read-correct);
   outline-offset: -2px;

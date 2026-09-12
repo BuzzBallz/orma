@@ -20,7 +20,7 @@ export function NotchTrace({ trace }: { trace: NotchStep[] }) {
             return (
               <div
                 key={i}
-                className="row"
+                className={'row notch-row' + (last ? ' notch-final' : '')}
                 style={{ gap: 12, padding: '10px 0', borderTop: i ? '1px solid var(--line)' : undefined, alignItems: 'flex-start' }}
               >
                 <span style={{ width: 44, flex: '0 0 auto' }}>
@@ -33,13 +33,10 @@ export function NotchTrace({ trace }: { trace: NotchStep[] }) {
                   style={{ width: 32, flex: '0 0 auto', textAlign: 'right', color: s.delta < 0 ? 'var(--bad)' : 'var(--fg-mute)' }}
                 >{s.delta}</span>
                 <span className="mute" style={{ flex: '0 0 auto' }}>——▶</span>
-                <span
-                  style={{
-                    width: 52, flex: '0 0 auto',
-                    outline: last ? '2px solid var(--read-correct)' : undefined,
-                    outlineOffset: last ? 2 : undefined, borderRadius: 3,
-                  }}
-                >
+                {/* The landing grade is marked by weight and by the row, never by a ring:
+                    a 2px cyan ring is what focus looks like on this desk, and nothing else
+                    may borrow it. */}
+                <span style={{ width: 52, flex: '0 0 auto' }}>
                   <Chip tone={gradeTone(s.to)}>{s.to}</Chip>
                 </span>
               </div>

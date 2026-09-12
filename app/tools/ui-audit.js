@@ -68,6 +68,22 @@ window.uiAudit = async function uiAudit(opts = {}) {
           .filter(b => b.scrollHeight > b.clientHeight + 1).length
         record('layout', `${label} · no band overflows`, over === 0, `${over} band(s) overflowing`)
       }
+      // A cyan ring means keyboard focus and nothing else. Anything else wearing the
+      // focus colour as an outline reads as a stray selection box to everyone who sees it.
+      const probe = document.createElement('i')
+      probe.style.color = 'var(--read-correct)'
+      document.body.appendChild(probe)
+      const FOCUS_COLOUR = getComputedStyle(probe).color
+      probe.remove()
+      const strays = [...document.querySelectorAll('body *')].filter(el => {
+        if (el === document.activeElement) return false
+        const cs = getComputedStyle(el)
+        return cs.outlineStyle !== 'none' && cs.outlineWidth !== '0px' && cs.outlineColor === FOCUS_COLOUR
+      })
+      record('layout', `${label} · focus colour is not used as decoration`,
+        strays.length === 0,
+        strays.length ? strays.map(e => e.tagName + '.' + [...e.classList][0]).join(', ') : `0 stray rings (${FOCUS_COLOUR})`)
+
       // Wide tables are allowed to scroll, but only inside their own box.
       for (const sc of document.querySelectorAll('.tbl-scroll')) {
         // The box may be the div itself, or a Radix ScrollArea viewport inside it.

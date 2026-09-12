@@ -21,7 +21,9 @@ function Band({ n, beat, children, footer }: {
         height: HEIGHTS[n - 1],
         opacity: lit ? 1 : 0.28,
         transform: beat === n ? 'translateY(-2px)' : 'none',
-        outline: beat === n ? '1px solid var(--read-correct)' : undefined,
+        // Amber, not the reading cyan: the lit band is furniture pointing at where we
+        // are in the story, and a cyan ring on this desk means focus.
+        outline: beat === n ? '1px solid var(--amber-dim)' : undefined,
         outlineOffset: beat === n ? '-1px' : undefined,
         transition: 'opacity 200ms linear',
         overflow: 'hidden',

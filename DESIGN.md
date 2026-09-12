@@ -538,3 +538,23 @@ meurt. La grille 24px se voit déjà dans le vide du rail DOWN et fait le travai
 statiques, donc discutables ici — mais la sensibilité au bruit visuel voyage souvent avec la
 sensibilité au mouvement, et le brief dit « tout off sauf hover ». On coupe. Le hover reste,
 en couleur seule : c'est lui qui dit qu'une ligne est cliquable.
+
+### Le carré bleu autour des chips — 12/09
+
+Signalé par l'owner : un cadre cyan de 2px autour de la note finale du notch trace, lu comme
+une boîte de sélection parasite. Il était délibéré — il marquait « voilà où la note a
+atterri » — mais il portait **exactement** la couleur et l'épaisseur du `:focus-visible`.
+
+Règle posée, et vérifiée par l'audit : **un anneau cyan veut dire « cet élément a le focus
+clavier », et rien d'autre.**
+
+- Notch trace : la dernière étape est marquée par le **poids**, pas par un anneau — sa chip
+  passe à 22% de remplissage contre 10%, bordure pleine contre 45%, graisse 600 contre 500,
+  et sa rangée prend un lavis ambre à 6%. L'ambre est du mobilier : il pointe, il ne signale
+  pas. La teinte de la chip reste **sa** teinte de note (contrat §6).
+- Bandes de `/moment` : l'anneau de la bande allumée passe de `--read-correct` à
+  `--amber-dim`, pour la même raison.
+
+Balayé sur les 12 combinaisons desk × vault : **0 anneau cyan décoratif**. Nouveau contrôle
+dans la section `layout` de l'audit — *« focus colour is not used as decoration »* — pour
+qu'il ne puisse pas revenir.
