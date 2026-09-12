@@ -51,7 +51,7 @@ export function NavSplit({ vault }: { vault: VaultDetailFields }) {
           value={vault.navNaive}
           formula="AssetsTotal / shares"
           pair="pair-naive"
-          tone="var(--muted)"
+          tone="var(--read-naive)"
           width={100}
           animate={false}
         />
@@ -60,7 +60,7 @@ export function NavSplit({ vault }: { vault: VaultDetailFields }) {
           value={vault.navCorrect}
           formula="(AssetsTotal - LossUnrealized) / shares"
           pair="pair-correct"
-          tone="var(--accent)"
+          tone="var(--read-correct)"
           width={barPct(vault.navCorrect, vault.navNaive)}
           animate
         />

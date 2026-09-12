@@ -36,7 +36,7 @@ export function NotchTrace({ trace }: { trace: NotchStep[] }) {
                 <span
                   style={{
                     width: 52, flex: '0 0 auto',
-                    outline: last ? '2px solid var(--accent)' : undefined,
+                    outline: last ? '2px solid var(--read-correct)' : undefined,
                     outlineOffset: last ? 2 : undefined, borderRadius: 3,
                   }}
                 >

@@ -54,11 +54,11 @@ export function Sparkline({ samples, height = 120 }: { samples: Sample[]; height
     <g className="spark-draw">
       <polyline
         fill="none" vectorEffect="non-scaling-stroke" strokeWidth="2"
-        stroke="var(--muted)" strokeDasharray="4 3" points={line(s => s.naive)}
+        stroke="var(--read-naive)" strokeDasharray="4 3" points={line(s => s.naive)}
       />
       <polyline
         fill="none" vectorEffect="non-scaling-stroke" strokeWidth="2"
-        stroke="var(--accent)" points={line(s => s.correct)}
+        stroke="var(--read-correct)" points={line(s => s.correct)}
       />
     </g>,
   )}

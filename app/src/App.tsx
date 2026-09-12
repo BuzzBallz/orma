@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { Fragment, useEffect, useRef } from 'react'
 import './app.css'
 import { API_BASE, EXPECTED_CONTRACT } from './lib/api'
 import { usePoll } from './lib/usePoll'
@@ -11,6 +11,8 @@ import { VaultDetail } from './screens/VaultDetail'
 import { VaultList } from './screens/VaultList'
 import { Moment } from './screens/Moment'
 import { short } from './lib/format'
+import { Tabs, TabsContent } from '@/components/ui/tabs'
+import { Separator } from '@/components/ui/separator'
 
 const POLL_MS = 3000
 
@@ -124,7 +126,7 @@ export default function App() {
         <div className="deskgrid">
           <GhostDesk title="oracle" />
           <Watch
-            verdict="ON /MOMENT" tone="var(--accent)"
+            verdict="ON /MOMENT" tone="var(--read-correct)"
             said={<>The published reading already has a home. Publisher, object index, the six on-chain dimensions and the ledger aggregate are band 3 of the moment desk, off the same three-second request.</>}
             aside={<>A second page would read the same object twice. Press <kbd>M</kbd>, or{' '}
               <a href="/moment" onClick={e => { e.preventDefault(); navigate('/moment') }}>open it here</a>.</>}
@@ -194,8 +196,14 @@ export default function App() {
     return <Moment d={detail.data} receivedAt={detail.receivedAt} tick={tick} />
   }
 
+  // The four desks are a real tab set: TabsList lives in the topbar, the routed view is the
+  // panel. The root is display:contents, so it carries Radix's context and no layout.
   return (
-    <>
+    <Tabs
+      className="tabs-root"
+      value={path}
+      onValueChange={v => navigate(v as RoutePath)}
+    >
       <HeaderBar
         health={health.data}
         healthUnreachable={health.data === null || health.stale}
@@ -207,18 +215,24 @@ export default function App() {
         receivedAt={primary.receivedAt}
         pollMs={POLL_MS}
         onSelect={id => navigate(path === '/' ? '/vault' : path, id)}
-        onNavigate={p => navigate(p)}
       />
       {primary.stale && <StaleBar ageMs={primary.ageMs} fails={primary.fails} error={primary.error} />}
-      <main className={'page' + (path === '/moment' ? ' tight' : '')}>
-        <div key={path} className={painted.current ? 'view' : undefined}>{body()}</div>
-      </main>
+      <TabsContent value={path}>
+        <main className={'page' + (path === '/moment' ? ' tight' : '')}>
+          <div key={path} className={painted.current ? 'view' : undefined}>{body()}</div>
+        </main>
+      </TabsContent>
       <div className="hints">
-        {HINTS.map(([k, label]) => (
-          <span className="h" key={k}><kbd>{k}</kbd> {label}</span>
+        {/* The dividers are real separators now, not a border-right on every item — which
+            also kills the hairline that used to dangle after the last shortcut. */}
+        {HINTS.map(([k, label], i) => (
+          <Fragment key={k}>
+            {i > 0 && <Separator orientation="vertical" className="hint-sep" />}
+            <span className="h"><kbd>{k}</kbd> {label}</span>
+          </Fragment>
         ))}
         <span className="who">built for the XRPL lending hackathon · De Vinci Blockchain, 12–13 Sept 2026</span>
       </div>
-    </>
+    </Tabs>
   )
 }

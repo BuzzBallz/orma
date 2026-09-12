@@ -26,7 +26,7 @@ export function OraclePanel({ oracle, receivedAt, tick }: { oracle: Oracle; rece
 
         <div className="row-wrap" style={{ gap: 8 }}>
           {oracle.dimensionsOnChain.map(d => (
-            <Chip key={d.key} tone="--accent" title={`scale ${d.scale}`}>{d.key} {d.value}</Chip>
+            <Chip key={d.key} tone="--read-correct" title={`scale ${d.scale}`}>{d.key} {d.value}</Chip>
           ))}
         </div>
       </div>

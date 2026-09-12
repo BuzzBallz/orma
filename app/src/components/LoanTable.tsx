@@ -2,6 +2,9 @@ import type { Loan, LoanStatus } from '../lib/types'
 import { dropsToXrp, fmtIso, ratioToPct, rateToPct, short } from '../lib/format'
 import { Chip, type Tone } from './Chip'
 import { Countdown } from './Countdown'
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table'
 
 /** Closed enum, contract §3.1. An unknown status renders dim with the raw value — never crash. */
 const STATUS: Record<LoanStatus, { tone: Tone; row?: 'row-warn' | 'row-bad' | 'row-dead'; pulse?: boolean }> = {
@@ -33,21 +36,22 @@ export function LoanTable({ loans, receivedAt, tick }: { loans: Loan[]; received
         <div className="empty">no loans originated</div>
       ) : (
         <div className="tbl-scroll">
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>status</th><th>loan</th><th>borrower</th>
-                <th className="rt">principal</th><th className="rt">total value</th>
-                <th className="rt">rate</th><th className="rt">share of debt</th>
-                <th>next payment</th><th className="rt">due</th><th className="rt">defaultable in</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table className="tbl">
+            <TableHeader>
+              <TableRow>
+                <TableHead>status</TableHead><TableHead>loan</TableHead><TableHead>borrower</TableHead>
+                <TableHead className="rt">principal</TableHead><TableHead className="rt">total value</TableHead>
+                <TableHead className="rt">rate</TableHead><TableHead className="rt">share of debt</TableHead>
+                <TableHead>next payment</TableHead><TableHead className="rt">due</TableHead>
+                <TableHead className="rt">defaultable in</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {loans.map(l => {
                 const s = STATUS[l.status] ?? { tone: '--fg-dim' as Tone }
                 return (
-                  <tr key={l.loanId} className={s.row}>
-                    <td>
+                  <TableRow key={l.loanId} className={s.row}>
+                    <TableCell>
                       <span className={s.pulse ? 'pulse' : undefined}>
                         <Chip tone={s.tone}>{l.status}</Chip>
                       </span>
@@ -56,27 +60,27 @@ export function LoanTable({ loans, receivedAt, tick }: { loans: Loan[]; received
                           broker may impair now
                         </span>
                       )}
-                    </td>
-                    <td className="mono">
+                    </TableCell>
+                    <TableCell className="mono">
                       <a href={l.explorerUrl} target="_blank" rel="noreferrer">{l.loanId.slice(0, 8)}</a>
-                    </td>
-                    <td className="mono">{short(l.borrower, 10)}</td>
-                    <td className="rt">{dropsToXrp(l.principalOutstanding)} XRP</td>
-                    <td className="rt">{dropsToXrp(l.totalValueOutstanding)} XRP</td>
-                    <td className="rt">{rateToPct(l.interestRate)}</td>
-                    <td className="rt">{ratioToPct(l.shareOfDebtTotal)}</td>
-                    <td className="mono">{fmtIso(l.nextPaymentDueAt)}</td>
-                    <td className="rt">
+                    </TableCell>
+                    <TableCell className="mono">{short(l.borrower, 10)}</TableCell>
+                    <TableCell className="rt">{dropsToXrp(l.principalOutstanding)} XRP</TableCell>
+                    <TableCell className="rt">{dropsToXrp(l.totalValueOutstanding)} XRP</TableCell>
+                    <TableCell className="rt">{rateToPct(l.interestRate)}</TableCell>
+                    <TableCell className="rt">{ratioToPct(l.shareOfDebtTotal)}</TableCell>
+                    <TableCell className="mono">{fmtIso(l.nextPaymentDueAt)}</TableCell>
+                    <TableCell className="rt">
                       <Countdown seconds={l.secondsUntilDue} receivedAt={receivedAt} tick={tick} />
-                    </td>
-                    <td className="rt">
+                    </TableCell>
+                    <TableCell className="rt">
                       <Countdown seconds={l.secondsUntilDefaultable} receivedAt={receivedAt} tick={tick} />
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 )
               })}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       )}
     </section>

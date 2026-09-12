@@ -5,6 +5,9 @@ import { Countdown } from '../components/Countdown'
 import { gradeTone } from '../lib/grades'
 import { fmtIso, short } from '../lib/format'
 import { useFlash } from '../lib/useFlash'
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table'
 
 type SortKey = 'gradeNumeric' | 'label' | 'phase' | 'secondsToRedemption' | 'navDivergenceBps' | 'loanCount' | 'trend'
 
@@ -28,22 +31,22 @@ const GHOSTS = [1, 2, 3, 4, 5]
  */
 function GhostRow({ n }: { n: number }) {
   return (
-    <tr className="ghost" aria-hidden>
-      <td><span className="ghost-chip" /></td>
-      <td>
+    <TableRow className="ghost" aria-hidden>
+      <TableCell><span className="ghost-chip" /></TableCell>
+      <TableCell>
         <span className="inst">
           <span className="name mute">Vault {n}</span>
           <span className="id">awaiting feed</span>
         </span>
-      </td>
-      <td className="mute">—</td>
-      <td className="rt mute">—</td>
-      <td className="rt mute">—</td>
-      <td className="rt mute">—</td>
-      <td className="rt mute">—</td>
-      <td className="mute">—</td>
-      <td><span className="ghost-dot" /></td>
-    </tr>
+      </TableCell>
+      <TableCell className="mute">—</TableCell>
+      <TableCell className="rt mute">—</TableCell>
+      <TableCell className="rt mute">—</TableCell>
+      <TableCell className="rt mute">—</TableCell>
+      <TableCell className="rt mute">—</TableCell>
+      <TableCell className="mute">—</TableCell>
+      <TableCell><span className="ghost-dot" /></TableCell>
+    </TableRow>
   )
 }
 
@@ -54,7 +57,7 @@ function Row({ v, i, receivedAt, tick, onOpen }: {
   const bpsMoved = useFlash(v.navDivergenceBps)
   const navMoved = useFlash(v.navCorrect)
   return (
-    <tr
+    <TableRow
       className={RAIL[gradeTone(v.grade)]}
       style={{ cursor: 'pointer', ['--i' as string]: i }}
       tabIndex={0}
@@ -62,33 +65,33 @@ function Row({ v, i, receivedAt, tick, onOpen }: {
       onClick={() => onOpen(v.vaultId)}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(v.vaultId) } }}
     >
-      <td><Chip tone={gradeTone(v.grade)}>{v.grade}</Chip></td>
-      <td>
+      <TableCell><Chip tone={gradeTone(v.grade)}>{v.grade}</Chip></TableCell>
+      <TableCell>
         <span className="inst">
           <span className="name">{v.label ?? short(v.vaultId, 8)}</span>
           <span className="id">{v.vaultId.slice(0, 12)}</span>
         </span>
-      </td>
-      <td className="mono" style={{ fontSize: 'var(--t-sm)' }}>{v.phase}</td>
-      <td className="rt">
+      </TableCell>
+      <TableCell className="mono" style={{ fontSize: 'var(--t-sm)' }}>{v.phase}</TableCell>
+      <TableCell className="rt">
         <Countdown seconds={v.secondsToRedemption} receivedAt={receivedAt} tick={tick} mode="boundary" />
-      </td>
-      <td className={'rt' + (bpsMoved ? ' flash' : '')} style={{ color: bpsTone(v.navDivergenceBps) }}>
+      </TableCell>
+      <TableCell className={'rt' + (bpsMoved ? ' flash' : '')} style={{ color: bpsTone(v.navDivergenceBps) }}>
         {v.navDivergenceBps} bps
-      </td>
-      <td className={'rt' + (navMoved ? ' flash' : '')}>
+      </TableCell>
+      <TableCell className={'rt' + (navMoved ? ' flash' : '')}>
         <span className="pair-naive bare">{v.navNaive}</span>
         <span className="mute"> → </span>
         <span className="pair-correct bare">{v.navCorrect}</span>
-      </td>
-      <td className="rt">
+      </TableCell>
+      <TableCell className="rt">
         {v.loanCount}
         <span style={{ color: v.distressedLoanCount > 0 ? 'var(--bad)' : 'var(--fg-mute)' }}>
           {' / '}{v.distressedLoanCount}
         </span>
-      </td>
-      <td className="mono" style={{ fontSize: 'var(--t-sm)' }}>{v.trend}</td>
-      <td>
+      </TableCell>
+      <TableCell className="mono" style={{ fontSize: 'var(--t-sm)' }}>{v.trend}</TableCell>
+      <TableCell>
         <span
           title={v.oraclePublished ? 'published' : 'not published'}
           style={{
@@ -96,13 +99,32 @@ function Row({ v, i, receivedAt, tick, onOpen }: {
             background: v.oraclePublished ? 'var(--ok)' : 'var(--fg-mute)',
           }}
         />
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
+  )
+}
+
+type Sort = { key: SortKey; asc: boolean }
+
+/** A sortable header. `aria-sort` is what the audit reads, and what a screen reader announces. */
+function Th({ k, label, rt, sort, onSort }: {
+  k: SortKey; label: string; rt?: boolean; sort: Sort; onSort: (k: SortKey) => void
+}) {
+  const on = sort.key === k
+  return (
+    <TableHead
+      className={rt ? 'rt' : undefined}
+      style={{ color: on ? 'var(--amber)' : 'var(--amber-dim)' }}
+      tabIndex={0}
+      aria-sort={on ? (sort.asc ? 'ascending' : 'descending') : 'none'}
+      onClick={() => onSort(k)}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSort(k) } }}
+    >{label}{on && <span className="ord">{sort.asc ? '▲' : '▼'}</span>}</TableHead>
   )
 }
 
 /**
- * S2 — spec §S2.
+ * S2 — spec §S2, on shadcn's Table.
  * Default sort is gradeNumeric ASCENDING, worst first (contract §2, and the gate checklist
  * in spec §9). Divergence is a secondary badge, never the sort: an undeclared loss reads
  * 0 bps and a divergence sort buries the most dangerous vault at the bottom.
@@ -112,7 +134,7 @@ export function VaultList({ vaults, receivedAt, tick, stamp, onOpen }: {
   stamp?: { ledgerIndex: number; serverTime: string }
   onOpen: (vaultId: string) => void
 }) {
-  const [sort, setSort] = useState<{ key: SortKey; asc: boolean }>({ key: 'gradeNumeric', asc: true })
+  const [sort, setSort] = useState<Sort>({ key: 'gradeNumeric', asc: true })
 
   const rows = [...vaults].sort((a, b) => {
     const k = sort.key
@@ -126,19 +148,6 @@ export function VaultList({ vaults, receivedAt, tick, stamp, onOpen }: {
 
   function toggle(k: SortKey) {
     setSort(s => (s.key === k ? { key: k, asc: !s.asc } : { key: k, asc: true }))
-  }
-
-  function Th({ k, label, rt }: { k: SortKey; label: string; rt?: boolean }) {
-    return (
-      <th
-        className={rt ? 'rt' : undefined}
-        style={{ color: sort.key === k ? 'var(--amber)' : 'var(--amber-dim)' }}
-        tabIndex={0}
-        aria-sort={sort.key === k ? (sort.asc ? 'ascending' : 'descending') : 'none'}
-        onClick={() => toggle(k)}
-        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(k) } }}
-      >{label}{sort.key === k && <span className="ord">{sort.asc ? '▲' : '▼'}</span>}</th>
-    )
   }
 
   return (
@@ -155,28 +164,28 @@ export function VaultList({ vaults, receivedAt, tick, stamp, onOpen }: {
         </span>
       </div>
       <div className="tbl-scroll">
-        <table className="tbl">
-          <thead>
-            <tr>
-              <Th k="gradeNumeric" label="grade" />
-              <Th k="label" label="instrument" />
-              <Th k="phase" label="phase" />
-              <Th k="secondsToRedemption" label="redemption" rt />
-              <Th k="navDivergenceBps" label="divergence" rt />
-              <th className="rt">reported → correct</th>
-              <Th k="loanCount" label="loans" rt />
-              <Th k="trend" label="trend" />
-              <th>oracle</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table className="tbl">
+          <TableHeader>
+            <TableRow>
+              <Th k="gradeNumeric" label="grade" sort={sort} onSort={toggle} />
+              <Th k="label" label="instrument" sort={sort} onSort={toggle} />
+              <Th k="phase" label="phase" sort={sort} onSort={toggle} />
+              <Th k="secondsToRedemption" label="redemption" rt sort={sort} onSort={toggle} />
+              <Th k="navDivergenceBps" label="divergence" rt sort={sort} onSort={toggle} />
+              <TableHead className="rt">reported → correct</TableHead>
+              <Th k="loanCount" label="loans" rt sort={sort} onSort={toggle} />
+              <Th k="trend" label="trend" sort={sort} onSort={toggle} />
+              <TableHead>oracle</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {rows.length === 0
               ? GHOSTS.map(n => <GhostRow key={n} n={n} />)
               : rows.map((v, i) => (
                 <Row key={v.vaultId} v={v} i={i} receivedAt={receivedAt} tick={tick} onOpen={onOpen} />
               ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
       {stamp && (
         <div className="readstamp">

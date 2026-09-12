@@ -39,7 +39,7 @@ export function PhaseBanner({ vault, phaseInfo, receivedAt, tick }: {
           color: 'var(--fg-dim)', fontSize: 'var(--t-sm)',
         }}>
           Withdrawals are blocked for the entire {vault.phase} phase. The ledger returns{' '}
-          <span className="mono" style={{ color: 'var(--accent)' }}>
+          <span className="mono" style={{ color: 'var(--read-correct)' }}>
             {phaseInfo.withdrawBlockedReason ?? 'tecTOO_SOON'}
           </span>{' '}
           — this is the protocol working as designed, not a failure.

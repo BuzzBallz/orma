@@ -207,3 +207,70 @@ qui a tranché** — jamais un « ok » nu.
 | `routes` | un chemin inconnu réécrit l'URL au lieu de mentir |
 
 À lancer avant chaque commit qui touche au CSS ou au layout, et avant le gel.
+
+## Passage sur shadcn/ui — 12/09, décision owner
+
+> « Décision owner : on passe l'UI sur shadcn, même si ça veut dire recoder des composants
+> déjà là. Qualité > garder l'ancien JSX. »
+
+Vite reste Vite, les routes restent les routes, le contrat HTTP ne bouge pas. Ce qui change,
+c'est **qui possède le comportement** des contrôles : Radix, plus mon JSX.
+
+### Installé
+
+| lib | version | pourquoi |
+|---|---|---|
+| `tailwindcss` + `@tailwindcss/vite` | 4.3.x | requis par shadcn ; plugin Vite, pas de PostCSS |
+| `shadcn` (init `-b radix -p nova`) | CLI | style `radix-nova`, `cssVariables: true`, icônes lucide |
+| `radix-ui`, `class-variance-authority`, `tailwind-merge`, `clsx` | — | tirés par les primitives |
+
+Huit primitives copiées dans `app/src/components/ui/` : `table`, `tabs`, `button`, `badge`,
+`dropdown-menu`, `separator`, `tooltip`, `scroll-area`. Ce sont **nos fichiers**, pas un
+node_module : on les a rethemés en place.
+
+`@fontsource-variable/geist` est arrivé avec l'init — **désinstallé le jour même**. §6.2
+interdit la webfont, le wifi de la salle ne la servira pas, et Plex est déjà auto-hébergé.
+
+### Recodé avec
+
+| avant | après | ce qu'on gagne |
+|---|---|---|
+| `<nav>` + `<button class=desk>` | `Tabs` / `TabsList variant="line"` / `TabsTrigger`, racine dans `App.tsx`, panneau = la vue routée | rôles `tablist`/`tab`/`tabpanel` réels, focus glissant, **flèches gauche/droite entre desks** |
+| listbox maison (~90 lignes) | `DropdownMenu` | piège de focus, fermeture Échap/clic-dehors, typeahead — plus à maintenir |
+| `<table class=tbl>` à la main | `Table`/`TableHeader`/`TableRow`/`TableHead`/`TableCell` | conteneur de scroll horizontal fourni, sémantique `data-slot` stable pour l'audit |
+| `<span class=chip>` | `Badge variant="outline"` sous `.chip` | anneau de focus et dimensionnement d'icône gratuits ; la teinte reste une custom property |
+| `<span class=sep>` | `Separator orientation="vertical"` | `role="separator"` au lieu d'un div décoratif muet |
+
+Le `VaultPicker` custom a été jeté, comme autorisé. Il marchait, mais il réimplémentait
+mal ce que Radix fait bien.
+
+### Collisions de tokens — le piège
+
+`shadcn init` **écrase** les customs qui portent ses noms. `--accent` et `--muted` étaient
+à moi (lecture correcte / lecture naïve, figées par contrat §6) ; l'init les a remplacées
+par des `oklch()` gris. Renommées partout en **`--read-correct` / `--read-naive`**, qui ne
+peuvent plus entrer en collision avec quoi que ce soit.
+
+Dans l'autre sens, les 59 tokens de shadcn pointent maintenant sur la palette terminal :
+`--background: var(--bg)`, `--primary: var(--amber)`, `--radius: 2px`, les cinq `--chart-*`
+sur ambre / cyan / vert / jaune / rouge. **`--accent` et `--muted` côté shadcn sont des
+surfaces** (`--bg-3`, `--bg-2`), jamais les couleurs de lecture : sinon le survol d'un item
+de menu se peint en cyan de NAV.
+
+Le bloc `.dark` généré est **supprimé**. On ne livre qu'un thème, et sa version redéfinissait
+`--read-naive`/`--read-correct` en gris — une mine sous le contrat §6 en attendant que
+quelque chose pose `class="dark"` sur `<html>`.
+
+### Ce que les utilitaires Tailwind ne peuvent pas casser
+
+Les utilitaires v4 vivent dans une `@layer`. Les règles de `app.css` sont **hors layer**,
+donc elles gagnent toujours, à spécificité égale ou moindre. C'est ce qui permet à
+`.chip`, `.pill`, `.desks`, `table.tbl` de garder la peau terminal par-dessus les classes
+des primitives sans un seul `!important`. Les trois endroits où il a fallu neutraliser
+explicitement une utilitaire, parce que `app.css` ne déclarait pas la propriété :
+`Badge`→`h-5` (chip : `height:auto`), `TableHead`→`h-10` (`height:auto`),
+`TabsTrigger`→`flex-1` (`flex:0 0 auto`).
+
+La racine `Tabs` et son `TabsContent` sont en `display: contents` : ils portent le contexte
+Radix et **aucune boîte**, donc le grid de la page et la barre d'état collée en bas ne
+bougent pas d'un pixel.

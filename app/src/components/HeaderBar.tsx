@@ -6,6 +6,9 @@ import type { RoutePath } from '../lib/useRoute'
 import { fmtIso } from '../lib/format'
 import { useFlash } from '../lib/useFlash'
 import { VaultPicker } from './VaultPicker'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+import { TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 /**
  * Spec §8: an unreachable /api/health is the earliest warning that the demo is misrouted,
@@ -19,11 +22,11 @@ function HealthPill({ health, unreachable }: { health: Health | null; unreachabl
     : health!.source === 'devnet' ? ['--ok', 'devnet'] : ['--warn', 'fixtures']
   const Icon = down ? CircleAlert : health!.source === 'devnet' ? Radio : Activity
   return (
-    <span className="pill" style={{ ['--pill-tone' as string]: `var(${tone})` }}>
+    <Badge variant="outline" className="pill" style={{ ['--pill-tone' as string]: `var(${tone})` }}>
       <Icon size={12} strokeWidth={2.25} aria-hidden />
       <span className={'dot' + (down ? ' waiting' : '')} />
       {text}
-    </span>
+    </Badge>
   )
 }
 
@@ -31,7 +34,7 @@ const DESKS: [RoutePath, string][] = [
   ['/', 'list'], ['/vault', 'vault'], ['/moment', 'moment'], ['/oracle', 'oracle'],
 ]
 
-export function HeaderBar({ health, healthUnreachable, vaults, activeVaultId, path, ledgerIndex, serverTime, receivedAt, pollMs, onSelect, onNavigate }: {
+export function HeaderBar({ health, healthUnreachable, vaults, activeVaultId, path, ledgerIndex, serverTime, receivedAt, pollMs, onSelect }: {
   health: Health | null
   healthUnreachable: boolean
   vaults: VaultRow[]
@@ -42,14 +45,13 @@ export function HeaderBar({ health, healthUnreachable, vaults, activeVaultId, pa
   receivedAt: number
   pollMs: number
   onSelect: (vaultId: string) => void
-  onNavigate: (path: RoutePath) => void
 }) {
   const live = health != null && !healthUnreachable
   const contractMismatch = live && health!.contractVersion !== EXPECTED_CONTRACT
   const ledgerMoved = useFlash(ledgerIndex)
 
   // The desk indicator slides. Measured, because the labels are not equal width.
-  const nav = useRef<HTMLElement>(null)
+  const nav = useRef<HTMLDivElement>(null)
   const [ind, setInd] = useState<{ x: number; w: number } | null>(null)
   useLayoutEffect(() => {
     const el = nav.current?.querySelector<HTMLButtonElement>('[data-active="true"]')
@@ -67,7 +69,7 @@ export function HeaderBar({ health, healthUnreachable, vaults, activeVaultId, pa
         <span className="sub">xls-66</span>
       </span>
 
-      <span className="sep" />
+      <Separator orientation="vertical" className="sep" />
 
       <span className="statusgroup">
         <HealthPill health={health} unreachable={healthUnreachable} />
@@ -77,7 +79,7 @@ export function HeaderBar({ health, healthUnreachable, vaults, activeVaultId, pa
         </span>
       </span>
 
-      <span className="sep" />
+      <Separator orientation="vertical" className="sep" />
 
       <span className="meta" style={contractMismatch ? { color: 'var(--warn)' } : undefined}>
         {contractMismatch
@@ -89,14 +91,19 @@ export function HeaderBar({ health, healthUnreachable, vaults, activeVaultId, pa
 
       <span className="spacer" />
 
-      <nav className="desks" ref={nav}>
+      {/* The four desks are real tabs: the routed view below is their panel. Radix gives us
+          roving focus and arrow-key travel between desks for free; `data-active` is ours so
+          the measured indicator and the CSS do not have to guess at Radix's internals. */}
+      <TabsList variant="line" className="desks" ref={nav} aria-label="desks">
         {ind && <span className="desk-ind" style={{ transform: `translateX(${ind.x}px)`, width: ind.w }} />}
         {DESKS.map(([p, label]) => (
-          <button key={p} className="desk" data-active={path === p} onClick={() => onNavigate(p)}>{label}</button>
+          <TabsTrigger key={p} value={p} className="desk" data-active={path === p ? 'true' : undefined}>
+            {label}
+          </TabsTrigger>
         ))}
-      </nav>
+      </TabsList>
 
-      <span className="sep" />
+      <Separator orientation="vertical" className="sep" />
 
       <VaultPicker vaults={vaults} activeVaultId={activeVaultId} onSelect={onSelect} />
     </header>
