@@ -8,6 +8,7 @@
 import { createServer } from 'node:http'
 import { readFileSync, existsSync } from 'node:fs'
 import { presentVault, presentRow, setLabel } from './present.mjs'
+import { findShareEscrows, presentCollateral } from './collateral.mjs'
 import { logger } from './log.mjs'
 
 const log = logger('api')
@@ -47,10 +48,11 @@ export function createApi(reader, opts = {}) {
     return h
   }
 
-  const rowFor = (snap) => {
-    const row = presentRow(snap, { prevNavCorrect: prevNav.get(snap.vaultId) })
-    return row
-  }
+  const rowFor = (snap) =>
+    presentRow(snap, {
+      prevNavCorrect: prevNav.get(snap.vaultId),
+      oracle: opts.oracleFor?.(snap.vaultId) ?? null,
+    })
 
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, `http://localhost:${port}`)
@@ -85,9 +87,32 @@ export function createApi(reader, opts = {}) {
       if (m && req.method === 'GET') {
         const snap = reader.get(m[1].toUpperCase()) ?? reader.get(m[1])
         if (!snap) return fail(404, 'VAULT_NOT_FOUND', 'No vault with that id', false)
-        const detail = presentVault(snap, { prevNavCorrect: prevNav.get(snap.vaultId) })
+        const detail = presentVault(snap, {
+          prevNavCorrect: prevNav.get(snap.vaultId),
+          oracle: opts.oracleFor?.(snap.vaultId) ?? null,
+        })
         prevNav.set(snap.vaultId, snap.navCorrect)
         return send(200, stamp(detail))
+      }
+
+      // Collateral: escrowed vault shares, valued both ways. This is the endpoint a
+      // second broker would call before lending against a pledge.
+      const cm = url.pathname.match(/^\/api\/vaults\/([A-Fa-f0-9]{64})\/collateral$/)
+      if (cm && req.method === 'GET') {
+        const snap = reader.get(cm[1].toUpperCase()) ?? reader.get(cm[1])
+        if (!snap) return fail(404, 'VAULT_NOT_FOUND', 'No vault with that id', false)
+        const shareMptId = snap.vault.shareMptId
+        if (!shareMptId) return fail(404, 'NO_SHARE_MPT', 'vault has no share issuance', false)
+        // No reverse index exists from an MPT issuance to the escrows holding it, so a
+        // lender must be told which accounts to look at. Reported as a feedback item.
+        const accounts = [
+          ...(url.searchParams.get('accounts')?.split(',').filter(Boolean) ?? []),
+          ...(opts.watchAccounts ?? []),
+          snap.vault.owner,
+        ]
+        const haircut = Number(url.searchParams.get('haircut') ?? 0)
+        const escrows = await findShareEscrows(reader.xrpl, shareMptId, accounts)
+        return send(200, stamp(presentCollateral(escrows, snap, haircut)))
       }
 
       if (key === 'GET /api/indexer-race') {

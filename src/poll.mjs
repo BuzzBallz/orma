@@ -32,6 +32,8 @@ export class Reader {
     this.lastGoodAt = null
     this._timer = null
     this._running = false
+    /** optional hook, set by the publish loop. Must never block or throw into tick(). */
+    this.onSnapshot = null
   }
 
   addVault(id) {
@@ -133,6 +135,7 @@ export class Reader {
         }
         const prev = this.snapshots.get(id)
         this.snapshots.set(id, snap)
+        if (this.onSnapshot) { try { this.onSnapshot(snap) } catch { /* never let a consumer break a read */ } }
         this.lastGoodAt = Date.now()
         this.degraded = false
 
