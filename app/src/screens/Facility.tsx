@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react'
-import type { VaultDetail } from '../lib/types'
+import type { BrokerHistory, Collateral, VaultDetail } from '../lib/types'
 import { Chip } from '../components/Chip'
 import { gradeIndex, gradeTone } from '../lib/grades'
 import { bpsToPct, dropsToXrp, duration, fmtIso, ratioToPct, rateToPct } from '../lib/format'
 import { creditText, facilityName, facilityRef, factorRows, outlookOf, splitFactors } from '../lib/credit'
+import { ManagerConduct, PledgedCollateral } from './FacilityExhibits'
 
 /** A labelled figure. Anything the payload does not carry prints n.a., never a guess. */
 function F({ k, v, note }: { k: string; v: ReactNode; note?: string }) {
@@ -30,7 +31,11 @@ function Section({ title, children, tight }: { title: string; children: ReactNod
  * indicators and profile. Every figure in it is a figure the calculation agent sent. Where
  * a figure was not sent, the line reads n.a. and nothing is inferred to fill it.
  */
-export function Facility({ d }: { d: VaultDetail }) {
+export function Facility({ d, history, collateral }: {
+  d: VaultDetail
+  history?: BrokerHistory | null
+  collateral?: Collateral | null
+}) {
   const v = d.vault
   const name = facilityName(v)
   const outlook = outlookOf(v.trend)
@@ -263,6 +268,9 @@ export function Facility({ d }: { d: VaultDetail }) {
                 </tbody>
               </table>
             </Section>
+
+            <ManagerConduct h={history ?? null} />
+            <PledgedCollateral c={collateral ?? null} />
 
             <Section title="Key indicators">
               <table className="op-tbl">

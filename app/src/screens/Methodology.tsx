@@ -9,10 +9,17 @@ export function Methodology() {
         <h2 className="panel-title">how the internal score is built</h2>
         <p className="caption meth">
           Five factors, each scored on its own from {GRADE_LADDER[0]} to{' '}
-          {GRADE_LADDER[GRADE_LADDER.length - 1]}. The facility score starts at the weakest
-          of them and is notched down once for each condition that makes it worse in
-          practice. <b>No weights are applied</b> — a weighted average would let a strong
-          factor pay for a broken one.
+          {GRADE_LADDER[GRADE_LADDER.length - 1]}. For a fixed-term facility the headline
+          question is whether claims can be met on the redemption date, so the score{' '}
+          <b>starts at that factor</b> and is notched down once for each condition that
+          weakens confidence in the answer. <b>No weights are applied</b> — a weighted
+          average would let a strong factor pay for a broken one.
+        </p>
+        <p className="caption meth">
+          Every step is shown. A facility can therefore score well on the headline question
+          and still carry a weak factor: a loss already written down is a loss the unit
+          value has already absorbed, and what remains is whether the cash is there to pay
+          the reduced claim.
         </p>
         <table className="op-tbl" style={{ marginTop: 12 }}>
           <thead><tr><th>factor</th><th>what it measures</th></tr></thead>

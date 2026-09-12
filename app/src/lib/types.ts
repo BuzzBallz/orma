@@ -121,3 +121,85 @@ export interface IndexerRace {
     divergenceBps: number
   }
 }
+
+// --- Exhibit 3: what the manager actually did -------------------------------
+// Cover consumed on a default is keyed to the manager's TOTAL outstanding book at that
+// instant, not to the exposure that defaulted. Each default shrinks the base for the
+// next, so the total first-loss capital consumed across a fixed set of defaults depends
+// on the ORDER they are declared in — and the party choosing that order is the party
+// whose capital is consumed. `fairness` is 0 when they chose the sequence worst for
+// investors and 1 when they chose the best.
+export type BrokerEventKind =
+  | 'default' | 'impair' | 'unimpair' | 'manage' | 'cover_deposit' | 'cover_withdraw'
+
+export interface BrokerEvent {
+  kind: BrokerEventKind; at: string | null; hash: string | null; loanId: string | null
+  /** false when the action left the manager's own object untouched — an impairment. */
+  brokerStateKnown: boolean
+  // NULL, not "0", when brokerStateKnown is false: the transaction does not report the
+  // book at that moment, and a zero would read as an empty book.
+  debtBefore: string | null; debtAfter: string | null
+  coverBefore: string | null; coverAfter: string | null
+  coverConsumed: string; principal: string
+  /** The exposure the action was taken against. On an impairment, the only real figure. */
+  exposure: string
+}
+
+export interface Ordering {
+  applicable: boolean
+  reason?: string
+  defaultCount: number
+  actualCoverPaid?: string; bestPossible?: string; worstPossible?: string
+  costToDepositors?: string; spread?: string; fairness?: string
+  observedOrder?: { loanId: string | null; at: string | null; hash: string | null
+    principal: string; debtBefore: string; coverConsumed: string }[]
+  fairOrder?: string[]
+}
+
+export interface ReputationFinding { code: string; detail: string }
+
+export interface Reputation {
+  grade: string; score: number
+  observations: {
+    defaults: number; impairments: number; defaultsWithoutPriorImpairment: number
+    coverWithdrawals: number; eventsRetained: number
+  }
+  findings: ReputationFinding[]
+  caveat: string
+}
+
+export interface Recommendation {
+  applicable: boolean
+  reason?: string
+  candidates?: number
+  recommendedOrder?: { loanId: string; principal: string; status: LoanStatus }[]
+  coverIfFair?: string; coverIfSelfServing?: string; atStakeForDepositors?: string
+}
+
+export interface BrokerHistory extends Stamped {
+  loanBrokerId: string; owner: string
+  events: BrokerEvent[]
+  ordering: Ordering
+  reputation: Reputation
+  recommendation: Recommendation
+}
+
+// --- Exhibit 4: units pledged away as collateral ----------------------------
+// A haircut is applied to the HONEST value, never to the reported one: a haircut
+// absorbs volatility, it does not absorb a misstatement.
+export interface Pledge {
+  escrowId: string; pledgor: string; beneficiary: string
+  shares: string; valueNaive: string; valueCorrect: string
+  overstatement: string; overstatementPct: string
+  haircutPct: string; maxLendable: string
+  finishAfter: string | null; cancelAfter: string | null
+  explorerUrl: string | null
+}
+
+export interface Collateral extends Stamped {
+  shareMptId: string | null; navNaive: string; navCorrect: string
+  pledgeCount: number; totalShares: string
+  totalValueNaive: string; totalValueCorrect: string
+  totalOverstatement: string; totalOverstatementPct: string
+  pledges: Pledge[]
+}

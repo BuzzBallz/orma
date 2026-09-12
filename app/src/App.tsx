@@ -4,7 +4,7 @@ import { API_MIXED_ORIGIN, SUSPECT_AFTER_FAILS, SUSPECT_BACKOFF_MS } from './lib
 import { usePoll } from './lib/usePoll'
 import { useTick } from './lib/useTick'
 import { useRoute, type RoutePath } from './lib/useRoute'
-import type { Health, IndexerRace, VaultDetail as Detail, VaultsResponse } from './lib/types'
+import type { BrokerHistory, Collateral, Health, IndexerRace, VaultDetail as Detail, VaultsResponse } from './lib/types'
 import { HeaderBar } from './components/HeaderBar'
 import { StaleBar } from './components/StaleBar'
 import { Portfolio } from './screens/Portfolio'
@@ -133,6 +133,15 @@ function Desk() {
 
   // A finished capture, not a moving figure: fetch it only while its tab is open and
   // do not re-ask every four seconds. null path means usePoll stays idle.
+  // Exhibits 3 and 4. Fetched only on the facility tab and only once a facility is
+  // chosen, and slowly: a manager's track record is history, not a live figure. A 404
+  // here (no manager, no pledges) is a normal state, so usePoll keeps data null and the
+  // exhibits omit themselves rather than rendering an error into a credit opinion.
+  const histPath = path === '/facility' && vaultId ? `/api/vaults/${vaultId}/broker-history` : null
+  const collPath = path === '/facility' && vaultId ? `/api/vaults/${vaultId}/collateral` : null
+  const history = usePoll<BrokerHistory>(histPath, 20000)
+  const collateral = usePoll<Collateral>(collPath, 20000)
+
   const race = usePoll<IndexerRace>(path === '/evidence' ? '/api/indexer-race' : null, 30000)
 
   const primary = path === '/' ? vaults : detail
@@ -253,7 +262,21 @@ function Desk() {
       )
     }
 
-    if (path === '/facility') return <Facility d={detail.data} />
+    if (path === '/facility') {
+      // usePoll deliberately keeps the last good payload across a path change, so that a
+      // blip never blanks the figures. For these two exhibits that same behaviour would
+      // attribute one facility's manager -- and their conduct grade -- to the next
+      // facility opened, for as long as the new request is in flight. So each exhibit is
+      // shown only when the payload identifies ITSELF as belonging to this facility.
+      // Matching on the payload's own id is stronger than matching on the url it came
+      // from: it survives a redirect, a cache and a race.
+      const d = detail.data
+      const h = history.data && d.broker && history.data.loanBrokerId === d.broker.loanBrokerId
+        ? history.data : null
+      const c = collateral.data && d.vault.shareMptId && collateral.data.shareMptId === d.vault.shareMptId
+        ? collateral.data : null
+      return <Facility d={d} history={h} collateral={c} />
+    }
     return <Event d={detail.data} tick={tick} />
   }
 
