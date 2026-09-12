@@ -1321,3 +1321,15 @@ tr:hover .chip, .picker-list [data-highlighted] .chip{ transform: translateY(-1p
 .res-ok{ color: var(--ok); font-family: var(--mono); }
 .res-no{ color: var(--bad); font-family: var(--mono); }
 .res-verdict{ margin-top: 12px; color: var(--fg-dim); }
+
+/* The documentation link. Deliberately quieter than a tab and marked as leaving the
+   application: it is a different document for a different reader. */
+.docs-link{
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-left: 14px; padding: 0 2px;
+  font: 500 var(--t-sm)/1 var(--sans); color: var(--fg-idle);
+  text-decoration: none; white-space: nowrap;
+  transition: color 200ms;
+}
+.docs-link:hover{ color: var(--amber); }
+.docs-link svg{ width: 11px; height: 11px; opacity: .8; }
