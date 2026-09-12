@@ -136,9 +136,15 @@ export function createApi(reader, opts = {}) {
           owner: broker.owner,
           events: events.map((e) => ({
             kind: e.kind, at: e.at, hash: e.hash, loanId: e.loanId,
-            debtBefore: e.debtBefore.toFixed(0), debtAfter: e.debtAfter.toFixed(0),
-            coverBefore: e.coverBefore.toFixed(0), coverAfter: e.coverAfter.toFixed(0),
+            // null, not "0": an impairment leaves the broker object untouched, so this
+            // transaction does not report the book. Zero would read as an empty book.
+            brokerStateKnown: e.brokerStateKnown,
+            debtBefore: e.brokerStateKnown ? e.debtBefore.toFixed(0) : null,
+            debtAfter: e.brokerStateKnown ? e.debtAfter.toFixed(0) : null,
+            coverBefore: e.brokerStateKnown ? e.coverBefore.toFixed(0) : null,
+            coverAfter: e.brokerStateKnown ? e.coverAfter.toFixed(0) : null,
             coverConsumed: e.coverConsumed.toFixed(0), principal: e.principal.toFixed(0),
+            exposure: e.exposure.toFixed(0),
           })),
           ordering,
           reputation: reputation(events, ordering, broker),

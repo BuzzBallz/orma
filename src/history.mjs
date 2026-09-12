@@ -55,16 +55,30 @@ export async function fetchBrokerHistory(xrpl, ownerAccount, brokerId) {
     const meta = entry.meta ?? entry.metaData
     if (!meta || meta.TransactionResult !== 'tesSUCCESS') continue
 
-    const brokerNode = (meta.AffectedNodes ?? [])
-      .map((n) => n.ModifiedNode)
-      .find((n) => n?.LedgerEntryType === 'LoanBroker' && (n.LedgerIndex === brokerId || n.FinalFields?.index === brokerId))
-    if (!brokerNode && tx.LoanBrokerID !== brokerId) continue
+    const nodes = (meta.AffectedNodes ?? []).map((n) => n.ModifiedNode ?? n.DeletedNode).filter(Boolean)
+    const brokerNode = nodes
+      .find((n) => n.LedgerEntryType === 'LoanBroker' && (n.LedgerIndex === brokerId || n.FinalFields?.index === brokerId))
+
+    // An impairment does NOT touch the LoanBroker object and LoanManage carries no
+    // LoanBrokerID -- only LoanID. Matching on the broker node or the transaction field
+    // alone therefore drops every impairment on the floor, which matters because
+    // reputation() counts impairments to decide whether a default was signalled first.
+    // Without this join an honest broker who impairs before defaulting is scored as
+    // though they never warned anyone. The Loan node in the same metadata carries
+    // FinalFields.LoanBrokerID, so the join costs no extra request.
+    const loanNode = nodes.find((n) => n.LedgerEntryType === 'Loan')
+    const loanBroker = loanNode?.FinalFields?.LoanBrokerID ?? loanNode?.PreviousFields?.LoanBrokerID
+    if (!brokerNode && tx.LoanBrokerID !== brokerId && loanBroker !== brokerId) continue
 
     const prev = brokerNode?.PreviousFields ?? {}
     const fin = brokerNode?.FinalFields ?? {}
     const at = entry.close_time_iso
       ?? (entry.tx_json?.date ? new Date((entry.tx_json.date + RIPPLE_EPOCH) * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z') : null)
 
+    // When the broker object was not touched -- an impairment -- its cover and book are
+    // genuinely unchanged, but this transaction does not say what they were. Report that
+    // as unknown rather than as zero: a zero here would read as "the book was empty".
+    const known = Boolean(brokerNode)
     const coverBefore = prev.CoverAvailable !== undefined ? num(prev.CoverAvailable) : num(fin.CoverAvailable)
     const coverAfter = num(fin.CoverAvailable)
     const debtBefore = prev.DebtTotal !== undefined ? num(prev.DebtTotal) : num(fin.DebtTotal)
@@ -80,10 +94,14 @@ export async function fetchBrokerHistory(xrpl, ownerAccount, brokerId) {
         hash: entry.hash ?? tx.hash,
         loanId: tx.LoanID ?? null,
         ledgerIndex: entry.ledger_index ?? null,
+        brokerStateKnown: known,
         debtBefore, debtAfter,
         coverBefore, coverAfter,
         coverConsumed: Decimal.max(0, coverBefore.minus(coverAfter)),
         principal: Decimal.max(0, debtBefore.minus(debtAfter)),
+        // The exposure the action was taken against. On an impairment this is the only
+        // figure the transaction actually tells you.
+        exposure: num(loanNode?.FinalFields?.PrincipalOutstanding),
       })
     } else if (type === 'LoanBrokerCoverDeposit' || type === 'LoanBrokerCoverWithdraw') {
       events.push({
@@ -92,9 +110,11 @@ export async function fetchBrokerHistory(xrpl, ownerAccount, brokerId) {
         hash: entry.hash ?? tx.hash,
         loanId: null,
         ledgerIndex: entry.ledger_index ?? null,
+        brokerStateKnown: known,
         debtBefore, debtAfter, coverBefore, coverAfter,
         coverConsumed: new Decimal(0),
         principal: new Decimal(0),
+        exposure: new Decimal(0),
         amount: coverAfter.minus(coverBefore).abs(),
       })
     }
