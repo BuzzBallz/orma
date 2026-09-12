@@ -89,13 +89,13 @@ export function Event({ d, tick }: { d: VaultDetail; tick: number }) {
       </section>
 
       <section className="panel">
-        <h2 className="panel-title">calendar</h2>
+        <h2 className="panel-title">Calendar</h2>
         <div className="tbl-scroll">
           <table className="tbl">
             <thead>
               <tr>
-                <th>event</th><th>counterparty</th>
-                <th className="rt">amount</th><th className="rt">due</th><th className="rt">date</th>
+                <th>Event</th><th>Counterparty</th>
+                <th className="rt">Amount</th><th className="rt">Due</th><th className="rt">Date</th>
               </tr>
             </thead>
             <tbody>
@@ -114,7 +114,7 @@ export function Event({ d, tick }: { d: VaultDetail; tick: number }) {
       </section>
 
       <section className="panel">
-        <h2 className="panel-title">what happens at redemption</h2>
+        <h2 className="panel-title">What happens at redemption</h2>
         <p className="caption" style={{ maxWidth: '90ch' }}>
           Claims of {dropsToXrp(d.phaseInfo.claimsAtRedemption)} are projected against
           liquidity of {dropsToXrp(d.phaseInfo.liquidityAtRedemption)}.

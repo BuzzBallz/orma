@@ -149,7 +149,7 @@ export function Facility({ d, history, collateral }: {
             <Section title="Exhibit 1 · Factor scores">
               <table className="op-tbl">
                 <thead>
-                  <tr><th>factor</th><th>what it measures</th><th className="rt">score</th></tr>
+                  <tr><th>Factor</th><th>What it measures</th><th className="rt">Score</th></tr>
                 </thead>
                 <tbody>
                   {factors.map(f => {
@@ -259,7 +259,7 @@ export function Facility({ d, history, collateral }: {
             <Section title="Exhibit 2 · Measured factors">
               <table className="op-tbl factors">
                 <thead>
-                  <tr><th>factor</th><th className="rt">measured</th><th className="rt">score</th><th>basis</th></tr>
+                  <tr><th>Factor</th><th className="rt">Measured</th><th className="rt">Score</th><th>Basis</th></tr>
                 </thead>
                 <tbody>
                   {d.score.dimensions.map(dim => (
@@ -280,7 +280,7 @@ export function Facility({ d, history, collateral }: {
             <Section title="Key indicators">
               <table className="op-tbl">
                 <thead>
-                  <tr><th>indicator</th><th className="rt">value</th><th>basis</th></tr>
+                  <tr><th>Indicator</th><th className="rt">Value</th><th>Basis</th></tr>
                 </thead>
                 <tbody>
                   <tr><td>Reported unit value</td><td className="rt num">{v.navNaive}</td><td className="op-says">as stated by the facility</td></tr>

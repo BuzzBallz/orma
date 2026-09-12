@@ -21,7 +21,7 @@ export function Evidence({ d }: { d: IndexerRace | null }) {
     return (
       <div className="stack">
         <section className="panel">
-          <h2 className="panel-title">verification</h2>
+          <h2 className="panel-title">Verification</h2>
           <p className="caption meth">No capture has been received.</p>
         </section>
       </div>
@@ -36,21 +36,21 @@ export function Evidence({ d }: { d: IndexerRace | null }) {
   return (
     <div className="stack">
       <section className="panel">
-        <h2 className="panel-title">what the two readers see</h2>
+        <h2 className="panel-title">What the two readers see</h2>
         <p className="caption meth">{d.finding}</p>
 
         <div className="race">
           <div className="race-pane race-naive">
-            <div className="race-hd">reader A — diffs the metadata</div>
+            <div className="race-hd">Reader A — diffs the metadata</div>
             <div className="race-val">{d.readings.naive.value}</div>
             <div className="race-formula">{d.readings.naive.formula}</div>
-            <div className="race-note">reports no change</div>
+            <div className="race-note">Reports no change</div>
           </div>
           <div className="race-pane race-correct">
-            <div className="race-hd">reader B — re-reads the object</div>
+            <div className="race-hd">Reader B — re-reads the object</div>
             <div className="race-val">{d.readings.correct.value}</div>
             <div className="race-formula">{d.readings.correct.formula}</div>
-            <div className="race-note">reports the loss</div>
+            <div className="race-note">Reports the loss</div>
           </div>
         </div>
 
@@ -62,7 +62,7 @@ export function Evidence({ d }: { d: IndexerRace | null }) {
 
       {/* The only text on this screen that must be legible from the back of a room. */}
       <section className="panel">
-        <h2 className="panel-title">the metadata, unedited</h2>
+        <h2 className="panel-title">The metadata, unedited</h2>
         <p className="caption meth">{d.why}</p>
         <div className="ev-diff">
           <div className="ev-lbl">PreviousFields</div>
@@ -82,13 +82,13 @@ export function Evidence({ d }: { d: IndexerRace | null }) {
 
       {before && (
         <section className="panel">
-          <h2 className="panel-title">and it was healthy a moment earlier</h2>
+          <h2 className="panel-title">And it was healthy a moment earlier</h2>
           <p className="caption meth">
             Read directly from the object before the transaction. Without this, an empty change
             set is ambiguous — it could mean nothing moved. It did not mean that.
           </p>
           <table className="op-tbl" style={{ marginTop: 12 }}>
-            <thead><tr><th>field</th><th>before</th><th>after</th></tr></thead>
+            <thead><tr><th>Field</th><th>Before</th><th>After</th></tr></thead>
             <tbody>
               {Object.keys(d.vaultNode.finalFields).map(k => (
                 <tr key={k}>
@@ -103,17 +103,17 @@ export function Evidence({ d }: { d: IndexerRace | null }) {
       )}
 
       <section className="panel">
-        <h2 className="panel-title">provenance</h2>
+        <h2 className="panel-title">Provenance</h2>
         <table className="op-tbl">
           <tbody>
-            <tr><td><b>result</b></td><td className="op-says">{d.transactionResult}</td></tr>
+            <tr><td><b>Result</b></td><td className="op-says">{d.transactionResult}</td></tr>
             {d.transactionHash && (
-              <tr><td><b>transaction</b></td><td className="op-says ev-hash">{d.transactionHash}</td></tr>
+              <tr><td><b>Transaction</b></td><td className="op-says ev-hash">{d.transactionHash}</td></tr>
             )}
-            {d.vaultId && <tr><td><b>vault</b></td><td className="op-says ev-hash">{d.vaultId}</td></tr>}
+            {d.vaultId && <tr><td><b>Vault</b></td><td className="op-says ev-hash">{d.vaultId}</td></tr>}
             {d.buildVersion && <tr><td><b>rippled</b></td><td className="op-says">{d.buildVersion}</td></tr>}
-            {d.capturedAt && <tr><td><b>captured</b></td><td className="op-says">{d.capturedAt}</td></tr>}
-            {d.capturedDuring && <tr><td><b>during</b></td><td className="op-says">{d.capturedDuring}</td></tr>}
+            {d.capturedAt && <tr><td><b>Captured</b></td><td className="op-says">{d.capturedAt}</td></tr>}
+            {d.capturedDuring && <tr><td><b>During</b></td><td className="op-says">{d.capturedDuring}</td></tr>}
           </tbody>
         </table>
         {!live && (

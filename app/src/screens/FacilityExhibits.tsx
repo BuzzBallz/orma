@@ -64,7 +64,7 @@ export function ManagerConduct({ h }: { h: BrokerHistory | null }) {
         <>
           <table className="op-tbl">
             <thead>
-              <tr><th>first-loss cover consumed</th><th className="rt">XRP</th><th>basis</th></tr>
+              <tr><th>First-loss cover consumed</th><th className="rt">XRP</th><th>Basis</th></tr>
             </thead>
             <tbody>
               <tr>
@@ -103,7 +103,7 @@ export function ManagerConduct({ h }: { h: BrokerHistory | null }) {
 
       {rep.findings.length > 0 && (
         <table className="op-tbl" style={{ marginTop: 12 }}>
-          <thead><tr><th>observation</th></tr></thead>
+          <thead><tr><th>Observation</th></tr></thead>
           <tbody>
             {rep.findings.map(f => (
               <tr key={f.code}><td className="op-says">{f.detail}</td></tr>
@@ -123,8 +123,8 @@ export function ManagerConduct({ h }: { h: BrokerHistory | null }) {
       <table className="op-tbl" style={{ marginTop: 12 }}>
         <thead>
           <tr>
-            <th>action</th><th className="rt">exposure</th>
-            <th className="rt">book before</th><th className="rt">cover used</th><th>when</th>
+            <th>Action</th><th className="rt">Exposure</th>
+            <th className="rt">Book before</th><th className="rt">Cover used</th><th>When</th>
           </tr>
         </thead>
         <tbody>
@@ -167,7 +167,7 @@ export function PledgedCollateral({ c }: { c: Collateral | null }) {
     <Section title="Exhibit 4 · Units pledged as collateral">
       <table className="op-tbl">
         <thead>
-          <tr><th>measure</th><th className="rt">XRP</th><th>basis</th></tr>
+          <tr><th>Measure</th><th className="rt">XRP</th><th>Basis</th></tr>
         </thead>
         <tbody>
           <tr>
@@ -191,8 +191,8 @@ export function PledgedCollateral({ c }: { c: Collateral | null }) {
       <table className="op-tbl" style={{ marginTop: 12 }}>
         <thead>
           <tr>
-            <th>pledge</th><th className="rt">units</th>
-            <th className="rt">reported</th><th className="rt">held</th><th className="rt">lendable</th>
+            <th>Pledge</th><th className="rt">Units</th>
+            <th className="rt">Reported</th><th className="rt">Held</th><th className="rt">Lendable</th>
           </tr>
         </thead>
         <tbody>
