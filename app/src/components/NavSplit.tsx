@@ -23,11 +23,11 @@ function Reading({ title, value, formula, pair, tone, width, animate }: {
 }) {
   return (
     <div style={{ flex: '1 1 0', minWidth: 0 }}>
-      <div className="panel-title">{title}</div>
-      <div className={'num ' + pair} style={{ fontSize: 'var(--t-xl)', paddingBottom: 4, marginBottom: 8 }}>
+      <div className="label">{title}</div>
+      <div className={'num ' + pair} style={{ fontSize: 'var(--t-xl)', paddingBottom: 6, marginBottom: 10, marginTop: 8 }}>
         {value}
       </div>
-      <div className="caption mono" style={{ marginBottom: 8 }}>{formula}</div>
+      <div className="caption mono" style={{ marginBottom: 10 }}>{formula}</div>
       <div className={'bar' + (animate ? ' animate' : '')} style={{ ['--bar-tone' as string]: tone }}>
         <i style={{ width: width + '%' }} />
       </div>
@@ -39,11 +39,11 @@ export function NavSplit({ vault }: { vault: VaultDetailFields }) {
   const tone = bpsTone(vault.navDivergenceBps)
   return (
     <section className="panel">
-      <h2 className="panel-title">NAV per share — two readings of the same vault</h2>
+      <h2 className="panel-title">nav per share — two readings of the same vault</h2>
 
       <div className="readings">
         <Reading
-          title="reported nav / share"
+          title="reported"
           value={vault.navNaive}
           formula="AssetsTotal / shares"
           pair="pair-naive"
@@ -52,7 +52,7 @@ export function NavSplit({ vault }: { vault: VaultDetailFields }) {
           animate={false}
         />
         <Reading
-          title="correct nav / share"
+          title="correct"
           value={vault.navCorrect}
           formula="(AssetsTotal - LossUnrealized) / shares"
           pair="pair-correct"
@@ -62,25 +62,25 @@ export function NavSplit({ vault }: { vault: VaultDetailFields }) {
         />
       </div>
 
-      <div style={{ textAlign: 'center', marginTop: 24 }}>
-        <div className="panel-title">divergence</div>
-        <div className="row" style={{ justifyContent: 'center', alignItems: 'baseline', gap: 16 }}>
+      <div style={{ textAlign: 'center', marginTop: 32 }}>
+        <div className="label">divergence</div>
+        <div className="row" style={{ justifyContent: 'center', alignItems: 'baseline', gap: 16, marginTop: 8 }}>
           <span className="num" style={{ fontSize: 'var(--t-xxl)', color: tone }}>
             {vault.navDivergenceBps}
           </span>
-          <span className="num dim" style={{ fontSize: 'var(--t-lg)' }}>bps</span>
+          <span className="num mute" style={{ fontSize: 'var(--t-lg)' }}>bps</span>
           <span className="num" style={{ fontSize: 'var(--t-lg)', color: tone }}>
             {bpsToPct(vault.navDivergenceBps)}
           </span>
         </div>
         {vault.navDivergenceBps === 0 && (
-          <div className="caption" style={{ marginTop: 4 }}>
+          <div className="caption" style={{ marginTop: 8 }}>
             the two readings agree — because nothing has been declared
           </div>
         )}
       </div>
 
-      <div className="caption mono" style={{ marginTop: 16, borderTop: '1px solid var(--line)', paddingTop: 8 }}>
+      <div className="caption mono" style={{ marginTop: 20, borderTop: '1px solid var(--line)', paddingTop: 12 }}>
         AssetsTotal {dropsToXrp(vault.assetsTotal)} · AssetsAvailable {dropsToXrp(vault.assetsAvailable)}
         {' '}· LossUnrealized {dropsToXrp(vault.lossUnrealized)} · shares {vault.sharesOutstanding}
       </div>

@@ -17,12 +17,9 @@ function formatValue(d: Dimension): string {
 function DimRow({ d }: { d: Dimension }) {
   const tone = gradeTone(d.grade)
   return (
-    <div style={{ padding: '8px 0', borderTop: '1px solid var(--line)' }}>
+    <div style={{ padding: '10px 0', borderTop: '1px solid var(--line)' }}>
       <div className="row" style={{ gap: 12 }}>
-        <span
-          className="mono"
-          style={{ fontSize: 'var(--t-xs)', color: 'var(--fg-dim)', letterSpacing: '0.08em', width: 72, flex: '0 0 auto' }}
-        >{d.key}</span>
+        <span className="label" style={{ width: 72, flex: '0 0 auto' }}>{d.key}</span>
 
         <span style={{ flex: '0 1 140px', minWidth: 90, fontSize: 'var(--t-base)' }}>{d.label}</span>
 
@@ -47,7 +44,7 @@ function DimRow({ d }: { d: Dimension }) {
           )}
         </span>
       </div>
-      <div className="caption" style={{ marginTop: 4 }}>{d.explain}</div>
+      <div className="caption" style={{ marginTop: 6 }}>{d.explain}</div>
     </div>
   )
 }
@@ -58,14 +55,14 @@ export function ScoreVector({ score }: { score: Score }) {
     <section className="panel">
       <h2 className="panel-title">grade</h2>
 
-      <div className="row" style={{ gap: 16, alignItems: 'center', marginBottom: 8 }}>
+      <div className="row" style={{ gap: 16, alignItems: 'center', marginBottom: 12 }}>
         <span
           className="num"
           style={{
             fontSize: 'var(--t-xl)', color: `var(${tone})`,
-            border: `1px solid var(${tone})`, borderRadius: 6,
-            background: `color-mix(in srgb, var(${tone}) 12%, transparent)`,
-            padding: '0 16px', lineHeight: 1.2,
+            border: `1px solid color-mix(in srgb, var(${tone}) 45%, transparent)`, borderRadius: 4,
+            background: `color-mix(in srgb, var(${tone}) 10%, transparent)`,
+            padding: '2px 20px', lineHeight: 1.15,
           }}
         >{score.grade}</span>
         <div>

@@ -108,12 +108,12 @@ export function VaultList({ vaults, receivedAt, tick, onOpen }: {
                 </td>
                 <td className="rt">
                   <span className="pair-naive bare">{v.navNaive}</span>
-                  <span className="dim"> → </span>
+                  <span className="mute"> → </span>
                   <span className="pair-correct bare">{v.navCorrect}</span>
                 </td>
                 <td className="rt">
                   {v.loanCount}
-                  <span style={{ color: v.distressedLoanCount > 0 ? 'var(--bad)' : 'var(--fg-dim)' }}>
+                  <span style={{ color: v.distressedLoanCount > 0 ? 'var(--bad)' : 'var(--fg-mute)' }}>
                     {' / '}{v.distressedLoanCount}
                   </span>
                 </td>
@@ -122,8 +122,8 @@ export function VaultList({ vaults, receivedAt, tick, onOpen }: {
                   <span
                     title={v.oraclePublished ? 'published' : 'not published'}
                     style={{
-                      display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
-                      background: v.oraclePublished ? 'var(--ok)' : 'var(--fg-dim)',
+                      display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
+                      background: v.oraclePublished ? 'var(--ok)' : 'var(--fg-mute)',
                     }}
                   />
                 </td>

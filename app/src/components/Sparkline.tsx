@@ -19,7 +19,7 @@ export function Sparkline({ samples, height = 120 }: { samples: Sample[]; height
     return (
       <div style={{ height, display: 'flex', alignItems: 'center', borderTop: '1px solid var(--line)' }}>
         <span className="caption">
-          one sample per poll · the two readings start drawing on the next 3-second tick
+          one sample per poll · the two readings start drawing on the next three-second tick
         </span>
       </div>
     )

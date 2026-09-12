@@ -38,9 +38,9 @@ function Reader({ title, value, formula, pair }: {
 }) {
   return (
     <div style={{ flex: '1 1 0', minWidth: 0 }}>
-      <div className="panel-title">{title}</div>
-      <div className={'num ' + pair} style={{ fontSize: 'var(--t-xl)', paddingBottom: 4 }}>{value}</div>
-      <div className="caption mono" style={{ marginTop: 4 }}>{formula}</div>
+      <div className="label">{title}</div>
+      <div className={'num ' + pair} style={{ fontSize: 'var(--t-xl)', paddingBottom: 6, marginTop: 8 }}>{value}</div>
+      <div className="caption mono" style={{ marginTop: 6 }}>{formula}</div>
     </div>
   )
 }
@@ -85,7 +85,7 @@ export function Moment({ d, receivedAt, tick }: { d: Detail; receivedAt: number;
           <Reader title="indexer a — the obvious reading" value={d.vault.navNaive}
             formula={naiveFormula} pair="pair-naive" />
           <div style={{ flex: '0 0 auto', textAlign: 'center', padding: '0 16px' }}>
-            <div className="num" style={{ fontSize: 'var(--t-hero)', lineHeight: 1, color: d.vault.navDivergenceBps === 0 ? 'var(--fg-dim)' : 'var(--bad)' }}>
+            <div className="num" style={{ fontSize: 'var(--t-hero)', lineHeight: 1, color: d.vault.navDivergenceBps === 0 ? 'var(--fg-mute)' : 'var(--bad)' }}>
               {d.vault.navDivergenceBps}
             </div>
             <div className="caption num">bps · {bpsToPct(d.vault.navDivergenceBps)}</div>
@@ -105,23 +105,23 @@ export function Moment({ d, receivedAt, tick }: { d: Detail; receivedAt: number;
           </div>
         }
       >
-        <div className="row" style={{ alignItems: 'flex-start', gap: 24 }}>
+        <div className="row" style={{ alignItems: 'flex-start', gap: 32 }}>
           <div style={{ flex: '0 0 200px' }}>
-            <div className="panel-title">previousFields</div>
-            <div className="num" style={{ fontSize: 'var(--t-lg)', color: 'var(--bad)' }}>
+            <div className="label">previousFields</div>
+            <div className="num" style={{ fontSize: 'var(--t-lg)', color: 'var(--bad)', marginTop: 8 }}>
               {Object.keys(prev).length === 0 ? '{}' : JSON.stringify(prev)}
             </div>
           </div>
           <div style={{ flex: '1 1 auto', minWidth: 0 }}>
-            <div className="panel-title">finalFields</div>
-            <pre className="mono" style={{ margin: 0, fontSize: 'var(--t-xs)', lineHeight: 1.3, color: 'var(--bad)' }}>
+            <div className="label">finalFields</div>
+            <pre className="mono" style={{ margin: '8px 0 0', fontSize: 'var(--t-xs)', lineHeight: 1.4, color: 'var(--bad)' }}>
 {JSON.stringify(final, null, 1)}
             </pre>
           </div>
           <div style={{ flex: '0 0 260px', textAlign: 'right' }}>
             <Chip tone="--ok">{r?.transactionResult ?? 'tesSUCCESS'}</Chip>
             {impaired && (
-              <div style={{ marginTop: 8 }}>
+              <div style={{ marginTop: 10 }}>
                 <a className="mono caption" href={impaired.explorerUrl} target="_blank" rel="noreferrer">
                   open the loan on devnet.xrpl.org
                 </a>

@@ -7,15 +7,15 @@ import { useAnchored } from './Countdown'
 export function OraclePanel({ oracle, receivedAt, tick }: { oracle: Oracle; receivedAt: number; tick: number }) {
   const age = useAnchored(-oracle.ageSeconds, receivedAt, tick)   // ageSeconds counts UP
   return (
-    <div className="row" style={{ alignItems: 'flex-start', gap: 24 }}>
+    <div className="row" style={{ alignItems: 'flex-start', gap: 32 }}>
       <div style={{ flex: '1 1 auto', minWidth: 0 }}>
-        <div className="row-wrap" style={{ gap: 16, marginBottom: 8 }}>
-          <span className="caption">publisher <span className="mono dim">{oracle.publisher}</span></span>
+        <div className="row-wrap" style={{ gap: 20, marginBottom: 12 }}>
+          <span className="caption">publisher <span className="mono mute">{oracle.publisher}</span></span>
           <span className="caption">
             object{' '}
             <a className="mono" href={oracle.explorerUrl} target="_blank" rel="noreferrer">{short(oracle.objectIndex, 12)}</a>
           </span>
-          <span className="caption">baseAsset <span className="mono dim">{short(oracle.baseAssetHex, 12)}</span></span>
+          <span className="caption">baseAsset <span className="mono mute">{short(oracle.baseAssetHex, 12)}</span></span>
           <span className="caption">
             age <span className="num" style={{ color: oracle.stale ? 'var(--warn)' : undefined }}>
               {duration(Math.max(0, -age))}
@@ -31,7 +31,7 @@ export function OraclePanel({ oracle, receivedAt, tick }: { oracle: Oracle; rece
         </div>
       </div>
 
-      <div style={{ flex: '0 0 240px', borderLeft: '1px solid var(--line)', paddingLeft: 16 }}>
+      <div style={{ flex: '0 0 260px', borderLeft: '1px solid var(--line)', paddingLeft: 20 }}>
         {oracle.aggregate === null ? (
           <div className="caption">single publisher — no ledger aggregate yet</div>
         ) : (
@@ -42,7 +42,7 @@ export function OraclePanel({ oracle, receivedAt, tick }: { oracle: Oracle; rece
               <span className="caption">mean <span className="num">{oracle.aggregate.mean}</span></span>
               <span className="caption">stdDev <span className="num">{oracle.aggregate.stdDev}</span></span>
             </div>
-            <div className="caption" style={{ marginTop: 4 }}>computed by the ledger, not by us</div>
+            <div className="caption" style={{ marginTop: 6 }}>computed by the ledger, not by us</div>
           </>
         )}
       </div>

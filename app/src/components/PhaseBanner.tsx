@@ -10,8 +10,8 @@ export function PhaseBanner({ vault, phaseInfo, receivedAt, tick }: {
   const passed = phaseInfo.secondsToNextBoundary <= 0
   return (
     <section className="panel" style={{ padding: 0 }}>
-      <div className="row-wrap" style={{ minHeight: 72, padding: '12px 16px', gap: 24 }}>
-        <div style={{ fontSize: 'var(--t-lg)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+      <div className="row-wrap" style={{ minHeight: 72, padding: '16px 20px', gap: 24 }}>
+        <div style={{ fontSize: 'var(--t-lg)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
           {vault.phase}
         </div>
 
@@ -25,8 +25,8 @@ export function PhaseBanner({ vault, phaseInfo, receivedAt, tick }: {
         <span className="spacer" />
 
         <div style={{ textAlign: 'right' }}>
-          <div className="caption">{passed ? 'boundary passed' : 'next boundary'}</div>
-          <div style={{ fontSize: 'var(--t-lg)' }}>
+          <div className="label">{passed ? 'boundary passed' : 'next boundary'}</div>
+          <div style={{ fontSize: 'var(--t-lg)', marginTop: 4 }}>
             <Countdown seconds={phaseInfo.secondsToNextBoundary} receivedAt={receivedAt} tick={tick} mode="boundary" />
           </div>
           <div className="caption mono">{fmtIso(phaseInfo.nextBoundaryAt)}</div>
@@ -35,7 +35,7 @@ export function PhaseBanner({ vault, phaseInfo, receivedAt, tick }: {
 
       {phaseInfo.canWithdraw === false && (
         <div style={{
-          borderTop: '1px solid var(--line)', padding: '8px 16px',
+          borderTop: '1px solid var(--line)', padding: '10px 20px',
           color: 'var(--fg-dim)', fontSize: 'var(--t-sm)',
         }}>
           Withdrawals are blocked for the entire {vault.phase} phase. The ledger returns{' '}

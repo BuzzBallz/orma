@@ -19,7 +19,7 @@ export function LoanTable({ loans, receivedAt, tick }: { loans: Loan[]; received
 
   return (
     <section className="panel">
-      <div className="row" style={{ marginBottom: 8 }}>
+      <div className="row" style={{ marginBottom: 12 }}>
         <h2 className="panel-title" style={{ margin: 0 }}>loans</h2>
         <span className="spacer" />
         {impairable > 0 && (
@@ -52,7 +52,7 @@ export function LoanTable({ loans, receivedAt, tick }: { loans: Loan[]; received
                         <Chip tone={s.tone}>{l.status}</Chip>
                       </span>
                       {l.impairable && (
-                        <span className="mono" style={{ fontSize: 'var(--t-xs)', color: 'var(--warn)', marginLeft: 8 }}>
+                        <span className="mono" style={{ fontSize: 'var(--t-xs)', color: 'var(--warn)', marginLeft: 10 }}>
                           broker may impair now
                         </span>
                       )}

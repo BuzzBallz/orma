@@ -14,25 +14,25 @@ export function NotchTrace({ trace }: { trace: NotchStep[] }) {
       {trace.length === 0 ? (
         <div className="empty">no notching applied</div>
       ) : (
-        <div style={{ borderLeft: '1px solid var(--line)', paddingLeft: 12 }}>
+        <div style={{ borderLeft: '1px solid var(--line)', paddingLeft: 16 }}>
           {trace.map((s, i) => {
             const last = i === trace.length - 1
             return (
               <div
                 key={i}
                 className="row"
-                style={{ gap: 12, padding: '8px 0', borderTop: i ? '1px solid var(--line)' : undefined, alignItems: 'flex-start' }}
+                style={{ gap: 12, padding: '10px 0', borderTop: i ? '1px solid var(--line)' : undefined, alignItems: 'flex-start' }}
               >
                 <span style={{ width: 44, flex: '0 0 auto' }}>
                   <Chip tone={gradeTone(s.from)}>{s.from}</Chip>
                 </span>
-                <span className="dim" style={{ flex: '0 0 auto' }}>——</span>
+                <span className="mute" style={{ flex: '0 0 auto' }}>——</span>
                 <span style={{ flex: '1 1 auto', fontSize: 'var(--t-sm)' }}>{s.rule}</span>
                 <span
                   className="num"
-                  style={{ width: 32, flex: '0 0 auto', textAlign: 'right', color: s.delta < 0 ? 'var(--bad)' : 'var(--fg-dim)' }}
+                  style={{ width: 32, flex: '0 0 auto', textAlign: 'right', color: s.delta < 0 ? 'var(--bad)' : 'var(--fg-mute)' }}
                 >{s.delta}</span>
-                <span className="dim" style={{ flex: '0 0 auto' }}>——▶</span>
+                <span className="mute" style={{ flex: '0 0 auto' }}>——▶</span>
                 <span
                   style={{
                     width: 52, flex: '0 0 auto',
