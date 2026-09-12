@@ -1,5 +1,5 @@
 import type { Dimension, Score } from '../lib/types'
-import { gradeFill, gradeTone } from '../lib/grades'
+import { GRADE_LADDER, gradeFill, gradeIndex, gradeTone } from '../lib/grades'
 import { duration, fmtIso, ratioToPct } from '../lib/format'
 import { Chip } from './Chip'
 
@@ -67,8 +67,15 @@ export function ScoreVector({ score }: { score: Score }) {
           }}
         >{score.grade}</span>
         <div>
-          <div className="caption">method v{score.methodVersion}</div>
-          <div className="caption mono">computed {fmtIso(score.computedAt)}</div>
+          {/* A letter is not a scale. Say which step it is, out of how many, which way. */}
+          <div style={{ fontSize: 'var(--t-sm)', color: 'var(--fg)' }}>
+            {gradeIndex(score.grade) < 0
+              ? 'off the published scale'
+              : <>step <b>{gradeIndex(score.grade) + 1}</b> of {GRADE_LADDER.length} — {GRADE_LADDER[0]} is safest, {GRADE_LADDER[GRADE_LADDER.length - 1]} is worst</>}
+          </div>
+          <div className="caption mono" style={{ marginTop: 4 }}>
+            method v{score.methodVersion} · computed {fmtIso(score.computedAt)}
+          </div>
         </div>
       </div>
 

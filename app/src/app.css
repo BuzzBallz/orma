@@ -145,6 +145,11 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 }
 .panel-title{ margin: 0 0 12px; }
 .caption{ font-size: var(--t-sm); color: var(--fg-dim); line-height: 1.5; }
+/* Plain language, in my words — never a backend string, which renders verbatim. */
+.plain{
+  margin: -4px 0 16px; max-width: 60ch;
+  font-size: var(--t-sm); line-height: 1.6; color: var(--fg-dim);
+}
 .mute{ color: var(--fg-mute); }
 .empty{ color: var(--fg-mute); font-size: var(--t-sm); padding: 12px 0; }
 

@@ -40,6 +40,10 @@ export function NavSplit({ vault }: { vault: VaultDetailFields }) {
   return (
     <section className="panel">
       <h2 className="panel-title">nav per share — two readings of the same vault</h2>
+      <p className="plain">
+        What one share is worth. On the left, what the vault reports about itself. On the
+        right, what is left once the losses it has written down are taken off.
+      </p>
 
       <div className="readings">
         <Reading
@@ -73,11 +77,11 @@ export function NavSplit({ vault }: { vault: VaultDetailFields }) {
             {bpsToPct(vault.navDivergenceBps)}
           </span>
         </div>
-        {vault.navDivergenceBps === 0 && (
-          <div className="caption" style={{ marginTop: 8 }}>
-            the two readings agree — because nothing has been declared
-          </div>
-        )}
+        <div className="caption" style={{ marginTop: 8 }}>
+          {vault.navDivergenceBps === 0
+            ? 'the two readings agree — because nothing has been declared'
+            : <>the reported figure is that much too high · bps are hundredths of a percent</>}
+        </div>
       </div>
 
       <div className="caption mono" style={{ marginTop: 20, borderTop: '1px solid var(--line)', paddingTop: 12 }}>

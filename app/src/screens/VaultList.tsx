@@ -150,7 +150,8 @@ export function VaultList({ vaults, receivedAt, tick, stamp, onOpen }: {
         </span>
         <span className="spacer" />
         <span className="caption">
-          Zero divergence is not safety. A loss nobody has declared reads par on both sides.
+          Sorted worst first. Divergence is the gap between what a vault reports and what it
+          holds — and zero is not safety: a loss nobody has declared reads fine on both sides.
         </span>
       </div>
       <div className="tbl-scroll">
@@ -160,7 +161,7 @@ export function VaultList({ vaults, receivedAt, tick, stamp, onOpen }: {
               <Th k="gradeNumeric" label="grade" />
               <Th k="label" label="instrument" />
               <Th k="phase" label="phase" />
-              <Th k="secondsToRedemption" label="next moment" rt />
+              <Th k="secondsToRedemption" label="redemption" rt />
               <Th k="navDivergenceBps" label="divergence" rt />
               <th className="rt">reported → correct</th>
               <Th k="loanCount" label="loans" rt />

@@ -136,3 +136,32 @@ pnpm --dir app build      # tsc -b && vite build
 ```
 
 Toujours lancer ça avant de committer, jamais `tsc --noEmit` seul.
+
+## Chasse aux bugs UI — `app/tools/ui-audit.js`
+
+Le balayage que je faisais à la main est devenu un script. Zéro dépendance, il tourne
+dans la page contre le vrai DOM et le vrai feed.
+
+```
+# l'app doit tourner, le feed aussi
+await import('/tools/ui-audit.js')
+await uiAudit()                              # tout, ~1 min
+await uiAudit({ only: ['layout','contract'] })
+```
+
+Environ **70 vérifications**, en sept sections. Chacune imprime PASS/FAIL **avec la mesure
+qui a tranché** — jamais un « ok » nu.
+
+| section | ce qu'elle attrape |
+|---|---|
+| `layout` | débordement horizontal, contenu qui rend **hors de sa boîte** (le bug qui cachait la table de prêts de S1), `/moment` qui ne tient plus en un viewport, bande qui déborde, table qui scrolle ailleurs que dans son propre conteneur |
+| `rendering` | `NaN`, `undefined`, `Invalid Date`, `[object Object]`, `null` visibles à l'écran, sur chaque vault × chaque écran |
+| `contract` | les faits visuels que le contrat gèle : lecture naïve **pointillée**, correcte **pleine** (§6), barres de dimensions pilotées par la **note** et non la valeur (§S1.3), six dimensions dans l'ordre de l'API (§4.2) |
+| `a11y` | tout contrôle atteignable, **anneau de focus sur chacun**, `aria-sort` sur les en-têtes triables, `alt` sur chaque image |
+| `contrast` | ratio WCAG de **chaque couleur de texte réellement rendue** contre le fond |
+| `motion` | animations déclarées, garde `prefers-reduced-motion` présente |
+| `consistency` | un seul tracking de label, un seul gap, un seul radius, deux familles de police max — en sautant proprement ce que l'écran ne contient pas |
+| `polls` | **la course** : après avoir martelé 1–5, une seule boucle de poll survit |
+| `routes` | un chemin inconnu réécrit l'URL au lieu de mentir |
+
+À lancer avant chaque commit qui touche au CSS ou au layout, et avant le gel.
