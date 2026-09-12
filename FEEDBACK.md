@@ -7,7 +7,7 @@
 > words"*, and a report written before the build cannot honestly claim that.
 >
 > It stays in the repo as the **evidence base**: every claim below is verified against live Devnet with
-> transaction hashes, and the full 38-finding register is in [`FEEDBACK-APPENDIX.md`](FEEDBACK-APPENDIX.md).
+> transaction hashes, and the full 39-finding register is in [`FEEDBACK-APPENDIX.md`](FEEDBACK-APPENDIX.md).
 >
 > **It gets rewritten Sunday 10:30–12:00** from what actually happened building the product, using three
 > sources: the friction we hit during the build (primary), the `/xrpl-session-analysis` outputs the hook
@@ -22,7 +22,7 @@
 | **Flavour** | **Loaded** (XLS-47 Price Oracle + XLS-70 Credentials + PermissionedDomains) |
 | **Environment** | XRPL Devnet, `wss://s.devnet.rippletest.net:51233`, rippled **3.4.0-rc5**, `network_id` 2 |
 | **Libraries** | `xrpl` **5.2.0** with `ripple-binary-codec` **2.11.0**, Node 24.13.0 · `xrpl-py` 5.1.0 and 5.2.0b0 |
-| **Evidence** | 38 findings with transaction hashes: `FEEDBACK-APPENDIX.md` |
+| **Evidence** | 39 findings with transaction hashes: `FEEDBACK-APPENDIX.md` |
 
 *The brief pins `xrpl@5.2.0-beta.0`; stable **5.2.0** shipped hours before the event and supersedes it.
 We pinned stable and raised it with a mentor.*

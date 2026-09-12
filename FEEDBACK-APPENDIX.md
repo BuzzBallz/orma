@@ -1,7 +1,7 @@
 # Appendix — full feedback register, XLS-65 / XLS-66
 
 > **The deliverable is [`/FEEDBACK.md`](../FEEDBACK.md), the three-page developer report at the repository
-> root. This file is its supporting evidence: the complete 38-finding register, with transaction hashes,
+> root. This file is its supporting evidence: the complete 39-finding register, with transaction hashes,
 > file and line references, verbatim error strings, upstream issue and PR numbers, and the three findings
 > we withdrew. Nothing here is rewritten for the report; the report selects from it.**
 
@@ -110,7 +110,7 @@ Every finding also carries a **status**, which is a claim about the world and no
 
 ## 3. Index of findings
 
-**38 findings, plus three we withdrew (§10).** Statuses are as of 2026-09-12 and were re-checked against the
+**39 findings, plus three we withdrew (§10).** Statuses are as of 2026-09-12 and were re-checked against the
 live trackers that morning; §13 lists what moved.
 
 | ID | Sev | Status | Component | Finding |
@@ -153,6 +153,7 @@ live trackers that morning; §13 lists what moved.
 | M4 | P2 | Partially tracked (`XRPL-Standards#623`, closed unmerged) | XLS-66, rippled API | XLS-66's two statements of the cover-liquidation formula disagree, and no read API previews it |
 | D8 | P2 | NEW | XLS-66 §3.11.1 | `LoanPay` is given transaction type 83; it is 84 |
 | D10 | P2 | Partially tracked (`XRPL-Standards#616`, `#555`) | XLS-65, XLS-66 | Twelve Invariants sections, plus XLS-65's Rationale and Security Considerations, are `TBD` |
+| **D11** | **P1** | **NEW** | XLS-65, XLS-66, docs | Both standards state the arithmetic completely and evaluate none of it. No number appears anywhere, and a rule nobody has evaluated reads as a rule with no consequences |
 | W1–W3 | — | **Withdrawn** | — | See §10 |
 
 ---
@@ -1770,6 +1771,70 @@ announced an RLUSD institutional lending platform built on exactly these two ame
 currently testing on XRPL Devnet. For a protocol that is weeks away from pooling third-party institutional
 capital, an empty Security Considerations section and twelve empty Invariants sections are the gap most
 likely to be quoted back at the project later.
+
+---
+
+### D11 — the specifications state the arithmetic and never once evaluate it
+
+**P1 · XLS-65, XLS-66, xrpl-dev-portal · NEW**
+
+Neither standard contains a worked numeric example. Not a NAV, not a share price, not a
+cover liquidation, not an interest accrual. Every rule is given as an expression over
+named fields, and no expression is ever evaluated against values.
+
+This is not a stylistic complaint and it is not about readability. It has a specific
+consequence, which we can demonstrate on ourselves.
+
+**What it cost us.** XLS-66 gives cover liquidation as
+
+```
+min( DebtTotal x CoverRateMinimum x CoverRateLiquidation, DefaultAmount, CoverAvailable )
+```
+
+Three things about that line are invisible until you put numbers into it:
+
+1. **Both** rates are in 1e-5 units, so **both** are divided by 1e5. Nothing on the
+   page says so — the only written-down source is a constant inside `node_modules`
+   (U3). Read naively, 10% reads as `10000` and the product is wrong by 1e10.
+2. The result is **ceilinged**, which the prose does not mention. M4 records that the
+   standard's own two statements of this formula disagree with each other.
+3. The base is `LoanBroker.DebtTotal` — the broker's **total** book at that instant —
+   not the principal of the loan that defaulted.
+
+We lost roughly two hours across (1) and (2). One line reading *"a broker with 40 XRP
+outstanding, `CoverRateMinimum` 10000 and `CoverRateLiquidation` 10000, pays
+`ceil(40 × 0.1 × 0.1)` = 0.40 XRP"* would have cost one sentence and closed all three
+questions at once.
+
+**The consequence that matters.** Point (3) is not a rounding detail. Because the base
+is the total book, and the book shrinks with each default, **the total cover paid
+across a fixed set of defaults depends on the order they are declared in** — and the
+party who chooses that order is the party whose capital is being consumed. Measured on
+Devnet with loans of 30 and 10 XRP at 10%/10%: declaring the big one first consumed
+0.50 XRP of cover, the small one first consumed 0.70 XRP. Same losses, same rates, 40%
+difference in what the first-loss capital absorbed. The difference lands on depositors.
+
+That behaviour is fully determined by the specification as written. Discovering it
+required no undocumented rule and no source reading — only substituting two numbers.
+As far as we can establish nobody had evaluated it, because nothing in the document
+invites you to put a number in and look at what comes out. An unevaluated rule reads
+as a rule with no consequences.
+
+An XRPL engineer who worked on the lending design told us, unprompted, that a business
+example with real numbers would have saved him half an hour of explaining the concept
+to us in person. We are filing it because by the time he said it we had already paid
+for the same gap twice, in a form we could measure.
+
+**Suggested fix**, in the order we would do it:
+
+1. **One worked example per formula**, inline, in the section that states it. Cover
+   liquidation, share price on deposit, share price on withdrawal, interest accrual,
+   management fee. Five examples, five lines each. This is an afternoon.
+2. **One end-to-end worked lifecycle** on the docs portal: a vault takes 50 XRP, lends
+   40 across two loans, one defaults, and every intermediate figure is shown. This is
+   the artefact that would have replaced our first day.
+3. **State units at the field**, not in a constant. `CoverRateMinimum` should read
+   *"1e-5 units; 10000 = 10%"* where it is defined.
 
 ---
 
