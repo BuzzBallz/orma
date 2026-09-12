@@ -1928,3 +1928,66 @@ reproduce were withdrawn before submission and are in §10, with the reasoning i
 
 *Prepared for the De Vinci Blockchain XRPL Lending Protocol Hackathon, 12–13 September 2026.
 All transaction hashes are on XRPL Devnet and are viewable at `https://devnet.xrpl.org/transactions/<hash>`.*
+
+---
+
+# Appendix C — Composability evidence (Loaded track)
+
+Assembled Sat 12 Sept 13:40. **Input for the Sunday rewrite of `FEEDBACK.md` friction point 3**, which is
+currently framed around the composition we abandoned (a ZK verifier and the lending amendments living on
+disjoint devnets) rather than the one we shipped. The workshop explicitly invited feedback on combining
+amendments and on whether the documentation and limitations are well explained. This is that material.
+
+**What we composed, in one working flow:** XLS-65 Vault · XLS-66 Lending · MPTokensV1 (vault shares) ·
+XLS-80 Permissioned Domains · XLS-70 Credentials · XLS-47 Price Oracle. Six amendments, four of which had to
+agree with each other before a single gated deposit could settle.
+
+### C1 · The gate is not where you look for it
+`DomainID` is **not** a field on the `Vault` ledger entry. It lives on the **share `MPTokenIssuance`**, read
+with `ledger_entry { mpt_issuance: Vault.ShareMPTID }`. Composing XLS-65 with XLS-80 therefore means knowing
+that the permission sits on an object the Vault only points at. Nothing in the XLS-65 or XLS-80 text says
+where to look. *Proposal: one sentence in the XLS-65 private-vault section naming the object that carries
+`DomainID`, and a cross-link from XLS-80.*
+
+### C2 · The domain is enforced per value movement, not per onboarding
+A graded LP paying vault shares to an ungraded account returns `tecNO_AUTH`, so the secondary-market
+laundering route is closed — good, and undocumented. But `MPTokenAuthorize` by an ungraded account
+**succeeds**: anyone may create the empty holding object, they simply cannot receive value into it. The
+mental model "the domain decides who is in the vault" is wrong; it decides who may *receive*.
+*Proposal: state the enforcement point explicitly, and that holding creation is deliberately ungated.*
+
+### C3 · Two ungated paths into a gated vault
+The **vault owner is exempt from their own domain**: an ungraded owner deposited into their own gated vault,
+`tesSUCCESS`. And `LoanBrokerCoverDeposit` is ungated entirely, because posting first-loss capital is not a
+share purchase. Both are defensible; neither is written down, and both matter to anyone modelling who can put
+money into a permissioned vault. *Proposal: an explicit exemptions list in the XLS-65 permissioned-vault section.*
+
+### C4 · XLS-75 PermissionDelegation does not compose with the lending suite
+Measured with a control. `DelegateSet` granting `Payment` → `tesSUCCESS`. `DelegateSet` granting
+`LoanManage`, `VaultCreate`, `VaultDeposit`, `LoanBrokerSet`, `LoanSet` or `LoanPay` → **`temMALFORMED`**.
+Cause: `TxSettings.h` defaults `delegable{Delegation::NotDelegable}` and no transaction in the 65–85 range
+opts in; 57 other transaction types do. `PermissionDelegationV1_1` is enabled on Devnet, so the amendment is
+live and simply does not cover this suite.
+
+Consequence for a real deployment: only the LoanBroker owner may impair, unimpair or default, and that owner
+is necessarily also the vault owner, so an institution cannot delegate the impairment desk to a risk
+committee through the documented delegation mechanism. The working substitute is `SetRegularKey` or
+`SignerListSet` — both verified `tesSUCCESS` for `tfLoanImpair` — because preclaim compares the **account**,
+not the signing key. That is a key-management answer to what looks like a permissions question.
+*Proposal: say in XLS-66 that lending transactions are non-delegable and name the RegularKey/SignerList
+pattern as the supported route; `temMALFORMED` gives a developer no hint that delegation is simply out of scope.*
+
+### C5 · XLS-47 accepts a non-price payload, and nothing says so
+An Oracle object carries our fragility vector with `AssetClass: "risk"` and a 40-hex `BaseAsset` derived from
+the VaultID, and `get_aggregate_price` then computes median and standard deviation across independent
+publishers **inside the ledger**. This is the cleanest composition in the project and the docs frame XLS-47
+purely as a price feed. Three traps we hit: `OracleSet` is **not a merge** (omitted pairs are kept but have
+`AssetPrice` and `Scale` stripped); `LastUpdateTime` must **strictly increase** or `tecINVALID_UPDATE_TIME`
+burns a fee and a sequence number; and a **future** `LastUpdateTime` bricks the object until wall clock
+catches up. *Proposal: document the non-price use, and put those three behaviours in the `OracleSet` reference.*
+
+### What to do with this on Sunday
+Re-frame friction point 3 to lead with C1–C4 — a composition we completed, with the documentation gaps it
+exposed — and keep the state-proof ask as a short closing paragraph rather than the headline. "We combined six
+amendments and here is where the documentation stopped" is the answer to the question the jury actually asked;
+"we could not combine two amendments that live on different devnets" is not.
