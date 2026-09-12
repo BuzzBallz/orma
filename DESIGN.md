@@ -330,3 +330,23 @@ hero trois colonnes.
 
 `prefers-reduced-motion` : tout coupé **sauf le hover**, qui reste en couleur seule —
 c'est lui qui dit qu'une ligne est cliquable.
+
+### La barre d'état repassait par-dessus les rangées — 12/09
+
+`html, body, #root { height: 100% }` bornait le bloc conteneur du `position: sticky` de la
+barre à **900px**. Sur un desk plus haut que l'écran (S1 avec ses prêts, 1802px), la barre
+se figeait à y=900 du document et peignait par-dessus le NOTCH TRACE et les ALERTS au lieu
+de suivre le défilement.
+
+Elle n'est plus collée : elle vit à la fin du document et descend avec la page.
+
+- `#root { min-height: 100dvh }` — `min-height: 100%` se résout contre un parent en hauteur
+  auto, c'est-à-dire contre rien, et le desk s'arrêtait 44px avant le bord.
+- `main.page { flex: 1 }` + `.view > .blotter`, `.view > .deskgrid { flex: 1 0 auto }` —
+  le desk prend le mou, donc sur un écran qui contient tout la barre tombe **pile** sur le
+  bord bas et a l'air collée. `1 0 auto`, jamais `1 1 auto` : c'est le rétrécissement qui
+  avait un jour poussé la table de prêts hors de sa boîte.
+- `.page` ne réserve plus les 31px de la barre : plus rien ne vit dessous.
+
+Mesuré sur les six desks, en haut ET en bas du défilement : **0 élément croisé par la
+barre**, et elle atterrit sur le bord bas dans les deux cas.

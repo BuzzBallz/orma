@@ -147,7 +147,8 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; }
-html, body, #root { height: 100%; }
+html, body { min-height: 100%; }
+#root { min-height: 100dvh; }
 html{ color-scheme: dark; }
 
 body{
@@ -240,8 +241,7 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 
 .page{
   max-width: 1440px; width: 100%; margin: 0 auto;
-  /* the pinned status line is 31px: the last panel must not live under it */
-  padding: 16px 32px calc(32px + 31px);
+  padding: 16px 32px 32px;
   flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0;
 }
 /* The view owns the remaining height so a desk fills its frame instead of floating in
@@ -454,7 +454,7 @@ table.tbl th:nth-child(4), table.tbl td:nth-child(4){ padding-left: 20px; }
    .deskgrid (feed down) it goes back to its content height. */
 .view > .blotter{
   display: flex; flex-direction: column;
-  min-height: calc(100dvh - var(--topbar) - 124px);
+  flex: 1 0 auto;          /* grow into the desk, never shrink under the rows */
 }
 .view > .blotter .readstamp{ margin-top: auto; }
 
@@ -577,7 +577,7 @@ kbd{
    be painted over. The panels carry an entrance animation with a transform, which puts
    them in the positioned layer; a plain block here loses to them. */
 .hints{
-  position: sticky; bottom: 0; z-index: 30;
+  position: relative; z-index: 1;
   border-top: 1px solid var(--amber-dim);
   background: var(--bg);
   padding: 5px 32px;
@@ -660,7 +660,7 @@ kbd{
 /* Alone on a desk, the room reaches the status line too — same rule as the blotter.
    min-content floor, so a tall rail grows the grid instead of being squashed by it. */
 .view > .deskgrid{
-  min-height: calc(100dvh - var(--topbar) - 124px);
+  flex: 1 0 auto;
   grid-template-rows: minmax(min-content, 1fr) auto;
 }
 @media (max-width: 1240px){ .deskgrid.down{ grid-template-columns: 264px minmax(0, 1fr); } }
