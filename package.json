@@ -1,0 +1,18 @@
+{
+  "name": "xrpl-vault-fragility-oracle",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "fixtures:build": "node tools/build-fixtures.mjs",
+    "fixtures": "node tools/fixture-server.mjs",
+    "verify": "node tools/verify-toolchain.mjs"
+  },
+  "dependencies": {
+    "decimal.js": "10.6.0",
+    "xrpl": "5.2.0"
+  }
+}

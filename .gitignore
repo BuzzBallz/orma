@@ -1,0 +1,77 @@
+# =============================================================================
+#  PRE-EVENT MATERIAL - NEVER COMMITTED TO THE SUBMISSION REPO
+# =============================================================================
+#  Everything in this first block was produced BEFORE the hackathon opened
+#  (Sat 12 Sept 2026, 09:00 Paris). It stays on disk because the team works
+#  from it, but it is not part of the submission and must never appear in
+#  this repository's history.
+#
+#  Check what is excluded:  git status --ignored --short
+#  Recover the pre-event history:
+#      git clone ../XRPL_preevent_archive.bundle recovered
+#
+#  NOTE: git has no inline comments in .gitignore. A '#' only starts a comment
+#  at the START of a line. Never put an explanation after a pattern.
+# =============================================================================
+
+# probe scripts, recon dumps, captured tx metadata, vendored tarballs
+/reference/
+
+# specs, tasklists, decisions, API contract, timeline
+/docs/
+
+# fixture builder, fixture server, toolchain verifier
+/tools/
+
+# generated from pre-event Devnet captures
+/fixtures/
+
+# vendored npm tarballs for offline install
+/vendor/
+
+# the archived pre-event git history
+/.git-preevent-archive/
+*.bundle
+
+# project-local Claude instructions - working notes, not a deliverable
+/CLAUDE.md
+/.claude/
+
+# =============================================================================
+#  Standard exclusions
+# =============================================================================
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# =============================================================================
+#  Devnet wallet seeds
+# =============================================================================
+#  Disposable and faucet-regenerable, but they are private keys and never
+#  belong in git. The pre-commit hook blocks them as a second line of defence.
+# =============================================================================
+**/wallets*.json
+**/accounts*.json
+**/subjects*.json
+**/state-*.json
+**/*-state.json
+**/*.seeds.json
+**/demo-state.json
+**/tree.json
+
+# Logs and scratch
+*.log
+/tmp/
+.DS_Store
+Thumbs.db
