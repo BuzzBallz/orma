@@ -3,7 +3,7 @@ import type { VaultRow } from '../lib/types'
 import { Chip } from '../components/Chip'
 import { Countdown } from '../components/Countdown'
 import { gradeTone } from '../lib/grades'
-import { bpsToPct, short } from '../lib/format'
+import { short } from '../lib/format'
 import { useFlash } from '../lib/useFlash'
 
 type SortKey = 'gradeNumeric' | 'label' | 'phase' | 'secondsToRedemption' | 'navDivergenceBps' | 'loanCount' | 'trend'
@@ -74,7 +74,7 @@ function Row({ v, receivedAt, tick, onOpen }: {
         <Countdown seconds={v.secondsToRedemption} receivedAt={receivedAt} tick={tick} mode="boundary" />
       </td>
       <td className={'rt' + (bpsMoved ? ' flash' : '')} style={{ color: bpsTone(v.navDivergenceBps) }}>
-        {v.navDivergenceBps} bps · {bpsToPct(v.navDivergenceBps)}
+        {v.navDivergenceBps} bps
       </td>
       <td className={'rt' + (navMoved ? ' flash' : '')}>
         <span className="pair-naive bare">{v.navNaive}</span>

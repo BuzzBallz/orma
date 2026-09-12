@@ -10,31 +10,31 @@ import { StaleBar } from './components/StaleBar'
 import { VaultDetail } from './screens/VaultDetail'
 import { VaultList } from './screens/VaultList'
 import { Moment } from './screens/Moment'
+import { OpsPhoto } from './components/OpsPhoto'
 import { short } from './lib/format'
 
 const POLL_MS = 3000
 
 const HINTS: [string, string][] = [
-  ['1–5', 'instrument'], ['L', 'list'], ['V', 'vault'], ['M', 'moment'], ['space', 'beat'],
+  ['1–5', 'pick a vault'], ['L', 'the book'], ['V', 'this vault'], ['M', 'the moment'], ['space', 'next beat'],
 ]
 
 /**
- * The desk's status rail. Spec §5.1 rule 3 and §6.5: an instruction, never a spinner and
- * never a skeleton. It sits beside the frame rather than replacing it, so a judge always
- * sees the shape of the product.
+ * What whoever is on watch would say, not what a machine would print. One verdict, then
+ * a person talking, then the facts that are actually true. Spec §5.1 rule 3 and §6.5:
+ * an instruction, never a spinner, never a skeleton, never an invented figure.
  */
-function StatusRail({ kicker, verdict, tone, lede, facts, action, note }: {
-  kicker: string; verdict: string; tone: string
-  lede: React.ReactNode
+function Watch({ verdict, tone, said, aside, facts }: {
+  verdict: string; tone: string
+  said: React.ReactNode; aside?: React.ReactNode
   facts: [string, React.ReactNode][]
-  action?: React.ReactNode
-  note?: React.ReactNode
 }) {
   return (
-    <aside className="rail" style={{ ['--status-tone' as string]: tone }}>
-      <div className="kicker">{kicker}</div>
+    <section className="panel watch" style={{ ['--status-tone' as string]: tone }}>
+      <div className="label">on watch</div>
       <div className="verdict">{verdict}</div>
-      <p className="lede">{lede}</p>
+      <p className="said">{said}</p>
+      {aside && <p className="said">{aside}</p>}
       <dl className="facts">
         {facts.map(([k, v]) => (
           <div key={k} style={{ display: 'contents' }}>
@@ -43,32 +43,18 @@ function StatusRail({ kicker, verdict, tone, lede, facts, action, note }: {
           </div>
         ))}
       </dl>
-      {action}
-      {note && <div className="note">{note}</div>}
-    </aside>
+    </section>
   )
 }
 
-function NoFeedRail({ error }: { error: string | null }) {
+/** The command, at the foot of the desk, in mono. Secondary — it is not the headline. */
+function RunLine({ extra }: { extra?: React.ReactNode }) {
   return (
-    <StatusRail
-      kicker="system"
-      verdict="NO FEED"
-      tone="var(--bad)"
-      lede={<>No payload has arrived, so there is nothing to hold on screen. <b>The polling loop is still running</b> — the book fills itself when the feed answers.</>}
-      facts={[
-        ['endpoint', API_BASE],
-        ['last error', error ?? 'no response'],
-        ['contract', `v${EXPECTED_CONTRACT} expected`],
-      ]}
-      action={
-        <div className="action">
-          <div className="say">Start the API. Three seconds later this is live.</div>
-          <code>node tools/fixture-server.mjs</code>
-        </div>
-      }
-      note="Countdowns come from validated-ledger close time. No reload needed."
-    />
+    <div className="runline">
+      <span className="say">Start the API and the screen fills itself.</span>
+      <code>node tools/fixture-server.mjs</code>
+      <span className="aside">{extra ?? 'Nothing to click. It reconnects on its own.'}</span>
+    </div>
   )
 }
 
@@ -81,7 +67,7 @@ function GhostDesk({ title }: { title: string }) {
         <span style={{ width: '46%' }} /><span style={{ width: '28%' }} />
         <span style={{ width: '62%' }} /><span style={{ width: '35%' }} />
       </div>
-      <div className="empty">every figure on this desk comes from one poll — nothing is drawn until it lands</div>
+      <div className="empty">Everything on this desk comes from one request. We draw it when it lands, not before.</div>
     </section>
   )
 }
@@ -138,52 +124,53 @@ export default function App() {
       return (
         <div className="deskgrid">
           <GhostDesk title="oracle" />
-          <StatusRail
-            kicker="oracle" verdict="BAND 3" tone="var(--accent)"
-            lede={<>The published reading lives on the moment desk: publisher, object index, the six on-chain dimensions and the ledger aggregate, against the same three-second poll.</>}
+          <Watch
+            verdict="ON /MOMENT" tone="var(--accent)"
+            said={<>The published reading already has a home. Publisher, object index, the six on-chain dimensions and the ledger aggregate are band 3 of the moment desk, off the same three-second request.</>}
+            aside={<>A second page would read the same object twice. Press <kbd>M</kbd>, or{' '}
+              <a href="/moment" onClick={e => { e.preventDefault(); navigate('/moment') }}>open it here</a>.</>}
             facts={[['reads', 'oracle object on devnet'], ['computed by', 'the ledger, not by us']]}
-            action={
-              <div className="action">
-                <div className="say">
-                  <a href="/moment" onClick={e => { e.preventDefault(); navigate('/moment') }}>Open the moment desk</a>
-                  {' — or press '}<kbd>M</kbd>
-                </div>
-              </div>
-            }
           />
         </div>
       )
     }
 
     if (path === '/') {
-      // The book is always framed: five structural slots hold the shape until the feed lands.
-      if (!vaults.data) {
+      const down = !vaults.data
+      if (down) {
         return (
-          <div className="deskgrid">
+          <div className={'deskgrid' + (vaults.fails > 0 ? ' down' : '')}>
+            {vaults.fails > 0 && (
+              <Watch
+                verdict="FEED LOST" tone="var(--bad)"
+                said={<>We have lost the feed. The five vaults are still there — we just do not put anything on screen until the server answers.</>}
+                aside={<>The poll keeps running in the background, so nobody has to do anything. <b>1–5 picks a vault, the way you would on a desk.</b></>}
+                facts={[['reading from', API_BASE], ['it said', vaults.error ?? 'nothing yet'], ['contract', `v${EXPECTED_CONTRACT}`]]}
+              />
+            )}
             <VaultList vaults={[]} receivedAt={0} tick={tick} onOpen={() => {}} />
-            {vaults.fails > 0 && <NoFeedRail error={vaults.error} />}
+            <OpsPhoto caption="feed paused" />
+            {vaults.fails > 0 && <RunLine />}
           </div>
         )
       }
-      return <VaultList vaults={rows} receivedAt={vaults.receivedAt} tick={tick} onOpen={id => navigate('/vault', id)} />
+      return (
+        <div className="deskgrid">
+          <VaultList vaults={rows} receivedAt={vaults.receivedAt} tick={tick} onOpen={id => navigate('/vault', id)} />
+          <OpsPhoto caption="five vaults, live" />
+        </div>
+      )
     }
 
     if (notFound && !detail.data) {
       return (
         <div className="deskgrid">
           <GhostDesk title="instrument" />
-          <StatusRail
-            kicker="instrument" verdict="UNKNOWN" tone="var(--warn)"
-            lede={<>The feed answered and holds no vault under that id. Polling continues, so if the instrument is about to exist it appears here on its own.</>}
-            facts={[['requested', short(vaultId, 24)], ['feed', API_BASE]]}
-            action={
-              <div className="action">
-                <div className="say">
-                  <a href="/" onClick={e => { e.preventDefault(); navigate('/', null) }}>Back to the book</a>
-                  {' — or press '}<kbd>1</kbd>…<kbd>5</kbd>
-                </div>
-              </div>
-            }
+          <Watch
+            verdict="NOT ON THE BOOK" tone="var(--warn)"
+            said={<>The server answered and it holds nothing under that id. Either it is not ours, or it has not been created yet.</>}
+            aside={<><a href="/" onClick={e => { e.preventDefault(); navigate('/', null) }}>Back to the book</a>, or press <kbd>1</kbd>…<kbd>5</kbd>. The poll stays on this id in case it shows up.</>}
+            facts={[['asked for', short(vaultId, 24)], ['reading from', API_BASE]]}
           />
         </div>
       )
@@ -194,7 +181,12 @@ export default function App() {
       return (
         <div className="deskgrid">
           <GhostDesk title={path === '/moment' ? 'the moment' : 'instrument'} />
-          <NoFeedRail error={detail.error} />
+          <Watch
+            verdict="FEED LOST" tone="var(--bad)"
+            said={<>We have lost the feed. This vault is still there — we just do not draw a figure we have not been given.</>}
+            aside={<>The poll keeps running. It comes back on its own, no reload.</>}
+            facts={[['reading from', API_BASE], ['it said', detail.error ?? 'nothing yet'], ['contract', `v${EXPECTED_CONTRACT}`]]}
+          />
         </div>
       )
     }
@@ -226,6 +218,7 @@ export default function App() {
         {HINTS.map(([k, label]) => (
           <span className="h" key={k}><kbd>{k}</kbd> {label}</span>
         ))}
+        <span className="who">built for the XRPL lending hackathon · De Vinci Blockchain, 12–13 Sept 2026</span>
       </div>
     </>
   )

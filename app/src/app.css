@@ -63,6 +63,14 @@ body{
 
 #root{ display: flex; flex-direction: column; }
 
+/* Grain. A locally generated 128px tile at 5% — enough to stop the flats reading as a
+   render, not enough to be a texture you notice. Inert by construction. */
+body::after{
+  content: ""; position: fixed; inset: 0; z-index: 100; pointer-events: none;
+  background-image: url('/assets/grain.png'); background-size: 128px 128px;
+  opacity: .05;
+}
+
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; text-underline-offset: 2px; }
 
@@ -156,8 +164,8 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
   white-space: nowrap; color: var(--fg);
 }
 .brand .mark{
-  width: 3px; height: 15px; background: var(--accent); border-radius: 1px;
-  align-self: center;
+  width: 18px; height: 18px; color: var(--accent);
+  align-self: center; flex: 0 0 auto;
 }
 .brand .sub{
   font: var(--t-xs)/1 var(--mono); letter-spacing: 0.1em;
@@ -228,11 +236,11 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 table.tbl{ width: 100%; border-collapse: collapse; font-size: var(--t-base); }
 table.tbl th{
   text-align: left;
-  padding: 0 12px 8px; border-bottom: 1px solid var(--line-2);
+  padding: 0 8px 8px; border-bottom: 1px solid var(--line-2);
   white-space: nowrap; background: none;
 }
 table.tbl td{
-  padding: 0 12px; height: 44px;
+  padding: 0 8px; height: 44px;
   border-bottom: 1px solid var(--line); white-space: nowrap;
   vertical-align: middle;
 }
@@ -359,6 +367,7 @@ kbd{
 }
 .hints .h{ display: inline-flex; align-items: center; gap: 7px; }
 .hints kbd{ letter-spacing: 0; }
+.hints .who{ margin-left: auto; letter-spacing: 0.06em; text-transform: none; font-family: var(--mono); }
 
 /* ---------- instrument picker ---------- */
 
@@ -399,42 +408,85 @@ kbd{
 /* ---------- desk grid: the frame never empties ---------- */
 
 .deskgrid{
-  display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px;
-  align-items: stretch; flex: 1 1 auto;
+  display: grid; grid-template-columns: minmax(0, 1fr) 240px;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 12px; align-items: stretch; flex: 1 1 auto;
+}
+/* Feed down on the book: a word from whoever is on watch, the empty book, the room. */
+.deskgrid.down{
+  grid-template-columns: 264px minmax(0, 1fr) 240px;
+  grid-template-rows: minmax(0, 1fr) auto;   /* the desk stretches, the command sits at its foot */
 }
 .deskgrid > .panel{ display: flex; flex-direction: column; }
-@media (max-width: 1100px){ .deskgrid{ grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 1240px){ .deskgrid.down{ grid-template-columns: 280px minmax(0, 1fr); } .deskgrid.down .ops{ display: none } }
+@media (max-width: 1100px){ .deskgrid, .deskgrid.down{ grid-template-columns: minmax(0, 1fr); } }
 
-.rail{
-  background: var(--bg-1); border: 1px solid var(--line); border-radius: 4px; padding: 20px;
+/* ---------- the room ----------
+   One committed photograph, darkened into the palette. Not decoration: it says a desk
+   like this is what the screen stands in for. Source and licence in public/assets/README.md. */
+
+.ops{
+  position: relative; overflow: hidden;
+  border: 1px solid var(--line); border-radius: 4px;
+  background: var(--bg-1);
+  display: flex; flex-direction: column;
 }
-.rail .kicker{
-  font: 500 var(--t-xs)/1 var(--sans); text-transform: uppercase;
-  letter-spacing: 0.22em; color: var(--fg-mute); margin-bottom: 14px;
+.ops img{
+  width: 100%; height: 100%; object-fit: cover; object-position: 30% 60%;
+  filter: grayscale(.55) brightness(.45) contrast(1.05);
+  display: block;
 }
-.rail .verdict{
+.ops::before{
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--bg) 35%, transparent) 0%,
+    color-mix(in srgb, var(--bg) 82%, transparent) 100%);
+}
+.ops figcaption{
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 14px;
+  font: var(--t-xs)/1.5 var(--mono); letter-spacing: 0.06em;
+  color: var(--fg-dim);
+  border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  background: color-mix(in srgb, var(--bg) 60%, transparent);
+}
+.ops figcaption b{ color: var(--fg); font-weight: 500; }
+
+/* The word from the desk. Lower than a poster: a verdict, then a person talking. */
+.watch{ display: flex; flex-direction: column; }
+.watch .verdict{
   font-family: var(--mono); font-variant-numeric: tabular-nums;
-  font-size: var(--t-xl); line-height: 1; letter-spacing: -0.04em;
-  color: var(--status-tone, var(--fg)); margin-bottom: 16px;
+  font-size: 40px; line-height: 1; letter-spacing: -0.04em;
+  color: var(--status-tone, var(--fg)); margin: 4px 0 16px;
 }
-.rail .lede{ font-size: var(--t-sm); line-height: 1.6; color: var(--fg-dim); margin: 0 0 20px; }
-.rail .lede b{ color: var(--fg); font-weight: 500; }
-.rail .facts{
-  display: grid; grid-template-columns: max-content minmax(0, 1fr);
-  gap: 0 16px; border-top: 1px solid var(--line); padding-top: 12px; margin: 0 0 20px;
+.watch .said{ font-size: var(--t-base); line-height: 1.6; color: var(--fg); margin: 0 0 8px; }
+.watch .said + .said{ color: var(--fg-dim); font-size: var(--t-sm); }
+/* The watch column is narrow: a URL does not survive being squeezed beside its label,
+   so the label sits above the value. */
+.watch .facts{
+  display: grid; grid-template-columns: minmax(0, 1fr);
+  border-top: 1px solid var(--line); padding-top: 14px; margin: 20px 0 0;
 }
-.rail .facts dt{ padding: 5px 0; }
-.rail .facts dd{
-  margin: 0; padding: 5px 0; font: var(--t-xs) var(--mono);
-  color: var(--fg-dim); overflow-wrap: anywhere;
+.watch .facts dt{ padding: 10px 0 2px; }
+.watch .facts dt:first-of-type{ padding-top: 0; }
+.watch .facts dd{
+  margin: 0; font: var(--t-xs)/1.5 var(--mono);
+  color: var(--fg); overflow-wrap: anywhere;   /* brighter than its label, so the pairs read as pairs */
 }
-.rail .action{ border-left: 2px solid var(--accent); padding: 10px 0 10px 14px; }
-.rail .action .say{ font-size: var(--t-sm); color: var(--fg); margin-bottom: 8px; }
-.rail .action code{
-  display: inline-block; font: var(--t-xs) var(--mono); color: var(--accent);
-  background: var(--bg-2); border: 1px solid var(--line); border-radius: 3px; padding: 6px 9px;
+
+/* The command sits at the foot of the desk, in mono, secondary. */
+.runline{
+  grid-column: 1 / -1;
+  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  border: 1px solid var(--line); border-radius: 4px; background: var(--bg-1);
+  padding: 12px 20px;
 }
-.rail .note{ margin-top: 16px; font-size: var(--t-xs); color: var(--fg-mute); line-height: 1.6; }
+.runline .say{ font-size: var(--t-sm); color: var(--fg); }
+.runline code{
+  font: var(--t-xs) var(--mono); color: var(--accent);
+  background: var(--bg-2); border: 1px solid var(--line);
+  border-radius: 3px; padding: 5px 9px;
+}
+.runline .aside{ font-size: var(--t-xs); color: var(--fg-mute); }
 
 /* ---------- structural placeholders ----------
    Shape only. Every figure is an em-dash: nothing here is a number. */

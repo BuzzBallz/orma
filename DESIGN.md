@@ -71,6 +71,20 @@ Le blotter fantôme (5 slots `Vault 1…5`) est **structurel** : chaque figure e
 Aucun id, aucun montant, aucun countdown n'y est inventé — un backend live peut servir d'autres
 instruments que les cinq fixtures.
 
+## Matière — assets committés (12/09)
+
+Aucun hotlink : le wifi de salle est un risque et un asset distant qui tombe sur scène est
+un échec visible. Tout est dans `app/public/assets/`, sources et licences dans son README.
+
+| fichier | quoi | provenance |
+|---|---|---|
+| `operator-desk.jpg` | salle de contrôle BESSY II, 900×675, 145 Ko | Wikimedia Commons, **CC0**, auteur Nylki. Redimensionné et recompressé en local. |
+| `grain.png` | grain 128×128 tuilable, overlay 5 %, inerte | **généré en local** par un script jetable, pas téléchargé |
+| `mark.svg` | le sigle de la topbar | **dessiné pour ce projet**, délibérément pas la marque XRPL |
+
+**Pas de portraits.** Il n'existe aucun endroit humain dans cette app en lecture seule, et
+coller cinq visages d'inconnus comme s'ils étaient l'équipe serait fabriquer des gens.
+
 ## Écarts assumés avec le brief générique
 
 Pas d'animation d'entrée (§6.5 : « no fade-ins »). Pas de skeleton (§6.5, et §5.1 r.3 veut un

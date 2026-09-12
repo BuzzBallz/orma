@@ -58,7 +58,8 @@ export function HeaderBar({ health, healthUnreachable, vaults, activeVaultId, pa
   return (
     <header className="topbar">
       <span className="brand">
-        <span className="mark" />
+        {/* Drawn for this project, not the XRPL trademark — see public/assets/README.md. */}
+        <img className="mark" src="/assets/mark.svg" alt="" width={18} height={18} />
         Vault Fragility Oracle
         <span className="sub">xls-66</span>
       </span>
