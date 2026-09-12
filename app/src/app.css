@@ -463,27 +463,12 @@ table.tbl th:nth-child(4), table.tbl td:nth-child(4){ padding-left: 20px; }
 .scroll-term:hover [data-slot="scroll-area-thumb"]{ background: var(--fg-mute); }
 
 /* A terminal screen is full. Alone on the book desk the blotter reaches the status line
-   instead of floating in a void with the ground showing under it — the void was the
-   loudest tell that this was a page, not a desk. Only when it IS alone: inside a
-   .deskgrid (feed down) it goes back to its content height. */
-.blotter{ display: flex; flex-direction: column; min-height: 0; }
-.blotter > *{ flex: 0 0 auto; }          /* the rows are rigid… */
-.blotter .tbl-fill{ flex: 1 1 auto; min-height: 0; }   /* …the ruling absorbs */
-/* The ruling continues under the rows: 27px to match a row (26px cell + its hairline).
-   It is the blotter's own grid, so a short book reads as a book with room, not a void. */
+/* The panel is as tall as what it holds. Ruled empty lines under five rows were a sheet
+   of ledger paper with nothing written on it — a page pretending to have more to say. */
+.blotter{ display: flex; flex-direction: column; }
+
 /* The book's sentence is a line under the header, not a paragraph wedged beside it. */
 .blotter-say{ margin: 14px 0 0; max-width: 88ch; }
-
-.blotter .tbl-fill{
-  flex: 1 1 auto; min-height: 0;
-  margin: 0 -20px; 
-  background-image: repeating-linear-gradient(to bottom,
-    transparent 0 31px, color-mix(in srgb, var(--line) 45%, transparent) 31px 32px);
-  -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 55%, transparent 100%);
-          mask-image: linear-gradient(to bottom, #000 0, #000 55%, transparent 100%);
-}
-.blotter .readstamp{ margin-top: 0; }
-.view > .blotter{ flex: 1 0 auto; }   /* alone on the desk, grow into it; never shrink */
 
 /* The reading stamp sits under the rows, quieter than a caption. */
 .readstamp{
@@ -892,7 +877,7 @@ kbd{
   display: flex !important; align-items: baseline; gap: 12px; flex-wrap: wrap;
   padding: 7px 32px; border-radius: 0 !important;
   background: color-mix(in srgb, var(--amber) 8%, transparent) !important;
-  border: 0 !important; border-bottom: 1px solid color-mix(in srgb, var(--amber) 28%, transparent) !important;
+  border: 0 !important; border-bottom: 1px solid var(--line) !important;
   color: var(--amber); cursor: pointer;
 }
 .wbanner [data-slot="alert-title"]{
@@ -1084,6 +1069,14 @@ tr.ghost:hover td > *{ transform: none; }
 .ghost-desk .ghost-lines span{ display: block; height: 8px; background: var(--bg-2); border-radius: 2px; }
 
 /* ---------- responsive ---------- */
+
+/* Mobile: a name and a score is what fits and what matters. The rest of the columns are
+   a scroll away, not a squeeze. */
+@media (max-width: 760px){
+  table.tbl th:nth-child(n+3), table.tbl td:nth-child(n+3){ display: none; }
+  table.tbl th:nth-child(2), table.tbl td:nth-child(2){ text-align: right; }
+  .op-grid{ gap: 16px; }
+}
 
 @media (max-width: 760px){
   :root{ --t-hero: 52px; --t-xxl: 42px; --t-xl: 32px; --t-lg: 20px; }

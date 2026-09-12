@@ -879,3 +879,49 @@ avec dix expositions a vingt entrées. L'y forcer voudrait dire rogner des éch�
 réduire les rangées jusqu'à l'illisible. Le contrôle correspondant de l'audit assertait une
 règle qui ne s'applique plus à cette vue : il vérifie maintenant que **rien n'est rogné dans
 un panneau**, ce qui est l'invariant réel.
+
+## Le constat P0, traité — 12/09
+
+### 1. La nav n'était pas morte — les vues se ressemblaient
+
+Vérifié sur le preview déployé, clic souris réel : `mousedown trusted` à (882,22) →
+`onTab: "facility"` → `path: /facility`, onglet actif `facility`. Rien ne recouvre les
+onglets : `elementFromPoint` au centre de chacun renvoie le bouton lui-même.
+
+**Mais le constat est juste sur le fond.** Sans payload, `/facility` et `/event` rendaient
+un placeholder + un rail de statut — c'est-à-dire **la même mise en page que le portfolio
+vide** : un rail à droite, un panneau à gauche, le même mot en gros. Un lecteur en conclut
+que les onglets sont du décor, et il a raison de le conclure.
+
+Corrigé à la racine : **chaque vue rend son propre document, payload ou non.**
+
+- `/facility` → la structure complète de la note (Ratings, Summary, strengths/challenges,
+  Exhibit 1, Key indicators) avec **`n.a.` partout**. 1 163px de document, pas un rail.
+- `/event` → « No scheduled event on file. » + le calendrier avec ses quatre types
+  d'entrée en tirets.
+- `/methodology` → inchangé, déjà distinct.
+
+Deux défauts réels corrigés au passage : la cible de clic d'un onglet faisait 30px dans une
+barre de 44px — deux pixels trop haut ou trop bas et on ratait le bouton. Le bouton remplit
+la barre maintenant ; la pilule reste à 30px, centrée.
+
+### 2. Le puits de lignes vides
+
+`.tbl-fill` supprimé. Le panneau fait la hauteur de ce qu'il contient : **300px** au lieu de
+808. Le faux papier réglé était une page qui prétendait avoir plus à dire.
+
+### 3. « Figures withheld » : 8 → 1
+
+C'était dans le badge, le H1 du rail, le sous-titre du portfolio et **chacune des cinq
+rangées**. Le rail du portfolio est supprimé, les rangées ne portent plus que le tiret, le
+sous-titre dit `weakest first`. Il ne reste **que le badge du chrome**, sur les quatre vues.
+
+### 5, 6, 7
+
+Le filet ambre horizontal qui traversait le fond (bandeau de statut et bandeau de sign-in)
+passe à `--line`. Les rangées du dialog sont libellées **Desktop app / Desktop app
+(alternate) / Mobile app**, le nom du produit en tooltip ; la copy est une phrase :
+*« Sign-in records the reader. It does not send an instruction. »* Le favicon Vite violet
+est remplacé par la marque — deux lectures d'une même valeur, pleine ambre et pointillée
+grise. `as of` est masqué s'il n'y a pas d'horodatage. Le sélecteur liste **Facility 1–5**
+en tirets quand rien n'est reçu. Sous 760px la table ne garde que **nom + score**.

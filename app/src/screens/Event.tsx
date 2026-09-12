@@ -38,7 +38,8 @@ function loanRows(loans: Loan[]): Row[] {
  * The forward calendar for one facility: what falls due, when, and what it is worth.
  * Every line is a date the calculation agent sent. Nothing is projected forward by us.
  */
-export function Event({ d, tick }: { d: VaultDetail; tick: number }) {
+export function Event({ d, tick, name }: { d: VaultDetail | null; tick: number; name?: string }) {
+  if (!d) return <CalendarSkeleton name={name} />
   const v = d.vault
   const scheduled: Row[] = [
     {
@@ -125,6 +126,50 @@ export function Event({ d, tick }: { d: VaultDetail; tick: number }) {
             : <> Claims are covered.</>}
           {d.phaseInfo.withdrawBlockedReason && <> Withdrawals are currently closed: {creditText(d.phaseInfo.withdrawBlockedReason)}.</>}
         </p>
+      </section>
+    </div>
+  )
+}
+
+/**
+ * The calendar before any figures. The four kinds of entry it will hold, each on an
+ * em-dash — the shape of the page, with nothing filled in.
+ */
+function CalendarSkeleton({ name }: { name?: string }) {
+  const KINDS = ['Scheduled payment', 'Period boundary', 'Redemption date', 'Review date']
+  return (
+    <div className="stack">
+      <section className="panel">
+        <div className="row" style={{ marginBottom: 14, alignItems: 'baseline' }}>
+          <h2 className="panel-title" style={{ margin: 0 }}>next event</h2>
+          <span className="num mute" style={{ fontSize: 'var(--t-xs)' }}>{name ?? 'no facility selected'}</span>
+        </div>
+        <p className="caption" style={{ maxWidth: '70ch' }}>
+          No scheduled event on file.
+          {!name && ' Choose a facility from the portfolio to see what falls due and when.'}
+        </p>
+      </section>
+
+      <section className="panel">
+        <h2 className="panel-title">calendar</h2>
+        <div className="tbl-scroll">
+          <table className="tbl">
+            <thead>
+              <tr><th>event</th><th>counterparty</th><th className="rt">amount</th><th className="rt">due</th><th className="rt">date</th></tr>
+            </thead>
+            <tbody>
+              {KINDS.map(k => (
+                <tr key={k} className="ghost">
+                  <td className="mute">{k}</td>
+                  <td className="mute">—</td>
+                  <td className="rt num mute">—</td>
+                  <td className="rt num mute">—</td>
+                  <td className="rt num mute">—</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   )

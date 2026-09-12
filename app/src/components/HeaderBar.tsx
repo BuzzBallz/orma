@@ -65,9 +65,10 @@ export function HeaderBar({ health, healthUnreachable, vaults, activeVaultId, pa
         </span>
       </span>
 
-      <Separator orientation="vertical" className="sep" />
-
-      <span className="meta keep">as of <b>{asOf ? fmtIso(asOf) : '—'}</b></span>
+      {asOf && <>
+        <Separator orientation="vertical" className="sep" />
+        <span className="meta keep">as of <b>{fmtIso(asOf)}</b></span>
+      </>}
 
       <span className="spacer" />
 

@@ -5,10 +5,16 @@ import { Separator } from '@/components/ui/separator'
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { WALLETS, XAMAN_CONFIGURED, useWallet, type WalletKind } from '../lib/wallet'
 
 const ICON: Record<WalletKind, typeof ShieldCheck> = {
   crossmark: ShieldCheck, gemwallet: ShieldCheck, xaman: Smartphone,
+}
+
+/** What a reader chooses by. The product name is a detail, and lives in the tooltip. */
+const KIND_LABEL: Record<WalletKind, string> = {
+  crossmark: 'Desktop app', gemwallet: 'Desktop app (alternate)', xaman: 'Mobile app',
 }
 
 /**
@@ -29,8 +35,7 @@ export function SignInDialog({ open, onOpenChange }: {
         <DialogHeader className="dlg-head">
           <DialogTitle className="dlg-title">sign in</DialogTitle>
           <DialogDescription className="dlg-sub">
-            Nothing on these pages is behind a sign-in. It records who is reading, and
-            authorises nothing: no instruction is sent and no amount is moved.
+            Sign-in records the reader. It does not send an instruction.
           </DialogDescription>
         </DialogHeader>
 
@@ -42,8 +47,10 @@ export function SignInDialog({ open, onOpenChange }: {
             return (
               <div className="wrow" key={w.kind} data-here={here}>
                 <Icon size={14} strokeWidth={2} aria-hidden />
-                <span className="wname">{w.name}</span>
-                <span className="wnote">{w.note}</span>
+                <Tooltip>
+                  <TooltipTrigger asChild><span className="wname">{KIND_LABEL[w.kind]}</span></TooltipTrigger>
+                  <TooltipContent className="tip" side="top">{w.name}</TooltipContent>
+                </Tooltip>
                 <span className="spacer" />
                 <span className="wstate">
                   {busyRow ? 'waiting…'
@@ -89,7 +96,7 @@ export function SignInDialog({ open, onOpenChange }: {
           }}
         >
           <label className="label" htmlFor="ro-addr">
-            <KeyRound size={11} strokeWidth={2.25} aria-hidden /> no signing application — read as view only
+            <KeyRound size={11} strokeWidth={2.25} aria-hidden /> View only — account reference
           </label>
           <div className="wpaste-row">
             <input
@@ -101,9 +108,7 @@ export function SignInDialog({ open, onOpenChange }: {
               continue
             </Button>
           </div>
-          <span className="wnote">
-            The reference is checked before it is accepted. View only: nothing can be signed.
-          </span>
+          <span className="wnote">Nothing can be signed.</span>
         </form>
       </DialogContent>
     </Dialog>

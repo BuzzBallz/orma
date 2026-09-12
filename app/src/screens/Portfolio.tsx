@@ -51,14 +51,13 @@ function EmptyRow({ n, onOpen }: { n: number; onOpen: () => void }) {
   return (
     <TableRow
       className="ghost" tabIndex={0} style={{ cursor: 'pointer' }}
-      aria-label={`facility slot ${n}, figures withheld`}
+      aria-label={`facility slot ${n}, no figures received`}
       onClick={onOpen}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
     >
       <TableCell>
         <span className="inst">
           <span className="name mute">Facility {n}</span>
-          <span className="id">figures withheld</span>
         </span>
       </TableCell>
       <TableCell className="num mute">—</TableCell>
@@ -122,10 +121,8 @@ function Row({ v, i, receivedAt, tick, onOpen }: {
  * committee reads the worst name first, and the gap between reported and held value is
  * the reason this note exists.
  */
-export function Portfolio({ vaults, receivedAt, tick, stamp, status, onOpen }: {
+export function Portfolio({ vaults, receivedAt, tick, onOpen }: {
   vaults: VaultRow[]; receivedAt: number; tick: number
-  stamp?: { ledgerIndex: number; serverTime: string }
-  status?: { ageMs: number; fails: number; error: string | null; railOnScreen?: boolean }
   onOpen: (vaultId: string) => void
 }) {
   const withheld = vaults.length === 0
@@ -150,7 +147,7 @@ export function Portfolio({ vaults, receivedAt, tick, stamp, status, onOpen }: {
       <div className="row" style={{ marginBottom: 16, alignItems: 'baseline' }}>
         <h2 className="panel-title" style={{ margin: 0 }}>portfolio</h2>
         <span className="num mute" style={{ fontSize: 'var(--t-xs)' }}>
-          {withheld ? 'figures withheld · weakest first' : `${vaults.length} facilities · weakest first`}
+          {withheld ? 'weakest first' : `${vaults.length} facilities · weakest first`}
         </span>
         {sorted && (
           <Button variant="ghost" size="xs" className="btn-term" onClick={() => setSort(DEFAULT_SORT)}>
@@ -192,17 +189,14 @@ export function Portfolio({ vaults, receivedAt, tick, stamp, status, onOpen }: {
       </div>
 
       <p className="caption blotter-say">
-        Reported value is what the facility states; held value is what it owns once a
-        recognised loss is taken off.
+        {withheld
+          ? <>No figures have been received. The facilities on file are listed; nothing is
+              shown against them until a set arrives.</>
+          : <>Reported value is what the facility states; held value is what it owns once a
+              recognised loss is taken off.</>}
       </p>
 
-      <div className="tbl-fill" aria-hidden />
 
-      {!stamp && !status?.railOnScreen && (
-        <div className="readstamp">
-          <span className="label">status</span> <b>figures withheld</b>
-        </div>
-      )}
     </section>
   )
 }

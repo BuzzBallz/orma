@@ -3,7 +3,7 @@ import type { VaultDetail } from '../lib/types'
 import { Chip } from '../components/Chip'
 import { gradeIndex, gradeTone } from '../lib/grades'
 import { bpsToPct, dropsToXrp, duration, fmtIso, ratioToPct, rateToPct } from '../lib/format'
-import { creditText, facilityName, facilityRef, factorRows, outlookOf, splitFactors } from '../lib/credit'
+import { FACTORS, creditText, facilityName, facilityRef, factorRows, outlookOf, splitFactors } from '../lib/credit'
 
 /** A labelled figure. Anything the payload does not carry prints n.a., never a guess. */
 function F({ k, v, note }: { k: string; v: ReactNode; note?: string }) {
@@ -30,7 +30,8 @@ function Section({ title, children, tight }: { title: string; children: ReactNod
  * indicators and profile. Every figure in it is a figure the calculation agent sent. Where
  * a figure was not sent, the line reads n.a. and nothing is inferred to fill it.
  */
-export function Facility({ d }: { d: VaultDetail }) {
+export function Facility({ d, name: fallbackName }: { d: VaultDetail | null; name?: string }) {
+  if (!d) return <OpinionSkeleton name={fallbackName} />
   const v = d.vault
   const name = facilityName(v)
   const outlook = outlookOf(v.trend)
@@ -339,6 +340,106 @@ export function Facility({ d }: { d: VaultDetail }) {
         <footer className="op-foot">
           This note does not announce a rating action.
         </footer>
+      </div>
+    </article>
+  )
+}
+
+/**
+ * The same note, before any figures have been received. Structure first: a credit reader
+ * recognises the shape of the document and can see exactly which lines are missing. Every
+ * figure reads n.a. — nothing is estimated, nothing is borrowed from another facility.
+ */
+function OpinionSkeleton({ name }: { name?: string }) {
+  const NA = <span className="mute">n.a.</span>
+  return (
+    <article className="opinion">
+      <div className="op-page">
+        <header className="op-top">
+          <div className="op-kind">
+            <span className="label">credit opinion</span>
+            <span className="op-date">no figures received</span>
+          </div>
+          <h1 className="op-title">{name ?? 'No facility selected'}</h1>
+          <p className="op-sub">Lending facility · status n.a. · internal score n.a. · outlook n.a.</p>
+        </header>
+
+        <div className="op-grid">
+          <div className="op-main">
+            <Section title="Summary">
+              <p>
+                {name
+                  ? <>No figures have been received for {name}. A credit opinion is written
+                      from one set of figures; until that set arrives every line below reads
+                      n.a. Nothing here is estimated and nothing is carried over.</>
+                  : <>Choose a facility from the portfolio. The opinion is written from the
+                      figures on file for it — the structure below is what it fills in.</>}
+              </p>
+            </Section>
+
+            <div className="op-two">
+              <Section title="Credit strengths" tight>
+                <p>{NA}</p>
+              </Section>
+              <Section title="Credit challenges" tight>
+                <p>{NA}</p>
+              </Section>
+            </div>
+
+            <Section title="Exhibit 1 · Factor scores">
+              <table className="op-tbl">
+                <thead><tr><th>factor</th><th>what it measures</th><th className="rt">score</th></tr></thead>
+                <tbody>
+                  {FACTORS.map(f => (
+                    <tr key={f.name}>
+                      <td><b>{f.name}</b></td>
+                      <td className="op-says">{f.says}</td>
+                      <td className="rt">{NA}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Section>
+
+            <Section title="Key indicators">
+              <table className="op-tbl">
+                <thead><tr><th>indicator</th><th className="rt">value</th></tr></thead>
+                <tbody>
+                  {['Reported unit value', 'Held unit value', 'Reported vs held', 'Total assets',
+                    'Available assets', 'Recognised loss', 'Drawn debt', 'Coverage available',
+                    'Coverage shortfall', 'Largest exposure', 'Exposures',
+                    'Claims at redemption', 'Projected shortfall'].map(k => (
+                    <tr key={k}><td>{k}</td><td className="rt">{NA}</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </Section>
+          </div>
+
+          <aside className="op-side">
+            <div className="op-box">
+              <div className="label">Ratings</div>
+              <dl className="op-ratings">
+                <F k="internal score" v={NA} />
+                <F k="outlook" v={NA} />
+                <F k="status" v={NA} />
+                <F k="scale position" v={NA} />
+              </dl>
+            </div>
+            <div className="op-box">
+              <div className="label">At a glance</div>
+              <dl className="op-ratings">
+                <F k="reported unit value" v={NA} />
+                <F k="held unit value" v={NA} />
+                <F k="reported vs held" v={NA} />
+                <F k="exposures" v={NA} />
+                <F k="remaining term" v={NA} />
+              </dl>
+            </div>
+          </aside>
+        </div>
+
+        <footer className="op-foot">This note does not announce a rating action.</footer>
       </div>
     </article>
   )

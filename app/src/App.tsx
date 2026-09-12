@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import './app.css'
 import { API_MIXED_ORIGIN, SUSPECT_AFTER_FAILS, SUSPECT_BACKOFF_MS } from './lib/api'
 import { usePoll } from './lib/usePoll'
+import { facilityName } from './lib/credit'
 import { useTick } from './lib/useTick'
 import { useRoute, type RoutePath } from './lib/useRoute'
 import type { Health, VaultDetail as Detail, VaultsResponse } from './lib/types'
@@ -12,88 +13,17 @@ import { Facility } from './screens/Facility'
 import { Event } from './screens/Event'
 import { Methodology } from './screens/Methodology'
 import { Tabs, TabsContent } from '@/components/ui/tabs'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Toaster } from '@/components/ui/sonner'
 import { toast } from 'sonner'
 import { WALLETS, WalletProvider, useWallet } from './lib/wallet'
-import { ArrowLeft, KeyRound } from 'lucide-react'
+import { KeyRound } from 'lucide-react'
 
 const POLL_MS = 3000
 
-/**
- * The note beside the screen when there is nothing to put on it. It states what is known
- * and what is missing, in the same language as the rest of the service — never a spinner,
- * never a placeholder figure.
- */
-function Note({ heading, tone, said, aside, facts, action }: {
-  heading: string; tone: string
-  said: React.ReactNode; aside?: React.ReactNode
-  facts: [string, React.ReactNode][]
-  action?: React.ReactNode
-}) {
-  return (
-    <Card className="panel watch rail" style={{ ['--status-tone' as string]: tone }}>
-      <CardHeader className="rail-head">
-        <span className="rail-dot" aria-hidden />
-        <CardTitle className="rail-code">{heading}</CardTitle>
-      </CardHeader>
-      <CardContent className="rail-body">
-        <p className="said">{said}</p>
-        {aside && <p className="said">{aside}</p>}
-        {action}
-        <dl className="facts">
-          {facts.map(([k, v]) => (
-            <div key={k} style={{ display: 'contents' }}>
-              <dt className="label">{k}</dt>
-              <dd>{v}</dd>
-            </div>
-          ))}
-        </dl>
-      </CardContent>
-    </Card>
-  )
-}
 
-/** /facility with nothing selected: the shape of the note, with every field held open. */
-function FacilityPlaceholder() {
-  return (
-    <section className="panel ghost-desk rail slotdesk">
-      <h2 className="panel-title">credit opinion</h2>
-      <div className="slot-big">
-        <span className="slot-dash">—</span>
-      </div>
-      <dl className="slot-grid">
-        {['internal score', 'outlook', 'status', 'reported vs held', 'coverage', 'remaining term'].map(k => (
-          <div key={k} style={{ display: 'contents' }}>
-            <dt className="label">{k}</dt><dd className="num mute">n.a.</dd>
-          </div>
-        ))}
-      </dl>
-    </section>
-  )
-}
 
-/** /event with nothing selected. */
-function EventPlaceholder() {
-  return (
-    <section className="panel ghost-desk rail slotdesk">
-      <h2 className="panel-title">next event</h2>
-      <div className="slot-big">
-        <span className="slot-dash">—</span>
-        <span className="slot-say">no scheduled event on file</span>
-      </div>
-      <ol className="beat-list">
-        <li><span className="num mute">·</span> scheduled payment</li>
-        <li><span className="num mute">·</span> period boundary</li>
-        <li><span className="num mute">·</span> redemption date</li>
-        <li><span className="num mute">·</span> review date</li>
-      </ol>
-    </section>
-  )
-}
 
 function Desk() {
   const tick = useTick()
@@ -156,96 +86,33 @@ function Desk() {
   const painted = useRef(false)
   useEffect(() => { painted.current = true }, [])
 
-  const portfolioStatus = {
-    ageMs: vaults.ageMs, fails: vaults.fails, error: vaults.error,
-  }
-
   function body() {
     if (path === '/methodology') {
       return <Methodology />
     }
 
+    // No rail beside the portfolio. The state is in the chrome badge, the table shows
+    // em-dashes, and one sentence under the heading says why — the same words in four
+    // places is what made the page read as a loop.
     if (path === '/') {
-      if (!vaults.data) {
-        return (
-          <div className={vaults.fails > 0 ? 'deskgrid down' : ''}>
-            {vaults.fails > 0 && (
-              <Note
-                heading="Figures withheld" tone="var(--bad)"
-                said={<>The five facilities are on file. No figure is shown until one is received.</>}
-                facts={[['last received', vaults.ageMs > 0 ? `${Math.round(vaults.ageMs / 1000)}s ago` : 'not yet']]}
-              />
-            )}
-            <Portfolio
-              vaults={[]} receivedAt={0} tick={tick}
-              status={{ ...portfolioStatus, railOnScreen: vaults.fails > 0 }}
-              onOpen={() => navigate('/facility', null)}
-            />
-          </div>
-        )
-      }
       return (
         <Portfolio
           vaults={rows} receivedAt={vaults.receivedAt} tick={tick}
-          stamp={vaults.data ?? undefined}
-          status={portfolioStatus}
-          onOpen={id => navigate('/facility', id)}
+          onOpen={id => navigate('/facility', id || null)}
         />
       )
     }
 
-    if (!vaultId) {
-      return (
-        <div className="deskgrid">
-          {path === '/facility' ? <FacilityPlaceholder /> : <EventPlaceholder />}
-          <Note
-            heading="No facility selected" tone="var(--fg-dim)"
-            said={path === '/facility'
-              ? <>A credit opinion covers one facility. Choose one from the portfolio.</>
-              : <>The calendar covers one facility. Choose one from the portfolio.</>}
-            action={
-              <Button variant="outline" size="sm" className="btn-term" onClick={() => navigate('/', null)}>
-                <ArrowLeft size={12} strokeWidth={2.25} /> portfolio
-              </Button>}
-            facts={rows.length ? [['facilities on file', String(rows.length)]] : []}
-          />
-        </div>
-      )
-    }
+    // Both single-facility desks always render their own document, payload or not. An
+    // empty view that looks like the previous empty view is how a reader concludes the
+    // tabs are decoration — so the structure is what changes, not a status rail.
+    const picked = vaultId ? rows.find(r => r.vaultId === vaultId) : undefined
+    const selectedName = picked ? facilityName(picked)
+      : notFound && vaultId ? `Not on file — ${vaultId.slice(0, 12).toUpperCase()}`
+      : undefined
 
-    if (notFound && !detail.data) {
-      return (
-        <div className="deskgrid">
-          {path === '/facility' ? <FacilityPlaceholder /> : <EventPlaceholder />}
-          <Note
-            heading="Not on file" tone="var(--warn)"
-            said={<>No facility on file under that reference.</>}
-            action={
-              <Button variant="outline" size="sm" className="btn-term" onClick={() => navigate('/', null)}>
-                <ArrowLeft size={12} strokeWidth={2.25} /> portfolio
-              </Button>}
-            facts={[['reference', vaultId.slice(0, 12).toUpperCase()]]}
-          />
-        </div>
-      )
-    }
-
-    if (!detail.data) {
-      if (detail.fails === 0) return null
-      return (
-        <div className="deskgrid">
-          {path === '/facility' ? <FacilityPlaceholder /> : <EventPlaceholder />}
-          <Note
-            heading="Figures withheld" tone="var(--bad)"
-            said={<>This facility is on file. No figure is shown until one is received.</>}
-            facts={[]}
-          />
-        </div>
-      )
-    }
-
-    if (path === '/facility') return <Facility d={detail.data} />
-    return <Event d={detail.data} tick={tick} />
+    if (path === '/facility') return <Facility d={detail.data} name={selectedName} />
+    return <Event d={detail.data} tick={tick} name={selectedName} />
   }
 
   return (
