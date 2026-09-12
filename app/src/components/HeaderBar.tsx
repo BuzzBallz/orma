@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
+import { Activity, CircleAlert, Radio } from 'lucide-react'
 import { EXPECTED_CONTRACT } from '../lib/api'
 import type { Health, VaultRow } from '../lib/types'
 import type { RoutePath } from '../lib/useRoute'
@@ -16,8 +17,10 @@ function HealthPill({ health, unreachable }: { health: Health | null; unreachabl
   const [tone, text] = down
     ? ['--bad', 'no feed']
     : health!.source === 'devnet' ? ['--ok', 'devnet'] : ['--warn', 'fixtures']
+  const Icon = down ? CircleAlert : health!.source === 'devnet' ? Radio : Activity
   return (
     <span className="pill" style={{ ['--pill-tone' as string]: `var(${tone})` }}>
+      <Icon size={12} strokeWidth={2.25} aria-hidden />
       <span className={'dot' + (down ? ' waiting' : '')} />
       {text}
     </span>

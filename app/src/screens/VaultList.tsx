@@ -132,7 +132,7 @@ export function VaultList({ vaults, receivedAt, tick, stamp, onOpen }: {
     return (
       <th
         className={rt ? 'rt' : undefined}
-        style={{ color: sort.key === k ? 'var(--fg)' : undefined }}
+        style={{ color: sort.key === k ? 'var(--amber)' : 'var(--amber-dim)' }}
         tabIndex={0}
         aria-sort={sort.key === k ? (sort.asc ? 'ascending' : 'descending') : 'none'}
         onClick={() => toggle(k)}

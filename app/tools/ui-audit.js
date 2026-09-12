@@ -138,16 +138,27 @@ window.uiAudit = async function uiAudit(opts = {}) {
     const lin = c => (c /= 255) <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
     const lum = rgb => { const [r, g, b] = rgb.match(/\d+/g).map(Number).map(lin); return 0.2126*r + 0.7152*g + 0.0722*b }
     const ratio = (a, b) => { const l1 = lum(a), l2 = lum(b); return (Math.max(l1,l2) + .05) / (Math.min(l1,l2) + .05) }
-    const bg = getComputedStyle(document.body).backgroundColor
+    // Text on a coloured chip must be measured against THAT chip, not against the page.
+    // Comparing everything to the body ground reports a keycap as 1:1 and the whole
+    // report stops being believed.
+    const groundOf = el => {
+      for (let n = el; n && n !== document.documentElement; n = n.parentElement) {
+        const bg = getComputedStyle(n).backgroundColor
+        const a = bg.match(/[\d.]+/g)
+        if (a && (a.length < 4 || parseFloat(a[3]) > 0.85)) return bg
+      }
+      return getComputedStyle(document.body).backgroundColor
+    }
     const seen = new Map()
     for (const el of document.querySelectorAll('main *, .topbar *, .hints *')) {
       if (!el.textContent?.trim() || el.children.length) continue
-      const c = getComputedStyle(el).color
-      if (!seen.has(c)) seen.set(c, el.textContent.trim().slice(0, 18))
+      const key = getComputedStyle(el).color + ' on ' + groundOf(el)
+      if (!seen.has(key)) seen.set(key, el.textContent.trim().slice(0, 18))
     }
-    for (const [colour, sample] of seen) {
-      const r = ratio(colour, bg)
-      record('contrast', `${colour} ("${sample}")`, r >= 4.5, `${r.toFixed(2)}:1 on the page ground`)
+    for (const [pair, sample] of seen) {
+      const [fg, bg] = pair.split(' on ')
+      const r = ratio(fg, bg)
+      record('contrast', `${fg} ("${sample}")`, r >= 4.5, `${r.toFixed(2)}:1 against ${bg}`)
     }
   }
 

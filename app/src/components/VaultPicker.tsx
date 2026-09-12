@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import type { VaultRow } from '../lib/types'
 import { short } from '../lib/format'
 import { gradeTone } from '../lib/grades'
@@ -71,7 +72,7 @@ export function VaultPicker({ vaults, activeVaultId, onSelect }: {
       >
         <span className="picker-label">{label}</span>
         {active && <span className="chip" style={{ ['--chip-tone' as string]: `var(${gradeTone(active.grade)})` }}>{active.grade}</span>}
-        <span className="chev" aria-hidden>▾</span>
+        <ChevronDown className="chev" size={12} strokeWidth={2.25} aria-hidden />
       </button>
 
       {open && (

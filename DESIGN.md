@@ -137,6 +137,48 @@ pnpm --dir app build      # tsc -b && vite build
 
 Toujours lancer ça avant de committer, jamais `tsc --noEmit` seul.
 
+## Chrome terminal — 12/09 ~15:00
+
+Objectif : un terminal, pas un dashboard. Chrome volé à trois références clonées et lues
+(`zakirkun/blossom-terminal`, `vaughanf1/BB-Terminal`, `feremabraz/bloomberg-terminal`) —
+leur palette, pas leur code, et rien de leur métier.
+
+Les trois convergent : ambre `#ff8c00`–`#ff9900` pour le chrome, rouge `#ff3b3b` pour le
+risque, vert `#22ee22` pour le sain, fonds `#121212`–`#2a2a2a`.
+
+### Tokens ajoutés
+
+| token | valeur | rôle |
+|---|---|---|
+| `--amber` | `#FF9E2C` | **le mobilier** : labels, en-têtes, onglets, marque. 9.7:1 sur le fond. |
+| `--amber-dim` | `#B4701C` | chrome secondaire, filets, touches. 5.0:1. |
+
+L'ambre n'est **pas un signal**. Rouge = risque, vert = sain, cyan `--accent` = la lecture
+correcte, et ce dernier n'est jamais recyclé en chrome — le contrat §6 fixe cette paire.
+Écart assumé avec le « no other colours » du §6.1.
+
+Recalibrés vers les références : `--ok` `#35D64A`, `--bad` `#FF4A4A`, fonds en noir neutre
+plutôt que bleu-noir.
+
+### Densité
+
+Rang de table **52px → 26px**. Topbar 56 → 44. L'identité d'un instrument tient sur une
+ligne (nom et id côte à côte) au lieu de deux. Les labels passent en `--mono` : un terminal
+est monospace de bout en bout, et le tracking tombe de 0.12em à 0.08em parce que le mono
+est déjà large.
+
+### Librairie ajoutée
+
+`lucide-react` — et rien d'autre. Utilisée tout de suite : le glyphe d'état du feed
+(`Radio` en devnet, `Activity` en fixtures, `CircleAlert` en coupure) et le chevron du
+picker.
+
+**Tailwind et shadcn écartés, volontairement.** Ils auraient remplacé des composants déjà
+écrits, testés et accessibles — le picker est un listbox clavier complet, la table a
+`aria-sort` et des lignes activables, les onglets ont leur indicateur mesuré. Les échanger
+contre du code neuf à ré-auditer quelques heures avant un gate est le mauvais pari, et le
+look terminal vient de la densité et des tokens, pas d'un kit.
+
 ## Chasse aux bugs UI — `app/tools/ui-audit.js`
 
 Le balayage que je faisais à la main est devenu un script. Zéro dépendance, il tourne

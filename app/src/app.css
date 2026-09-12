@@ -34,23 +34,29 @@
 
 :root{
   /* NEUTRAL — design, not contract */
-  --bg:      #07090C;   /* page: near-black, cold */
-  --bg-1:    #0C1014;   /* panel */
-  --bg-2:    #12171D;   /* raised row, table head, hover */
-  --bg-3:    #171D25;   /* pressed / selected */
-  --line:    #1B2129;   /* every hairline, 1px */
-  --line-2:  #2A323C;   /* emphasised hairline */
+  --bg:      #07080A;   /* page: a terminal ground — neutral black, not blue-black */
+  --bg-1:    #0D0F12;   /* panel */
+  --bg-2:    #14171B;   /* raised row, hover */
+  --bg-3:    #1C2026;   /* pressed / selected */
+  --line:    #20242A;   /* every hairline, 1px */
+  --line-2:  #2E343C;   /* emphasised hairline */
 
-  --fg:      #E8ECF1;   /* primary text and figures */
-  --fg-dim:  #96A2B1;   /* secondary — 7.7:1 on --bg, 7.4:1 on --bg-1 */
-  --fg-mute: #76818F;   /* tertiary — 5.0:1 on --bg, 4.8:1 on --bg-1, clears AA */
+  --fg:      #E9ECEF;   /* primary text and figures */
+  --fg-dim:  #9AA3AC;   /* secondary — clears AA on --bg */
+  --fg-mute: #79828B;   /* tertiary  — clears AA on --bg */
+
+  /* CHROME — amber is the furniture of a trading terminal: every label, header and tab.
+     Deliberately NOT a signal: red is risk, green is healthy, cyan is the correct
+     reading. A disclosed deviation from spec §6.1's "no other colours". */
+  --amber:     #FF9E2C;
+  --amber-dim: #B4701C;
 
   /* CONTRACT — meanings fixed by contract §6, do not repurpose */
   --muted:   #8792A6;   /* the naive NAV reading, dashed */
-  --ok:      #3FB950;   /* healthy / current */
+  --ok:      #35D64A;   /* healthy / current */
   --warn:    #D29922;   /* watch / overdue / due_soon */
-  --bad:     #F85149;   /* distress / impaired / defaultable — RISK ONLY */
-  --dead:    #7C8593;   /* terminal / defaulted */
+  --bad:     #FF4A4A;   /* distress / impaired / defaultable — RISK ONLY */
+  --dead:    #79828B;   /* terminal / defaulted */
   --accent:  #58C7F3;   /* the correct NAV reading, and the single UI accent */
 
   --mono: "Plex Mono", ui-monospace, "SF Mono", Consolas, Menlo, monospace;
@@ -67,7 +73,7 @@
   --t-2xs:  10px;   /* chevrons and other glyph-only marks */
   --t-verdict: 40px;
 
-  --topbar: 56px;
+  --topbar: 44px;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -105,10 +111,10 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 
 /* The one label style in the app. */
 .label, .panel-title, table.tbl th, .hints{
-  font: 500 var(--t-xs)/1.2 var(--sans);
+  font: 500 var(--t-xs)/1.2 var(--mono);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--fg-dim);
+  letter-spacing: 0.08em;      /* mono is already wide; 0.12em on mono reads as spaced-out */
+  color: var(--amber);
 }
 
 /* ---------- layout ---------- */
@@ -175,6 +181,7 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 .topbar{
   position: sticky; top: 0; z-index: 20;
   height: var(--topbar);
+  border-bottom: 1px solid var(--amber-dim) !important;
   display: flex; align-items: center; gap: 0;
   padding: 0 32px;
   background: var(--bg);
@@ -185,17 +192,19 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 .topbar > .picker{ flex: 0 1 auto; min-width: 0; }
 
 .brand{
-  display: flex; align-items: baseline; gap: 8px;
-  font-size: var(--t-base); font-weight: 600; letter-spacing: -0.01em;
-  white-space: nowrap; color: var(--fg);
+  display: flex; align-items: center; gap: 8px;
+  font: 600 var(--t-base)/1 var(--mono); letter-spacing: 0.02em;
+  white-space: nowrap; color: var(--amber);
+  text-transform: uppercase;
 }
 .brand .mark{
   width: 18px; height: 18px; color: var(--accent);
   align-self: center; flex: 0 0 auto;
 }
 .brand .sub{
-  font: var(--t-xs)/1 var(--mono); letter-spacing: 0.1em;
-  text-transform: uppercase; color: var(--fg-mute);
+  font: var(--t-xs)/1 var(--mono); letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--amber-dim);
+  border: 1px solid var(--amber-dim); border-radius: 2px; padding: 1px 4px;
 }
 
 .topbar .sep{ width: 1px; height: 20px; background: var(--line); margin: 0 16px; }
@@ -203,7 +212,7 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 /* Health pill — a signal, not a slab. Dot carries the tone, text stays quiet. */
 .pill{
   display: inline-flex; align-items: center; gap: 7px;
-  height: 24px; padding: 0 10px 0 8px;
+  height: 22px; padding: 0 9px 0 7px;
   border: 1px solid color-mix(in srgb, var(--pill-tone, var(--fg-dim)) 35%, transparent);
   border-radius: 999px;
   background: color-mix(in srgb, var(--pill-tone, var(--fg-dim)) 8%, transparent);
@@ -232,17 +241,17 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
   position: relative;
   display: flex; align-items: center;
   padding: 0 14px;
-  font: 500 var(--t-xs)/1 var(--sans);
-  text-transform: uppercase; letter-spacing: 0.12em;
-  color: var(--fg-mute);
+  font: 500 var(--t-xs)/1 var(--mono);
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--amber-dim);
   background: none; border: 0; cursor: pointer;
 }
 .desk::after{
   content: ""; position: absolute; left: 14px; right: 14px; bottom: 0;
   height: 2px; background: transparent;
 }
-.desk:hover{ color: var(--fg-dim); }
-.desk[data-active="true"]{ color: var(--fg); }
+.desk:hover{ color: var(--amber); }
+.desk[data-active="true"]{ color: var(--amber); background: color-mix(in srgb, var(--amber) 9%, transparent); }
 .desk[data-active="true"]::after{ background: var(--accent); }
 .desk:disabled{ color: var(--fg-mute); opacity: .4; cursor: not-allowed; }
 
@@ -267,12 +276,12 @@ table.tbl th{
   white-space: nowrap; background: none;
 }
 table.tbl td{
-  padding: 0 8px; height: 52px;
+  padding: 0 8px; height: 26px;
   border-bottom: 1px solid var(--line); white-space: nowrap;
   vertical-align: middle;
 }
 table.tbl tbody tr{ position: relative; }
-table.tbl tbody tr:hover{ background: var(--bg-2); }
+table.tbl tbody tr:hover{ background: var(--bg-2); box-shadow: inset 2px 0 0 var(--amber); }
 table.tbl tbody tr:last-child td{ border-bottom: 0; }
 table.tbl .rt{ text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
 table.tbl th.rt{ text-align: right; }
@@ -294,8 +303,10 @@ table.tbl th:nth-child(4), table.tbl td:nth-child(4){ padding-left: 20px; }
 .readstamp b{ color: var(--fg-dim); font-weight: 500; }
 
 /* An instrument's identity: name over its id. */
-.inst{ display: flex; flex-direction: column; gap: 2px; }
-.inst .name{ font-size: var(--t-base); color: var(--fg); letter-spacing: -0.005em; }
+/* One line per instrument: the id sits beside the name, not under it. Two-line rows are
+   a web table; a blotter fits more of the book on screen. */
+.inst{ display: flex; align-items: baseline; gap: 10px; }
+.inst .name{ font: var(--t-base)/1 var(--mono); color: var(--fg); }
 .inst .id{ font: var(--t-xs)/1 var(--mono); color: var(--fg-mute); letter-spacing: 0.04em; }
 
 /* Risk rail: the only place a row carries colour. */
@@ -332,8 +343,8 @@ table.tbl tbody tr, a, .btn, .pill, kbd, .hints .h{
 }
 
 table.tbl th[aria-sort]{ cursor: pointer; user-select: none; }
-table.tbl th[aria-sort]:hover{ color: var(--fg); }
-table.tbl th[aria-sort] .ord{ color: var(--accent); margin-left: 4px; }
+table.tbl th[aria-sort]:hover{ color: var(--amber); }
+table.tbl th[aria-sort] .ord{ color: var(--amber); margin-left: 4px; }
 
 /* A row nudges on hover. The CONTENT moves, not the row box: transforming a
    collapsed table row repaints badly. */
@@ -349,7 +360,7 @@ button:disabled, .btn:disabled, .picker-btn:disabled{
 /* The desk indicator slides between desks instead of popping. */
 .desk-ind{
   position: absolute; bottom: 0; left: 0; height: 2px;
-  background: var(--accent);
+  background: var(--amber);
   transition: transform 180ms ease, width 180ms ease;
   pointer-events: none;
 }
@@ -400,27 +411,35 @@ kbd{
    A status line along the bottom of the desk, not a floating cheat-sheet. */
 
 .hints{
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--amber-dim);
   background: var(--bg);
-  padding: 8px 32px;
-  display: flex; gap: 24px; flex-wrap: wrap;
-  color: var(--fg-mute);   /* tracking comes from the shared .label rule */
+  padding: 5px 32px;
+  display: flex; gap: 0; flex-wrap: wrap;
+  color: var(--amber-dim);
 }
-.hints .h{ display: inline-flex; align-items: center; gap: 7px; }
-.hints kbd{ letter-spacing: 0; }
+.hints .h{
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 2px 14px 2px 0; margin-right: 14px;
+  border-right: 1px solid var(--line);
+}
+.hints kbd{
+  letter-spacing: 0; background: var(--amber-dim); color: var(--bg);
+  border: 0; border-radius: 2px; font-weight: 600; padding: 1px 5px;
+}
+.hints .who{ border-right: 0; color: var(--fg-mute); }
 .hints .who{ margin-left: auto; letter-spacing: 0.06em; text-transform: none; font-family: var(--mono); }
 
 /* ---------- instrument picker ---------- */
 
 .picker{
   position: relative; display: flex; align-items: center; gap: 10px;
-  height: 30px; padding: 0 0 0 10px;
-  border: 1px solid var(--line-2); border-radius: 3px;
+  height: 26px; padding: 0 0 0 9px;
+  border: 1px solid var(--amber-dim); border-radius: 2px;
   background: var(--bg-1);
 }
-.picker:hover{ border-color: var(--fg-mute); }
+.picker:hover{ border-color: var(--amber); }
 .picker:focus-within{ border-color: var(--accent); }
-.picker > .label{ color: var(--fg-mute); }   /* tracking comes from .label */
+.picker > .label{ color: var(--amber-dim); }
 .picker-btn{
   display: flex; align-items: center; gap: 10px;
   height: 100%; padding: 0 10px 0 0; min-width: 0;   /* or the label cannot ellipsis */
