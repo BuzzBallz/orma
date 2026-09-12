@@ -1,0 +1,270 @@
+/* ============================================================
+   XRPL Vault Fragility Oracle — one stylesheet.
+   Tokens: spec §6.1. Type: §6.2. Chips: §6.3. Spacing: §6.4. Motion: §6.5.
+   No shadows. No gradients. No radius outside panels (6px) and chips (3px).
+   ============================================================ */
+
+:root{
+  --bg:      #0B0E13;   /* page */
+  --bg-1:    #121722;   /* panel */
+  --bg-2:    #1A2130;   /* raised row, table header, hover */
+  --line:    #232C3B;   /* every border, 1px */
+
+  --fg:      #E6EAF2;   /* primary text and figures */
+  --fg-dim:  #9AA5B8;   /* captions, secondary */
+  --muted:   #8792A6;   /* CONTRACT: the naive NAV line, dashed */
+
+  --ok:      #3FB950;   /* CONTRACT: healthy / current */
+  --warn:    #D29922;   /* CONTRACT: watch / overdue / due_soon */
+  --bad:     #F85149;   /* CONTRACT: distress / impaired / defaultable */
+  --dead:    #7C8593;   /* CONTRACT: terminal / defaulted */
+  --accent:  #58C7F3;   /* CONTRACT: the correct NAV line */
+
+  --mono: ui-monospace, "Cascadia Mono", "JetBrains Mono", Consolas, Menlo, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --t-hero: 96px;
+  --t-xxl:  72px;
+  --t-xl:   56px;
+  --t-lg:   24px;
+  --t-md:   18px;
+  --t-base: 14px;
+  --t-sm:   12px;
+  --t-xs:   11px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body{
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: var(--t-base)/1.45 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Every number is mono + tabular. Figures that jitter as they tick look broken. */
+.num, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; line-height: 1.2; }
+
+/* Display figures: the bigger they get, the tighter they track. Applied by size, so the
+   96px divergence on S3 and the 72px on S1 read as one voice with no extra classes. */
+.num[style*="--t-hero"], .num[style*="--t-xxl"]{ letter-spacing: -0.04em; }
+.num[style*="--t-xl"]{ letter-spacing: -0.025em; }
+
+/* Labels are the counterweight: small, uppercase, widely tracked. */
+.panel-title, table.tbl th, .hints{ font-feature-settings: "cv08"; }
+
+/* ---------- layout ---------- */
+
+.page{ max-width: 1440px; margin: 0 auto; padding: 12px 24px 48px; }
+.grid12{ display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; }
+/* Grid items default to min-width:auto, which lets wide content stretch the track and
+   overflow the page. Every grid child is clamped instead. */
+.grid12 > *, .stack > * { min-width: 0; }
+.col-1-7 { grid-column: span 7; }
+.col-8-12{ grid-column: span 5; }
+.stack{ display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.row{ display: flex; align-items: center; gap: 8px; }
+.row-wrap{ display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* The two readings sit side by side at the design width and stack when they cannot. */
+.readings{ display: flex; align-items: flex-start; gap: 24px; }
+.spacer{ flex: 1 1 auto; }
+
+@media (max-width: 1100px){
+  .col-1-7, .col-8-12 { grid-column: span 12; }
+}
+
+/* ---------- panel ---------- */
+
+.panel{
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 16px;
+}
+.panel-title{
+  font: var(--t-xs)/1.2 var(--sans);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--fg-dim);
+  margin: 0 0 8px;
+}
+.caption{ font-size: var(--t-sm); color: var(--fg-dim); line-height: 1.45; }
+.dim{ color: var(--fg-dim); }
+.empty{ color: var(--fg-dim); font-size: var(--t-sm); padding: 8px 0; }
+
+/* ---------- chips ---------- */
+
+.chip{
+  display: inline-block;
+  font: var(--t-xs)/1.2 var(--mono);
+  font-variant-numeric: tabular-nums;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid var(--chip-tone, var(--fg-dim));
+  background: color-mix(in srgb, var(--chip-tone, var(--fg-dim)) 12%, transparent);
+  color: var(--chip-tone, var(--fg-dim));
+  white-space: nowrap;
+}
+.chip-lg{ font-size: var(--t-base); padding: 4px 10px; }
+
+/* ---------- header ---------- */
+
+.header{
+  position: sticky; top: 0; z-index: 10;
+  height: 48px;
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 24px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+.header .brand{ font-size: var(--t-base); font-weight: 600; letter-spacing: 0.02em; white-space: nowrap; }
+.header .meta{ white-space: nowrap; }
+/* Below the design width the header drops its least load-bearing metadata rather than wrapping.
+   The source badge and the ledger index never drop: they are the stage alarms. */
+@media (max-width: 1200px){ .header .meta.optional{ display: none } }
+.header .meta{ font: var(--t-xs)/1.2 var(--mono); font-variant-numeric: tabular-nums; color: var(--fg-dim); }
+.header select{
+  background: var(--bg-2); color: var(--fg); border: 1px solid var(--line);
+  border-radius: 3px; font: var(--t-xs) var(--mono); padding: 3px 6px;
+  flex: 0 1 280px; min-width: 96px;
+}
+.navlink{
+  font: var(--t-xs)/1.2 var(--sans); text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--fg-dim); cursor: pointer; background: none; padding: 4px 8px;
+  border: 1px solid transparent; border-radius: 3px;
+}
+.navlink[data-active="true"]{
+  color: var(--fg);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.navlink:disabled{ color: var(--dead); cursor: not-allowed; }
+
+/* kbd inside prose keeps the same token as the footer strip */
+.instruction kbd, .next kbd{
+  font: var(--t-xs) var(--mono); border: 1px solid var(--line); border-radius: 3px;
+  padding: 1px 5px; background: var(--bg-2); color: var(--fg-dim);
+}
+
+.stalebar{
+  padding: 6px 24px;
+  font: var(--t-sm) var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 15%, transparent);
+  border-bottom: 1px solid var(--line);
+}
+
+/* ---------- tables ---------- */
+
+table.tbl{ width: 100%; border-collapse: collapse; font-size: var(--t-base); }
+table.tbl th{
+  text-align: left; background: var(--bg-2); color: var(--fg-dim);
+  font: var(--t-xs)/1.2 var(--sans); text-transform: uppercase; letter-spacing: 0.08em;
+  padding: 8px; border-bottom: 1px solid var(--line); white-space: nowrap;
+}
+table.tbl td{ padding: 8px; height: 32px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+table.tbl tbody tr:hover{ background: var(--bg-2); }
+table.tbl .rt{ text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+table.tbl th.rt{ text-align: right; }
+.tbl-scroll{ overflow-x: auto; }
+
+tr.row-warn td:first-child{ box-shadow: inset 3px 0 0 var(--warn); }
+tr.row-bad  td:first-child{ box-shadow: inset 3px 0 0 var(--bad); }
+tr.row-dead td{ text-decoration: line-through; opacity: 0.65; }
+
+/* ---------- bars ---------- */
+
+.bar{ height: 10px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
+.bar > i{ display: block; height: 100%; background: var(--bar-tone, var(--fg-dim)); }
+.bar.animate > i{ transition: width 600ms cubic-bezier(.2,.7,.2,1); }
+.bar-sm{ height: 6px; }
+
+/* ---------- interaction ----------
+   One focus treatment for the whole app, reusing --accent (§6.1 allows no new hue).
+   Transitions touch colour only: no lift, no shadow, no transform. */
+
+:where(a, button, select, [tabindex]):focus-visible,
+table.tbl th[aria-sort]:focus-visible,
+table.tbl tbody tr:focus-visible{
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.navlink, table.tbl th[aria-sort], table.tbl tbody tr, .header select, a{
+  transition: color 120ms linear, background-color 120ms linear, border-color 120ms linear;
+}
+
+.navlink:hover{ color: var(--fg); }
+table.tbl th[aria-sort]{ cursor: pointer; user-select: none; }
+table.tbl th[aria-sort]:hover{ color: var(--fg); background: var(--line); }
+.header select:hover{ border-color: var(--fg-dim); }
+
+/* ---------- the signature pair ----------
+   The naive reading is muted and DASHED; the correct reading is accent and SOLID.
+   Contract §6 fixes this pairing — it must never be swapped, so it lives in one place. */
+
+.pair-naive  { color: var(--muted);  border-bottom: 1px dashed var(--muted); }
+.pair-correct{ color: var(--accent); border-bottom: 1px solid  var(--accent); }
+.pair-naive.bare, .pair-correct.bare{ border-bottom: 0; }
+
+/* ---------- motion: exactly three ---------- */
+
+@keyframes pulse { 0%,100%{ opacity: 1 } 50%{ opacity: .55 } }
+.pulse{ animation: pulse 2s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce){
+  *{ animation: none !important; transition: none !important }
+}
+
+/* Below the design width the display scale comes down with the viewport. The demo runs at
+   1440; this only has to stay readable and un-overlapped. */
+@media (max-width: 760px){
+  :root{
+    --t-hero: 56px; --t-xxl: 48px; --t-xl: 34px; --t-lg: 20px;
+  }
+  .readings{ flex-direction: column; gap: 16px; }
+  .page{ padding-left: 12px; padding-right: 12px; }
+  .header{ height: auto; flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+  .header .brand{ flex: 1 0 100%; }
+  .header select{ flex: 1 0 100%; max-width: none; }
+  .hints{ line-height: 2 }
+}
+
+/* ---------- footer hint strip ---------- */
+
+.page.tight{ padding-top: 8px; padding-bottom: 0; }
+.page.tight .hints{ margin-top: 8px; }
+
+.hints{
+  margin-top: 24px; padding: 8px 0; border-top: 1px solid var(--line);
+  font: var(--t-xs) var(--mono); color: var(--fg-dim);
+}
+.hints kbd{
+  font: var(--t-xs) var(--mono); border: 1px solid var(--line); border-radius: 3px;
+  padding: 1px 4px; background: var(--bg-2); color: var(--fg-dim);
+}
+
+/* ---------- first-run / no-data instruction ---------- */
+
+.instruction{
+  max-width: 560px; margin: 96px auto; padding: 24px;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--bg-1);
+  font-family: var(--mono); font-size: var(--t-base); color: var(--fg);
+}
+.instruction .lead{ font-family: var(--sans); font-size: var(--t-lg); letter-spacing: -0.01em; margin-bottom: 8px; }
+.instruction .why{ font-family: var(--sans); font-size: var(--t-sm); color: var(--fg-dim); margin-bottom: 16px; }
+.instruction code{
+  display: block; margin-top: 8px; padding: 8px 12px; color: var(--accent);
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 3px;
+}
+.instruction .next{ margin-top: 16px; font-size: var(--t-sm); color: var(--fg-dim); }
