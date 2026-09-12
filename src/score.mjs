@@ -89,7 +89,7 @@ export function buildScore({ liquidityRatio, coverAdequacy, concentration, recog
   if (recogLagSeconds > 300) { const t = notch(headline, -2); trace.push({ from: headline, rule: 'RECOG lag > 300s: overdue exposure the broker has not declared', delta: -2, to: t }); headline = t }
   else if (recogLagSeconds > 0) { const t = notch(headline, -1); trace.push({ from: headline, rule: 'RECOG lag > 0s: overdue exposure not yet declared', delta: -1, to: t }); headline = t }
   if (D(concentration).gte(0.75)) { const t = notch(headline, -1); trace.push({ from: headline, rule: 'single loan >= 75% of broker debt (cover is keyed to total debt, not loan size)', delta: -1, to: t }); headline = t }
-  if (D(coverAdequacy).lt(0.05)) { const t = notch(headline, -1); trace.push({ from: headline, rule: 'liquidatable cover < 5% of recognised loss', delta: -1, to: t }); headline = t }
+  if (D(coverAdequacy).lt(0.05)) { const t = notch(headline, -1); trace.push({ from: headline, rule: 'liquidatable cover < 5% of the exposure it must absorb', delta: -1, to: t }); headline = t }
   if (LADDER.indexOf(gLiq) >= LADDER.indexOf('B') && phase === 'Redemption') { const t = notch(headline, -2); trace.push({ from: headline, rule: 'in Redemption phase with exhausted liquidity: withdrawals are failing now', delta: -2, to: t }); headline = t }
 
   dims.push({ key: 'HEADLINE', label: 'Composite', value: headline, unit: 'grade', grade: headline, notches: 0,
