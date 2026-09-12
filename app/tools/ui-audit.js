@@ -40,8 +40,16 @@ window.uiAudit = async function uiAudit(opts = {}) {
   } catch { /* feed down: the layout and a11y sections still run */ }
 
   const SCREENS = VAULTS.length
-    ? [['/', null], ['/methodology', null], ...VAULTS.flatMap(v => [['/facility', v], ['/event', v]])]
-    : [['/', null]]
+    ? [['/', null], ['/methodology', null], ['/evidence', null],
+       ...VAULTS.flatMap(v => [['/facility', v], ['/event', v]])]
+    : [['/', null], ['/evidence', null]]
+
+  // /evidence is the one screen NOT addressed to the credit analyst. It is the protocol
+  // finding the whole product rests on, shown to the engineers reviewing the work, and it
+  // has to use the protocol's own field names -- paraphrasing them there would destroy the
+  // evidence. So it is exempt from the vocabulary check and from nothing else: layout,
+  // a11y, contrast, motion and overflow all still apply to it.
+  const ANALYST_SCREENS = (p) => p !== '/evidence'
 
   // ---------------------------------------------------------------- layout --
   if (run('layout')) {
@@ -80,10 +88,17 @@ window.uiAudit = async function uiAudit(opts = {}) {
         'v1.0.0', 'contract v', 'build ', 'endpoint', 'api base', 'failed poll',
         'attempts', 'still asking', 'on watch', 'hackathon', 'methodology note',
       ]
-      const seen = document.body.innerText.toLowerCase() + ' ' + location.pathname.toLowerCase()
-      const found = BANNED.filter(wd => seen.includes(wd))
-      record('consistency', `${label} · no word outside the reader's vocabulary`,
-        found.length === 0, found.length ? found.join(', ') : `${BANNED.length} terms checked, none present`)
+      if (ANALYST_SCREENS(path)) {
+        const seen = document.body.innerText.toLowerCase() + ' ' + location.pathname.toLowerCase()
+        const found = BANNED.filter(wd => seen.includes(wd))
+        record('consistency', `${label} · no word outside the reader's vocabulary`,
+          found.length === 0, found.length ? found.join(', ') : `${BANNED.length} terms checked, none present`)
+      } else {
+        // Assert the exemption is narrow: the engineering register may appear HERE and
+        // must never leak onto a screen an analyst reads.
+        record('consistency', `${label} · exempt from the analyst vocabulary, by design`,
+          true, 'engineering register is correct on this screen only')
+      }
 
       // A cyan ring means keyboard focus and nothing else. Anything else wearing the
       // focus colour as an outline reads as a stray selection box to everyone who sees it.

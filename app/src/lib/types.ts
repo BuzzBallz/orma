@@ -100,9 +100,21 @@ export interface ApiError { error: { code: string; message: string; retryable: b
 
 export interface IndexerRace {
   serverTime: string; ledgerIndex: number
-  source: string; transactionResult: string; finding: string; why: string
-  vaultNode: { ledgerIndex: string; previousFields: Record<string, unknown>; finalFields: Record<string, string> }
-  loanNode: { ledgerIndex: string; previousFields: Record<string, unknown>; finalFieldsFlags: number }
+  /** Present on a capture taken during the event; absent on the pre-event fixture. */
+  capturedAt?: string; capturedDuring?: string; network?: string; buildVersion?: string
+  transactionHash?: string; vaultId?: string; loanBrokerId?: string; loanId?: string
+  /** Only the pre-event fixture carries this: the probe file it was lifted from. */
+  source?: string
+  transactionResult: string; finding: string; why: string; verdict?: string
+  vaultNode: {
+    ledgerIndex: string
+    previousFields: Record<string, unknown>
+    finalFields: Record<string, string>
+    /** The same three fields read BEFORE the impairment, proving the vault was healthy. */
+    healthyBefore?: Record<string, string>
+    sharesOutstanding?: string
+  }
+  loanNode: { ledgerIndex: string; previousFields: Record<string, unknown>; finalFieldsFlags: number | null }
   readings: {
     naive: { formula: string; value: string }
     correct: { formula: string; value: string }

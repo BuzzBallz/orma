@@ -25,8 +25,12 @@ function StatusBadge({ health, unreachable }: { health: Health | null; unreachab
   )
 }
 
+// 'verification' last, and named for what it proves rather than for how it works: it is
+// the only tab addressed to an engineer, and it should not be the first thing an analyst
+// reaches for.
 const DESKS: [RoutePath, string][] = [
   ['/', 'portfolio'], ['/facility', 'facility'], ['/event', 'event'], ['/methodology', 'methodology'],
+  ['/evidence', 'verification'],
 ]
 
 export function HeaderBar({ health, healthUnreachable, vaults, activeVaultId, path, asOf, receivedAt, pollMs, onSelect }: {

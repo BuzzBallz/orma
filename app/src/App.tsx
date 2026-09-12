@@ -4,13 +4,14 @@ import { API_MIXED_ORIGIN, SUSPECT_AFTER_FAILS, SUSPECT_BACKOFF_MS } from './lib
 import { usePoll } from './lib/usePoll'
 import { useTick } from './lib/useTick'
 import { useRoute, type RoutePath } from './lib/useRoute'
-import type { Health, VaultDetail as Detail, VaultsResponse } from './lib/types'
+import type { Health, IndexerRace, VaultDetail as Detail, VaultsResponse } from './lib/types'
 import { HeaderBar } from './components/HeaderBar'
 import { StaleBar } from './components/StaleBar'
 import { Portfolio } from './screens/Portfolio'
 import { Facility } from './screens/Facility'
 import { Event } from './screens/Event'
 import { Methodology } from './screens/Methodology'
+import { Evidence } from './screens/Evidence'
 import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -121,7 +122,7 @@ function Desk() {
         return
       }
       const routes: Record<string, RoutePath> = {
-        p: '/', f: '/facility', e: '/event', m: '/methodology',
+        p: '/', f: '/facility', e: '/event', m: '/methodology', v: '/evidence',
       }
       const r = routes[e.key.toLowerCase()]
       if (r) navigate(r)
@@ -129,6 +130,10 @@ function Desk() {
     addEventListener('keydown', onKey)
     return () => removeEventListener('keydown', onKey)
   }, [rows, path, navigate])
+
+  // A finished capture, not a moving figure: fetch it only while its tab is open and
+  // do not re-ask every four seconds. null path means usePoll stays idle.
+  const race = usePoll<IndexerRace>(path === '/evidence' ? '/api/indexer-race' : null, 30000)
 
   const primary = path === '/' ? vaults : detail
   const stamp = path === '/' ? vaults.data : detail.data
@@ -161,6 +166,10 @@ function Desk() {
   }
 
   function body() {
+    if (path === '/evidence') {
+      return <Evidence d={race.data} />
+    }
+
     if (path === '/methodology') {
       return <Methodology />
     }

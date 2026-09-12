@@ -1247,3 +1247,58 @@ tr:hover .chip, .picker-list [data-highlighted] .chip{ transform: translateY(-1p
     font-family: var(--mono);
   }
 }
+/* ---------------------------------------------------------------------------
+   VERIFICATION — the split reading, and the metadata behind it.
+
+   Contract §6 fixes the two reading colours and their line styles: the naive
+   reading is muted and DASHED, the correct reading is accent and SOLID. Those
+   are meanings, not decoration, so they are reused here exactly as the figures
+   screens use them and are never restyled locally.
+
+   The figures are set at --t-xxl because this panel is read from the back of a
+   room, not from a desk. Everything else on the screen is deliberately quiet so
+   that the empty object below is the thing the eye lands on.
+--------------------------------------------------------------------------- */
+.race{
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px; margin-top: 16px;
+}
+@media (max-width: 720px){ .race{ grid-template-columns: minmax(0, 1fr); } }
+
+.race-pane{ padding: 16px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg-1); }
+.race-naive{ border-style: dashed; border-color: var(--read-naive); }
+.race-correct{ border-style: solid; border-color: var(--read-correct); }
+
+.race-hd{
+  font-size: var(--t-sm); color: var(--fg-mute); text-transform: lowercase;
+  letter-spacing: .04em; margin-bottom: 10px;
+}
+.race-val{
+  font-family: var(--mono); font-size: var(--t-xxl); line-height: 1;
+  font-variant-numeric: tabular-nums; letter-spacing: -.02em;
+}
+.race-naive   .race-val{ color: var(--read-naive); }
+.race-correct .race-val{ color: var(--read-correct); }
+.race-formula{ font-family: var(--mono); font-size: var(--t-sm); color: var(--fg-mute); margin-top: 10px; }
+.race-note{ font-size: var(--t-sm); color: var(--fg-dim); margin-top: 6px; }
+.race-naive   .race-note{ color: var(--bad); }
+.race-correct .race-note{ color: var(--ok); }
+
+.race-gap{ margin-top: 14px; font-size: var(--t-sm); color: var(--fg-dim); }
+.race-gap b{ font-family: var(--mono); color: var(--fg); font-size: var(--t-md); }
+
+/* The empty object is the evidence. It gets the room. */
+.ev-diff{ display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin-top: 14px; }
+.ev-lbl{ font-family: var(--mono); font-size: var(--t-sm); color: var(--fg-mute); margin-top: 8px; }
+.ev-code{
+  font-family: var(--mono); font-size: var(--t-md); color: var(--fg);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+  padding: 14px; margin: 0; overflow-x: auto; white-space: pre;
+}
+.ev-empty{
+  color: var(--bad); border-color: var(--bad);
+  font-size: var(--t-xl); text-align: center; padding: 26px 14px;
+}
+.ev-verdict{ margin-top: 12px; }
+/* A 64-character hash must wrap rather than widen the panel and scroll the page. */
+.ev-hash{ font-family: var(--mono); word-break: break-all; }

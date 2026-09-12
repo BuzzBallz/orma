@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
-export type RoutePath = '/' | '/facility' | '/event' | '/methodology'
-const ROUTES: RoutePath[] = ['/', '/facility', '/event', '/methodology']
+export type RoutePath = '/' | '/facility' | '/event' | '/methodology' | '/evidence'
+const ROUTES: RoutePath[] = ['/', '/facility', '/event', '/methodology', '/evidence']
 
 /** Older links keep working; the address bar is rewritten to the current wording. */
 const MOVED: Record<string, RoutePath> = {
