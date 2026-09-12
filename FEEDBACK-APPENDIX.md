@@ -2094,14 +2094,28 @@ Isolated by varying one thing, on a vault with a 900 second redemption window:
 | 180 s | 888 s | `tesSUCCESS` |
 | 1200 s | 879 s | **`tecNO_PERMISSION`** |
 
+**This is the third cell of U1, re-derived independently.** We did not set out to
+confirm U1; we set out to satisfy Track 2's wrong-phase requirement, and the twelfth
+row refused to behave. U1 reached the same conclusion before the event by varying
+`PaymentInterval` on a build we no longer run. This run varied the *term* instead, on
+`3.4.0-rc5`, on a vault built for a different purpose — and landed in the same place.
+Two different isolations, two builds, one cause.
+
+We are reporting it as confirmation rather than as a new finding because the value is
+in the second observation, not the first. A single probe hitting an overloaded code
+can always be a mistake in the probe — which is exactly what happened to us once
+already, and is recorded as withdrawn in §10. Two independent probes cannot.
+
 So `tecNO_PERMISSION` on `LoanSet` means *this loan would mature after the vault
 redeems* — the same code `LoanBrokerSet` returns when the vault is *open-ended rather
-than closed-ended*. Two unrelated causes, one code, no message distinguishing them.
+than closed-ended*, and the same code `LoanManage` returns when a loan is already
+impaired. Two of those are reachable within sixty seconds of each other while
+originating one loan, and nothing in the result distinguishes them.
 
-This inverts the question we started with. The issue is not that a confusing error is
-returned where a permission error belongs; it is that the permission error is
-**overloaded**, and a developer originating a loan cannot tell whether their vault is
-the wrong kind or their loan outlives it.
+This inverts the question the workshop posed. The concern raised there was that a
+confusing error might be returned where a clean permission error belongs. On the
+lending path the opposite is true: the permission error is the one that is confusing,
+because it is carrying four meanings at once.
 
 ## Why this matters for the report
 
@@ -2111,5 +2125,6 @@ the XLS-65 withdrawal failure conditions in our snapshot, and "investment phase"
 matches nowhere in either specification. Every developer building an LP-facing
 interface has to discover the lockup empirically, as we did.
 
-And `tecNO_PERMISSION` carries two unrelated meanings on two different transactions
-in the same flow, which is the single cheapest thing on this list to fix.
+And `tecNO_PERMISSION` carries four meanings across three transactions in the same
+flow (U1), which is the cheapest thing on this list to fix — `rippled#7848` already
+computes the text that would disambiguate it and discards it.
