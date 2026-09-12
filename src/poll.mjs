@@ -123,6 +123,7 @@ export class Reader {
         const snap = {
           vaultId: id,
           readAt: this.serverTime,
+          closeTimeUsed: closeTime,
           ledgerIndex: this.ledgerIndex,
           vault,
           brokers,
