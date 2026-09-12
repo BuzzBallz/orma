@@ -32,11 +32,6 @@ export function PledgeResolution({ r }: { r: Resolution | null }) {
     <section className="op-sec">
       <h3 className="op-h">Exhibit 5 · What a second lender can establish alone</h3>
 
-      <p className="caption meth">
-        An investor pledges units of this facility to another lender. That lender holds the
-        units and nothing else. This is what they can establish without asking anyone.
-      </p>
-
       <table className="op-tbl" style={{ marginTop: 12 }}>
         <thead><tr><th>Step</th><th>Result</th></tr></thead>
         <tbody>
@@ -54,8 +49,8 @@ export function PledgeResolution({ r }: { r: Resolution | null }) {
 
       {r.opaque && (
         <p className="caption meth res-verdict">
-          The units carry nothing readable. A lender taking them as collateral has no
-          independent way to value them, and would have to price them on the borrower's word.
+          The units carry nothing readable. A lender would have to price them on the
+          borrower's word.
         </p>
       )}
 
@@ -99,12 +94,8 @@ export function PledgeResolution({ r }: { r: Resolution | null }) {
 
       {nav && (
         <p className="caption meth" style={{ marginTop: 10 }}>
-          The figure is reproducible without trusting this page:{' '}
-          <b className="num">{nav.provenance.recompute}</b>, from{' '}
-          <b className="num">{dropsToXrp(nav.provenance.assetsTotal)}</b> of assets less{' '}
-          <b className="num">{dropsToXrp(nav.provenance.lossUnrealized)}</b> of recognised loss over{' '}
-          <b className="num">{nav.provenance.unitsOutstanding}</b> units, as of ledger{' '}
-          <b className="num">{nav.ledgerIndex ?? '—'}</b>.
+          Recompute: <b className="num">({dropsToXrp(nav.provenance.assetsTotal)} − {dropsToXrp(nav.provenance.lossUnrealized)}) ÷ {nav.provenance.unitsOutstanding}</b>,
+          ledger <b className="num">{nav.ledgerIndex ?? '—'}</b>.
         </p>
       )}
     </section>

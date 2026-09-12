@@ -90,15 +90,12 @@ export function ManagerConduct({ h }: { h: BrokerHistory | null }) {
             </tbody>
           </table>
           <p className="caption meth" style={{ marginTop: 10 }}>
-            Sequence score <b className="num">{o.fairness}</b> — 0 is the sequence worst for
-            investors, 1 the best. Same losses either way; only the order differs.
+            Sequence score <b className="num">{o.fairness}</b>, where 0 is worst for investors
+            and 1 best. Same losses either way; only the order differs.
           </p>
         </>
       ) : (
-        <p className="caption meth">
-          Sequence not assessable: {o.reason}. Two or more declared losses are needed before
-          the order can be said to have cost anything.
-        </p>
+        <p className="caption meth">Sequence not assessable: {o.reason}.</p>
       )}
 
       {rep.findings.length > 0 && (
@@ -209,8 +206,8 @@ export function PledgedCollateral({ c }: { c: Collateral | null }) {
       </table>
 
       <p className="caption meth" style={{ marginTop: 10 }}>
-        Lendable applies the discount to the held value, not the reported one. A discount
-        absorbs volatility; it does not absorb an overstatement.
+        The discount applies to the held value. A discount absorbs volatility, not an
+        overstatement.
       </p>
     </Section>
   )

@@ -28,8 +28,7 @@ export function EntryGate({ g }: { g: Gate | null }) {
       ) : (
         <>
           <p className="caption meth">
-            Restricted. A subscriber must hold one of the credentials below, from the issuer
-            named beside it, or the transfer is refused outright.
+            Restricted. Without one of these credentials, a subscription is refused outright.
           </p>
           <table className="op-tbl" style={{ marginTop: 12 }}>
             <thead><tr><th>Credential required</th><th>Accepted from</th></tr></thead>
@@ -46,9 +45,8 @@ export function EntryGate({ g }: { g: Gate | null }) {
             </tbody>
           </table>
           <p className="caption meth" style={{ marginTop: 10 }}>
-            The facility named these issuers itself. An issuer is not asked, signs nothing,
-            and cannot decline being cited — which is what makes the requirement the
-            facility's own and not a private arrangement.
+            The facility named these issuers itself. None of them was asked, and none can
+            decline being cited.
           </p>
         </>
       )}

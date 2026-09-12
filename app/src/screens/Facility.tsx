@@ -48,7 +48,6 @@ export function Facility({ d, history, collateral, resolution, gate }: {
 
   const gapPct = bpsToPct(v.navDivergenceBps)
   const shortfall = d.broker.coverShortfall
-  const hasShortfall = shortfall !== '0' && Number(shortfall) > 0
   const largest = d.loans.length
     ? d.loans.reduce((a, b) => (Number(a.shareOfDebtTotal) > Number(b.shareOfDebtTotal) ? a : b))
     : null
@@ -94,27 +93,9 @@ export function Facility({ d, history, collateral, resolution, gate }: {
                 alone is reading a number the facility cannot currently realise.
               </p>
               <p>
-                Drawn debt stands at {dropsToXrp(d.broker.debtTotal)} against a committed
-                maximum of {dropsToXrp(d.broker.debtMaximum)}. First-loss coverage available
-                is {dropsToXrp(d.broker.coverAvailable)} against {dropsToXrp(d.broker.coverRequired)}{' '}
-                required at the {rateToPct(d.broker.coverRateMinimum)} minimum
-                rate{hasShortfall ? `, a shortfall of ${dropsToXrp(shortfall)}` : ', with no shortfall'}.
-                {largest && <> The largest single exposure is {ratioToPct(largest.shareOfDebtTotal)} of
-                  drawn debt; coverage is keyed to total debt rather than to any one exposure,
-                  so a single default consumes disproportionately little of it.</>}
-              </p>
-              <p>
-                Available assets are {dropsToXrp(v.assetsAvailable)} of{' '}
-                {dropsToXrp(v.assetsTotal)} total. At the redemption date, claims of{' '}
-                {dropsToXrp(d.phaseInfo.claimsAtRedemption)} are projected against liquidity of{' '}
-                {dropsToXrp(d.phaseInfo.liquidityAtRedemption)}
-                {Number(redemptionShortfall) > 0
-                  ? <>, a projected shortfall of {dropsToXrp(redemptionShortfall)} ({ratioToPct(d.phaseInfo.shortfallPct)} of claims). Redemption is served in the order requests arrive.</>
-                  : <>, with no projected shortfall.</>}
-              </p>
-              <p>
-                The internal score of {v.grade} is reached by ordinal notching from the
-                weakest measured factor. No weights are applied. The outlook is {outlook}.
+                The internal score of {v.grade} anchors on whether claims can be met at
+                redemption and is notched down from there. No weights are applied. The
+                outlook is {outlook}.
               </p>
             </Section>
 
