@@ -674,19 +674,27 @@ kbd{
 .rail{ gap: 12px; box-shadow: none; }
 .rail > [data-slot="card-header"], .rail > [data-slot="card-content"]{ padding: 0; display: block; }
 
-/* The state, printed on a rule. 11px mono, the tone in a 6px square — the same way the
-   rest of the desk states a fact. It replaced a 40px word floating in the panel. */
+/* The state, printed on a rule: 28px mono — the top of the owner's 28-36px band, and a
+   third of the poster it replaced — with the tone in an 8px square beside it. Readable
+   across a room, and still a status code rather than a headline in a void. */
 .rail-head{
-  display: flex !important; align-items: center; gap: 8px;
-  padding-bottom: 10px !important; border-bottom: 1px solid var(--line);
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: "dot label" "code code";
+  align-items: center; gap: 3px 8px;
+  padding-bottom: 12px !important; border-bottom: 1px solid var(--line);
 }
+.rail-head > .rail-dot{ grid-area: dot; }
+.rail-head > .label{ grid-area: label; }
+.rail-head > .rail-code{ grid-area: code; }
+.rail-head > .spacer{ display: none; }   /* the code owns the second row outright */
 .rail-dot{
-  width: 6px; height: 6px; flex: 0 0 auto; border-radius: 1px;
+  width: 8px; height: 8px; border-radius: 1px;
   background: var(--status-tone, var(--fg-dim));
 }
 .rail-code{
-  font: 500 var(--t-xs)/1 var(--mono) !important;
-  letter-spacing: 0.12em; text-transform: uppercase;
+  font: 500 28px/1.05 var(--mono) !important;
+  letter-spacing: -0.01em; text-transform: uppercase;
   color: var(--status-tone, var(--fg));
 }
 .rail-body .said:first-child{ margin-top: 2px; }

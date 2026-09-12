@@ -350,3 +350,39 @@ Elle n'est plus collée : elle vit à la fin du document et descend avec la page
 
 Mesuré sur les six desks, en haut ET en bas du défilement : **0 élément croisé par la
 barre**, et elle atterrit sur le bord bas dans les deux cas.
+
+## Étape 1 — chrome anti-slop et arrêt du poll storm (12/09)
+
+### C1 — le verdict
+
+Le poster est mort depuis le commit précédent ; il revient **dimensionné**, à 28px, le bas
+de la fourchette 28–36 demandée. Il tient sa propre ligne sous `● ON WATCH`, donc « FEED
+LOST » passe sur un seul rang dans un rail de 264px. Lisible d'un bout à l'autre de la
+salle, et toujours un code d'état sur un filet, pas un titre dans le vide.
+
+### C16 — le preview ne matraque plus un laptop
+
+Deux mécanismes, parce que le problème est double.
+
+**Le cas structurel.** `VITE_API_BASE` non défini retombe sur `http://localhost:8787`.
+Depuis une page https, ce n'est même pas une requête qui échoue : le navigateur la bloque
+en contenu mixte avant qu'elle ne sorte de l'onglet. `API_UNREACHABLE` détecte exactement
+ça — page en https, base en http — et l'app **ne poste alors aucune requête**. Elle dessine
+le desk, garde ses cinq slots en tirets cadratins, et affiche le rail `NO API` avec la
+raison, la base lue, et `requests made: none`.
+
+**Le cas transitoire.** Le serveur est là mais ne répond pas. Le poll ralentit au lieu de
+matraquer : `min(interval × 2^échecs, max(interval, 5s))`. Le `max` compte — un poll déjà
+plus lent que le plafond (les vaults à 15s hors LIST) garde sa cadence, un backoff ne doit
+jamais accélérer un poll. Mesuré, API coupée : les deux polls se posent à **5003ms**
+d'intervalle au lieu de 3000. Premier succès, `fails` retombe à 0, et le poll revient à
+**3002ms** dès la beat suivante.
+
+### C17 — le shell avant le premier fetch
+
+Mesuré à 120ms après navigation, API coupée : topbar présent, 4 onglets, **5 lignes
+fantômes**, 34 tirets cadratins, **zéro chiffre** dans le tableau. Le premier `fetch` part
+d'un `useEffect`, donc après la première peinture, par construction.
+
+`app/.env.example` documente la seule variable que le front lit — et pourquoi elle ne peut
+contenir aucun secret.

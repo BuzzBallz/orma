@@ -1,5 +1,21 @@
-export const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:8787'
+export const API_BASE = (import.meta.env.VITE_API_BASE ?? 'http://localhost:8787').replace(/\/+$/, '')
 export const EXPECTED_CONTRACT = '1.0.0'
+
+/**
+ * A deployed preview cannot reach the operator's laptop. With VITE_API_BASE unset the base
+ * falls back to http://localhost:8787, which from an https page is blocked as mixed content
+ * before it ever leaves the tab — and polled every 3s that is a failure storm with nothing
+ * to show for it. Name the misconfiguration once, stop asking, and let the desk paint its
+ * empty slots. Spec §8: the screen always says where it is reading from.
+ *
+ * null means "go ahead and poll".
+ */
+export const API_UNREACHABLE: string | null =
+  typeof location !== 'undefined'
+  && location.protocol === 'https:'
+  && API_BASE.startsWith('http://')
+    ? `this page is served over https and the API base is ${API_BASE}`
+    : null
 
 export class ApiFailure extends Error {
   // Plain fields, not parameter properties: the Vite template compiles with

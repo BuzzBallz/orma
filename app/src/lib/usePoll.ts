@@ -14,6 +14,17 @@ export interface Poll<T> {
 const STALE_AFTER_MS = 6000
 
 /**
+ * A failing poll backs off exponentially instead of hammering, capped at 5s — long enough
+ * to stop being a storm, short enough that the desk is back within one beat of the
+ * operator restarting the API. A poll that is already slower than the cap keeps its own
+ * interval: backing off must never make a poll go faster.
+ */
+const BACKOFF_CAP_MS = 5000
+const nextDelay = (intervalMs: number, fails: number) =>
+  fails === 0 ? intervalMs
+    : Math.min(intervalMs * 2 ** fails, Math.max(intervalMs, BACKOFF_CAP_MS))
+
+/**
  * setTimeout-chained poll. Never setInterval: a slow response must not stack requests.
  * `data` is never set back to null after a success — not on error, not on a 404, not on a url change.
  */
@@ -32,6 +43,7 @@ export function usePoll<T>(path: string | null, intervalMs: number): Poll<T> {
     // the first one every 3s. Pressing 1-5 quickly on stage is exactly that.
     let cancelled = false
     let timer: ReturnType<typeof setTimeout> | undefined
+    let fails = 0
 
     async function cycle() {
       if (cancelled) return
@@ -39,15 +51,18 @@ export function usePoll<T>(path: string | null, intervalMs: number): Poll<T> {
       try {
         const data = await getJson<T>(path)
         if (cancelled) return
+        fails = 0
         setState({ data, error: null, code: null, fails: 0, receivedAt: performance.now() })
       } catch (e) {
         if (cancelled) return
         const f = e instanceof ApiFailure ? e : null
+        fails += 1
         // keep data: last good payload stays on screen
         setState(s => ({ ...s, error: f?.message ?? 'network error', code: f?.code ?? null, fails: s.fails + 1 }))
       } finally {
-        // whatever the outcome, schedule the next poll. The loop must be unkillable.
-        if (!cancelled) timer = setTimeout(cycle, intervalMs)
+        // whatever the outcome, schedule the next poll. The loop must be unkillable —
+        // it just slows down while nobody is answering.
+        if (!cancelled) timer = setTimeout(cycle, nextDelay(intervalMs, fails))
       }
     }
     cycle()

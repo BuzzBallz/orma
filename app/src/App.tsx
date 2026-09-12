@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef } from 'react'
 import './app.css'
-import { API_BASE, EXPECTED_CONTRACT } from './lib/api'
+import { API_BASE, API_UNREACHABLE, EXPECTED_CONTRACT } from './lib/api'
 import { usePoll } from './lib/usePoll'
 import { useTick } from './lib/useTick'
 import { useRoute, type RoutePath } from './lib/useRoute'
@@ -109,9 +109,11 @@ export default function App() {
   const tick = useTick()
   const { path, vaultId, navigate } = useRoute()
 
-  const health = usePoll<Health>('/api/health', 5000)
-  const vaults = usePoll<VaultsResponse>('/api/vaults', path === '/' ? POLL_MS : 15000)
-  const detail = usePoll<Detail>(vaultId ? `/api/vaults/${vaultId}` : null, POLL_MS)
+  // A deployed preview with no backend behind it polls nothing at all: see API_UNREACHABLE.
+  const canPoll = API_UNREACHABLE === null
+  const health = usePoll<Health>(canPoll ? '/api/health' : null, 5000)
+  const vaults = usePoll<VaultsResponse>(canPoll ? '/api/vaults' : null, path === '/' ? POLL_MS : 15000)
+  const detail = usePoll<Detail>(canPoll && vaultId ? `/api/vaults/${vaultId}` : null, POLL_MS)
 
   const rows = vaults.data?.vaults ?? []
 
@@ -153,6 +155,27 @@ export default function App() {
   useEffect(() => { painted.current = true }, [])
 
   function body() {
+    // No API behind this build. Say it once, draw the empty book, and make no request —
+    // a public page hammering a laptop address every three seconds helps nobody.
+    if (API_UNREACHABLE) {
+      return (
+        <div className="deskgrid down">
+          <Watch
+            verdict="NO API" tone="var(--warn)"
+            said={<>This build has no server behind it. The desk is drawn and the book keeps its five slots, but every figure is an em-dash: we do not put a number on screen that nobody sent us.</>}
+            aside={<>Point <code>VITE_API_BASE</code> at an https endpoint and the screen fills itself. Nothing else changes.</>}
+            facts={[
+              ['reading from', API_BASE],
+              ['why not', API_UNREACHABLE],
+              ['requests made', 'none'],
+              ['contract', `v${EXPECTED_CONTRACT}`],
+            ]}
+          />
+          <VaultList vaults={[]} receivedAt={0} tick={tick} onOpen={() => {}} />
+        </div>
+      )
+    }
+
     if (path === '/oracle') {
       return (
         <div className="deskgrid">
