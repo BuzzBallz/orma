@@ -7,6 +7,22 @@
  * Env: PORT (8787), XRPL_WS, POLL_MS (4000), LOG_PRETTY=1, LOG_LEVEL, DEMO_KEY
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
+
+// Node 20 has --env-file, but running the demo must not depend on remembering a flag,
+// and this is ten lines with no dependency. Existing environment always wins, so a
+// shell override still works. Written without regexes on purpose: the escaping is a
+// liability in a file that gets patched, and indexOf says what it means.
+if (existsSync('.env')) {
+  for (const raw of readFileSync('.env', 'utf8').split(String.fromCharCode(10))) {
+    const line = raw.trim()
+    if (!line || line.startsWith('#')) continue
+    const eq = line.indexOf('=')
+    if (eq < 1) continue
+    const k = line.slice(0, eq).trim()
+    const v = line.slice(eq + 1).trim().replace(/^["']|["']$/g, '')
+    if (process.env[k] === undefined) process.env[k] = v
+  }
+}
 import { join } from 'node:path'
 import { Client, Wallet } from 'xrpl'
 import { Reader } from './poll.mjs'
