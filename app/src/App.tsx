@@ -290,7 +290,7 @@ function Desk() {
         )}
 
       <TabsContent value={path}>
-        <main className={'page' + (path === '/event' ? ' tight' : '')}>
+        <main className="page">
           <div key={path} className={painted.current ? 'view' : undefined}>{body()}</div>
         </main>
       </TabsContent>

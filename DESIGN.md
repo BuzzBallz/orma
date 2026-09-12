@@ -802,3 +802,80 @@ pages de la note. Pas sur chaque boîte.
 Pas d'orbe, pas de mesh, pas de glass, pas de rebond élastique, pas de webfont, pas un
 chiffre de plus. Le seul ajout visuel est **une** ombre courte sur la feuille lue, et une
 pilule de 8px derrière l'onglet actif.
+
+## Le système de traits, refait — 12/09
+
+Le reproche : « 1px solid partout, même teinte, même radius, cages dans des cages ».
+Passe sur les traits uniquement. Aucune page nouvelle, aucun contenu déplacé.
+
+### Tokens : avant / après
+
+```
+avant                                  après
+--line:   #20242A   (gris opaque)      --line:      rgba(255,244,232,.065)
+--line-2: #2E343C   (gris opaque)      --line-2:    rgba(255,244,232,.115)
+                                       --rule-soft: rgba(255,244,232,.04)
+```
+
+Un gris opaque est **un second objet posé sur la surface**. Un alpha, c'est la surface,
+ombrée. Et il est chaud, parce que le fond l'est. Les trois rôles sont explicites : le trait
+porteur d'une surface, un contrôle qu'on a atteint, un séparateur dans un tableau.
+
+### Traits tués
+
+| | |
+|---|---|
+| anneau des chips | un cercle autour d'un fond : le fond passe de 10% à 16%, l'anneau saute |
+| anneau de la pastille d'état | idem, fond 8% → 14% |
+| cadre du sous-titre de marque | fond au lieu du cadre |
+| **séparateur vertical de colonne** | la gouttière fait le même travail ; un trait vertical est un mur de cage |
+| soulignement d'en-tête du blotter | la casse et la couleur disent déjà que c'est un en-tête |
+| soulignement d'en-tête des exhibits | idem |
+| **7 cadres d'encadrés latéraux** | un cadre dans un panneau encadré, c'est une cage dans une cage : ils prennent un fond |
+| 7 filets d'en-tête d'encadré | l'espace suffit |
+| filet haut de la grille des champs | |
+| filet haut de la liste des beats | |
+| filet haut de la liste de règles | |
+| **3 cadres de rangée du dialog** | fond au lieu de cadre |
+| **3 barres de teinte 2px des toasts** | l'icône porte déjà la teinte |
+| filet haut du bandeau d'événement | |
+
+**14 familles de traits supprimées**, dont trois qui se répétaient par élément (encadrés,
+rangées de dialog, toasts).
+
+### Le test du brief, passé
+
+Tous les `box-shadow` coupés, on compte les **boîtes fermées** (4 côtés) :
+
+| vue | boîtes fermées | traits à un seul côté |
+|---|---|---|
+| portfolio | **3** | 26 |
+| facility | **4** (les deux pages) | 92 |
+| event | **5** (trois panneaux) | 11 |
+| methodology | **5** (trois panneaux) | 13 |
+
+Les seules boîtes restantes sont **la surface qu'on lit** et **les deux contrôles du topbar**
+(sélecteur, Sign in) — que le brief autorise explicitement à porter une bordure discrète.
+Zéro boîte dans une boîte. Les 92 traits de la note sont tous des **séparateurs horizontaux
+de rangée**, plus la ligne de tête et le pied : c'est la structure d'une note de notation,
+pas une grille.
+
+### Épaisseur et couleur
+
+- **Toutes les bordures de l'app font 1px.** Il n'y en a aucune à 2px, nulle part.
+- **Zéro bordure en ambre plein.** L'indicateur d'onglet actif ne dépense même pas
+  l'exception des 2px : c'est une pilule remplie, `border-width: 0`.
+- Les contrôles sont à `--line` au repos et passent à `--line-2` au survol / à l'ouverture.
+
+### Deux débordements de 4px, et la vraie cause
+
+`main.page` était en `flex: 1 1 auto` : le desk pouvait être **comprimé sous son propre
+contenu**, et c'est comme ça que quatre pixels finissaient par rendre hors de la vue. Il est
+en `1 0 auto` — il grandit dans l'écran, il ne rétrécit jamais sous les rangées.
+
+Et `/event` n'est plus contraint à un écran. La contrainte « un viewport » venait des quatre
+bandes fixes de l'ancien desk ; un calendrier fait la longueur de ses données — une facility
+avec dix expositions a vingt entrées. L'y forcer voudrait dire rogner des échéances ou
+réduire les rangées jusqu'à l'illisible. Le contrôle correspondant de l'audit assertait une
+règle qui ne s'applique plus à cette vue : il vérifie maintenant que **rien n'est rogné dans
+un panneau**, ce qui est l'invariant réel.

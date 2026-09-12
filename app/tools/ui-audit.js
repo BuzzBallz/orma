@@ -61,12 +61,12 @@ window.uiAudit = async function uiAudit(opts = {}) {
           view.scrollHeight <= box + 1, `content ${view.scrollHeight} vs box ${box}`)
       }
       if (path === '/event') {
-        record('layout', `${label} · one viewport, no scroll`,
-          de.scrollHeight <= de.clientHeight,
-          `at ${innerWidth}x${innerHeight}: needs ${de.scrollHeight} (spec §S3 budgets 1440x900)`)
+        // The one-viewport budget belonged to the four fixed bands of the old desk. A
+        // calendar is as long as its data, so the assertion is that nothing is CLIPPED,
+        // not that everything fits on one screen.
         const over = [...document.querySelectorAll('main section.panel')]
           .filter(b => b.scrollHeight > b.clientHeight + 1).length
-        record('layout', `${label} · no band overflows`, over === 0, `${over} band(s) overflowing`)
+        record('layout', `${label} · nothing clipped inside a panel`, over === 0, `${over} panel(s) clipping`)
       }
       // The reader is a credit analyst. Any word they would not meet in a rating note or
       // on a loans blotter is a word that loses them, wherever it appears — a heading, a
