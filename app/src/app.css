@@ -218,6 +218,7 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 .meta + .meta{ margin-left: 16px; }
 
 @media (max-width: 1280px){ .meta.optional{ display: none } }
+@media (max-width: 1100px){ .topbar .meta:not(.keep){ display: none } .topbar .sep{ margin: 0 10px } }
 
 /* Desk navigation — reads as a row of desks, not a row of buttons. */
 .desks{ display: flex; align-items: stretch; height: var(--topbar); margin-left: 8px; }
@@ -402,11 +403,14 @@ kbd{
 .picker > .label{ letter-spacing: 0.14em; color: var(--fg-mute); }
 .picker-btn{
   display: flex; align-items: center; gap: 10px;
-  height: 100%; padding: 0 10px 0 0;
+  height: 100%; padding: 0 10px 0 0; min-width: 0;   /* or the label cannot ellipsis */
   background: none; border: 0; cursor: pointer;
   font: var(--t-xs) var(--mono); color: var(--fg);
 }
-.picker-label{ max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker-label{
+  flex: 0 1 auto; min-width: 0; max-width: 180px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .picker .chev{ color: var(--fg-mute); font-size: var(--t-2xs); line-height: 1; transition: transform 160ms ease; }
 .picker-btn[aria-expanded="true"] .chev{ transform: rotate(180deg); }
 
@@ -432,40 +436,10 @@ kbd{
   gap: 12px; align-items: stretch;   /* the room matches the book's height, whatever it is */
 }
 /* Feed down on the book: a word from whoever is on watch, the empty book, the room. */
-.deskgrid.down{ grid-template-columns: 264px minmax(0, 1fr) 240px; }
+.deskgrid.down{ grid-template-columns: 264px minmax(0, 1fr); }
 .deskgrid > .panel{ display: flex; flex-direction: column; }
-@media (max-width: 1240px){ .deskgrid.down{ grid-template-columns: 280px minmax(0, 1fr); } .deskgrid.down .ops{ display: none } }
+@media (max-width: 1240px){ .deskgrid.down{ grid-template-columns: 264px minmax(0, 1fr); } }
 @media (max-width: 1100px){ .deskgrid, .deskgrid.down{ grid-template-columns: minmax(0, 1fr); } }
-
-/* ---------- the room ----------
-   One committed photograph, darkened into the palette. Not decoration: it says a desk
-   like this is what the screen stands in for. Source and licence in public/assets/README.md. */
-
-.ops{
-  position: relative; overflow: hidden;
-  border: 1px solid var(--line); border-radius: 4px;
-  background: var(--bg-1);
-  display: flex; flex-direction: column;
-}
-.ops img{
-  width: 100%; height: 100%; object-fit: cover; object-position: 30% 60%;
-  filter: grayscale(.55) brightness(.45) contrast(1.05);
-  display: block;
-}
-.ops::before{
-  content: ""; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(180deg,
-    color-mix(in srgb, var(--bg) 35%, transparent) 0%,
-    color-mix(in srgb, var(--bg) 82%, transparent) 100%);
-}
-.ops figcaption{
-  position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 14px;
-  font: var(--t-xs)/1.5 var(--mono); letter-spacing: 0.06em;
-  color: var(--fg-dim);
-  border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
-  background: color-mix(in srgb, var(--bg) 60%, transparent);
-}
-.ops figcaption b{ color: var(--fg); font-weight: 500; }
 
 /* The word from the desk. Lower than a poster: a verdict, then a person talking. */
 .watch{ display: flex; flex-direction: column; }
@@ -571,7 +545,7 @@ table.tbl tbody tr:not(.ghost){
   from { opacity: 0; transform: translateY(8px) }
   to   { opacity: 1; transform: none }
 }
-.view .panel, .view .ops, .view .runline{
+.view .panel, .view .runline{
   animation: panelIn 300ms cubic-bezier(.2,.7,.2,1) both;
 }
 .view .stack > *:nth-child(1), .view .grid12 > *:nth-child(1){ animation-delay: 0ms }
@@ -597,9 +571,6 @@ table.tbl tbody tr:not(.ghost){
        a panel that grows under the cursor reads as a toy. --- */
 .panel{ transition: border-color 200ms ease, background-color 200ms ease; }
 .panel:hover{ border-color: var(--line-2); background: color-mix(in srgb, var(--bg-2) 45%, var(--bg-1)); }
-.ops{ transition: border-color 200ms ease; }
-.ops img{ transition: filter 420ms ease, transform 900ms cubic-bezier(.2,.7,.2,1); }
-.ops:hover img{ filter: grayscale(.3) brightness(.62) contrast(1.05); transform: scale(1.03); }
 
 /* --- 6. Chips settle in when a grade changes, and lift under the pointer. --- */
 .chip{ transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease; }

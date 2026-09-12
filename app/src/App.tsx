@@ -10,7 +10,6 @@ import { StaleBar } from './components/StaleBar'
 import { VaultDetail } from './screens/VaultDetail'
 import { VaultList } from './screens/VaultList'
 import { Moment } from './screens/Moment'
-import { OpsPhoto } from './components/OpsPhoto'
 import { short } from './lib/format'
 
 const POLL_MS = 3000
@@ -139,7 +138,7 @@ export default function App() {
       const down = !vaults.data
       if (down) {
         return (
-          <div className={'deskgrid' + (vaults.fails > 0 ? ' down' : '')}>
+          <div className={vaults.fails > 0 ? 'deskgrid down' : ''}>
             {vaults.fails > 0 && (
               <Watch
                 verdict="FEED LOST" tone="var(--bad)"
@@ -149,17 +148,11 @@ export default function App() {
               />
             )}
             <VaultList vaults={[]} receivedAt={0} tick={tick} onOpen={() => {}} />
-            <OpsPhoto caption="feed paused" />
             {vaults.fails > 0 && <RunLine />}
           </div>
         )
       }
-      return (
-        <div className="deskgrid">
-          <VaultList vaults={rows} receivedAt={vaults.receivedAt} tick={tick} onOpen={id => navigate('/vault', id)} />
-          <OpsPhoto caption="five vaults, live" />
-        </div>
-      )
+      return <VaultList vaults={rows} receivedAt={vaults.receivedAt} tick={tick} onOpen={id => navigate('/vault', id)} />
     }
 
     if (notFound && !detail.data) {

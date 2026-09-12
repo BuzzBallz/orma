@@ -81,7 +81,7 @@ export function HeaderBar({ health, healthUnreachable, vaults, activeVaultId, pa
           ? <>contract <b>{health!.contractVersion}</b> ≠ {EXPECTED_CONTRACT}</>
           : <>contract <b>v{live ? health!.contractVersion : EXPECTED_CONTRACT}</b></>}
       </span>
-      <span className={'meta' + (ledgerMoved ? ' flash' : '')}>ledger <b>{ledgerIndex ?? '—'}</b></span>
+      <span className={'meta keep' + (ledgerMoved ? ' flash' : '')}>ledger <b>{ledgerIndex ?? '—'}</b></span>
       <span className="meta optional">{fmtIso(serverTime)}</span>
 
       <span className="spacer" />

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ApiFailure, getJson } from './api'
 
 export interface Poll<T> {
@@ -23,31 +23,35 @@ export function usePoll<T>(path: string | null, intervalMs: number): Poll<T> {
   })
   // A tick purely to re-render so `stale`/`ageMs` stay live between polls.
   const [, setBeat] = useState(0)
-  const alive = useRef(true)
 
   useEffect(() => {
-    alive.current = true
+    // `cancelled` is per effect run, deliberately NOT a ref. A ref is shared across runs:
+    // switching vault sets it false on cleanup and the next run sets it true again, so a
+    // request still in flight for the OLD path would see `true`, write the old vault's
+    // payload under the new vault's url, and schedule a second polling loop that fights
+    // the first one every 3s. Pressing 1-5 quickly on stage is exactly that.
+    let cancelled = false
     let timer: ReturnType<typeof setTimeout> | undefined
 
     async function cycle() {
-      if (!alive.current) return
+      if (cancelled) return
       if (path === null) { timer = setTimeout(cycle, intervalMs); return }
       try {
         const data = await getJson<T>(path)
-        if (!alive.current) return
+        if (cancelled) return
         setState({ data, error: null, code: null, fails: 0, receivedAt: performance.now() })
       } catch (e) {
-        if (!alive.current) return
+        if (cancelled) return
         const f = e instanceof ApiFailure ? e : null
         // keep data: last good payload stays on screen
         setState(s => ({ ...s, error: f?.message ?? 'network error', code: f?.code ?? null, fails: s.fails + 1 }))
       } finally {
         // whatever the outcome, schedule the next poll. The loop must be unkillable.
-        if (alive.current) timer = setTimeout(cycle, intervalMs)
+        if (!cancelled) timer = setTimeout(cycle, intervalMs)
       }
     }
     cycle()
-    return () => { alive.current = false; if (timer) clearTimeout(timer) }
+    return () => { cancelled = true; if (timer) clearTimeout(timer) }
   }, [path, intervalMs])
 
   // 1Hz heartbeat so the stale bar's numbers move without a new payload.
