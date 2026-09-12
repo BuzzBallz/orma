@@ -5,6 +5,7 @@ import { Countdown } from './Countdown'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 
 /** Closed enum, contract §3.1. An unknown status renders dim with the raw value — never crash. */
 const STATUS: Record<LoanStatus, { tone: Tone; row?: 'row-warn' | 'row-bad' | 'row-dead'; pulse?: boolean }> = {
@@ -32,10 +33,12 @@ export function LoanTable({ loans, receivedAt, tick }: { loans: Loan[]; received
         )}
       </div>
 
+      {/* A vault can carry more loans than the desk is tall. ScrollArea keeps both
+          axes inside this box instead of pushing the page around. */}
       {loans.length === 0 ? (
         <div className="empty">no loans originated</div>
       ) : (
-        <div className="tbl-scroll">
+        <ScrollArea type="auto" className="tbl-scroll scroll-term">
           <Table className="tbl">
             <TableHeader>
               <TableRow>
@@ -81,7 +84,8 @@ export function LoanTable({ loans, receivedAt, tick }: { loans: Loan[]; received
               })}
             </TableBody>
           </Table>
-        </div>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
       )}
     </section>
   )

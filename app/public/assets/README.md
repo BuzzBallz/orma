@@ -4,12 +4,13 @@ Every file here is committed to the repo and served from the same origin. Nothin
 hotlinked: the venue wifi is a risk and a remote asset that fails on stage is a visible
 failure.
 
-## grain.png
+## noise.png
 
-- 128x128 tileable grain, generated locally by a throwaway Node script — not downloaded.
-  8-bit grayscale + alpha, so the noise lives in the alpha channel and tints nothing.
-  Used as a 5% overlay on the page, `pointer-events: none`.
-- No licence question: this repo made it.
+- 128x128 tileable greyscale noise, generated locally by a throwaway Python script
+  (zlib + struct, no dependencies, `random.seed(66)` so the file is reproducible).
+  Not downloaded, not traced, no licence to carry. 16 KB.
+- Used at 5% opacity as a fixed overlay over the whole desk (`body::after`), together
+  with the 4% scanline veil. Both are `pointer-events: none`.
 
 ## mark.svg
 

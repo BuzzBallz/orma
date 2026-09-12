@@ -274,3 +274,59 @@ explicitement une utilitaire, parce que `app.css` ne déclarait pas la propriét
 La racine `Tabs` et son `TabsContent` sont en `display: contents` : ils portent le contexte
 Radix et **aucune boîte**, donc le grid de la page et la barre d'état collée en bas ne
 bougent pas d'un pixel.
+
+## Anti-slop — 12/09, deuxième passe shadcn
+
+Brief owner : priorité 1 « que ça ne fasse PLUS AI slop », priorité 2 « vivant + smooth ».
+
+### Les cinq tells tués
+
+1. **Le mot de 40px qui flotte.** `FEED LOST` / `NOT ON THE BOOK` s'affichaient en
+   `--t-verdict: 40px` au milieu d'un panneau vide. Un desk ne te crie pas un titre : il
+   imprime un code d'état de 11px sur un filet, avec un carré de 6px à la teinte, et il
+   passe à la suite. `.rail-head` / `.rail-code` / `.rail-dot`.
+2. **Le vide sous le contenu.** Le blotter s'arrêtait à 320px sur un écran de 900 et la
+   barre d'état flottait au milieu du noir. Un écran de terminal est **plein** : le desk
+   prend le mou (`main.page{flex:1}`), le blotter et la grille de rails descendent jusqu'à
+   la barre, et le tampon de lecture se colle au filet du bas.
+3. **Les aplats sans matière.** Fond mort = rendu, pas machine. Ajouté, CSS pur et inerte :
+   grille 24px masquée + vignette **derrière** le desk, scanlines 4% + grain 5% **devant**.
+   Le balayage ambre de 1px a pour période `POLL_MS` — ce n'est pas une boucle décorative,
+   ce sont les trois secondes qui passent.
+4. **Les affordances par défaut.** `title=""` natif, `<a>` en guise de bouton, listbox
+   maison. Remplacés par `Tooltip` (ce que veut dire une note, d'où sort le point oracle),
+   `Button` (copier la commande, revenir au book, remettre l'ordre du contrat) et
+   `DropdownMenu`, tous rethemés en clé de terminal : carré, mono, filet ambre.
+5. **Le motion « designer ».** Verdict 420ms, tracé 900ms, distribution 320ms, lifts 260ms
+   — joli, et parfaitement faux pour un desk. Tout est ramené dans la bande **140–180ms**,
+   le flash d'une cellule qui a vraiment changé en HTTP est à **120ms**, et rien ne voyage
+   avec lui : un seul accent animé à la fois.
+
+Bonus : le topbar était calé à gauche, sa queue flottait 120px avant le bord droit.
+
+### Fond vivant — ce qu'il coûte
+
+| couche | où | quoi |
+|---|---|---|
+| `.ground::before` | z-0, derrière | grille 24px, masque radial qui l'efface au centre |
+| `.g-vignette` | z-0, derrière | radial 42% aux bords, il cadre sans assombrir |
+| `.g-sweep` | z-0, derrière | ligne ambre 1px, `animation-duration: var(--poll)` |
+| `.veil` | z-100, devant | scanlines 4%, période 3px |
+| `body::after` | z-100, devant | grain `noise.png` 5% |
+
+Tout est `position: fixed` + `pointer-events: none`. Pas de canvas, pas de particules, pas
+d'orbe, pas de glow pleine page, pas de librairie. Les panneaux sont à 92% d'opacité pour
+que la grille respire dessous — 92% reste au-dessus du seuil de 85% que le contrôle de
+contraste de l'audit utilise pour reconnaître un fond.
+
+### shadcn réellement monté
+
+`Table` (blotter + prêts) · `Tabs` (les quatre desks, la vue routée est le panneau) ·
+`DropdownMenu` (sélecteur) · `Badge` (sous `.chip` et sous `.pill`) · `Separator` (topbar,
+footer) · `Button` (copier la commande, retour au book, ouvrir le moment, remettre
+« worst first ») · `Tooltip` (note sur l'échelle, point oracle) · `ScrollArea` (la table
+de prêts, deux axes, capée à 44vh) · `Card` **uniquement en rail technique** — jamais un
+hero trois colonnes.
+
+`prefers-reduced-motion` : tout coupé **sauf le hover**, qui reste en couleur seule —
+c'est lui qui dit qu'une ligne est cliquable.

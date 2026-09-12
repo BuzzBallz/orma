@@ -8,6 +8,10 @@ import { useFlash } from '../lib/useFlash'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Button } from '@/components/ui/button'
+import { RotateCcw } from 'lucide-react'
+import { GRADE_LADDER, gradeIndex } from '../lib/grades'
 
 type SortKey = 'gradeNumeric' | 'label' | 'phase' | 'secondsToRedemption' | 'navDivergenceBps' | 'loanCount' | 'trend'
 
@@ -65,7 +69,17 @@ function Row({ v, i, receivedAt, tick, onOpen }: {
       onClick={() => onOpen(v.vaultId)}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(v.vaultId) } }}
     >
-      <TableCell><Chip tone={gradeTone(v.grade)}>{v.grade}</Chip></TableCell>
+      <TableCell>
+        {/* What the letters mean, on hover. Every figure in here is the row's own
+            HTTP grade against the ladder the contract freezes — nothing invented. */}
+        <Tooltip>
+          <TooltipTrigger asChild><span><Chip tone={gradeTone(v.grade)}>{v.grade}</Chip></span></TooltipTrigger>
+          <TooltipContent className="tip" side="right">
+            <b>{v.grade}</b> — step {gradeIndex(v.grade) + 1} of {GRADE_LADDER.length}.
+            {' '}AAA is the strongest, D the weakest. The book is sorted worst first.
+          </TooltipContent>
+        </Tooltip>
+      </TableCell>
       <TableCell>
         <span className="inst">
           <span className="name">{v.label ?? short(v.vaultId, 8)}</span>
@@ -92,19 +106,30 @@ function Row({ v, i, receivedAt, tick, onOpen }: {
       </TableCell>
       <TableCell className="mono" style={{ fontSize: 'var(--t-sm)' }}>{v.trend}</TableCell>
       <TableCell>
-        <span
-          title={v.oraclePublished ? 'published' : 'not published'}
-          style={{
-            display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
-            background: v.oraclePublished ? 'var(--ok)' : 'var(--fg-mute)',
-          }}
-        />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span
+              style={{
+                display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
+                background: v.oraclePublished ? 'var(--ok)' : 'var(--fg-mute)',
+              }}
+            />
+          </TooltipTrigger>
+          <TooltipContent className="tip" side="left">
+            {v.oraclePublished
+              ? <>An oracle object for this vault is <b>published on the ledger</b>.</>
+              : <>No oracle object published for this vault yet.</>}
+          </TooltipContent>
+        </Tooltip>
       </TableCell>
     </TableRow>
   )
 }
 
 type Sort = { key: SortKey; asc: boolean }
+
+/** Contract §2 and the gate checklist in spec §9: worst grade first, ascending. */
+const DEFAULT_SORT: Sort = { key: 'gradeNumeric', asc: true }
 
 /** A sortable header. `aria-sort` is what the audit reads, and what a screen reader announces. */
 function Th({ k, label, rt, sort, onSort }: {
@@ -134,7 +159,8 @@ export function VaultList({ vaults, receivedAt, tick, stamp, onOpen }: {
   stamp?: { ledgerIndex: number; serverTime: string }
   onOpen: (vaultId: string) => void
 }) {
-  const [sort, setSort] = useState<Sort>({ key: 'gradeNumeric', asc: true })
+  const [sort, setSort] = useState<Sort>(DEFAULT_SORT)
+  const sorted = sort.key !== DEFAULT_SORT.key || sort.asc !== DEFAULT_SORT.asc
 
   const rows = [...vaults].sort((a, b) => {
     const k = sort.key
@@ -151,12 +177,18 @@ export function VaultList({ vaults, receivedAt, tick, stamp, onOpen }: {
   }
 
   return (
-    <section className="panel">
+    <section className="panel blotter">
       <div className="row" style={{ marginBottom: 16, alignItems: 'baseline' }}>
         <h2 className="panel-title" style={{ margin: 0 }}>the book</h2>
         <span className="num mute" style={{ fontSize: 'var(--t-xs)' }}>
           {vaults.length > 0 ? `${vaults.length} instruments · worst grade first` : 'awaiting feed · worst grade first'}
         </span>
+        {/* Only once the reader has left the contract's order. Nothing to reset before. */}
+        {sorted && (
+          <Button variant="ghost" size="xs" className="btn-term" onClick={() => setSort(DEFAULT_SORT)}>
+            <RotateCcw size={11} strokeWidth={2.25} /> worst first
+          </Button>
+        )}
         <span className="spacer" />
         <span className="caption">
           Sorted worst first. Divergence is the gap between what a vault reports and what it

@@ -69,10 +69,15 @@ window.uiAudit = async function uiAudit(opts = {}) {
       }
       // Wide tables are allowed to scroll, but only inside their own box.
       for (const sc of document.querySelectorAll('.tbl-scroll')) {
+        // The box may be the div itself, or a Radix ScrollArea viewport inside it.
+        const box = sc.querySelector('[data-slot="scroll-area-viewport"]') || sc
         const t = sc.querySelector('table')
-        if (t && t.scrollWidth > sc.clientWidth + 1) {
+        if (t && t.scrollWidth > box.clientWidth + 1) {
+          // 'auto' (our own .tbl-scroll) and 'scroll' (Radix's viewport) both contain it.
+          // 'visible' is the failure: that is the table escaping onto the page.
+          const ox = getComputedStyle(box).overflowX
           record('layout', `${label} · table scrolls in its own box`,
-            getComputedStyle(sc).overflowX === 'auto', `needs ${t.scrollWidth}, box ${sc.clientWidth}`)
+            ox === 'auto' || ox === 'scroll', `${ox} — needs ${t.scrollWidth}, box ${box.clientWidth}`)
         }
       }
     }

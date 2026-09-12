@@ -162,12 +162,61 @@ body{
 #root{ display: flex; flex-direction: column; }
 
 /* Grain. A locally generated 128px tile at 5% — enough to stop the flats reading as a
-   render, not enough to be a texture you notice. Inert by construction. */
+   render, not enough to be a texture you notice. Over everything, inert by construction. */
 body::after{
   content: ""; position: fixed; inset: 0; z-index: 100; pointer-events: none;
-  background-image: url('/assets/grain.png'); background-size: 128px 128px;
+  background-image: url('/assets/noise.png'); background-size: 128px 128px;
   opacity: .05;
 }
+
+/* ---------- the ground ----------
+   One inert layer BEHIND the desk: a 24px grid, scanlines, a vignette, and the sweep that
+   marks a poll cycle. Fixed, pointer-events:none, pure CSS — no canvas, no particles, no
+   full-page glow. It costs one composited layer and it is what stops the flats reading
+   as a render. Panels sit on it at 92% opacity so the grid survives faintly underneath. */
+.ground{ position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+
+/* 24px grid, masked away from the middle of the screen where the figures actually live. */
+.ground::before{
+  content: ""; position: absolute; inset: 0;
+  background-image:
+    linear-gradient(to right,  color-mix(in srgb, var(--line-2) 70%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--line-2) 70%, transparent) 1px, transparent 1px);
+  background-size: 24px 24px;
+  -webkit-mask-image: radial-gradient(115% 80% at 50% 38%, transparent 35%, #000 100%);
+          mask-image: radial-gradient(115% 80% at 50% 38%, transparent 35%, #000 100%);
+}
+
+/* Scanlines at 4%, OVER the desk with the grain — behind a 92% panel they would be 0.3%
+   of nothing. 3px period: fine enough to read as a tube, coarse enough not to moire. */
+.veil{
+  position: fixed; inset: 0; z-index: 100; pointer-events: none;
+  background: repeating-linear-gradient(to bottom, rgba(255,255,255,.04) 0 1px, transparent 1px 3px);
+}
+
+/* The vignette is behind, and it is gentle: it frames the desk, it does not dim it. */
+.g-vignette{
+  position: absolute; inset: 0;
+  background: radial-gradient(118% 85% at 50% 40%, transparent 48%, rgba(0,0,0,.42) 100%);
+}
+
+/* The sweep IS the poll. Its duration is bound to POLL_MS from App.tsx — it is not a
+   decorative loop that happens to look busy, it is the three seconds going by. */
+@keyframes sweep { from { transform: translateY(-1px) } to { transform: translateY(100vh) } }
+.g-sweep{
+  position: absolute; left: 0; right: 0; top: 0; height: 1px;
+  background: linear-gradient(to right, transparent,
+    color-mix(in srgb, var(--amber) 30%, transparent) 16%,
+    color-mix(in srgb, var(--amber) 30%, transparent) 84%, transparent);
+  animation: sweep var(--poll, 3000ms) linear infinite;
+}
+
+/* Content stacks above the ground. topbar (z-20) and the status line (z-30) already do. */
+main.page, .feedbar{ position: relative; z-index: 1; }
+/* #root is a full-height flex column: the desk takes the slack so the status line lands
+   on the bottom edge of the screen. Without this a short desk left the strip floating
+   mid-screen with black under it — a page, not a terminal. */
+main.page{ flex: 1 1 auto; }
 
 a { color: var(--read-correct); text-decoration: none; }
 a:hover { text-decoration: underline; text-underline-offset: 2px; }
@@ -216,7 +265,7 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 /* ---------- panel ---------- */
 
 .panel{
-  background: var(--bg-1);
+  background: color-mix(in srgb, var(--bg-1) 92%, transparent);
   border: 1px solid var(--line);
   border-radius: 4px;
   padding: 16px 20px;
@@ -388,6 +437,27 @@ table.tbl th:nth-child(3), table.tbl td:nth-child(3){
 }
 table.tbl th:nth-child(4), table.tbl td:nth-child(4){ padding-left: 20px; }
 
+/* ScrollArea, terminal-side: a 6px amber-dim hairline, no rounded track, no fade.
+   The loans box is capped so a long book scrolls inside the panel, not the page. */
+.tbl-scroll[data-slot="scroll-area"]{ max-height: 44vh; overflow: hidden; }
+/* ScrollArea, terminal-side: a 6px amber-dim hairline, no rounded track, no fade. */
+.scroll-term [data-slot="scroll-area-scrollbar"]{ padding: 0; width: 6px; }
+.scroll-term [data-slot="scroll-area-thumb"]{
+  border-radius: 1px; background: var(--line-2);
+  transition: background-color 160ms ease;
+}
+.scroll-term:hover [data-slot="scroll-area-thumb"]{ background: var(--amber-dim); }
+
+/* A terminal screen is full. Alone on the book desk the blotter reaches the status line
+   instead of floating in a void with the ground showing under it — the void was the
+   loudest tell that this was a page, not a desk. Only when it IS alone: inside a
+   .deskgrid (feed down) it goes back to its content height. */
+.view > .blotter{
+  display: flex; flex-direction: column;
+  min-height: calc(100dvh - var(--topbar) - 124px);
+}
+.view > .blotter .readstamp{ margin-top: auto; }
+
 /* The reading stamp sits under the rows, quieter than a caption. */
 .readstamp{
   margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line);
@@ -549,6 +619,17 @@ kbd{
 .picker .chev{ color: var(--fg-mute); font-size: var(--t-2xs); line-height: 1; transition: transform 160ms ease; }
 .picker-btn[aria-expanded="true"] .chev{ transform: rotate(180deg); }
 
+/* Tooltip: shadcn ships it as a white slab on black. Same treatment as the picker —
+   skin only, Radix keeps the placement. */
+.tip{
+  border-radius: 2px; padding: 6px 9px;
+  background: var(--bg-2) !important; border: 1px solid var(--line-2);
+  font: var(--t-xs)/1.45 var(--mono); color: var(--fg) !important;
+  max-width: 260px; text-transform: none; letter-spacing: 0;
+}
+.tip [data-slot], .tip svg{ background: var(--bg-2) !important; fill: var(--bg-2) !important; }
+.tip b{ color: var(--amber); font-weight: 500; }
+
 /* Radix portals this and positions it itself: skin only, never position, never z-index —
    and never an animation of ours, the primitive already brings its open/close one. */
 .picker-list{
@@ -576,16 +657,39 @@ kbd{
 /* Feed down on the book: a word from whoever is on watch, the empty book, the room. */
 .deskgrid.down{ grid-template-columns: 264px minmax(0, 1fr); }
 .deskgrid > .panel{ display: flex; flex-direction: column; }
+/* Alone on a desk, the room reaches the status line too — same rule as the blotter.
+   min-content floor, so a tall rail grows the grid instead of being squashed by it. */
+.view > .deskgrid{
+  min-height: calc(100dvh - var(--topbar) - 124px);
+  grid-template-rows: minmax(min-content, 1fr) auto;
+}
 @media (max-width: 1240px){ .deskgrid.down{ grid-template-columns: 264px minmax(0, 1fr); } }
 @media (max-width: 1100px){ .deskgrid, .deskgrid.down{ grid-template-columns: minmax(0, 1fr); } }
 
 /* The word from the desk. Lower than a poster: a verdict, then a person talking. */
 .watch{ display: flex; flex-direction: column; }
-.watch .verdict{
-  font-family: var(--mono); font-variant-numeric: tabular-nums;
-  font-size: var(--t-verdict); line-height: 1; letter-spacing: -0.03em;
-  color: var(--status-tone, var(--fg)); margin: 4px 0 16px;
+
+/* Card ships a ring, a 16px gap and its own padding; the rail is a panel, so hand all
+   three back to the terminal stylesheet. */
+.rail{ gap: 12px; box-shadow: none; }
+.rail > [data-slot="card-header"], .rail > [data-slot="card-content"]{ padding: 0; display: block; }
+
+/* The state, printed on a rule. 11px mono, the tone in a 6px square — the same way the
+   rest of the desk states a fact. It replaced a 40px word floating in the panel. */
+.rail-head{
+  display: flex !important; align-items: center; gap: 8px;
+  padding-bottom: 10px !important; border-bottom: 1px solid var(--line);
 }
+.rail-dot{
+  width: 6px; height: 6px; flex: 0 0 auto; border-radius: 1px;
+  background: var(--status-tone, var(--fg-dim));
+}
+.rail-code{
+  font: 500 var(--t-xs)/1 var(--mono) !important;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--status-tone, var(--fg));
+}
+.rail-body .said:first-child{ margin-top: 2px; }
 .watch .said{ font-size: var(--t-base); line-height: 1.6; color: var(--fg); margin: 0 0 8px; }
 .watch .said + .said{ color: var(--fg-dim); font-size: var(--t-sm); }
 /* The watch column is narrow: a URL does not survive being squeezed beside its label,
@@ -600,6 +704,20 @@ kbd{
   margin: 0; font: var(--t-xs)/1.5 var(--mono);
   color: var(--fg); overflow-wrap: anywhere;   /* brighter than its label, so the pairs read as pairs */
 }
+
+/* Buttons are terminal keys: square, mono, amber hairline. No pill, no fill, no shadow. */
+.btn-term{
+  height: 24px; padding: 0 10px; gap: 6px;
+  border-radius: 2px; box-shadow: none;
+  font: 500 var(--t-xs)/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--amber-dim); background: none; border: 1px solid var(--line-2);
+  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+.btn-term:hover{
+  color: var(--amber); border-color: var(--amber-dim);
+  background: color-mix(in srgb, var(--amber) 7%, transparent);
+}
+.rail-body .btn-term{ margin-top: 4px; }
 
 /* The command sits at the foot of the desk, in mono, secondary. */
 .runline{
@@ -668,45 +786,45 @@ tr.ghost:hover td > *{ transform: none; }
 /* --- 1. The book deals itself. Rows cascade in when the payload first lands.
        They mount once (keyed by vaultId), so this does not replay every poll. --- */
 @keyframes dealIn {
-  from { opacity: 0; transform: translateY(6px) }
+  from { opacity: 0; transform: translateY(4px) }
   to   { opacity: 1; transform: none }
 }
 table.tbl tbody tr:not(.ghost){
-  animation: dealIn 320ms cubic-bezier(.2,.7,.2,1) both;
-  animation-delay: calc(var(--i, 0) * 45ms);
+  animation: dealIn 160ms cubic-bezier(.2,.7,.2,1) both;
+  animation-delay: calc(var(--i, 0) * 24ms);
 }
+/* The row answers the pointer in 160ms, ground and rail only. */
+table.tbl tbody tr{ transition: background-color 160ms ease, box-shadow 160ms ease; }
 
 /* --- 2. The desk assembles. Panels arrive in sequence on a route change, not as
        one page-wide fade. --- */
 @keyframes panelIn {
-  from { opacity: 0; transform: translateY(8px) }
+  from { opacity: 0; transform: translateY(4px) }
   to   { opacity: 1; transform: none }
 }
 .view .panel, .view .runline{
-  animation: panelIn 300ms cubic-bezier(.2,.7,.2,1) both;
+  animation: panelIn 160ms cubic-bezier(.2,.7,.2,1) both;
 }
 .view .stack > *:nth-child(1), .view .grid12 > *:nth-child(1){ animation-delay: 0ms }
-.view .stack > *:nth-child(2), .view .grid12 > *:nth-child(2){ animation-delay: 60ms }
-.view .stack > *:nth-child(3), .view .grid12 > *:nth-child(3){ animation-delay: 110ms }
-.view .stack > *:nth-child(4), .view .grid12 > *:nth-child(4){ animation-delay: 150ms }
-.view .stack > *:nth-child(5), .view .grid12 > *:nth-child(5){ animation-delay: 185ms }
-.view .stack > *:nth-child(6), .view .grid12 > *:nth-child(6){ animation-delay: 210ms }
+.view .stack > *:nth-child(2), .view .grid12 > *:nth-child(2){ animation-delay: 40ms }
+.view .stack > *:nth-child(3), .view .grid12 > *:nth-child(3){ animation-delay: 70ms }
+.view .stack > *:nth-child(4), .view .grid12 > *:nth-child(4){ animation-delay: 95ms }
+.view .stack > *:nth-child(5), .view .grid12 > *:nth-child(5){ animation-delay: 115ms }
+.view .stack > *:nth-child(6), .view .grid12 > *:nth-child(6){ animation-delay: 130ms }
 
 /* --- 3. The sparkline draws itself, left to right. Done with a clip, NOT with
        stroke-dasharray: the dashes are contract §6's way of telling the naive reading
        from the correct one, and a draw animation must not touch them. --- */
 @keyframes wipeIn { from { clip-path: inset(0 100% 0 0) } to { clip-path: inset(0 0 0 0) } }
-.spark-draw{ animation: wipeIn 900ms cubic-bezier(.4,0,.2,1) both; }
+.spark-draw{ animation: wipeIn 600ms cubic-bezier(.4,0,.2,1) both; }
 
-/* --- 4. A figure that moves, moves. On a real HTTP change the cell flashes AND the
-       number lifts a couple of pixels — never on a timer. --- */
-@keyframes liftIn { from { transform: translateY(4px); opacity: .45 } to { transform: none; opacity: 1 } }
-.flash{ animation: flash 420ms ease-out 1; }
-.flash .num, .flash b, .flash > span{ animation: liftIn 260ms cubic-bezier(.2,.7,.2,1) 1; display: inline-block; }
+/* --- 4. A figure that moves, moves — 120ms, and only when a real HTTP cell changed.
+       Never on a timer, and nothing travels with it: one animated accent at a time. --- */
+.flash{ animation: flash 120ms ease-out 1; }
 
 /* --- 5. Panels answer the pointer. Border and ground only — no shadow, no scale:
        a panel that grows under the cursor reads as a toy. --- */
-.panel{ transition: border-color 200ms ease, background-color 200ms ease; }
+.panel{ transition: border-color 160ms ease, background-color 160ms ease; }
 .panel:hover{ border-color: var(--line-2); background: color-mix(in srgb, var(--bg-2) 45%, var(--bg-1)); }
 
 /* --- 6. Chips settle in when a grade changes, and lift under the pointer. --- */
@@ -716,26 +834,32 @@ tr:hover .chip, .picker-list [data-highlighted] .chip{ transform: translateY(-1p
 /* --- 7. The health pill breathes a ring while the feed is down — the dot alone was
        easy to miss across a room. --- */
 @keyframes ring {
-  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--pill-tone) 55%, transparent) }
-  70%  { box-shadow: 0 0 0 7px color-mix(in srgb, var(--pill-tone) 0%, transparent) }
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--pill-tone) 12%, transparent) }
+  70%  { box-shadow: 0 0 0 8px color-mix(in srgb, var(--pill-tone) 0%, transparent) }
   100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--pill-tone) 0%, transparent) }
 }
 .pill .dot.waiting{ animation: waiting 1.6s ease-in-out infinite, ring 1.6s ease-out infinite; }
 
 /* --- 8. The verdict arrives. One stroke, on mount. --- */
-@keyframes verdictIn { from { opacity: 0; letter-spacing: .04em } to { opacity: 1; letter-spacing: -.03em } }
-.watch .verdict{ animation: verdictIn 420ms cubic-bezier(.2,.7,.2,1) both; }
+/* (the verdict poster is gone — see the rail head in §S5) */
 
 /* --- 9. S3 beats: the lit band comes forward, the others fall back further. --- */
-.moment-band{ transition: opacity 220ms ease, transform 220ms ease, border-color 220ms ease; }
+.moment-band{ transition: opacity 180ms ease, transform 180ms ease, border-color 180ms ease; }
 
 /* --- 10. The divergence figure counts itself in on mount. --- */
-@keyframes figureIn { from { opacity: 0; transform: translateY(10px) scale(.97) } to { opacity: 1; transform: none } }
-.figure-in{ animation: figureIn 420ms cubic-bezier(.2,.7,.2,1) both; }
+@keyframes figureIn { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
+.figure-in{ animation: figureIn 180ms cubic-bezier(.2,.7,.2,1) both; }
 
-/* Everything above, off. */
+/* Everything above, off — with one exception the brief keeps: hover feedback stays,
+   because it is what tells you a row is clickable. Colour only; nothing travels. */
 @media (prefers-reduced-motion: reduce){
   *, *::before, *::after{ animation: none !important; transition: none !important }
+  .panel, table.tbl tbody tr, .desk, .picker, .picker-btn, .hints .h kbd, a,
+  .picker-list [data-slot="dropdown-menu-item"], table.tbl th[aria-sort]{
+    transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease !important;
+  }
+  tr:hover .chip, .picker-list [data-highlighted] .chip{ transform: none !important }
+  .ground{ display: none !important }
 }
 
 @theme inline {

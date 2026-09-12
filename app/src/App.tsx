@@ -11,8 +11,13 @@ import { VaultDetail } from './screens/VaultDetail'
 import { VaultList } from './screens/VaultList'
 import { Moment } from './screens/Moment'
 import { short } from './lib/format'
+import { useState } from 'react'
 import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { ArrowLeft, ArrowUpRight, Check, Copy } from 'lucide-react'
 
 const POLL_MS = 3000
 
@@ -21,39 +26,66 @@ const HINTS: [string, string][] = [
 ]
 
 /**
- * What whoever is on watch would say, not what a machine would print. One verdict, then
- * a person talking, then the facts that are actually true. Spec §5.1 rule 3 and §6.5:
- * an instruction, never a spinner, never a skeleton, never an invented figure.
+ * The technical rail. What whoever is on watch would say, then the facts that are
+ * actually true — spec §5.1 rule 3 and §6.5: an instruction, never a spinner, never a
+ * skeleton, never an invented figure. Card is used HERE and only here: this is a rail
+ * beside the desk, not a feature tile.
+ *
+ * The state used to be a 40px word floating in the panel. A desk does not shout a
+ * headline at you; it prints a status code on a rule and gets on with it.
  */
-function Watch({ verdict, tone, said, aside, facts }: {
+function Watch({ verdict, tone, said, aside, facts, action }: {
   verdict: string; tone: string
   said: React.ReactNode; aside?: React.ReactNode
   facts: [string, React.ReactNode][]
+  action?: React.ReactNode
 }) {
   return (
-    <section className="panel watch" style={{ ['--status-tone' as string]: tone }}>
-      <div className="label">on watch</div>
-      <div className="verdict">{verdict}</div>
-      <p className="said">{said}</p>
-      {aside && <p className="said">{aside}</p>}
-      <dl className="facts">
-        {facts.map(([k, v]) => (
-          <div key={k} style={{ display: 'contents' }}>
-            <dt className="label">{k}</dt>
-            <dd>{v}</dd>
-          </div>
-        ))}
-      </dl>
-    </section>
+    <Card className="panel watch rail" style={{ ['--status-tone' as string]: tone }}>
+      <CardHeader className="rail-head">
+        <span className="rail-dot" aria-hidden />
+        <CardTitle className="rail-code">{verdict}</CardTitle>
+        <span className="spacer" />
+        <span className="label">on watch</span>
+      </CardHeader>
+      <CardContent className="rail-body">
+        <p className="said">{said}</p>
+        {aside && <p className="said">{aside}</p>}
+        {action}
+        <dl className="facts">
+          {facts.map(([k, v]) => (
+            <div key={k} style={{ display: 'contents' }}>
+              <dt className="label">{k}</dt>
+              <dd>{v}</dd>
+            </div>
+          ))}
+        </dl>
+      </CardContent>
+    </Card>
   )
 }
 
+const RUN_CMD = 'node tools/fixture-server.mjs'
+
 /** The command, at the foot of the desk, in mono. Secondary — it is not the headline. */
 function RunLine({ extra }: { extra?: React.ReactNode }) {
+  const [copied, setCopied] = useState(false)
   return (
     <div className="runline">
       <span className="say">Start the API and the screen fills itself.</span>
-      <code>node tools/fixture-server.mjs</code>
+      <code>{RUN_CMD}</code>
+      <Button
+        variant="ghost" size="xs" className="btn-term"
+        onClick={() => {
+          navigator.clipboard?.writeText(RUN_CMD).then(() => {
+            setCopied(true)
+            setTimeout(() => setCopied(false), 1200)
+          }, () => {})
+        }}
+      >
+        {copied ? <Check size={11} strokeWidth={2.5} /> : <Copy size={11} strokeWidth={2.25} />}
+        {copied ? 'copied' : 'copy'}
+      </Button>
       <span className="aside">{extra ?? 'Nothing to click. It reconnects on its own.'}</span>
     </div>
   )
@@ -62,7 +94,7 @@ function RunLine({ extra }: { extra?: React.ReactNode }) {
 /** A framed placeholder for the single-instrument desks, so they do not empty out either. */
 function GhostDesk({ title }: { title: string }) {
   return (
-    <section className="panel ghost-desk">
+    <section className="panel ghost-desk rail">
       <h2 className="panel-title">{title}</h2>
       <div className="ghost-lines">
         <span style={{ width: '46%' }} /><span style={{ width: '28%' }} />
@@ -128,8 +160,11 @@ export default function App() {
           <Watch
             verdict="ON /MOMENT" tone="var(--read-correct)"
             said={<>The published reading already has a home. Publisher, object index, the six on-chain dimensions and the ledger aggregate are band 3 of the moment desk, off the same three-second request.</>}
-            aside={<>A second page would read the same object twice. Press <kbd>M</kbd>, or{' '}
-              <a href="/moment" onClick={e => { e.preventDefault(); navigate('/moment') }}>open it here</a>.</>}
+            aside={<>A second page would read the same object twice. Press <kbd>M</kbd>, or open it here.</>}
+            action={
+              <Button variant="outline" size="sm" className="btn-term" onClick={() => navigate('/moment')}>
+                the moment desk <ArrowUpRight size={12} strokeWidth={2.25} />
+              </Button>}
             facts={[['reads', 'oracle object on devnet'], ['computed by', 'the ledger, not by us']]}
           />
         </div>
@@ -170,7 +205,11 @@ export default function App() {
           <Watch
             verdict="NOT ON THE BOOK" tone="var(--warn)"
             said={<>The server answered and it holds nothing under that id. Either it is not ours, or it has not been created yet.</>}
-            aside={<><a href="/" onClick={e => { e.preventDefault(); navigate('/', null) }}>Back to the book</a>, or press <kbd>1</kbd>…<kbd>5</kbd>. The poll stays on this id in case it shows up.</>}
+            aside={<>Press <kbd>1</kbd>…<kbd>5</kbd> for an instrument that is on the book. The poll stays on this id in case it shows up.</>}
+            action={
+              <Button variant="outline" size="sm" className="btn-term" onClick={() => navigate('/', null)}>
+                <ArrowLeft size={12} strokeWidth={2.25} /> back to the book
+              </Button>}
             facts={[['asked for', short(vaultId, 24)], ['reading from', API_BASE]]}
           />
         </div>
@@ -199,11 +238,22 @@ export default function App() {
   // The four desks are a real tab set: TabsList lives in the topbar, the routed view is the
   // panel. The root is display:contents, so it carries Radix's context and no layout.
   return (
+    <TooltipProvider delayDuration={250} skipDelayDuration={400}>
     <Tabs
       className="tabs-root"
       value={path}
       onValueChange={v => navigate(v as RoutePath)}
     >
+      {/* Inert ground: grid, scanlines, vignette, and a sweep whose period IS the poll.
+          Fixed and pointer-events:none — it can never eat a click. */}
+      <div className="ground" aria-hidden style={{ ['--poll' as string]: POLL_MS + 'ms' }}>
+        <span className="g-vignette" />
+        <span className="g-sweep" />
+      </div>
+      {/* Over the desk, with the grain: scanlines. A tube's lines are in front of the
+          phosphor, not behind it — behind a 92% panel they read as nothing at all. */}
+      <span className="veil" aria-hidden />
+
       <HeaderBar
         health={health.data}
         healthUnreachable={health.data === null || health.stale}
@@ -234,5 +284,6 @@ export default function App() {
         <span className="who">built for the XRPL lending hackathon · De Vinci Blockchain, 12–13 Sept 2026</span>
       </div>
     </Tabs>
+    </TooltipProvider>
   )
 }
