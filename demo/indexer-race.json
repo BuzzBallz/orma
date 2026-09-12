@@ -1,18 +1,18 @@
 {
-  "capturedAt": "2026-09-12T16:05:57Z",
+  "capturedAt": "2026-09-12T21:07:56Z",
   "capturedDuring": "XRPL Lending Protocol Hackathon, Paris, 12-13 September 2026",
   "network": "devnet",
   "label": "Meridian Trade Finance I",
   "buildVersion": "3.4.0-rc5",
-  "transactionHash": "9CFF971F35A9D162CE3A54C71961E64694A83A79321EB05DED8A36EEFAD14106",
+  "transactionHash": "075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3",
   "transactionResult": "tesSUCCESS",
   "finding": "The first impairment of a previously-healthy vault is invisible to metadata diffing.",
   "why": "LossUnrealized was 0 (the type default) so rippled omits it from PreviousFields. Under cash-basis accounting impairment changes nothing else on the Vault, so PreviousFields is entirely {} while FinalFields carries a non-zero LossUnrealized.",
-  "vaultId": "F8941703977DDC15ACC7C8758C8609A9EDC60A43ADAF234AE0A175D14C78087A",
-  "loanBrokerId": "3B10D891C30244EB9C12E902143FD25737B4B92121589F5C8E066EB8E538CDB1",
-  "loanId": "24B77C167B48F89F81BDC0D94E0D3472D151D294232C46A030811BEADE39DE48",
+  "vaultId": "864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835",
+  "loanBrokerId": "41BD2EA81CD03ED9EAC612BFFC6179AC742120FC4A5E0DD1D3E4DCE7DB5B2F38",
+  "loanId": "60C170A9F1096E7200196E2DBC5849A5D8991C2F630123E77FF359B68F2B4188",
   "vaultNode": {
-    "ledgerIndex": "F8941703977DDC15ACC7C8758C8609A9EDC60A43ADAF234AE0A175D14C78087A",
+    "ledgerIndex": "864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835",
     "previousFields": {},
     "finalFields": {
       "AssetsTotal": "51000000",
@@ -27,7 +27,7 @@
     "sharesOutstanding": "51000000"
   },
   "loanNode": {
-    "ledgerIndex": "24B77C167B48F89F81BDC0D94E0D3472D151D294232C46A030811BEADE39DE48",
+    "ledgerIndex": "60C170A9F1096E7200196E2DBC5849A5D8991C2F630123E77FF359B68F2B4188",
     "previousFields": {
       "Flags": 0
     },

@@ -96,7 +96,9 @@ const now = await closeTime()
 // A first run with a 25 second window proved exactly that: the deposit came back
 // tecEXPIRED and the withdrawal tecTOO_SOON, neither of which says anything about the
 // gate. The two phase rules mask the credential rule rather than compose with it.
-const SUB = now + 900
+// 900s is the floor the sequence needs; a presentation wants far more, so the
+// orchestrator raises it. Either way the whole test runs inside Subscription.
+const SUB = now + Math.max(900, Number(process.env.GATE_SUBSCRIPTION_SECONDS ?? 900))
 const RED = SUB + WINDOW
 const vc = must(await submitValidated(c, vaultOwner, {
   TransactionType: 'VaultCreate', Asset: { currency: 'XRP' },

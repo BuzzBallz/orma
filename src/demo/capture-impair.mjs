@@ -68,11 +68,14 @@ console.log('  funding')
 const { wallet: owner } = await c.fundWallet()
 const { wallet: borrower } = await c.fundWallet()
 
+const arg = (n, d) => { const i = process.argv.indexOf('--' + n); return i > -1 && process.argv[i + 1] ? process.argv[i + 1] : d }
 const now = await closeTime()
 const SUB = now + 25
-// 900s is generous: the loan must mature strictly before RedemptionDate or LoanSet
-// returns tecNO_PERMISSION (finding U1, confirmed twice — see FEEDBACK-APPENDIX.md E).
-const RED = SUB + 900
+// The loan must mature strictly before RedemptionDate or LoanSet returns
+// tecNO_PERMISSION (finding U1, confirmed twice, see FEEDBACK-APPENDIX.md Appendix E).
+// The window is long by default so the facility stays in its Investment phase for a
+// demo rather than sliding into Redemption while nobody is looking.
+const RED = SUB + Number(arg('window', 900))
 
 console.log('\n  building the vault')
 let r = must(await c.submitAndWait({

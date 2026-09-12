@@ -162,8 +162,33 @@ export class OraclePublisher {
         // Invariant 1: ALWAYS the full set. Omitting a pair strips its price.
         PriceDataSeries: buildPriceData(detail),
       }
-      const r = await this.client.submitAndWait(tx, { wallet: this.wallet, autofill: true })
-      const result = r.result.meta.TransactionResult
+      let r = await this.client.submitAndWait(tx, { wallet: this.wallet, autofill: true })
+      let result = r.result.meta.TransactionResult
+
+      // tecARRAY_TOO_LARGE means this document id is carrying pairs from a previous life.
+      //
+      // Invariant 1 again, from the other side: OracleSet does not REMOVE a pair it
+      // omits, it keeps it with the price stripped. So reusing a document id for a
+      // different set of assets -- which is exactly what happens when the demo vaults are
+      // rebaked and the publisher account is stable -- accumulates the old pairs under
+      // the new ones until the series passes the ledger's ceiling and nothing can be
+      // published at all. The object is not corrupt, it is full of ghosts.
+      //
+      // Deleting and recreating is the only way back: there is no "remove this pair".
+      if (result === 'tecARRAY_TOO_LARGE') {
+        log.warn('document id carries stale pairs, recreating', { docId })
+        try {
+          await this.client.submitAndWait(
+            { TransactionType: 'OracleDelete', Account: this.wallet.address, OracleDocumentID: docId },
+            { wallet: this.wallet, autofill: true },
+          )
+          r = await this.client.submitAndWait(tx, { wallet: this.wallet, autofill: true })
+          result = r.result.meta.TransactionResult
+        } catch (e) {
+          log.warn('could not recreate the oracle document', { docId, err: String(e).slice(0, 90) })
+        }
+      }
+
       if (result === 'tesSUCCESS') {
         this._lastUpdate.set(docId, lut)
         log.info('published', { vault: vaultId.slice(0, 12), docId, nav: detail.vault.navCorrect, grade: detail.score.grade })
