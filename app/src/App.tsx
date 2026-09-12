@@ -155,7 +155,16 @@ function Desk() {
   const race = usePoll<IndexerRace>(path === '/evidence' ? '/api/indexer-race' : null, 30000)
 
   const primary = path === '/' ? vaults : detail
-  const stamp = path === '/' ? vaults.data : detail.data
+  // The verification screen is not scoped to a facility, so it has no detail payload to
+  // date itself from, and the header read "figures received" with no as-of beside it --
+  // which invites exactly the question that screen exists to answer. The capture carries
+  // its own stamp, so use it.
+  //
+  // Only for the DATE. Staleness deliberately still comes from `primary`: a capture is a
+  // fixed historical artifact polled every 30s, so routing staleness through it would
+  // post a permanent "received 12s ago" warning over a transaction that is not going to
+  // change. Stale means a live figure stopped arriving. This one already arrived.
+  const stamp = path === '/' ? vaults.data : path === '/evidence' ? race.data : detail.data
   const notFound = detail.code === 'VAULT_NOT_FOUND'
 
   const wasWithheld = useRef(false)
@@ -328,7 +337,7 @@ function Desk() {
         onSelect={id => navigate(path === '/' ? '/facility' : path, id)}
       />
 
-      {primary.stale
+      {primary.stale && path !== '/evidence'
         ? <StaleBar ageMs={primary.ageMs} fails={primary.fails} />
         : wallet.missing && (
           <Alert className="wbanner" onClick={wallet.dismissMissing}>
