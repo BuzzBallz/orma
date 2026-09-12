@@ -1,7 +1,7 @@
 # Appendix — full feedback register, XLS-65 / XLS-66
 
 > **The deliverable is [`/FEEDBACK.md`](../FEEDBACK.md), the three-page developer report at the repository
-> root. This file is its supporting evidence: the complete 39-finding register, with transaction hashes,
+> root. This file is its supporting evidence: the complete 40-finding register, with transaction hashes,
 > file and line references, verbatim error strings, upstream issue and PR numbers, and the three findings
 > we withdrew. Nothing here is rewritten for the report; the report selects from it.**
 
@@ -110,7 +110,7 @@ Every finding also carries a **status**, which is a claim about the world and no
 
 ## 3. Index of findings
 
-**39 findings, plus three we withdrew (§10).** Statuses are as of 2026-09-12 and were re-checked against the
+**40 findings, plus three we withdrew (§10).** Statuses are as of 2026-09-12 and were re-checked against the
 live trackers that morning; §13 lists what moved.
 
 | ID | Sev | Status | Component | Finding |
@@ -154,6 +154,7 @@ live trackers that morning; §13 lists what moved.
 | D8 | P2 | NEW | XLS-66 §3.11.1 | `LoanPay` is given transaction type 83; it is 84 |
 | D10 | P2 | Partially tracked (`XRPL-Standards#616`, `#555`) | XLS-65, XLS-66 | Twelve Invariants sections, plus XLS-65's Rationale and Security Considerations, are `TBD` |
 | **D11** | **P1** | **NEW** | XLS-65, XLS-66, docs | Both standards state the arithmetic completely and evaluate none of it. No number appears anywhere, and a rule nobody has evaluated reads as a rule with no consequences |
+| **M5** | **P1** | **NEW — found while building** | rippled | A LoanBroker's action history cannot be reconstructed by filtering: `LoanManage` names no broker and an impairment does not touch the broker object, so impairments vanish and the consumer cannot tell |
 | W1–W3 | — | **Withdrawn** | — | See §10 |
 
 ---
@@ -1374,6 +1375,77 @@ without first solving discovery out of band.
 **Ask, cheapest first:** implement `vault_list` (it is already specified, including pagination and three
 worked response examples); add `loan_info` / `loan_broker_info`; or add the three entry types to
 `subscribe`. Any one of the three unblocks the category.
+
+---
+
+### M5 — a LoanBroker's action history cannot be reconstructed by filtering, and an indexer cannot tell that it is missing events
+
+**P1 · rippled · NEW — found while building, and it shipped a wrong answer before we caught it**
+
+To assess a broker you need what they did: when they flagged an exposure, when they declared a loss, when
+they added or withdrew first-loss capital. The obvious reconstruction is to walk `account_tx` for the broker
+owner and keep the transactions that concern this broker. There are exactly two ways to decide that, and on
+an impairment both of them fail.
+
+**1. The transaction does not name the broker.** `LoanManage` carries `LoanID`. It has no `LoanBrokerID`
+field at all, on any flag.
+
+**2. The broker object is not modified.** We expected impairment to touch `LoanBroker` — it is the object
+whose loss-absorbing obligation the impairment speaks to. It does not. The full affected-node set of
+`9CFF971F35A9D162CE3A54C71961E64694A83A79321EB05DED8A36EEFAD14106`, an impairment on a funded
+closed-ended vault with a broker and cover in place, is:
+
+| node | type |
+|---|---|
+| `ModifiedNode` | `Loan` |
+| `ModifiedNode` | `AccountRoot` |
+| `ModifiedNode` | `Vault` |
+
+So a filter on either the transaction field or the broker node returns cover deposits and defaults, and
+**silently drops every impairment**. Defaults survive only because a default decrements `DebtTotal` and
+therefore does touch `LoanBroker`. The broker's record comes back looking complete, in the right order,
+with correct figures — and missing precisely the events that show the manager behaving well.
+
+## What it cost us, and why the shape of the failure is the point
+
+Our conduct score counts impairments to decide whether a loss was *signalled* before it was realised. A
+manager who flags an exposure and then declares it has warned their depositors; one who goes straight to a
+default has not. With impairments invisible, every default looked unsignalled. **The rule written to reward
+disclosure was penalising it**, twenty points per loss, on exactly the managers it was built to protect.
+
+Nothing failed. No result code, no exception, no empty response. The reconstruction returned a plausible
+history that a reviewer would accept, and we only found it because we happened to bake a vault whose sole
+action was an impairment and noticed the record said one event where we had submitted two.
+
+That is the part worth fixing. A missing capability announces itself; a filter that quietly under-reports
+does not, and every consumer of it is wrong in the same direction — too kind to managers who conceal, too
+harsh on managers who disclose.
+
+## The workaround, and why it should not be needed
+
+The join is available at no extra request: the `Loan` node in the same metadata carries
+`FinalFields.LoanBrokerID`. So the reconstruction becomes *"keep this transaction if the broker node matches,
+or the transaction names the broker, or any Loan node in the metadata points at it"*. Sixteen characters of
+condition, once you know it is required.
+
+Nothing points a reader there. `LoanManage` is documented in terms of the loan, the affected-node set is not
+published anywhere, and the natural mental model — that an action against a broker's book touches the
+broker's object — is wrong in exactly one case out of four.
+
+**Suggested fix**, cheapest first:
+
+1. **Add `LoanBrokerID` to `LoanManage`.** It is knowable at submission, it is already on the `Loan`, and it
+   makes the transaction self-describing. This alone closes the finding.
+2. **Or touch `LoanBroker` on impairment.** There is a defensible reason to: an impairment is a statement
+   about an obligation that broker carries, and a field such as an impaired-principal counter would make the
+   object tell the truth about its own book. This is the larger change and also the more useful one, because
+   it makes the current state readable without replaying history.
+3. **Failing both, document the affected-node set per flag.** A table of what `tfLoanImpair`,
+   `tfLoanUnimpair` and `tfLoanDefault` each modify would let an indexer author get this right by reading
+   rather than by discovering.
+
+This compounds with M3. There is no event stream and no enumeration, so transaction history is already the
+only route to a broker's record; that route having a silent hole in it removes the last one.
 
 ---
 
