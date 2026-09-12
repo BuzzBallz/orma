@@ -1,0 +1,102 @@
+{
+  "bakedAt": "2026-09-12T20:55:08Z",
+  "bakedDuring": "XRPL Lending Protocol Hackathon, Paris, 12-13 September 2026",
+  "network": "devnet",
+  "buildVersion": "3.4.0-rc5",
+  "label": "Thorne Senior Secured I",
+  "vaultId": "17B64735E2038A4413D96F8EDC7F1B7478D039941C7D3C1C746AF00B3C3F702E",
+  "domainId": "1BA8601BEB74AD90189B0062B441DBBF3E03C45EAF3D79A12D03A0F1CE6910D8",
+  "credentialType": "ORMA-IG",
+  "credentialTypeHex": "4F524D412D4947",
+  "accounts": {
+    "rater": "rMsPKmx9UPdeh42E9RKGkaUK7bNsCEy1Cj",
+    "vaultOwner": "rBmBXGpLyzLuG3ZfapAHt3tiWAXEByX37n",
+    "lpGraded": "rUyV1wq9gwqZSwEbE9SCBLQA9NRgcBkVi4",
+    "lpUngraded": "rGu91R1JRQA9j4EYtawxptdA6d4z31GpZk"
+  },
+  "steps": [
+    {
+      "step": "CredentialCreate",
+      "code": "tesSUCCESS",
+      "ok": true,
+      "hash": "4E62EDC1AE42C02781D92EB70A6C4F35D38FDC456DB91C40ED91A730C96BA62A",
+      "note": null
+    },
+    {
+      "step": "CredentialAccept (by the LP)",
+      "code": "tesSUCCESS",
+      "ok": true,
+      "hash": "FFAF4EBBFBCE9FFF1BFB3BA217F160FF17469D95125BEE9D3113812B73DED485",
+      "note": null
+    },
+    {
+      "step": "PermissionedDomainSet",
+      "code": "tesSUCCESS",
+      "ok": true,
+      "hash": "F45E704227E9C33E792663378C9795C4034E588B347D74BC2C273525A55508CB",
+      "note": "signed by the vault owner alone"
+    },
+    {
+      "step": "VaultCreate (private + domain)",
+      "code": "tesSUCCESS",
+      "ok": true,
+      "hash": "A84C2C4C87FE43A072D1A2569C6842930E37EF8F235697FF6F3ED51F91A2736F",
+      "note": null
+    },
+    {
+      "step": "VaultDeposit — graded LP",
+      "code": "tesSUCCESS",
+      "ok": true,
+      "hash": "A615D3FFEF83A4866962D3053382982E2980EAF562FD4D2E76A48471F933B317",
+      "note": null
+    },
+    {
+      "step": "VaultDeposit — ungraded LP",
+      "code": "tecNO_AUTH",
+      "ok": false,
+      "hash": "8AE76BBC137C877D928C62001688F462ED5F28742F55412045943E9492688970",
+      "note": "refused by the ledger, not by us"
+    },
+    {
+      "step": "CredentialDelete (revoke)",
+      "code": "tesSUCCESS",
+      "ok": true,
+      "hash": "D755E9B8863DF207DEEC0922BC5451414C2E5A5105CFD6CCA13E7B22F24A133D",
+      "note": null
+    },
+    {
+      "step": "VaultDeposit after revocation",
+      "code": "tecNO_AUTH",
+      "ok": false,
+      "hash": "9E9B13482D7B54B17A7350CD1355B6939228233A3A0325C1904DEF10060FE3EE",
+      "note": "entry is closed"
+    },
+    {
+      "step": "VaultWithdraw after revocation",
+      "code": "tesSUCCESS",
+      "ok": true,
+      "hash": "3664233B9FC9000084650F0AD5996F336D2B9A54C5E8AD6AEBEE13AF45E282D2",
+      "note": "the exit stays open"
+    }
+  ],
+  "gate": {
+    "gated": true,
+    "private": true,
+    "domainId": "1BA8601BEB74AD90189B0062B441DBBF3E03C45EAF3D79A12D03A0F1CE6910D8",
+    "acceptedCredentials": [
+      {
+        "issuer": "rMsPKmx9UPdeh42E9RKGkaUK7bNsCEy1Cj",
+        "type": "ORMA-IG",
+        "typeHex": "4F524D412D4947"
+      }
+    ],
+    "domainOwner": "rBmBXGpLyzLuG3ZfapAHt3tiWAXEByX37n",
+    "note": null
+  },
+  "verdict": {
+    "gradedAdmitted": true,
+    "ungradedRefused": true,
+    "entryClosedAfterRevocation": true,
+    "exitStayedOpen": true
+  }
+}
