@@ -50,6 +50,7 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 html, body, #root { height: 100%; }
+html{ color-scheme: dark; }
 
 body{
   margin: 0;
@@ -82,12 +83,20 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 
 /* ---------- layout ---------- */
 
-.page{ max-width: 1440px; width: 100%; margin: 0 auto; padding: 16px 32px 32px; flex: 1 1 auto; }
+.page{
+  max-width: 1440px; width: 100%; margin: 0 auto; padding: 16px 32px 32px;
+  flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0;
+}
+/* The view owns the remaining height so a desk fills its frame instead of
+   floating in the top-left quarter. */
+.page > *{ flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+/* A desk that is a single panel stretches to the frame too. */
+.page > * > .panel:only-child{ flex: 1 1 auto; }
 .grid12{ display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; }
 .grid12 > *, .stack > * { min-width: 0; }
 .col-1-7 { grid-column: span 7; }
 .col-8-12{ grid-column: span 5; }
-.stack{ display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.stack{ display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-content: start; }
 .row{ display: flex; align-items: center; gap: 8px; }
 .row-wrap{ display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .readings{ display: flex; align-items: flex-start; gap: 32px; }
@@ -138,6 +147,8 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
   border-bottom: 1px solid var(--line);
 }
 .topbar > * { flex: 0 0 auto; }
+/* The picker carries the longest label in the bar, so it is the one item allowed to shrink. */
+.topbar > .picker{ flex: 0 1 auto; min-width: 0; }
 
 .brand{
   display: flex; align-items: baseline; gap: 8px;
@@ -201,27 +212,6 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 .desk:disabled{ color: var(--fg-mute); opacity: .4; cursor: not-allowed; }
 
 /* Instrument selector — a desk control, not a naked <select>. */
-.selector{
-  position: relative; display: flex; align-items: center; gap: 10px;
-  height: 30px; padding: 0 10px;
-  border: 1px solid var(--line-2); border-radius: 3px;
-  background: var(--bg-1);
-}
-.selector:hover{ border-color: var(--fg-mute); }
-.selector:focus-within{ border-color: var(--accent); }
-.selector .label{ letter-spacing: 0.14em; color: var(--fg-mute); }
-.selector select{
-  appearance: none; -webkit-appearance: none;
-  background: none; border: 0; outline: none;
-  color: var(--fg); font: var(--t-xs) var(--mono);
-  padding: 0 16px 0 0; max-width: 240px; min-width: 120px; cursor: pointer;
-}
-.selector select option{ background: var(--bg-2); color: var(--fg); }
-.selector .chev{
-  position: absolute; right: 10px; pointer-events: none;
-  color: var(--fg-mute); font-size: 9px; line-height: 1;
-}
-
 /* ---------- feed status bar ---------- */
 
 .feedbar{
@@ -271,28 +261,69 @@ tr.row-dead td{ text-decoration: line-through; opacity: 0.55; }
 .bar.animate > i{ transition: width 600ms cubic-bezier(.2,.7,.2,1); }
 .bar-sm{ height: 5px; }
 
-/* ---------- interaction ----------
-   One focus treatment. Transitions touch colour only — no lift, no shadow,
-   no transform, no glow. */
+/* ---------- interaction + motion ----------
+   DEMO OVERRIDE of spec §6.5, agreed for the pitch: fluid CSS motion is allowed.
+   The scope is deliberately narrow — controls, rows, the view swap and two live
+   signals. Never a bounce, never a spring, never a fade-in of the whole page on
+   mount, never a shimmer. Everything here still dies under prefers-reduced-motion. */
 
-:where(a, button, select, [tabindex]):focus-visible,
-table.tbl th[aria-sort]:focus-visible,
-table.tbl tbody tr:focus-visible{
+:where(a, button, [tabindex], .picker-btn, .picker-list li, tr):focus-visible{
   outline: 2px solid var(--accent);
   outline-offset: -2px;
   border-radius: 2px;
 }
-.selector select:focus-visible{ outline: none; }
+.picker-btn:focus-visible{ outline-offset: 2px; }
 
-.desk, table.tbl th[aria-sort], table.tbl tbody tr, .selector, a, .btn{
-  transition: color 120ms linear, background-color 120ms linear, border-color 120ms linear;
+/* Controls only — not the raw DOM. */
+.desk, .picker, .picker-btn, .picker-list li, table.tbl th[aria-sort],
+table.tbl tbody tr, a, .btn, .pill, kbd, .hints .h{
+  transition:
+    color 160ms ease, background-color 160ms ease, border-color 160ms ease,
+    opacity 160ms ease, transform 160ms ease;
 }
 
 table.tbl th[aria-sort]{ cursor: pointer; user-select: none; }
 table.tbl th[aria-sort]:hover{ color: var(--fg); }
 table.tbl th[aria-sort] .ord{ color: var(--accent); margin-left: 4px; }
 
-button:disabled, .btn:disabled{ color: var(--fg-mute); opacity: .4; cursor: not-allowed; }
+/* A row nudges on hover. The CONTENT moves, not the row box: transforming a
+   collapsed table row repaints badly. */
+table.tbl tbody tr td > *{ transition: transform 160ms ease; }
+table.tbl tbody tr:hover td > *{ transform: translateX(2px); }
+
+button:disabled, .btn:disabled, .picker-btn:disabled{
+  color: var(--fg-mute); opacity: .45; cursor: not-allowed;
+}
+.picker-btn:disabled:hover{ border-color: var(--line-2); }
+.hints .h:hover kbd{ color: var(--fg); border-color: var(--fg-mute); }
+
+/* The desk indicator slides between desks instead of popping. */
+.desk-ind{
+  position: absolute; bottom: 0; left: 0; height: 2px;
+  background: var(--accent);
+  transition: transform 180ms ease, width 180ms ease;
+  pointer-events: none;
+}
+.desk[data-active="true"]::after{ background: transparent; }
+
+/* A view change moves 4px and settles. Never on first paint. */
+@keyframes viewIn { from { opacity: 0; transform: translateY(4px) } to { opacity: 1; transform: none } }
+.view{ animation: viewIn 160ms ease both; }
+
+/* The desk is waiting, not dead. */
+@keyframes waiting { 0%,100%{ opacity: 1 } 50%{ opacity: .3 } }
+.pill .dot.waiting{ animation: waiting 1.6s ease-in-out infinite; }
+
+/* One poll cycle drawn as a 2px rail that recharges. Not a spinner: it is the real
+   interval, restarted by each good payload and frozen while none arrive. */
+.statusgroup{ display: inline-flex; flex-direction: column; gap: 5px; }
+.tick{ display: block; width: 100%; height: 2px; background: var(--line); border-radius: 1px; overflow: hidden; }
+.tick > i{ display: block; height: 100%; width: 0; background: var(--fg-mute); animation: recharge linear 1 forwards; }
+@keyframes recharge { from { width: 0 } to { width: 100% } }
+
+/* A figure that actually moved — triggered by a change in an HTTP value, never a timer. */
+@keyframes flash { from { background: color-mix(in srgb, var(--accent) 22%, transparent) } to { background: transparent } }
+.flash{ animation: flash 120ms ease-out 1; }
 
 /* ---------- the signature pair ----------
    The naive reading is muted and DASHED; the correct reading is accent and SOLID.
@@ -375,6 +406,93 @@ kbd{
 }
 .hints .h{ display: inline-flex; align-items: center; gap: 7px; }
 .hints kbd{ letter-spacing: 0; }
+
+/* ---------- instrument picker ---------- */
+
+.picker{
+  position: relative; display: flex; align-items: center; gap: 10px;
+  height: 30px; padding: 0 0 0 10px;
+  border: 1px solid var(--line-2); border-radius: 3px;
+  background: var(--bg-1);
+}
+.picker:hover{ border-color: var(--fg-mute); }
+.picker:focus-within{ border-color: var(--accent); }
+.picker > .label{ letter-spacing: 0.14em; color: var(--fg-mute); }
+.picker-btn{
+  display: flex; align-items: center; gap: 10px;
+  height: 100%; padding: 0 10px 0 0;
+  background: none; border: 0; cursor: pointer;
+  font: var(--t-xs) var(--mono); color: var(--fg);
+}
+.picker-label{ max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker .chev{ color: var(--fg-mute); font-size: 10px; line-height: 1; transition: transform 160ms ease; }
+.picker-btn[aria-expanded="true"] .chev{ transform: rotate(180deg); }
+
+.picker-list{
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 30;
+  min-width: 300px; margin: 0; padding: 4px; list-style: none;
+  background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 4px;
+  animation: viewIn 160ms ease both;
+}
+.picker-list li{
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 8px; border-radius: 3px; cursor: pointer;
+  font: var(--t-xs) var(--mono); color: var(--fg-dim);
+}
+.picker-list li[data-cursor="true"]{ background: var(--bg-3); color: var(--fg); }
+.picker-list li[aria-selected="true"] .picker-name{ color: var(--fg); }
+.picker-name{ font-family: var(--sans); font-size: var(--t-sm); }
+
+/* ---------- desk grid: the frame never empties ---------- */
+
+.deskgrid{
+  display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px;
+  align-items: stretch; flex: 1 1 auto;
+}
+.deskgrid > .panel{ display: flex; flex-direction: column; }
+@media (max-width: 1100px){ .deskgrid{ grid-template-columns: minmax(0, 1fr); } }
+
+.rail{
+  background: var(--bg-1); border: 1px solid var(--line); border-radius: 4px; padding: 20px;
+}
+.rail .kicker{
+  font: 500 var(--t-xs)/1 var(--sans); text-transform: uppercase;
+  letter-spacing: 0.22em; color: var(--fg-mute); margin-bottom: 14px;
+}
+.rail .verdict{
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: var(--t-xl); line-height: 1; letter-spacing: -0.04em;
+  color: var(--status-tone, var(--fg)); margin-bottom: 16px;
+}
+.rail .lede{ font-size: var(--t-sm); line-height: 1.6; color: var(--fg-dim); margin: 0 0 20px; }
+.rail .lede b{ color: var(--fg); font-weight: 500; }
+.rail .facts{
+  display: grid; grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0 16px; border-top: 1px solid var(--line); padding-top: 12px; margin: 0 0 20px;
+}
+.rail .facts dt{ padding: 5px 0; }
+.rail .facts dd{
+  margin: 0; padding: 5px 0; font: var(--t-xs) var(--mono);
+  color: var(--fg-dim); overflow-wrap: anywhere;
+}
+.rail .action{ border-left: 2px solid var(--accent); padding: 10px 0 10px 14px; }
+.rail .action .say{ font-size: var(--t-sm); color: var(--fg); margin-bottom: 8px; }
+.rail .action code{
+  display: inline-block; font: var(--t-xs) var(--mono); color: var(--accent);
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 3px; padding: 6px 9px;
+}
+.rail .note{ margin-top: 16px; font-size: var(--t-xs); color: var(--fg-mute); line-height: 1.6; }
+
+/* ---------- structural placeholders ----------
+   Shape only. Every figure is an em-dash: nothing here is a number. */
+
+tr.ghost td{ color: var(--fg-mute); }
+tr.ghost:hover{ background: none; }
+tr.ghost:hover td > *{ transform: none; }
+.ghost-chip{ display: inline-block; width: 34px; height: 19px; border: 1px dashed var(--line-2); border-radius: 3px; }
+.ghost-dot{ display: inline-block; width: 7px; height: 7px; border-radius: 50%; border: 1px dashed var(--line-2); }
+.ghost-desk .ghost-lines{ display: grid; gap: 10px; margin: 4px 0 16px; }
+.ghost-desk .ghost-lines span{ display: block; height: 8px; background: var(--bg-2); border-radius: 2px; }
 
 /* ---------- responsive ---------- */
 

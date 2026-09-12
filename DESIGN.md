@@ -44,6 +44,33 @@ jamais masqués. Budget d'animation tenu : exactement trois. Chiffres tabulaires
 - **Interaction** : anneau de focus `--accent` 2px sur tout ce qui est atteignable au clavier,
   transitions 120 ms sur couleur/fond/bordure uniquement — jamais de translation, jamais d'ombre.
 
+## Override §6.5 — motion de démo (décidé par Dev B, 12/09)
+
+Le spec §6.5 n'autorise que trois animations. **Pour la démo, cette règle est levée**, sur
+décision explicite. La motion ajoutée reste bornée et documentée :
+
+| motion | durée | déclencheur |
+|---|---|---|
+| indicateur de desk qui glisse | 180 ms ease | changement de route |
+| bascule de vue (opacity + 4px) | 160 ms ease | changement de route, **jamais au premier paint** |
+| hover/focus des contrôles (couleur, fond, bordure, opacité, transform) | 160 ms ease | pointeur / clavier |
+| contenu de ligne qui se décale de 2px | 160 ms ease | hover de ligne |
+| chevron du picker | 160 ms ease | ouverture |
+| liste du picker | 160 ms ease | ouverture |
+| point de la pill qui respire | 1.6 s infinite | **uniquement feed DOWN** |
+| jauge de poll 2px qui se recharge | = intervalle réel (3000 ms) | chaque payload reçu ; figée si aucun |
+| flash d'une cellule | 120 ms | **changement réel d'une valeur HTTP**, jamais un timer |
+| barre NAV (spec) | 600 ms | changement de largeur |
+| pulse `defaultable` (spec) | 2 s infinite | statut du prêt |
+| opacité des bandes S3 (spec §S3) | 200 ms | beat |
+
+Toujours interdit et absent : bounce, spring, fade-in de page au mount, skeleton shimmer,
+spinner, webfont, nouvelle lib. Tout tombe sous `prefers-reduced-motion: reduce`.
+
+Le blotter fantôme (5 slots `Vault 1…5`) est **structurel** : chaque figure est un tiret cadratin.
+Aucun id, aucun montant, aucun countdown n'y est inventé — un backend live peut servir d'autres
+instruments que les cinq fixtures.
+
 ## Écarts assumés avec le brief générique
 
 Pas d'animation d'entrée (§6.5 : « no fade-ins »). Pas de skeleton (§6.5, et §5.1 r.3 veut un

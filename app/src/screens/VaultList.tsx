@@ -4,6 +4,7 @@ import { Chip } from '../components/Chip'
 import { Countdown } from '../components/Countdown'
 import { gradeTone } from '../lib/grades'
 import { bpsToPct, short } from '../lib/format'
+import { useFlash } from '../lib/useFlash'
 
 type SortKey = 'gradeNumeric' | 'label' | 'phase' | 'secondsToRedemption' | 'navDivergenceBps' | 'loanCount' | 'trend'
 
@@ -16,6 +17,88 @@ function bpsTone(bps: number): string | undefined {
   if (bps === 0) return 'var(--fg-dim)'
   if (bps < 100) return 'var(--warn)'
   return 'var(--bad)'
+}
+
+const GHOSTS = [1, 2, 3, 4, 5]
+
+/**
+ * Structural placeholder while no payload has arrived. It carries the shape of the book and
+ * nothing else: every figure is an em-dash. No id, no amount, no countdown is invented —
+ * a live backend may serve entirely different instruments.
+ */
+function GhostRow({ n }: { n: number }) {
+  return (
+    <tr className="ghost" aria-hidden>
+      <td><span className="ghost-chip" /></td>
+      <td>
+        <span className="inst">
+          <span className="name mute">Vault {n}</span>
+          <span className="id">awaiting feed</span>
+        </span>
+      </td>
+      <td className="mute">—</td>
+      <td className="rt mute">—</td>
+      <td className="rt mute">—</td>
+      <td className="rt mute">—</td>
+      <td className="rt mute">—</td>
+      <td className="mute">—</td>
+      <td><span className="ghost-dot" /></td>
+    </tr>
+  )
+}
+
+function Row({ v, receivedAt, tick, onOpen }: {
+  v: VaultRow; receivedAt: number; tick: number; onOpen: (id: string) => void
+}) {
+  // Flashes only when the ledger actually moved these figures. Never on a timer.
+  const bpsMoved = useFlash(v.navDivergenceBps)
+  const navMoved = useFlash(v.navCorrect)
+  return (
+    <tr
+      className={RAIL[gradeTone(v.grade)]}
+      style={{ cursor: 'pointer' }}
+      tabIndex={0}
+      aria-label={`open ${v.label ?? v.vaultId}`}
+      onClick={() => onOpen(v.vaultId)}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(v.vaultId) } }}
+    >
+      <td><Chip tone={gradeTone(v.grade)}>{v.grade}</Chip></td>
+      <td>
+        <span className="inst">
+          <span className="name">{v.label ?? short(v.vaultId, 8)}</span>
+          <span className="id">{v.vaultId.slice(0, 12)}</span>
+        </span>
+      </td>
+      <td className="mono" style={{ fontSize: 'var(--t-sm)' }}>{v.phase}</td>
+      <td className="rt">
+        <Countdown seconds={v.secondsToRedemption} receivedAt={receivedAt} tick={tick} mode="boundary" />
+      </td>
+      <td className={'rt' + (bpsMoved ? ' flash' : '')} style={{ color: bpsTone(v.navDivergenceBps) }}>
+        {v.navDivergenceBps} bps · {bpsToPct(v.navDivergenceBps)}
+      </td>
+      <td className={'rt' + (navMoved ? ' flash' : '')}>
+        <span className="pair-naive bare">{v.navNaive}</span>
+        <span className="mute"> → </span>
+        <span className="pair-correct bare">{v.navCorrect}</span>
+      </td>
+      <td className="rt">
+        {v.loanCount}
+        <span style={{ color: v.distressedLoanCount > 0 ? 'var(--bad)' : 'var(--fg-mute)' }}>
+          {' / '}{v.distressedLoanCount}
+        </span>
+      </td>
+      <td className="mono" style={{ fontSize: 'var(--t-sm)' }}>{v.trend}</td>
+      <td>
+        <span
+          title={v.oraclePublished ? 'published' : 'not published'}
+          style={{
+            display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
+            background: v.oraclePublished ? 'var(--ok)' : 'var(--fg-mute)',
+          }}
+        />
+      </td>
+    </tr>
+  )
 }
 
 /**
@@ -60,7 +143,9 @@ export function VaultList({ vaults, receivedAt, tick, onOpen }: {
     <section className="panel">
       <div className="row" style={{ marginBottom: 16, alignItems: 'baseline' }}>
         <h2 className="panel-title" style={{ margin: 0 }}>the book</h2>
-        <span className="num mute" style={{ fontSize: 'var(--t-xs)' }}>{vaults.length} instruments · worst grade first</span>
+        <span className="num mute" style={{ fontSize: 'var(--t-xs)' }}>
+          {vaults.length > 0 ? `${vaults.length} instruments · worst grade first` : 'awaiting feed · worst grade first'}
+        </span>
         <span className="spacer" />
         <span className="caption">
           Zero divergence is not safety. A loss nobody has declared reads par on both sides.
@@ -82,53 +167,11 @@ export function VaultList({ vaults, receivedAt, tick, onOpen }: {
             </tr>
           </thead>
           <tbody>
-            {rows.map(v => (
-              <tr
-                key={v.vaultId}
-                className={RAIL[gradeTone(v.grade)]}
-                style={{ cursor: 'pointer' }}
-                tabIndex={0}
-                aria-label={`open ${v.label ?? v.vaultId}`}
-                onClick={() => onOpen(v.vaultId)}
-                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(v.vaultId) } }}
-              >
-                <td><Chip tone={gradeTone(v.grade)}>{v.grade}</Chip></td>
-                <td>
-                  <span className="inst">
-                    <span className="name">{v.label ?? short(v.vaultId, 8)}</span>
-                    <span className="id">{v.vaultId.slice(0, 12)}</span>
-                  </span>
-                </td>
-                <td className="mono" style={{ fontSize: 'var(--t-sm)' }}>{v.phase}</td>
-                <td className="rt">
-                  <Countdown seconds={v.secondsToRedemption} receivedAt={receivedAt} tick={tick} mode="boundary" />
-                </td>
-                <td className="rt" style={{ color: bpsTone(v.navDivergenceBps) }}>
-                  {v.navDivergenceBps} bps · {bpsToPct(v.navDivergenceBps)}
-                </td>
-                <td className="rt">
-                  <span className="pair-naive bare">{v.navNaive}</span>
-                  <span className="mute"> → </span>
-                  <span className="pair-correct bare">{v.navCorrect}</span>
-                </td>
-                <td className="rt">
-                  {v.loanCount}
-                  <span style={{ color: v.distressedLoanCount > 0 ? 'var(--bad)' : 'var(--fg-mute)' }}>
-                    {' / '}{v.distressedLoanCount}
-                  </span>
-                </td>
-                <td className="mono" style={{ fontSize: 'var(--t-sm)' }}>{v.trend}</td>
-                <td>
-                  <span
-                    title={v.oraclePublished ? 'published' : 'not published'}
-                    style={{
-                      display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
-                      background: v.oraclePublished ? 'var(--ok)' : 'var(--fg-mute)',
-                    }}
-                  />
-                </td>
-              </tr>
-            ))}
+            {rows.length === 0
+              ? GHOSTS.map(n => <GhostRow key={n} n={n} />)
+              : rows.map(v => (
+                <Row key={v.vaultId} v={v} receivedAt={receivedAt} tick={tick} onOpen={onOpen} />
+              ))}
           </tbody>
         </table>
       </div>
