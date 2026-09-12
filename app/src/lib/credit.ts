@@ -21,6 +21,13 @@ const TERMS: [RegExp, string][] = [
   [/\bCoverRateLiquidation\b/g, 'liquidation coverage rate'],
   [/\bRedemptionDate\b/g, 'redemption date'],
   [/\btecINSUFFICIENT_FUNDS\b/g, 'insufficient funds'],
+  // Result codes. They arrive from the register verbatim and are precise, which is
+  // exactly why they are translated rather than dropped: the reason is worth stating,
+  // the code is not something this reader has ever seen.
+  [/\btecTOO_SOON\b/g, 'the investment period runs to the redemption date'],
+  [/\btecEXPIRED\b/g, 'the subscription period has closed'],
+  [/\btecNO_AUTH\b/g, 'the subscriber is not admitted'],
+  [/\btecNO_PERMISSION\b/g, 'not permitted for this facility'],
   [/\bdrops\b/g, 'units'],
   // Amounts arrive denominated; the note states the reporting currency once, in the
   // methodology, rather than repeating a ticker against every figure.

@@ -295,7 +295,7 @@ export function Facility({ d, history, collateral, resolution, gate }: {
                 {name} lends to a single broker against posted first-loss coverage. Drawn
                 debt is {dropsToXrp(d.broker.debtTotal)} of {dropsToXrp(d.broker.debtMaximum)}{' '}
                 committed. Investors subscribe units and redeem them at the scheduled date;
-                the facility is {v.isPrivate ? 'private' : 'open to subscription'} and its
+                the facility is {v.isPrivate ? 'restricted to admitted subscribers' : 'open to any subscriber'} and its
                 withdrawal policy is {creditText(v.withdrawalPolicy)}. Internal reference{' '}
                 {facilityRef(v.vaultId)}.
               </p>

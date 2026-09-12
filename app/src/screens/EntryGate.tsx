@@ -23,7 +23,12 @@ export function EntryGate({ g }: { g: Gate | null }) {
 
       {!g.gated ? (
         <p className="caption meth">
-          Open to any subscriber. {g.note ? <>{g.note[0].toUpperCase() + g.note.slice(1)}.</> : null}
+          Open to any subscriber.
+          {/* The note earns a sentence only when it says something the line above does
+              not: a facility marked restricted that enforces nothing, for instance. */}
+          {g.note && !/open to any/i.test(g.note)
+            ? <> {g.note[0].toUpperCase() + g.note.slice(1)}.</>
+            : null}
         </p>
       ) : (
         <>
