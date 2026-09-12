@@ -122,6 +122,25 @@ export class Xrpl {
     return r.result.node
   }
 
+  /**
+   * Transaction history for an account, newest first.
+   * Devnet retains roughly 29 days, which is ample for brokers created during an event
+   * but would not be for a real track record. Paginates on `marker`.
+   */
+  async accountTx(account, { limit = 200, maxPages = 5 } = {}) {
+    const out = []
+    let marker
+    for (let page = 0; page < maxPages; page++) {
+      const req = { command: 'account_tx', account, limit, ledger_index_min: -1, ledger_index_max: -1 }
+      if (marker) req.marker = marker
+      const r = await this.req(req)
+      out.push(...(r.result.transactions ?? []))
+      marker = r.result.marker
+      if (!marker) break
+    }
+    return out
+  }
+
   /** Objects owned by an account, optionally filtered. Used to discover a vault's brokers. */
   async accountObjects(account, type) {
     const r = await this.req({ command: 'account_objects', account, type, limit: 400 })

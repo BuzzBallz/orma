@@ -15,7 +15,9 @@
     "start": "node src/index.mjs",
     "check:contract": "node src/dev/check-contract.mjs",
     "check:oracle": "node src/dev/check-oracle.mjs",
-    "check:collateral": "node src/dev/check-collateral.mjs"
+    "check:collateral": "node src/dev/check-collateral.mjs",
+    "check:ordering": "node src/dev/check-ordering-math.mjs",
+    "check:history": "node src/dev/check-history.mjs"
   },
   "dependencies": {
     "decimal.js": "10.6.0",
