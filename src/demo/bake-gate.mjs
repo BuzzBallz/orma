@@ -159,6 +159,19 @@ const out = {
 }
 mkdirSync('demo', { recursive: true })
 writeFileSync(OUT, JSON.stringify(out, null, 2) + '\n')
+
+// The four keys, so the gate can be REPLAYED on stage rather than only recounted.
+//
+// Separate file, gitignored, and never referenced from demo/gate-vault.json: these are
+// worthless Devnet faucet keys and they are still private keys, so they stay out of the
+// artefact that gets committed. The pre-commit hook validates seeds by checksum and
+// will refuse them if this is ever staged by accident.
+writeFileSync('.demo-keys.json', JSON.stringify({
+  note: 'Devnet faucet keys for replaying the gate demo. Gitignored. Worthless, still private keys.',
+  vaultId, domainId, credentialType: BAR.name,
+  rater: rater.seed, vaultOwner: vaultOwner.seed, lpGraded: lpGood.seed, lpUngraded: lpBad.seed,
+}, null, 2) + String.fromCharCode(10))
+console.log('  keys for a live replay -> .demo-keys.json (gitignored)')
 console.log(`\n  -> ${OUT}\n`)
 
 await x.disconnect()
