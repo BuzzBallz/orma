@@ -690,9 +690,12 @@ kbd{
 .op-tbl td b{ color: var(--fg); font-weight: 500; }
 .op-says{ color: var(--fg-mute); }
 
+/* No frame, so the ground has to do the work. A tint of the foreground reads on a dark
+   page; a tint of another near-black does not — the boxes were at 1.05 against the sheet
+   and disappeared into it. */
 .op-box{
   border: 0; border-radius: var(--r-panel); padding: 14px 16px;
-  background: color-mix(in srgb, var(--bg-2) 60%, transparent);
+  background: color-mix(in srgb, var(--fg) 6.5%, transparent);
 }
 .op-box > .label{ display: block; margin-bottom: 10px; }
 .op-ratings{ margin: 0; }

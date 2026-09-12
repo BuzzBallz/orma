@@ -55,11 +55,7 @@ export function Facility({ d, name: fallbackName }: { d: VaultDetail | null; nam
         <header className="op-top">
           <div className="op-kind">
             <span className="label">credit opinion</span>
-            <span className="op-date">
-              {d.serverTime
-                ? <>figures received {fmtIso(d.serverTime)}</>
-                : <>figures withheld</>}
-            </span>
+            <span className="op-date">figures of {fmtIso(d.serverTime)}</span>
           </div>
           <h1 className="op-title">{name}</h1>
           <p className="op-sub">
@@ -352,16 +348,20 @@ export function Facility({ d, name: fallbackName }: { d: VaultDetail | null; nam
  */
 function OpinionSkeleton({ name }: { name?: string }) {
   const NA = <span className="mute">n.a.</span>
+  const DASH = <span className="mute">—</span>
   return (
     <article className="opinion">
       <div className="op-page">
         <header className="op-top">
-          <div className="op-kind">
-            <span className="label">credit opinion</span>
-            <span className="op-date">no figures received</span>
-          </div>
-          <h1 className="op-title">{name ?? 'No facility selected'}</h1>
-          <p className="op-sub">Lending facility · status n.a. · internal score n.a. · outlook n.a.</p>
+          {name && (
+            <div className="op-kind"><span className="label">credit opinion</span></div>
+          )}
+          <h1 className="op-title">{name ?? 'Credit opinion'}</h1>
+          <p className="op-sub">
+            {name
+              ? <>Lending facility · status — · internal score — · outlook —</>
+              : <>No facility selected — choose one from the portfolio.</>}
+          </p>
         </header>
 
         <div className="op-grid">
@@ -379,10 +379,10 @@ function OpinionSkeleton({ name }: { name?: string }) {
 
             <div className="op-two">
               <Section title="Credit strengths" tight>
-                <p>{NA}</p>
+                <p className="mute">The factors scoring above the facility's own score.</p>
               </Section>
               <Section title="Credit challenges" tight>
-                <p>{NA}</p>
+                <p className="mute">The two weakest measured factors.</p>
               </Section>
             </div>
 
@@ -394,7 +394,7 @@ function OpinionSkeleton({ name }: { name?: string }) {
                     <tr key={f.name}>
                       <td><b>{f.name}</b></td>
                       <td className="op-says">{f.says}</td>
-                      <td className="rt">{NA}</td>
+                      <td className="rt">{DASH}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -409,7 +409,7 @@ function OpinionSkeleton({ name }: { name?: string }) {
                     'Available assets', 'Recognised loss', 'Drawn debt', 'Coverage available',
                     'Coverage shortfall', 'Largest exposure', 'Exposures',
                     'Claims at redemption', 'Projected shortfall'].map(k => (
-                    <tr key={k}><td>{k}</td><td className="rt">{NA}</td></tr>
+                    <tr key={k}><td>{k}</td><td className="rt">{DASH}</td></tr>
                   ))}
                 </tbody>
               </table>
@@ -429,11 +429,11 @@ function OpinionSkeleton({ name }: { name?: string }) {
             <div className="op-box">
               <div className="label">At a glance</div>
               <dl className="op-ratings">
-                <F k="reported unit value" v={NA} />
-                <F k="held unit value" v={NA} />
-                <F k="reported vs held" v={NA} />
-                <F k="exposures" v={NA} />
-                <F k="remaining term" v={NA} />
+                <F k="reported unit value" v={DASH} />
+                <F k="held unit value" v={DASH} />
+                <F k="reported vs held" v={DASH} />
+                <F k="exposures" v={DASH} />
+                <F k="remaining term" v={DASH} />
               </dl>
             </div>
           </aside>

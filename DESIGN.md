@@ -925,3 +925,17 @@ passe à `--line`. Les rangées du dialog sont libellées **Desktop app / Deskto
 est remplacé par la marque — deux lectures d'une même valeur, pleine ambre et pointillée
 grise. `as of` est masqué s'il n'y a pas d'horodatage. Le sélecteur liste **Facility 1–5**
 en tirets quand rien n'est reçu. Sous 760px la table ne garde que **nom + score**.
+
+### Revue du preview — cinq correctifs (12/09)
+
+| | ce qui clochait | corrigé |
+|---|---|---|
+| 2 | **30 × « n.a. »** contre 1 tiret sur la note vide — un mot répété trente fois en colonne, alors que le tiret est la convention partout ailleurs | **4** « n.a. » (la boîte Ratings seulement, où une agence l'écrit vraiment) et **23 tirets** |
+| 3 | le H1 en 32px portait **« No facility selected »** : l'emplacement du nom d'émetteur occupé par un état d'interface | H1 = **« Credit opinion »**, l'état passe en sous-titre |
+| 4 | les encadrés latéraux **invisibles** — sans bordure et avec un fond quasi identique à la feuille : **1,05** de séparation | fond en teinte du texte à 6,5% → **1,139**, mesuré en composant réellement les alphas |
+| 5 | « no figures received » en haut de la note **et** « figures withheld » dans le chrome : même fait, deux formulations | la ligne de la note est supprimée ; la note datée garde `figures of <heure>`, qui est ce sur quoi elle est écrite |
+| 7 | un `n.a.` isolé sous deux titres de prose | ils disent ce qui s'y écrira : « The factors scoring above the facility's own score. » / « The two weakest measured factors. » |
+
+Au passage : mon propre contrôle de contraste lisait mal `color(srgb …)` — il prenait les
+composantes 0–1 pour des 0–255 et rendait 1,01 là où la valeur peinte donne 1,088. Corrigé
+en composant la pile d'alphas jusqu'au fond.
