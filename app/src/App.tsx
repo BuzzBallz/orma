@@ -155,7 +155,7 @@ export default function App() {
       return (
         <VaultList
           vaults={rows} receivedAt={vaults.receivedAt} tick={tick}
-          stamp={vaults.data}
+          stamp={vaults.data ?? undefined}
           onOpen={id => navigate('/vault', id)}
         />
       )

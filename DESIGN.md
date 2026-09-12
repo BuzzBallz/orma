@@ -122,3 +122,17 @@ Pas d'animation d'entrée (§6.5 : « no fade-ins »). Pas de skeleton (§6.5, e
 panneau d'instruction, pas un spinner). **Pas de seed data** : cinq vaults réels sont servis sur
 `:8787`, et écrire un chiffre qui ne sort pas d'une réponse HTTP est l'interdit n°1 du projet.
 Pas de CTA sur les états vides : le produit est en lecture seule, il n'y a rien à cliquer.
+
+## Comment vérifier les types — piège
+
+`pnpm --dir app exec tsc --noEmit` **ne vérifie rien**. Le `app/tsconfig.json` a `"files": []`
+et délègue à des références de projet, donc sans `-b` TypeScript ne contrôle aucun fichier et
+sort en succès. Un bug de typage est passé en production à cause de ça.
+
+La vraie commande est celle du build :
+
+```
+pnpm --dir app build      # tsc -b && vite build
+```
+
+Toujours lancer ça avant de committer, jamais `tsc --noEmit` seul.
