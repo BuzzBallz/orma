@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef } from 'react'
 import './app.css'
-import { API_BASE, API_UNREACHABLE, EXPECTED_CONTRACT } from './lib/api'
+import { API_BASE, API_MIXED_ORIGIN, EXPECTED_CONTRACT, SUSPECT_AFTER_FAILS, SUSPECT_BACKOFF_MS } from './lib/api'
 import { usePoll } from './lib/usePoll'
 import { useTick } from './lib/useTick'
 import { useRoute, type RoutePath } from './lib/useRoute'
@@ -113,12 +113,16 @@ function Desk() {
   const tick = useTick()
   const { path, vaultId, navigate } = useRoute()
 
-  // A deployed preview with no backend behind it polls nothing at all: see API_UNREACHABLE.
-  const canPoll = API_UNREACHABLE === null
+  // A suspect base (http from https) is still tried — Chrome lets http://localhost through,
+  // so the demo laptop running the fixture server behind a Vercel URL genuinely works. It
+  // just stops hammering once it is clear nothing is answering. See API_MIXED_ORIGIN.
+  const slow = API_MIXED_ORIGIN
+    ? { slowAfter: SUSPECT_AFTER_FAILS, slowCapMs: SUSPECT_BACKOFF_MS }
+    : undefined
   const wallet = useWallet()
-  const health = usePoll<Health>(canPoll ? '/api/health' : null, 5000)
-  const vaults = usePoll<VaultsResponse>(canPoll ? '/api/vaults' : null, path === '/' ? POLL_MS : 15000)
-  const detail = usePoll<Detail>(canPoll && vaultId ? `/api/vaults/${vaultId}` : null, POLL_MS)
+  const health = usePoll<Health>('/api/health', 5000, slow)
+  const vaults = usePoll<VaultsResponse>('/api/vaults', path === '/' ? POLL_MS : 15000, slow)
+  const detail = usePoll<Detail>(vaultId ? `/api/vaults/${vaultId}` : null, POLL_MS, slow)
 
   const rows = vaults.data?.vaults ?? []
 
@@ -183,19 +187,21 @@ function Desk() {
   useEffect(() => { painted.current = true }, [])
 
   function body() {
-    // No API behind this build. Say it once, draw the empty book, and make no request —
-    // a public page hammering a laptop address every three seconds helps nobody.
-    if (API_UNREACHABLE) {
+    // Tried, and nothing is answering, from a base we already had reason to doubt. Name
+    // the cause instead of leaving five em-dashes unexplained — and the slow poll keeps
+    // running, so the desk fills itself the moment an API does show up.
+    if (API_MIXED_ORIGIN && !vaults.data && vaults.fails >= SUSPECT_AFTER_FAILS) {
       return (
         <div className="deskgrid down">
           <Watch
             verdict="NO API" tone="var(--warn)"
-            said={<>This build has no server behind it. The desk is drawn and the book keeps its five slots, but every figure is an em-dash: we do not put a number on screen that nobody sent us.</>}
+            said={<>Nothing is answering at that address. The desk is drawn and the book keeps its five slots, but every figure is an em-dash: we do not put a number on screen that nobody sent us.</>}
             aside={<>Point <code>VITE_API_BASE</code> at an https endpoint and the screen fills itself. Nothing else changes.</>}
             facts={[
               ['reading from', API_BASE],
-              ['why not', API_UNREACHABLE],
-              ['requests made', 'none'],
+              ['likely cause', API_MIXED_ORIGIN],
+              ['failed polls', String(vaults.fails)],
+              ['still asking', `every ${SUSPECT_BACKOFF_MS / 1000}s`],
               ['contract', `v${EXPECTED_CONTRACT}`],
             ]}
           />

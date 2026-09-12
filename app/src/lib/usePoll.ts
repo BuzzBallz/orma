@@ -20,15 +20,21 @@ const STALE_AFTER_MS = 6000
  * interval: backing off must never make a poll go faster.
  */
 const BACKOFF_CAP_MS = 5000
-const nextDelay = (intervalMs: number, fails: number) =>
+const nextDelay = (intervalMs: number, fails: number, capMs = BACKOFF_CAP_MS) =>
   fails === 0 ? intervalMs
-    : Math.min(intervalMs * 2 ** fails, Math.max(intervalMs, BACKOFF_CAP_MS))
+    : Math.min(intervalMs * 2 ** fails, Math.max(intervalMs, capMs))
 
 /**
  * setTimeout-chained poll. Never setInterval: a slow response must not stack requests.
  * `data` is never set back to null after a success — not on error, not on a 404, not on a url change.
  */
-export function usePoll<T>(path: string | null, intervalMs: number): Poll<T> {
+export function usePoll<T>(path: string | null, intervalMs: number, opts?: {
+  /** Consecutive failures after which the cap widens — for a base we already distrust. */
+  slowAfter?: number
+  slowCapMs?: number
+}): Poll<T> {
+  const slowAfter = opts?.slowAfter ?? Infinity
+  const slowCapMs = opts?.slowCapMs ?? BACKOFF_CAP_MS
   const [state, setState] = useState<Omit<Poll<T>, 'stale' | 'ageMs'>>({
     data: null, error: null, code: null, fails: 0, receivedAt: 0,
   })
@@ -62,12 +68,12 @@ export function usePoll<T>(path: string | null, intervalMs: number): Poll<T> {
       } finally {
         // whatever the outcome, schedule the next poll. The loop must be unkillable —
         // it just slows down while nobody is answering.
-        if (!cancelled) timer = setTimeout(cycle, nextDelay(intervalMs, fails))
+        if (!cancelled) timer = setTimeout(cycle, nextDelay(intervalMs, fails, fails >= slowAfter ? slowCapMs : BACKOFF_CAP_MS))
       }
     }
     cycle()
     return () => { cancelled = true; if (timer) clearTimeout(timer) }
-  }, [path, intervalMs])
+  }, [path, intervalMs, slowAfter, slowCapMs])
 
   // 1Hz heartbeat so the stale bar's numbers move without a new payload.
   useEffect(() => {

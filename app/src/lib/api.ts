@@ -2,20 +2,26 @@ export const API_BASE = (import.meta.env.VITE_API_BASE ?? 'http://localhost:8787
 export const EXPECTED_CONTRACT = '1.0.0'
 
 /**
- * A deployed preview cannot reach the operator's laptop. With VITE_API_BASE unset the base
- * falls back to http://localhost:8787, which from an https page is blocked as mixed content
- * before it ever leaves the tab — and polled every 3s that is a failure storm with nothing
- * to show for it. Name the misconfiguration once, stop asking, and let the desk paint its
- * empty slots. Spec §8: the screen always says where it is reading from.
+ * A deployed preview reaching an http base from an https page is a configuration we should
+ * be suspicious of, but NOT one we may refuse on the operator's behalf: Chrome treats
+ * http://localhost as a trustworthy origin and lets it through, so the demo laptop running
+ * the fixture server behind a Vercel URL can genuinely work. Every other machine, and
+ * Safari anywhere, will be blocked before the request leaves the tab.
  *
- * null means "go ahead and poll".
+ * So we try, and we stop hammering when it is clearly not going to answer — see
+ * SUSPECT_BACKOFF_MS. null means "nothing suspicious about this base".
  */
-export const API_UNREACHABLE: string | null =
+export const API_MIXED_ORIGIN: string | null =
   typeof location !== 'undefined'
   && location.protocol === 'https:'
   && API_BASE.startsWith('http://')
     ? `this page is served over https and the API base is ${API_BASE}`
     : null
+
+/** Consecutive failures after which a suspect base is treated as not coming back. */
+export const SUSPECT_AFTER_FAILS = 5
+/** …and the interval it falls back to. Two requests a minute is a heartbeat, not a storm. */
+export const SUSPECT_BACKOFF_MS = 30_000
 
 export class ApiFailure extends Error {
   // Plain fields, not parameter properties: the Vite template compiles with
