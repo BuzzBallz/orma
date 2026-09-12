@@ -76,13 +76,24 @@ build/
 .DS_Store
 Thumbs.db
 *.tar.gz
-
-# XRPL DevEx Capture (organizer feedback hook) - local tooling, never submitted
+# XRPL DevEx Capture (organizer feedback hook).
+# Local tooling and its capture buffer. Never submitted.
+# NOTE: git does NOT support inline comments -- a trailing "# why" on a rule line
+# makes the rule match nothing. Comments go on their own line, always.
 /xrpl-devex-hook/
 /.xrpl-devex/
+.xrpl-devex/
+
+# Agent skill folders written by the DevEx capture installer: symlinks with
+# absolute local paths, machine specific.
 /.cursor/
 /.codex/
 /.grok/
-.xrpl-devex/
+.codex/
+.cursor/
+.grok/
+
 .claude/settings.local.json
+
+# Demo and probe run outputs (phase matrix, baker captures).
 .demo/

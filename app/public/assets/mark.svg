@@ -1,0 +1,11 @@
+<!--
+  Sigil for the Vault Fragility Oracle. Drawn for this project — deliberately NOT the
+  XRPL trademark: two readings of the same quantity, one dashed and low, one solid and
+  true, with the gap between them as the subject. Same idea as the NAV split.
+  Colour is literal (#58C7F3 = --accent) because an <img> cannot inherit currentColor.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <path d="M2 15h20" stroke="#58C7F3" stroke-width="1.6" stroke-dasharray="3 2" opacity=".5"/>
+  <path d="M2 9h20" stroke="#58C7F3" stroke-width="1.6"/>
+  <path d="M6 9v6M18 9v6" stroke="#58C7F3" stroke-width="1" opacity=".3"/>
+</svg>
