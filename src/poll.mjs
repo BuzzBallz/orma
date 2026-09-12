@@ -182,6 +182,17 @@ export class Reader {
   }
 
   get(vaultId) { return this.snapshots.get(vaultId) ?? null }
+  /**
+   * Find a facility by its SHARE token rather than by its vault id.
+   *
+   * This is the lookup a holder needs. Someone pledged vault shares is given an MPT
+   * issuance id; they have no reason to know, and no way to discover, the vault behind
+   * it. Valuation has to be reachable from the token.
+   */
+  getByShareMpt(mptId) {
+    const want = String(mptId).toUpperCase()
+    return this.all().find((s) => String(s.vault.shareMptId ?? '').toUpperCase() === want) ?? null
+  }
   all() { return [...this.snapshots.values()] }
   get lastLedgerAgeSeconds() {
     return this.lastGoodAt ? Math.floor((Date.now() - this.lastGoodAt) / 1000) : null

@@ -123,6 +123,18 @@ export class Xrpl {
   }
 
   /**
+   * Read an MPTokenIssuance by its 48-hex id.
+   *
+   * This is the entry point for a party who holds ONLY the token: a second broker given
+   * vault shares as collateral has an issuance id and nothing else, and everything they
+   * need to value it has to be reachable from here.
+   */
+  async mptIssuance(issuanceId) {
+    const r = await this.req({ command: 'ledger_entry', mpt_issuance: String(issuanceId).toUpperCase() })
+    return r.result.node
+  }
+
+  /**
    * Transaction history for an account, newest first.
    * Devnet retains roughly 29 days, which is ample for brokers created during an event
    * but would not be for a real track record. Paginates on `marker`.

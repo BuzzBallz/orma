@@ -10,6 +10,8 @@ import { readFileSync, existsSync } from 'node:fs'
 import { presentVault, presentRow, setLabel } from './present.mjs'
 import { findShareEscrows, presentCollateral } from './collateral.mjs'
 import { fetchBrokerHistory, analyseOrdering, reputation, recommendOrder } from './history.mjs'
+import { presentNav, resolveFromIssuance, valuePledge } from './nav.mjs'
+import { deriveScoreInputs, buildScore } from './score.mjs'
 import { logger } from './log.mjs'
 
 const log = logger('api')
@@ -66,8 +68,17 @@ export function createApi(reader, opts = {}) {
     res.setHeader('Cache-Control', 'no-store')
     if (req.method === 'OPTIONS') return res.writeHead(204).end()
 
-    const send = (code, body) => {
-      res.writeHead(code, { 'Content-Type': 'application/json' })
+    const send = (code, body, o = {}) => {
+      const headers = { 'Content-Type': 'application/json' }
+      // Only the two valuation routes opt in. They exist to be called by a party with no
+      // relationship to us -- that is the entire point of putting the URL in a token --
+      // and they serve read-only public ledger state, so there is nothing to protect.
+      // The rest of the API stays same-origin.
+      if (o.cors) {
+        headers['Access-Control-Allow-Origin'] = '*'
+        headers['Cache-Control'] = 'public, max-age=4'
+      }
+      res.writeHead(code, headers)
       res.end(JSON.stringify(body, null, 2))
       if (code >= 400) log.warn('response', { key, code })
     }
@@ -152,6 +163,73 @@ export function createApi(reader, opts = {}) {
         }
         historyCache.set(broker.loanBrokerId, { at: Date.now(), body })
         return send(200, stamp(body))
+      }
+
+      // ---------------------------------------------------------------------
+      // The valuation endpoint a share token's own metadata points at.
+      //
+      // Public, stable and deliberately small. The metadata carrying this URL can never
+      // be rewritten (Appendix D1), so this contract is effectively permanent: fields may
+      // be added, nothing may ever be renamed, retyped or removed.
+      //
+      // CORS is open because the whole point is that a party with no relationship to us
+      // can use it. Read-only, public ledger state, nothing to protect.
+      // ---------------------------------------------------------------------
+      const nm = url.pathname.match(/^\/api\/vaults\/([A-Fa-f0-9]{64})\/nav$/)
+      if (nm && req.method === 'GET') {
+        const snap = reader.get(nm[1].toUpperCase()) ?? reader.get(nm[1])
+        if (!snap) return fail(404, 'VAULT_NOT_FOUND', 'No vault with that id', false)
+        let score = null
+        try {
+          score = buildScore(deriveScoreInputs({ ...snap.vault, broker: snap.brokers[0] ?? {}, loans: snap.loans, phase: snap.vault.phase }).scoreArgs)
+        } catch { /* the valuation is the product; the grade is a courtesy */ }
+        return send(200, stamp(presentNav(snap, {
+          score, source, network: 'devnet',
+          buildVersion: reader.xrpl?.buildVersion ?? null,
+          asOf: reader.serverTime ?? null,
+          ledgerIndex: reader.ledgerIndex ?? null,
+        })), { cors: true })
+      }
+
+      // THE ROUTE THE TOKEN POINTS AT. Same valuation, keyed by the share token instead
+      // of by the vault, because that is the only identifier a holder has. This is what
+      // the metadata template resolves to, so it must never itself follow a pointer:
+      // that would be a loop.
+      //
+      // `units` values a specific pledge, so a lender does not have to reimplement
+      // decimal arithmetic to use this.
+      const vm = url.pathname.match(/^\/api\/mpt\/([A-Fa-f0-9]{48})\/nav$/)
+      if (vm && req.method === 'GET') {
+        const snap = reader.getByShareMpt(vm[1])
+        if (!snap) return fail(404, 'SHARE_NOT_TRACKED', 'No facility on this service issues that share token', false)
+        let score = null
+        try {
+          score = buildScore(deriveScoreInputs({ ...snap.vault, broker: snap.brokers[0] ?? {}, loans: snap.loans, phase: snap.vault.phase }).scoreArgs)
+        } catch { /* the valuation is the product; the grade is a courtesy */ }
+        const body = presentNav(snap, {
+          score, source, network: 'devnet',
+          buildVersion: reader.xrpl?.buildVersion ?? null,
+          asOf: reader.serverTime ?? null, ledgerIndex: reader.ledgerIndex ?? null,
+        })
+        const units = url.searchParams.get('units')
+        if (units) body.pledge = valuePledge(body, units)
+        return send(200, stamp(body), { cors: true })
+      }
+
+      // THE DIAGNOSTIC. Runs the loop a second broker runs and reports every step:
+      // read the issuance, decode the metadata, substitute the token's own id into the
+      // pointer, follow it. Separate from the route above on purpose -- the valuation
+      // must not be reachable only by walking a pointer to itself.
+      //
+      // Every step is reported including failure, because "this collateral is opaque" is
+      // a useful answer to give a lender and a far better one than an exception.
+      const rm = url.pathname.match(/^\/api\/mpt\/([A-Fa-f0-9]{48})\/resolve$/)
+      if (rm && req.method === 'GET') {
+        const resolve = url.searchParams.get('resolve') !== 'false'
+        const out = await resolveFromIssuance(reader.xrpl, rm[1].toUpperCase(), { resolve })
+        const units = url.searchParams.get('units')
+        if (units && out.nav) out.pledge = valuePledge(out.nav, units)
+        return send(200, stamp(out), { cors: true })
       }
 
       // Demo 1. `demo/` is TRACKED and `fixtures/` is not, so the tracked capture must be
