@@ -1,0 +1,59 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Orma",
+  "description": "Credit measurement, publication and enforcement for XLS-65 vaults and XLS-66 lending on the XRP Ledger.",
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#C9A45F",
+    "light": "#EAE0CE",
+    "dark": "#C9A45F"
+  },
+  "background": {
+    "color": {
+      "dark": "#0A0B0E"
+    }
+  },
+  "appearance": {
+    "default": "dark"
+  },
+  "navigation": {
+    "groups": [
+      {
+        "group": "Start here",
+        "pages": [
+          "pages/introduction",
+          "pages/concepts",
+          "pages/quickstart"
+        ]
+      },
+      {
+        "group": "The method",
+        "pages": [
+          "pages/mathematics"
+        ]
+      },
+      {
+        "group": "Publication and enforcement",
+        "pages": [
+          "pages/nav-pointer",
+          "pages/gate"
+        ]
+      },
+      {
+        "group": "Build on it",
+        "pages": [
+          "pages/api-reference",
+          "pages/ai-agents"
+        ]
+      },
+      {
+        "group": "In practice",
+        "pages": [
+          "pages/use-cases",
+          "pages/findings"
+        ]
+      }
+    ]
+  }
+}
