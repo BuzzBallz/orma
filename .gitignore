@@ -85,3 +85,4 @@ Thumbs.db
 /.grok/
 .xrpl-devex/
 .claude/settings.local.json
+.demo/

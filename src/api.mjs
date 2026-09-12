@@ -9,6 +9,7 @@ import { createServer } from 'node:http'
 import { readFileSync, existsSync } from 'node:fs'
 import { presentVault, presentRow, setLabel } from './present.mjs'
 import { findShareEscrows, presentCollateral } from './collateral.mjs'
+import { fetchBrokerHistory, analyseOrdering, reputation, recommendOrder } from './history.mjs'
 import { logger } from './log.mjs'
 
 const log = logger('api')
@@ -23,6 +24,8 @@ export function createApi(reader, opts = {}) {
   const source = opts.source ?? 'devnet'
   /** previous navCorrect per vault, so `trend` is real rather than guessed */
   const prevNav = new Map()
+  /** history is many round trips; 15s is well inside a 4s UI poll */
+  const historyCache = new Map()
 
   const stamp = (body) => ({
     serverTime: reader.serverTime ?? new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
@@ -113,6 +116,36 @@ export function createApi(reader, opts = {}) {
         const haircut = Number(url.searchParams.get('haircut') ?? 0)
         const escrows = await findShareEscrows(reader.xrpl, shareMptId, accounts)
         return send(200, stamp(presentCollateral(escrows, snap, haircut)))
+      }
+
+      // Broker track record: what they actually did, what the fair sequence would have
+      // paid depositors, and what they should do next. The two audiences Shota named:
+      // depositors see the cost of the ordering, the broker gets a fairness tool.
+      const hm = url.pathname.match(/^\/api\/vaults\/([A-Fa-f0-9]{64})\/broker-history$/)
+      if (hm && req.method === 'GET') {
+        const snap = reader.get(hm[1].toUpperCase()) ?? reader.get(hm[1])
+        if (!snap) return fail(404, 'VAULT_NOT_FOUND', 'No vault with that id', false)
+        const broker = snap.brokers[0]
+        if (!broker) return fail(404, 'NO_BROKER', 'vault has no loan broker', false)
+        const cached = historyCache.get(broker.loanBrokerId)
+        if (cached && Date.now() - cached.at < 15000) return send(200, stamp(cached.body))
+        const events = await fetchBrokerHistory(reader.xrpl, broker.owner, broker.loanBrokerId)
+        const ordering = analyseOrdering(events, broker)
+        const body = {
+          loanBrokerId: broker.loanBrokerId,
+          owner: broker.owner,
+          events: events.map((e) => ({
+            kind: e.kind, at: e.at, hash: e.hash, loanId: e.loanId,
+            debtBefore: e.debtBefore.toFixed(0), debtAfter: e.debtAfter.toFixed(0),
+            coverBefore: e.coverBefore.toFixed(0), coverAfter: e.coverAfter.toFixed(0),
+            coverConsumed: e.coverConsumed.toFixed(0), principal: e.principal.toFixed(0),
+          })),
+          ordering,
+          reputation: reputation(events, ordering, broker),
+          recommendation: recommendOrder(snap.loans, broker),
+        }
+        historyCache.set(broker.loanBrokerId, { at: Date.now(), body })
+        return send(200, stamp(body))
       }
 
       if (key === 'GET /api/indexer-race') {
