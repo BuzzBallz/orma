@@ -30,7 +30,7 @@ export function baseGradeFromRatio(r, bands) {
   return 'D'
 }
 
-export function buildScore({ liquidityRatio, coverAdequacy, concentration, recogLagSeconds, shortfallPct, phase }) {
+export function buildScore({ liquidityRatio, coverAdequacy, concentration, recogLagSeconds, shortfallPct, phase, realisedLossPct = 0 }) {
   const dims = []
   const trace = []
 
@@ -64,6 +64,27 @@ export function buildScore({ liquidityRatio, coverAdequacy, concentration, recog
   // confidence in that answer. No weights are applied anywhere.
   let headline = gDead
   trace.push({ from: gDead, rule: 'anchor on DEADLINE (can claims be met at redemption)', delta: 0, to: gDead })
+
+  // CAPITAL ALREADY DESTROYED.
+  //
+  // Every other dimension measures current EXPOSURE, and a realised loss leaves none
+  // behind: the write-off removes the asset, the provision is released, and the book
+  // reads clean. Without this rule a facility that defaulted on four fifths of its
+  // loans scores AAA the moment the write-off settles, identically to one that never
+  // lost a penny -- and because the book sorts worst-first to surface danger, the most
+  // damaged facility sorts last. Observed on Devnet, not hypothesised.
+  //
+  // This measures what the units are worth against what was paid for them, so it is
+  // memory rather than exposure, and it is deliberately the first notch applied.
+  const rl = D(realisedLossPct)
+  if (rl.gt(0)) {
+    // Bands, not a formula: the grade is ordinal and each step has to be defensible on
+    // its own rather than emerging from arithmetic nobody can check on a slide.
+    const delta = rl.gte(75) ? -14 : rl.gte(50) ? -12 : rl.gte(25) ? -8 : rl.gte(10) ? -5 : rl.gte(2) ? -3 : -1
+    const tR = notch(headline, delta)
+    trace.push({ from: headline, rule: `${rl.toFixed(1)}% of subscribed capital destroyed and written off`, delta, to: tR })
+    headline = tR
+  }
 
   if (recogLagSeconds > 300) { const t = notch(headline, -2); trace.push({ from: headline, rule: 'RECOG lag > 300s: overdue exposure the broker has not declared', delta: -2, to: t }); headline = t }
   else if (recogLagSeconds > 0) { const t = notch(headline, -1); trace.push({ from: headline, rule: 'RECOG lag > 0s: overdue exposure not yet declared', delta: -1, to: t }); headline = t }
@@ -143,10 +164,27 @@ export function deriveScoreInputs(o) {
     ? D(1)
     : Decimal.min(maxLiquidatableNow, coverAvailable).div(coverExposure)
 
+  // Capital destroyed, as a share of capital subscribed.
+  //
+  // Par is 1.0 for a closed-ended vault: subscription closes before any lending, so the
+  // first deposit sets the unit value at one and later subscribers join at the same
+  // value with no P&L yet accrued. SharesOutstanding is therefore capital subscribed,
+  // measured in asset units.
+  //
+  // Compared against assetsTotal, NOT against assetsTotal minus lossUnrealized. An
+  // unrealised loss is a provision against an asset the vault still holds and may still
+  // recover; it must NOT be counted here, or an honest manager who writes down early
+  // would be punished for the disclosure. Only a write-off, which removes the asset
+  // from AssetsTotal outright, is permanent destruction.
+  const shares = D(o.sharesOutstanding)
+  const realisedLossPct = shares.isZero() || assetsTotal.gte(shares)
+    ? D(0)
+    : shares.minus(assetsTotal).div(shares).times(100)
+
   return {
     scoreArgs: {
       liquidityRatio: assetsTotal.isZero() ? D(1) : assetsAvailable.div(assetsTotal),
-      coverAdequacy, concentration, recogLagSeconds, shortfallPct, phase: o.phase,
+      coverAdequacy, concentration, recogLagSeconds, shortfallPct, phase: o.phase, realisedLossPct,
     },
     broker: { maxLiquidatableNow, coverRequired, coverShortfall, strandedCoverFraction },
     cliff: { claims, liquidityAtRedemption, projectedShortfall, shortfallPct },
