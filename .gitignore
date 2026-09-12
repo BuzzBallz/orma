@@ -97,3 +97,7 @@ Thumbs.db
 
 # Demo and probe run outputs (phase matrix, baker captures).
 .demo/
+
+# Internal design notes. Working material, not a deliverable: it reads as scaffolding
+# next to the report and the code, and the repo is judged on what it ships.
+/DESIGN.md
