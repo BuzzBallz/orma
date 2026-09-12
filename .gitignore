@@ -104,3 +104,6 @@ Thumbs.db
 
 # Devnet faucet keys for replaying the gate demo on stage. Worthless, still private keys.
 /.demo-keys.json
+
+# Ground-truth briefs assembled for the overnight documentation run. Derived material.
+/.nightbrief/

@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Orma</title>
+<style>
+  :root{
+    --bg:#0A0B0E; --panel:#0E1015; --fg:#EAE0CE; --gold:#C9A45F;
+    --dim:#B3AA99; --mute:#8C8578; --line:#1F222A;
+    --mono:"Plex Mono",ui-monospace,"SF Mono",Consolas,Menlo,monospace;
+    --sans:"Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:var(--sans);overflow:hidden}
+  .slide{
+    position:fixed;inset:0;display:none;flex-direction:column;
+    padding:5vh 7vw;background:var(--bg);
+  }
+  .slide.on{display:flex}
+  .shead{display:flex;align-items:baseline;gap:1.2rem;
+    font:500 1.1vw/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--mute);
+    border-bottom:1px solid var(--line);padding-bottom:1.6vh}
+  .sid{color:var(--gold)}
+  .stitle{color:var(--dim);text-transform:none;letter-spacing:.02em;font-size:1.25vw}
+  .stime{margin-left:auto}
+  .sbody{flex:1;display:flex;flex-direction:column;justify-content:center;gap:2.4vh}
+  /* One idea per slide, so the type is large and there is deliberately little of it. */
+  .line{margin:0;font-size:3.4vw;line-height:1.22;letter-spacing:-.015em;font-weight:500}
+  .line code{font-family:var(--mono);font-size:.86em;color:var(--gold)}
+  .line b{color:var(--gold);font-weight:600}
+  .sfoot{display:flex;justify-content:space-between;
+    font:500 1vw/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--mute);
+    border-top:1px solid var(--line);padding-top:1.6vh}
+  .notes{display:none}
+  body.notes .notes{
+    display:block;position:fixed;left:0;right:0;bottom:0;max-height:38vh;overflow:auto;
+    background:var(--panel);border-top:1px solid var(--gold);
+    padding:2vh 7vw;font-size:1.15vw;line-height:1.6;color:var(--dim)}
+  body.notes .slide.on .notes{display:block}
+  .notes p{margin:0 0 .8em}
+  #clock{position:fixed;top:1.2vh;right:1.2vw;z-index:10;
+    font:600 1.1vw/1 var(--mono);letter-spacing:.06em;color:var(--mute)}
+  #clock.run{color:var(--gold)}
+  #clock.over{color:#FF4A4A}
+  /* Printing is how this becomes a PDF, so every slide must exist on its own page. */
+  @media print{
+    @page{size:1600px 900px;margin:0}
+    html,body{overflow:visible;height:auto}
+    .slide{position:relative;display:flex !important;height:900px;page-break-after:always;padding:60px 90px}
+    .shead{font-size:15px}.stitle{font-size:17px}.line{font-size:46px}.sfoot{font-size:13px}
+    #clock,.notes{display:none !important}
+  }
+</style>
+</head>
+<body>
+<div id="clock">0:00</div>
+
+  <section class="slide" data-i="0">
+    <header class="shead">
+      <span class="sid">S1</span>
+      <span class="stitle">The empty object</span>
+      <span class="stime">0:00 &middot; 15s</span>
+    </header>
+    <div class="sbody">
+      <p class="line"><code>"PreviousFields": {}</code></p>
+      <p class="line">this is everything the indexer was told</p>
+    </div>
+    <footer class="sfoot"><span>Orma</span><span>1 / 10</span></footer>
+    <aside class="notes"><p>Live on the Verification tab, the <code>{}</code> block filling the panel.</p><p>A lending vault takes fifty-one XRP. It lends ten. The borrower stops paying and the manager writes the loan down. // The fund is now worth eighty cents on the unit. // <b>This is everything an indexer watching that ledger was told.</b></p><p>*Beat. Let them read the braces.*</p></aside>
+  </section>
+
+  <section class="slide" data-i="1">
+    <header class="shead">
+      <span class="sid">S2</span>
+      <span class="stitle">One party, two levers</span>
+      <span class="stime">0:15 &middot; 25s</span>
+    </header>
+    <div class="sbody">
+      <p class="line">LoanBroker owner = vault owner</p>
+      <p class="line">two levers: <b>when</b>, and <b>in what order</b></p>
+    </div>
+    <footer class="sfoot"><span>Orma</span><span>2 / 10</span></footer>
+    <aside class="notes"><p>Two lines, nothing else.</p><p>The loan broker owner <b>is</b> the vault owner. Same account, by protocol. // They hold two levers. // <b>When</b> to recognise a loss: until they do, the reported value reads clean. // And <b>in what order</b> to realise them: cover is sized against the broker's *total* book, so each default shrinks the base for the next. // Both move money toward the manager. Neither is visible with the standard tools.</p></aside>
+  </section>
+
+  <section class="slide" data-i="2">
+    <header class="shead">
+      <span class="sid">S3</span>
+      <span class="stitle">What Orma is</span>
+      <span class="stime">0:40 &middot; 12s</span>
+    </header>
+    <div class="sbody">
+      <p class="line">measure → publish → enforce</p>
+      <p class="line">Meridian · Kestrel · Calder · Thorne</p>
+      <p class="line">four facilities, live on Devnet</p>
+    </div>
+    <footer class="sfoot"><span>Orma</span><span>3 / 10</span></footer>
+    <aside class="notes"><p>Orma measures both, publishes them as a ledger object and inside the share token, and lets a third party gate capital on the result. // All of it on Devnet, built today.</p></aside>
+  </section>
+
+  <section class="slide" data-i="3">
+    <header class="shead">
+      <span class="sid">S4</span>
+      <span class="stitle">Two readers, one transaction</span>
+      <span class="stime">0:52 &middot; 35s</span>
+    </header>
+    <div class="sbody">
+      <p class="line">diffs metadata: <b>1.000000</b></p>
+      <p class="line">re-reads the object: <b>0.803922</b></p>
+      <p class="line">1,961 bp apart, same transaction</p>
+      <p class="line"><code>LossUnrealized</code> 0 → 10,000,000, omitted</p>
+    </div>
+    <footer class="sfoot"><span>Orma</span><span>4 / 10</span></footer>
+    <aside class="notes"><p>Stay on Verification. The scroll is already set.</p><p>Left: a reader that diffs transaction metadata. The standard way. // Right: ours. It re-reads the object. // <b>One point zero zero.</b> Against <b>zero point eight zero</b>. // Nineteen per cent apart, on the same transaction, from the same ledger.</p><p><b>Scroll down one screen</b> to the before/after table.</p><p>And here is why. <code>LossUnrealized</code> was zero, and zero is the type default, so rippled omits it from the change set. // The other two fields genuinely did not move. // The one that did is the one that is invisible.</p><p>*This is the moment they remember. Do not rush the table.*</p></aside>
+  </section>
+
+  <section class="slide" data-i="4">
+    <header class="shead">
+      <span class="sid">S5</span>
+      <span class="stitle">The order</span>
+      <span class="stime">1:27 &middot; 40s</span>
+    </header>
+    <div class="sbody">
+      <p class="line">largest loss first: <b>0.50 XRP</b> of cover</p>
+      <p class="line">smallest first: <b>0.70 XRP</b></p>
+      <p class="line">the difference, <b>0.20 XRP</b>, is investor money</p>
+      <p class="line">Calder, same tool: conduct <b>A</b></p>
+    </div>
+    <footer class="sfoot"><span>Orma</span><span>5 / 10</span></footer>
+    <aside class="notes"><p>Facility picker → <b>Kestrel Bridge Financing II</b> → scroll to Exhibit 3.</p><p>Two bad loans, thirty XRP and ten. This manager declared the big one first. // That consumed <b>zero point five</b> of their own first-loss capital. // Small one first would have consumed <b>zero point seven</b>. // Same losses, same rates, only the order. // The <b>zero point two</b> is investor money, and the party who chose the order is the party it spared.</p><p>Facility picker → <b>Calder Structured Credit III</b>.</p><p>Same tool, same screen, a different manager. // Conduct <b>A</b>. They flagged the loss before they took it. // <b>That</b> is what a new investor wants to see before they subscribe.</p><p>*Say "default sequencing and cover sizing" and nothing wider. Do not extend "unilateral control" to impairment re-pricing. <code>41-SECURITY-DISCLOSURE.md</code> §9.*</p></aside>
+  </section>
+
+  <section class="slide" data-i="5">
+    <header class="shead">
+      <span class="sid">S6</span>
+      <span class="stitle">The token prices itself</span>
+      <span class="stime">2:07 &middot; 30s</span>
+    </header>
+    <div class="sbody">
+      <p class="line">five steps, none of them ours</p>
+      <p class="line">priced naively: <b>1.000000</b></p>
+      <p class="line">priced on the pointer: <b>0.803922</b></p>
+      <p class="line"><b>0.196078 XRP</b> kept off the second lender's book</p>
+    </div>
+    <footer class="sfoot"><span>Orma</span><span>6 / 10</span></footer>
+    <aside class="notes"><p>Stay on Calder. Scroll to Exhibit 5.</p><p>An investor pledges their units to a second lender. That lender holds a token and nothing else. // They read the token's own metadata, follow the pointer it declares, and price the pledge. Five steps, none of which involve us. // Priced naively: <b>one point zero zero</b>. Priced on what the instrument points to: <b>zero point eight zero</b>. // <b>Zero point one nine of overstatement, kept out of the second lender's book.</b></p><p>*<code>[+]</code> at 5:00 only: on Kestrel that same exhibit stops at step two: no metadata, nothing readable. That is every vault today.*</p></aside>
+  </section>
+
+  <section class="slide" data-i="6">
+    <header class="shead">
+      <span class="sid">S7</span>
+      <span class="stitle">The gate</span>
+      <span class="stime">2:37 &middot; 20s</span>
+    </header>
+    <div class="sbody">
+      <p class="line">graded LP: <code>tesSUCCESS</code></p>
+      <p class="line">ungraded LP: <code>tecNO_AUTH</code></p>
+      <p class="line">refused by the ledger, not by us</p>
+    </div>
+    <footer class="sfoot"><span>Orma</span><span>7 / 10</span></footer>
+    <aside class="notes"><p>Facility picker → <b>Thorne Senior Secured I</b> → Exhibit 6.</p><p>Measuring is advice. This is enforcement. // An independent vault owner named our issuer in their domain. We signed nothing, and we cannot decline. // Two investors, same second: one admitted, the other refused <b>by the ledger</b>, not by us.</p><p>*<code>[+]</code> at 5:00 only: and when we revoke, entry closes and the exit stays open. A rater who could trap capital would be a worse problem than the one we solve.*</p></aside>
+  </section>
+
+  <section class="slide" data-i="7">
+    <header class="shead">
+      <span class="sid">S8</span>
+      <span class="stitle">Developer experience</span>
+      <span class="stime">2:57 &middot; 50s</span>
+    </header>
+    <div class="sbody">
+      <p class="line"><b>QR code to <code>FEEDBACK.md</code>, top right</b></p>
+      <p class="line"><b>X1</b> the empty change set</p>
+      <p class="line"><b>D2</b> the documented first hour cannot complete</p>
+      <p class="line"><b>M5</b> a broker's history cannot be reconstructed</p>
+      <p class="line">severity strip: 40 findings, <b>7 / 19 / 14</b> (P0 / P1 / P2)</p>
+    </div>
+    <footer class="sfoot"><span>Orma</span><span>8 / 10</span></footer>
+    <aside class="notes"><p>Three lines with their finding ids, a QR code to <code>FEEDBACK.md</code>, and the 40-mark severity strip.</p><p>Forty findings, filed as we hit them. Our top three. // <b>One.</b> The empty change set you saw in the first demo. One paragraph on the metadata page fixes it, and it was reported before us by the author of an XRPL explorer, who closed it himself as not-a-bug. He was half right. // <b>Two.</b> The documented first hour cannot complete. We shipped the fix. // <b>Three.</b> A broker's history cannot be reconstructed by filtering: <code>LoanManage</code> names no broker and an impairment does not touch the broker object, so every impairment vanishes and the consumer cannot tell. That one shipped a wrong answer in our own code before we caught it. // That code is the report.</p><p>*This is the highest-scoring slide in the deck. If you are over time, cut a demo beat, never this one.*</p></aside>
+  </section>
+
+  <section class="slide" data-i="8">
+    <header class="shead">
+      <span class="sid">S9</span>
+      <span class="stitle">What we gave back</span>
+      <span class="stime">3:47 &middot; 8s</span>
+    </header>
+    <div class="sbody">
+      <p class="line">five pull requests</p>
+      <p class="line">the tutorial, green on rc5 in 79.6 s</p>
+      <p class="line">40 findings, every one with a hash</p>
+    </div>
+    <footer class="sfoot"><span>Orma</span><span>9 / 10</span></footer>
+    <aside class="notes"><p>Five pull requests, a fixed tutorial that runs green on rc5, and forty findings with transaction hashes. All filed before this pitch.</p></aside>
+  </section>
+
+  <section class="slide" data-i="9">
+    <header class="shead">
+      <span class="sid">S10</span>
+      <span class="stitle">Close</span>
+      <span class="stime">3:55 &middot; 5s</span>
+    </header>
+    <div class="sbody">
+      <p class="line"><b>Orma</b></p>
+      <p class="line"><b>github.com/frytegg/xrpl-vault-fragility-oracle</b></p>
+      <p class="line">Track 2 · Loaded · Devnet · rippled 3.4.0-rc5 · xrpl 5.2.0 · Node 24.13.0</p>
+      <p class="line">DevEx: <code>tender-gopher-21</code> · <code>&lt;second pseudonym: read from Andrea's .xrpl-devex/identity.json&gt;</code></p>
+    </div>
+    <footer class="sfoot"><span>Orma</span><span>10 / 10</span></footer>
+    <aside class="notes"><p>The repo URL, big. The compliance block under it.</p><p>Orma. The repo is on the slide. // Thank you.</p><p>*Stop. Do not summarise. Take the questions.*</p></aside>
+  </section>
+<script>
+  const slides = [...document.querySelectorAll('.slide')]
+  let i = 0
+  const show = (n) => {
+    i = Math.max(0, Math.min(slides.length - 1, n))
+    slides.forEach((s, k) => s.classList.toggle('on', k === i))
+    location.hash = 's' + (i + 1)
+  }
+  // The timer is the whole reason a presenter looks at the top right corner. It turns
+  // red past four minutes, which is the format limit, not a suggestion.
+  let t0 = null, running = false
+  const clock = document.getElementById('clock')
+  setInterval(() => {
+    if (!running) return
+    const s = Math.floor((performance.now() - t0) / 1000)
+    clock.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0')
+    clock.classList.toggle('over', s > 240)
+  }, 250)
+  addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') { e.preventDefault(); show(i + 1) }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); show(i - 1) }
+    else if (e.key === 'Home') show(0)
+    else if (e.key === 'End') show(slides.length - 1)
+    else if (e.key.toLowerCase() === 's') document.body.classList.toggle('notes')
+    else if (e.key.toLowerCase() === 't') {
+      running = !running
+      if (running && t0 === null) t0 = performance.now()
+      else if (!running) { t0 = null; clock.textContent = '0:00'; clock.classList.remove('over') }
+      clock.classList.toggle('run', running)
+    }
+    else if (e.key.toLowerCase() === 'p') print()
+    else if (/^[1-9]$/.test(e.key)) show(Number(e.key) - 1)
+    else if (e.key === '0') show(9)
+  })
+  addEventListener('click', (e) => { if (!e.target.closest('.notes')) show(i + 1) })
+  show(Number((location.hash.match(/^#s(\d+)$/) || [])[1] || 1) - 1)
+</script>
+</body>
+</html>
