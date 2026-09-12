@@ -68,6 +68,12 @@
   --dead:    #79828B;   /* terminal / defaulted */
   --read-correct: #58C7F3;   /* the correct NAV reading — accent, SOLID (contract §6) */
 
+  /* BRAND, Orma. The mark is the O over two currents, one cream and one gold; the
+     wordmark is set in text beside it so it follows colour and scale rather than being
+     baked into the glyph. The SVG reads these two names and carries its own fallbacks. */
+  --mark-cream: #EAE0CE;
+  --mark-gold:  #C9A45F;
+
   --mono: "Plex Mono", ui-monospace, "SF Mono", Consolas, Menlo, monospace;
   --sans: "Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
 
@@ -252,7 +258,7 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
   color: var(--fg);
 }
 /* The one accent: the wordmark. */
-.brand{ color: var(--amber); }
+.brand{ color: var(--mark-cream); }
 
 /* ---------- layout ---------- */
 
@@ -337,12 +343,12 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 
 .brand{
   display: flex; align-items: center; gap: 8px;
-  font: 600 var(--t-base)/1 var(--mono); letter-spacing: 0.02em;
-  white-space: nowrap; color: var(--amber);
+  font: 600 var(--t-base)/1 var(--mono); letter-spacing: 0.08em;
+  white-space: nowrap; color: var(--mark-cream);
   text-transform: uppercase;
 }
 .brand .mark{
-  width: 18px; height: 18px; color: var(--read-correct);
+  width: 22px; height: 22px;
   align-self: center; flex: 0 0 auto;
 }
 .brand .sub{
@@ -1270,7 +1276,7 @@ tr:hover .chip, .picker-list [data-highlighted] .chip{ transform: translateY(-1p
 .race-correct{ border-style: solid; border-color: var(--read-correct); }
 
 .race-hd{
-  font-size: var(--t-sm); color: var(--fg-mute); text-transform: lowercase;
+  font-size: var(--t-sm); color: var(--fg-mute);
   letter-spacing: .04em; margin-bottom: 10px;
 }
 .race-val{
