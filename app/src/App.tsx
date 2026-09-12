@@ -17,7 +17,11 @@ import { Separator } from '@/components/ui/separator'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { ArrowLeft, ArrowUpRight, Check, Copy } from 'lucide-react'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Toaster } from '@/components/ui/sonner'
+import { toast } from 'sonner'
+import { WALLETS, WalletProvider, useWallet } from './lib/wallet'
+import { ArrowLeft, ArrowUpRight, Check, Copy, Puzzle } from 'lucide-react'
 
 const POLL_MS = 3000
 
@@ -105,12 +109,13 @@ function GhostDesk({ title }: { title: string }) {
   )
 }
 
-export default function App() {
+function Desk() {
   const tick = useTick()
   const { path, vaultId, navigate } = useRoute()
 
   // A deployed preview with no backend behind it polls nothing at all: see API_UNREACHABLE.
   const canPoll = API_UNREACHABLE === null
+  const wallet = useWallet()
   const health = usePoll<Health>(canPoll ? '/api/health' : null, 5000)
   const vaults = usePoll<VaultsResponse>(canPoll ? '/api/vaults' : null, path === '/' ? POLL_MS : 15000)
   const detail = usePoll<Detail>(canPoll && vaultId ? `/api/vaults/${vaultId}` : null, POLL_MS)
@@ -149,6 +154,16 @@ export default function App() {
   const primary = path === '/' ? vaults : detail
   const stamp = path === '/' ? vaults.data : detail.data
   const notFound = detail.code === 'VAULT_NOT_FOUND'
+
+  // B3 — the feed coming back is worth exactly one toast, on the edge, never on a timer.
+  const wasDown = useRef(false)
+  useEffect(() => {
+    if (vaults.fails > 0) { wasDown.current = true; return }
+    if (wasDown.current && vaults.data) {
+      wasDown.current = false
+      toast.success('Feed back', { description: `reading again from ${API_BASE}` })
+    }
+  }, [vaults.fails, vaults.data])
 
   // Views move on a route change, never on first paint.
   const painted = useRef(false)
@@ -276,6 +291,7 @@ export default function App() {
       {/* Over the desk, with the grain: scanlines. A tube's lines are in front of the
           phosphor, not behind it — behind a 92% panel they read as nothing at all. */}
       <span className="veil" aria-hidden />
+      <Toaster position="bottom-right" closeButton={false} duration={4000} />
 
       <HeaderBar
         health={health.data}
@@ -289,7 +305,18 @@ export default function App() {
         pollMs={POLL_MS}
         onSelect={id => navigate(path === '/' ? '/vault' : path, id)}
       />
-      {primary.stale && <StaleBar ageMs={primary.ageMs} fails={primary.fails} error={primary.error} />}
+      {primary.stale
+        ? <StaleBar ageMs={primary.ageMs} fails={primary.fails} error={primary.error} />
+        : wallet.missing && (
+          <Alert className="wbanner" onClick={wallet.dismissMissing}>
+            <Puzzle size={14} strokeWidth={2} aria-hidden />
+            <AlertTitle>{WALLETS.find(w => w.kind === wallet.missing)?.name} is not in this browser</AlertTitle>
+            <AlertDescription>
+              Install it and reload, or paste a classic address to follow the desk read-only.
+              Nothing on this screen is behind a wallet.
+            </AlertDescription>
+          </Alert>
+        )}
       <TabsContent value={path}>
         <main className={'page' + (path === '/moment' ? ' tight' : '')}>
           <div key={path} className={painted.current ? 'view' : undefined}>{body()}</div>
@@ -308,5 +335,13 @@ export default function App() {
       </div>
     </Tabs>
     </TooltipProvider>
+  )
+}
+
+export default function App() {
+  return (
+    <WalletProvider>
+      <Desk />
+    </WalletProvider>
   )
 }

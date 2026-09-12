@@ -386,3 +386,49 @@ d'un `useEffect`, donc après la première peinture, par construction.
 
 `app/.env.example` documente la seule variable que le front lit — et pourquoi elle ne peut
 contenir aucun secret.
+
+## Étape 2 — la couche wallet, montée sur shadcn (12/09)
+
+Trois composants ajoutés : `dialog`, `sonner`, `alert`. `button`, `dropdown-menu`, `badge`,
+`tooltip`, `separator`, `table`, `tabs` étaient déjà là.
+
+`sonner` de shadcn arrive câblé sur **`next-themes`**. On est sur Vite et on ne livre qu'un
+thème : la dépendance est désinstallée et le thème est écrit en clair dans le composant.
+Même traitement que `@fontsource-variable/geist` au premier passage.
+
+### Le joint
+
+`lib/wallet.tsx` expose un `useWallet()` avec `state / detected / missing / connect /
+connectReadOnly / disconnect`. L'étape 3 remplace le corps de `connect(kind)` par les vrais
+adapters `xrpl-connect` ; **rien d'autre ne bouge**. Tant que l'adapter n'est pas branché,
+`connect()` le dit — il n'invente pas une adresse pour faire joli.
+
+### Le chemin lecture seule est réel dès maintenant
+
+C'est le fallback A4 du brief, et il ne demande aucune librairie. Une adresse est la seule
+chose sur cet écran qu'un humain tape, donc elle est vérifiée **comme le ledger la
+vérifie** : base58 sur l'alphabet XRPL, 25 octets, version `0x00`, et le vrai checksum
+double-SHA-256 (`lib/xrpl-address.ts`, ~40 lignes, zéro dépendance).
+
+Testé : quatre adresses réelles acceptées (`rHb9CJ…`, `rN7n7o…`, `rsuUjf…`, `rDsbeo…`),
+une faute d'un caractère refusée sur le **checksum**, une adresse EVM refusée sur le
+préfixe. Une faute de frappe n'est jamais affichée comme un compte.
+
+### B1 → B8, mesurés
+
+| | quoi | preuve |
+|---|---|---|
+| B1 | `Button` connect / disconnect, `.btn-press` = `scale(0.98)` en 150ms, sur **Connect uniquement** | clic réel → dialog |
+| B2 | `Dialog` « choose a wallet », **3 rows**, chacune dit si l'extension est là | `not installed / not installed / no api key` |
+| B3 | 5 toasts `sonner` | `Connected read-only \| rHb9CJ…tyTh` · `Crossmark not detected` · `GemWallet not detected` · `Feed back \| reading again from …` · `Disconnected` |
+| B4 | **un seul bandeau** | feed coupé + extension manquante → `bannersOnScreen: 1`, c'est le feed. Feed sain → le bandeau extension, seul |
+| B5 | `DropdownMenu` connecté | `copy address` · `disconnect` (le copy échoue ici en « document is not focused » : l'automatisation n'a pas le focus, la permission est `granted`) |
+| B6 | `Badge` | `READ-ONLY` · `testnet` |
+| B7 | `Tooltip` | l'adresse entière : `rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh` |
+| B8 | `Separator` dans le dialog | présent |
+
+Restauration de session vérifiée : rechargement → `READ-ONLY \| testnet \| rN7n7o…fzRH`.
+Déconnexion → toast, `localStorage` vidé, bouton Connect de retour.
+
+Aucun « connect to unlock » nulle part : rien sur ce desk n'est derrière un wallet, et le
+dialog le dit — *« The desk reads the ledger with or without you. »*

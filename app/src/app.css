@@ -490,7 +490,7 @@ tr.row-dead td{ text-decoration: line-through; opacity: 0.55; }
    signals. Never a bounce, never a spring, never a fade-in of the whole page on
    mount, never a shimmer. Everything here still dies under prefers-reduced-motion. */
 
-:where(a, button, [tabindex], .picker-btn, .picker-list [data-slot="dropdown-menu-item"], tr):focus-visible{
+:where(a, button, input, [tabindex], .picker-btn, .picker-list [data-slot="dropdown-menu-item"], tr):focus-visible{
   outline: 2px solid var(--read-correct);
   outline-offset: -2px;
   border-radius: 2px;
@@ -594,6 +594,111 @@ kbd{
   border: 0; border-radius: 2px; font-weight: 600; padding: 1px 5px;
 }
 .hints .who{ margin-left: auto; letter-spacing: 0.06em; text-transform: none; font-family: var(--mono); }
+
+/* ---------- wallet ---------- */
+
+/* Topbar group. Reads as one object: state, network, account. */
+.wallet{ display: flex; align-items: center; gap: 8px; min-width: 0; }
+.wallet .wpill{ height: 22px; }
+.wallet .wnet{ text-transform: lowercase; letter-spacing: 0.08em; }
+.waddr{
+  height: 26px; padding: 0 9px; gap: 8px;
+  border: 1px solid var(--line-2); border-radius: 2px; background: var(--bg-1);
+  font: var(--t-xs) var(--mono); color: var(--fg); cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease;
+}
+.waddr:hover{ border-color: var(--amber-dim); }
+.waddr[aria-expanded="true"]{ border-color: var(--read-correct); }
+
+/* C12 — the press belongs to Connect and to nothing else on the desk. */
+.btn-press{ transition: transform 150ms ease, color 160ms ease, border-color 160ms ease, background-color 160ms ease; }
+.btn-press:active{ transform: scale(0.98) !important; }
+
+.picker-list [data-danger][data-highlighted]{ color: var(--bad); }
+
+/* ---------- wallet dialog ---------- */
+
+/* shadcn's Dialog is a rounded card with a shadow. Here it is a panel that happens to
+   float: same hairline, same radius, same ground as every other box on the desk. */
+.dlg{
+  gap: 14px; padding: 18px 20px 20px;
+  background: var(--bg-1) !important; border: 1px solid var(--line-2) !important;
+  border-radius: 3px !important; box-shadow: none !important;
+  max-width: 460px; width: calc(100vw - 32px);
+}
+.dlg-head{ display: block; padding: 0; }
+.dlg-title{
+  font: 500 var(--t-sm)/1.2 var(--mono) !important;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--amber);
+}
+.dlg-sub{
+  margin-top: 6px; font-size: var(--t-sm); line-height: 1.5; color: var(--fg-dim) !important;
+}
+.dlg-sep{ background: var(--line); }
+
+.wrows{ display: flex; flex-direction: column; gap: 1px; }
+.wrow{
+  display: flex; align-items: center; gap: 10px;
+  height: 38px; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: 2px; background: var(--bg);
+  font: var(--t-xs) var(--mono); color: var(--fg-mute);
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+.wrow:hover{ border-color: var(--line-2); background: var(--bg-2); }
+.wrow[data-here="true"]{ color: var(--fg-dim); }
+.wrow[data-here="true"] .wstate{ color: var(--ok); }
+.wname{ font-family: var(--sans); font-size: var(--t-base); color: var(--fg); }
+.wrow[data-here="false"] .wname{ color: var(--fg-dim); }
+.wnote{ font-size: var(--t-2xs); letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-mute); }
+.wstate{ font-size: var(--t-2xs); letter-spacing: 0.08em; text-transform: uppercase; }
+.wrow .wnote, .wrow .wstate{ flex: 0 0 auto; white-space: nowrap; }
+.wrow .wname{ flex: 0 1 auto; white-space: nowrap; }
+
+.wpaste{ display: flex; flex-direction: column; gap: 8px; }
+.wpaste .label{ display: inline-flex; align-items: center; gap: 6px; }
+.wpaste-row{ display: flex; gap: 8px; }
+.wfield{
+  flex: 1 1 auto; min-width: 0; height: 26px; padding: 0 9px;
+  background: var(--bg); color: var(--fg);
+  border: 1px solid var(--line-2); border-radius: 2px;
+  font: var(--t-xs) var(--mono);
+  transition: border-color 160ms ease;
+}
+.wfield::placeholder{ color: var(--fg-mute); }
+.wfield:focus{ outline: none; border-color: var(--read-correct); }
+
+/* ---------- the one banner (B4) ---------- */
+/* Same bar as the feed's, one tone down: it is chrome, not the product. */
+.wbanner{
+  position: relative; z-index: 1;
+  display: flex !important; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  padding: 7px 32px; border-radius: 0 !important;
+  background: color-mix(in srgb, var(--amber) 8%, transparent) !important;
+  border: 0 !important; border-bottom: 1px solid color-mix(in srgb, var(--amber) 28%, transparent) !important;
+  color: var(--amber); cursor: pointer;
+}
+.wbanner [data-slot="alert-title"]{
+  font: 500 var(--t-sm)/1.3 var(--mono); letter-spacing: 0.04em; color: var(--amber);
+}
+.wbanner [data-slot="alert-description"]{
+  font: var(--t-sm)/1.3 var(--mono); color: color-mix(in srgb, var(--amber) 65%, var(--fg)) !important;
+}
+.wbanner svg{ align-self: center; }
+
+/* ---------- toasts ---------- */
+/* Sonner, terminal-side: square, mono, a hairline and the tone on the left edge. */
+.cn-toast{
+  border-radius: 2px !important; box-shadow: none !important;
+  background: var(--bg-2) !important; border: 1px solid var(--line-2) !important;
+  color: var(--fg) !important;
+  font: var(--t-sm)/1.4 var(--mono) !important;
+}
+.cn-toast [data-description]{ color: var(--fg-mute) !important; font-size: var(--t-xs); }
+.cn-toast[data-type="success"]{ border-left: 2px solid var(--ok) !important; }
+.cn-toast[data-type="success"] svg{ color: var(--ok); }
+.cn-toast[data-type="error"]{ border-left: 2px solid var(--bad) !important; }
+.cn-toast[data-type="error"] svg{ color: var(--bad); }
+.cn-toast[data-type="warning"]{ border-left: 2px solid var(--warn) !important; }
 
 /* ---------- instrument picker ---------- */
 

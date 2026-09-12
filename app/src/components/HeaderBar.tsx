@@ -6,6 +6,7 @@ import type { RoutePath } from '../lib/useRoute'
 import { fmtIso } from '../lib/format'
 import { useFlash } from '../lib/useFlash'
 import { VaultPicker } from './VaultPicker'
+import { WalletButton } from './WalletButton'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -106,6 +107,10 @@ export function HeaderBar({ health, healthUnreachable, vaults, activeVaultId, pa
       <Separator orientation="vertical" className="sep" />
 
       <VaultPicker vaults={vaults} activeVaultId={activeVaultId} onSelect={onSelect} />
+
+      <Separator orientation="vertical" className="sep" />
+
+      <WalletButton />
     </header>
   )
 }
