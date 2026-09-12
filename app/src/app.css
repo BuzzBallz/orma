@@ -56,6 +56,9 @@
      reading. A disclosed deviation from spec §6.1's "no other colours". */
   --amber:     #FF9E2C;
   --amber-dim: #B4701C;
+  /* Idle chrome. Amber had spread to every label, tab and key until nothing amber meant
+     anything. Amber is now the active tab, an alert, and the wordmark. Nothing else. */
+  --fg-idle: #8A93A0;
 
   /* CONTRACT — meanings fixed by contract §6, do not repurpose */
   --read-naive:   #8792A6;   /* the naive NAV reading — muted, DASHED (contract §6) */
@@ -66,7 +69,7 @@
   --read-correct: #58C7F3;   /* the correct NAV reading — accent, SOLID (contract §6) */
 
   --mono: "Plex Mono", ui-monospace, "SF Mono", Consolas, Menlo, monospace;
-  --sans: "Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --sans: "Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
 
   --t-hero: 96px;
   --t-xxl:  72px;
@@ -80,6 +83,7 @@
   --t-verdict: 40px;
 
   --topbar: 44px;
+  --control: 30px;   /* tabs = picker = connect = one bar height */
 
   --background: var(--bg);
 
@@ -236,8 +240,10 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
   font: 500 var(--t-xs)/1.2 var(--mono);
   text-transform: uppercase;
   letter-spacing: 0.08em;      /* mono is already wide; 0.12em on mono reads as spaced-out */
-  color: var(--amber);
+  color: var(--fg-idle);
 }
+/* The one accent: the wordmark. */
+.brand{ color: var(--amber); }
 
 /* ---------- layout ---------- */
 
@@ -269,7 +275,7 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 .panel{
   background: color-mix(in srgb, var(--bg-1) 92%, transparent);
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 0;
   padding: 16px 20px;
 }
 .panel-title{ margin: 0 0 12px; }
@@ -292,7 +298,7 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
   letter-spacing: 0.06em;
   padding: 3px 7px;
   height: auto;            /* Badge ships h-5; the chip is sized by its own padding */
-  border-radius: 3px;
+  border-radius: 0;
   border: 1px solid color-mix(in srgb, var(--chip-tone, var(--fg-dim)) 45%, transparent);
   background: color-mix(in srgb, var(--chip-tone, var(--fg-dim)) 10%, transparent);
   color: var(--chip-tone, var(--fg-dim));
@@ -305,7 +311,7 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 .topbar{
   position: sticky; top: 0; z-index: 20;
   height: var(--topbar);
-  border-bottom: 1px solid var(--amber-dim) !important;
+  border-bottom: 1px solid var(--line-2) !important;
   display: flex; align-items: center; gap: 0;
   padding: 0 32px;
   background: var(--bg);
@@ -330,8 +336,8 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 }
 .brand .sub{
   font: var(--t-xs)/1 var(--mono); letter-spacing: 0.08em;
-  text-transform: uppercase; color: var(--amber-dim);
-  border: 1px solid var(--amber-dim); border-radius: 2px; padding: 1px 4px;
+  text-transform: uppercase; color: var(--fg-idle);
+  border: 1px solid var(--line-2); border-radius: 0; padding: 1px 4px;
 }
 
 .topbar .sep{ width: 1px; height: 20px; background: var(--line); margin: 0 16px; }
@@ -371,8 +377,8 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
    the topbar, and the sliding indicator needs the list itself as its positioning box. */
 .desks{
   position: relative;
-  display: flex; align-items: stretch; gap: 0;
-  height: var(--topbar); margin-left: 8px;
+  display: flex; align-items: center; gap: 0;
+  height: var(--control); margin-left: 8px;
   padding: 0; border-radius: 0; background: none;
 }
 .desk{
@@ -381,16 +387,18 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
   padding: 0 14px;
   font: 500 var(--t-xs)/1 var(--mono);
   text-transform: uppercase; letter-spacing: 0.08em;
-  color: var(--amber-dim);
+  color: var(--fg-idle);
   background: none; border: 0; cursor: pointer;
-  flex: 0 0 auto; height: 100%; border-radius: 0; box-shadow: none;
+  flex: 0 0 auto; height: var(--control); border-radius: 0; box-shadow: none;
+  letter-spacing: 0;               /* tracking belongs to labels, not to controls */
+  transition: color 160ms ease;
 }
 .desk::after{
   content: ""; position: absolute; left: 14px; right: 14px; bottom: 0;
   height: 2px; background: transparent;
 }
 .desk:hover{ color: var(--amber); }
-.desk[data-active="true"]{ color: var(--amber); background: color-mix(in srgb, var(--amber) 9%, transparent); }
+.desk[data-active="true"]{ color: var(--amber); background: none; }
 .desk[data-active="true"]::after{ background: var(--read-correct); }
 .desk:disabled{ color: var(--fg-mute); opacity: .4; cursor: not-allowed; }
 
@@ -448,23 +456,24 @@ table.tbl th:nth-child(4), table.tbl td:nth-child(4){ padding-left: 20px; }
   border-radius: 1px; background: var(--line-2);
   transition: background-color 160ms ease;
 }
-.scroll-term:hover [data-slot="scroll-area-thumb"]{ background: var(--amber-dim); }
+.scroll-term:hover [data-slot="scroll-area-thumb"]{ background: var(--fg-mute); }
 
 /* A terminal screen is full. Alone on the book desk the blotter reaches the status line
    instead of floating in a void with the ground showing under it — the void was the
    loudest tell that this was a page, not a desk. Only when it IS alone: inside a
    .deskgrid (feed down) it goes back to its content height. */
-.view > .blotter{
-  display: flex; flex-direction: column;
-  flex: 1 0 auto;          /* grow into the desk, never shrink under the rows */
-}
-.view > .blotter .readstamp{ margin-top: auto; }
+.blotter{ display: flex; flex-direction: column; }
+.blotter .readstamp{ margin-top: auto; }
+.view > .blotter{ flex: 1 0 auto; }   /* alone on the desk, grow into it; never shrink */
 
 /* The reading stamp sits under the rows, quieter than a caption. */
 .readstamp{
   margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line);
   font: var(--t-xs)/1.5 var(--mono); color: var(--fg-mute);
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 6px;
 }
+.readstamp .label{ color: var(--fg-idle); }
+.rs-sep{ width: 1px; height: 10px; background: var(--line-2); margin: 0 10px; align-self: center; }
 .readstamp b{ color: var(--fg-dim); font-weight: 500; }
 
 /* An instrument's identity: name over its id. */
@@ -590,36 +599,85 @@ kbd{
    them in the positioned layer; a plain block here loses to them. */
 .hints{
   position: relative; z-index: 1;
-  border-top: 1px solid var(--amber-dim);
+  border-top: 1px solid var(--line-2);
   background: var(--bg);
   padding: 5px 32px;
-  display: flex; gap: 0; flex-wrap: wrap;
-  color: var(--amber-dim);
+  display: flex; align-items: center; gap: 0; flex-wrap: wrap;
+  color: var(--fg-idle);
 }
 .hints .h{
   display: inline-flex; align-items: center; gap: 6px;
   padding: 2px 0;
 }
+.hints .run{ gap: 8px; }
+.hints .run code{
+  font: var(--t-xs) var(--mono); color: var(--fg-dim);
+  background: var(--bg-2); border: 1px solid var(--line); padding: 2px 7px;
+}
+.btn-mini{ height: 20px !important; padding: 0 7px !important; }
+
+/* Under 800px the keys go, except the first: 1-5 is the one that matters on stage. */
+@media (max-width: 800px){
+  .hints .key:not(:first-of-type){ display: none; }
+  .hints .hint-sep{ display: none; }
+  .hints .who{ font-size: var(--t-2xs); }
+}
 .hints .hint-sep{ width: 1px; height: 13px; background: var(--line); margin: 0 14px; align-self: center; }
 .hints kbd{
-  letter-spacing: 0; background: var(--amber-dim); color: var(--bg);
-  border: 0; border-radius: 2px; font-weight: 600; padding: 1px 5px;
+  letter-spacing: 0; background: var(--bg-3); color: var(--fg-dim);
+  border: 1px solid var(--line-2); border-radius: 0; font-weight: 600; padding: 1px 5px;
 }
 .hints .who{ margin-left: auto; letter-spacing: 0.06em; text-transform: none; font-family: var(--mono); }
+
+/* ---------- the desks that stand without a feed ---------- */
+
+.slotdesk{ display: flex; flex-direction: column; gap: 18px; }
+.slot-big{ display: flex; align-items: baseline; gap: 14px; }
+.slot-dash{ font: 500 56px/1 var(--mono); color: var(--fg-mute); }
+.slot-say{
+  font: var(--t-xs) var(--mono); letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--fg-mute);
+}
+.slot-grid{
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0 20px;
+  margin: 0; border-top: 1px solid var(--line); padding-top: 12px;
+}
+.slot-grid dt{ padding: 7px 0; }
+.slot-grid dd{ margin: 0; padding: 7px 0; text-align: right; color: var(--fg-mute); }
+.slot-grid dt + dd{ border-bottom: 1px solid var(--line); }
+.slot-grid dt{ border-bottom: 1px solid var(--line); }
+
+.beat-list{ margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+.beat-list li{
+  display: flex; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line);
+  font-size: var(--t-sm); color: var(--fg-dim);
+}
+
+.ruledesk .rulelist{
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; margin: 0;
+  border-top: 1px solid var(--line);
+}
+.ruledesk .rulelist dt{ padding: 14px 0 4px; }
+.ruledesk .rulelist dd{
+  margin: 0 0 14px; padding-bottom: 14px; border-bottom: 1px solid var(--line);
+  font-size: var(--t-sm); line-height: 1.6; color: var(--fg-dim);
+}
+.ruledesk .rulelist dd:last-of-type{ border-bottom: 0; }
+.ruledesk .rulelist b{ color: var(--fg); font-weight: 500; }
 
 /* ---------- wallet ---------- */
 
 /* Topbar group. Reads as one object: state, network, account. */
 .wallet{ display: flex; align-items: center; gap: 8px; min-width: 0; }
-.wallet .wpill{ height: 22px; }
+.wallet .wpill{ height: var(--control); border-radius: 0; }
 .wallet .wnet{ text-transform: lowercase; letter-spacing: 0.08em; }
 .waddr{
-  height: 26px; padding: 0 9px; gap: 8px;
-  border: 1px solid var(--line-2); border-radius: 2px; background: var(--bg-1);
+  height: var(--control); padding: 0 9px; gap: 8px;
+  border: 1px solid var(--line-2); border-radius: 0; background: var(--bg-1);
   font: var(--t-xs) var(--mono); color: var(--fg); cursor: pointer;
   transition: border-color 160ms ease, color 160ms ease;
 }
-.waddr:hover{ border-color: var(--amber-dim); }
+.waddr:hover{ border-color: var(--fg-mute); }
 .waddr[aria-expanded="true"]{ border-color: var(--read-correct); }
 
 /* C12 — the press belongs to Connect and to nothing else on the desk. */
@@ -635,7 +693,7 @@ kbd{
 .dlg{
   gap: 14px; padding: 18px 20px 20px;
   background: var(--bg-1) !important; border: 1px solid var(--line-2) !important;
-  border-radius: 3px !important; box-shadow: none !important;
+  border-radius: 0 !important; box-shadow: none !important;
   max-width: 460px; width: calc(100vw - 32px);
 }
 .dlg-head{ display: block; padding: 0; }
@@ -652,7 +710,7 @@ kbd{
 .wrow{
   display: flex; align-items: center; gap: 10px;
   height: 38px; padding: 0 10px;
-  border: 1px solid var(--line); border-radius: 2px; background: var(--bg);
+  border: 1px solid var(--line); border-radius: 0; background: var(--bg);
   font: var(--t-xs) var(--mono); color: var(--fg-mute);
   transition: border-color 160ms ease, background-color 160ms ease;
 }
@@ -677,9 +735,9 @@ kbd{
 .wpaste .label{ display: inline-flex; align-items: center; gap: 6px; }
 .wpaste-row{ display: flex; gap: 8px; }
 .wfield{
-  flex: 1 1 auto; min-width: 0; height: 26px; padding: 0 9px;
+  flex: 1 1 auto; min-width: 0; height: var(--control); padding: 0 9px;
   background: var(--bg); color: var(--fg);
-  border: 1px solid var(--line-2); border-radius: 2px;
+  border: 1px solid var(--line-2); border-radius: 0;
   font: var(--t-xs) var(--mono);
   transition: border-color 160ms ease;
 }
@@ -723,13 +781,13 @@ kbd{
 
 .picker{
   position: relative; display: flex; align-items: center; gap: 10px;
-  height: 26px; padding: 0 0 0 9px;
-  border: 1px solid var(--amber-dim); border-radius: 2px;
+  height: var(--control); padding: 0 0 0 9px;
+  border: 1px solid var(--line-2); border-radius: 0;
   background: var(--bg-1);
 }
-.picker:hover{ border-color: var(--amber); }
+.picker:hover{ border-color: var(--fg-mute); }
 .picker:focus-within{ border-color: var(--read-correct); }
-.picker > .label{ color: var(--amber-dim); }
+.picker > .label{ color: var(--fg-idle); }
 .picker-btn{
   display: flex; align-items: center; gap: 10px;
   height: 100%; padding: 0 10px 0 0; min-width: 0;   /* or the label cannot ellipsis */
@@ -758,11 +816,11 @@ kbd{
    and never an animation of ours, the primitive already brings its open/close one. */
 .picker-list{
   min-width: 300px; padding: 4px;
-  background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 4px;
+  background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 0;
 }
 .picker-list [data-slot="dropdown-menu-item"]{
   display: flex; align-items: center; gap: 10px;
-  padding: 7px 8px; border-radius: 3px; cursor: pointer;
+  padding: 7px 8px; border-radius: 0; cursor: pointer;
   font: var(--t-xs) var(--mono); color: var(--fg-dim);
 }
 .picker-list [data-slot="dropdown-menu-item"][data-highlighted]{ background: var(--bg-3); color: var(--fg); }
@@ -839,16 +897,13 @@ kbd{
 
 /* Buttons are terminal keys: square, mono, amber hairline. No pill, no fill, no shadow. */
 .btn-term{
-  height: 24px; padding: 0 10px; gap: 6px;
-  border-radius: 2px; box-shadow: none;
-  font: 500 var(--t-xs)/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase;
-  color: var(--amber-dim); background: none; border: 1px solid var(--line-2);
+  height: var(--control); padding: 0 12px; gap: 6px;
+  border-radius: 0; box-shadow: none;
+  font: 500 var(--t-xs)/1 var(--mono); letter-spacing: 0; text-transform: uppercase;
+  color: var(--fg-idle); background: none; border: 1px solid var(--line-2);
   transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
 }
-.btn-term:hover{
-  color: var(--amber); border-color: var(--amber-dim);
-  background: color-mix(in srgb, var(--amber) 7%, transparent);
-}
+.btn-term:hover{ color: var(--fg); border-color: var(--fg-mute); background: var(--bg-2); }
 .rail-body .btn-term{ margin-top: 4px; }
 
 /* The command sits at the foot of the desk, in mono, secondary. */
@@ -883,8 +938,6 @@ kbd{
 tr.ghost td{ color: var(--fg-mute); }
 tr.ghost:hover{ background: none; }
 tr.ghost:hover td > *{ transform: none; }
-.ghost-chip{ display: inline-block; width: 34px; height: 19px; border: 1px dashed var(--line-2); border-radius: 3px; }
-.ghost-dot{ display: inline-block; width: 7px; height: 7px; border-radius: 50%; border: 1px dashed var(--line-2); }
 .ghost-desk .ghost-lines{ display: grid; gap: 10px; margin: 4px 0 16px; }
 .ghost-desk .ghost-lines span{ display: block; height: 8px; background: var(--bg-2); border-radius: 2px; }
 

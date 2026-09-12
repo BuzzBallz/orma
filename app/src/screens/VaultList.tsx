@@ -33,23 +33,28 @@ const GHOSTS = [1, 2, 3, 4, 5]
  * nothing else: every figure is an em-dash. No id, no amount, no countdown is invented —
  * a live backend may serve entirely different instruments.
  */
-function GhostRow({ n }: { n: number }) {
+/**
+ * Four columns, not nine: with no feed the other five have nothing to be about. Every
+ * figure is an em-dash in the same mono as a real one — a dotted box and an empty circle
+ * looked like controls you could press, which is the opposite of what they mean.
+ */
+function GhostRow({ n, onOpen }: { n: number; onOpen: () => void }) {
   return (
-    <TableRow className="ghost" aria-hidden>
-      <TableCell><span className="ghost-chip" /></TableCell>
+    <TableRow
+      className="ghost" tabIndex={0} style={{ cursor: 'pointer' }}
+      aria-label={`slot ${n}, awaiting feed`}
+      onClick={onOpen}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
+    >
       <TableCell>
         <span className="inst">
           <span className="name mute">Vault {n}</span>
           <span className="id">awaiting feed</span>
         </span>
       </TableCell>
-      <TableCell className="mute">—</TableCell>
-      <TableCell className="rt mute">—</TableCell>
-      <TableCell className="rt mute">—</TableCell>
-      <TableCell className="rt mute">—</TableCell>
-      <TableCell className="rt mute">—</TableCell>
-      <TableCell className="mute">—</TableCell>
-      <TableCell><span className="ghost-dot" /></TableCell>
+      <TableCell className="num mute">—</TableCell>
+      <TableCell className="rt num mute">—</TableCell>
+      <TableCell className="rt num mute">—</TableCell>
     </TableRow>
   )
 }
@@ -154,11 +159,14 @@ function Th({ k, label, rt, sort, onSort }: {
  * in spec §9). Divergence is a secondary badge, never the sort: an undeclared loss reads
  * 0 bps and a divergence sort buries the most dangerous vault at the bottom.
  */
-export function VaultList({ vaults, receivedAt, tick, stamp, onOpen }: {
+export function VaultList({ vaults, receivedAt, tick, stamp, status, onOpen }: {
   vaults: VaultRow[]; receivedAt: number; tick: number
   stamp?: { ledgerIndex: number; serverTime: string }
+  /** Drives the status line that closes the panel — it is never allowed to be empty. */
+  status?: { ageMs: number; fails: number; error: string | null; contract: string }
   onOpen: (vaultId: string) => void
 }) {
+  const down = vaults.length === 0
   const [sort, setSort] = useState<Sort>(DEFAULT_SORT)
   const sorted = sort.key !== DEFAULT_SORT.key || sort.asc !== DEFAULT_SORT.asc
 
@@ -198,33 +206,54 @@ export function VaultList({ vaults, receivedAt, tick, stamp, onOpen }: {
       <div className="tbl-scroll">
         <Table className="tbl">
           <TableHeader>
-            <TableRow>
-              <Th k="gradeNumeric" label="grade" sort={sort} onSort={toggle} />
-              <Th k="label" label="instrument" sort={sort} onSort={toggle} />
-              <Th k="phase" label="phase" sort={sort} onSort={toggle} />
-              <Th k="secondsToRedemption" label="redemption" rt sort={sort} onSort={toggle} />
-              <Th k="navDivergenceBps" label="divergence" rt sort={sort} onSort={toggle} />
-              <TableHead className="rt">reported → correct</TableHead>
-              <Th k="loanCount" label="loans" rt sort={sort} onSort={toggle} />
-              <Th k="trend" label="trend" sort={sort} onSort={toggle} />
-              <TableHead>oracle</TableHead>
-            </TableRow>
+            {down ? (
+              <TableRow>
+                <TableHead>instrument</TableHead>
+                <TableHead>phase</TableHead>
+                <TableHead className="rt">divergence</TableHead>
+                <TableHead className="rt">oracle</TableHead>
+              </TableRow>
+            ) : (
+              <TableRow>
+                <Th k="gradeNumeric" label="grade" sort={sort} onSort={toggle} />
+                <Th k="label" label="instrument" sort={sort} onSort={toggle} />
+                <Th k="phase" label="phase" sort={sort} onSort={toggle} />
+                <Th k="secondsToRedemption" label="redemption" rt sort={sort} onSort={toggle} />
+                <Th k="navDivergenceBps" label="divergence" rt sort={sort} onSort={toggle} />
+                <TableHead className="rt">reported → correct</TableHead>
+                <Th k="loanCount" label="loans" rt sort={sort} onSort={toggle} />
+                <Th k="trend" label="trend" sort={sort} onSort={toggle} />
+                <TableHead>oracle</TableHead>
+              </TableRow>
+            )}
           </TableHeader>
           <TableBody>
-            {rows.length === 0
-              ? GHOSTS.map(n => <GhostRow key={n} n={n} />)
+            {down
+              ? GHOSTS.map(n => <GhostRow key={n} n={n} onOpen={() => onOpen('')} />)
               : rows.map((v, i) => (
                 <Row key={v.vaultId} v={v} i={i} receivedAt={receivedAt} tick={tick} onOpen={onOpen} />
               ))}
           </TableBody>
         </Table>
       </div>
-      {stamp && (
-        <div className="readstamp">
-          read at ledger <b>{stamp.ledgerIndex}</b> · {fmtIso(stamp.serverTime)} · every figure
-          above came from that one response
-        </div>
-      )}
+
+      {/* The panel always closes on a line. An empty black half-screen under five slots
+          says nothing; this says when we last heard, why not, and against what contract. */}
+      <div className="readstamp">
+        {stamp
+          ? <>read at ledger <b>{stamp.ledgerIndex}</b> · {fmtIso(stamp.serverTime)} · every figure above came from that one response</>
+          : <>
+              <span className="label">last poll</span>{' '}
+              <b>{status && status.ageMs > 0 ? `${Math.round(status.ageMs / 1000)}s ago` : '—'}</b>
+              <span className="rs-sep" />
+              <span className="label">cause</span>{' '}
+              <b>{status?.error ?? 'no answer yet'}</b>
+              {status && status.fails > 0 && <> · {status.fails} failed</>}
+              <span className="rs-sep" />
+              <span className="label">contract</span>{' '}
+              <b>v{status?.contract ?? '—'}</b>
+            </>}
+      </div>
     </section>
   )
 }

@@ -210,7 +210,11 @@ window.uiAudit = async function uiAudit(opts = {}) {
       if (!vals.length) return record('consistency', name, true, 'not on this screen — skipped')
       record('consistency', name, vals.length <= max, vals.join(' / '))
     }
-    oneOf('one tracking for uppercase labels', '.panel-title,.label,.desk,.hints', e => cs(e).letterSpacing)
+    // Labels only. Controls deliberately carry no tracking — a tab and a button are not
+    // captions, and spacing them out is what made every uppercase word look like a label.
+    oneOf('one tracking for labels', '.panel-title,.label,.hints', e => cs(e).letterSpacing)
+    oneOf('no tracking on controls', '.desk,.btn-term,button.picker-btn',
+      e => cs(e).letterSpacing === 'normal' || cs(e).letterSpacing === '0px' ? 'none' : cs(e).letterSpacing)
     oneOf('one grid gap', '.grid12,.stack', e => cs(e).gap)
     oneOf('one panel radius', 'main .panel', e => cs(e).borderRadius)
     const fams = uniq([...document.querySelectorAll('main *')].map(e => cs(e).fontFamily.split(',')[0]))

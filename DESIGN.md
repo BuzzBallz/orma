@@ -558,3 +558,56 @@ clavier », et rien d'autre.**
 Balayé sur les 12 combinaisons desk × vault : **0 anneau cyan décoratif**. Nouveau contrôle
 dans la section `layout` de l'audit — *« focus colour is not used as decoration »* — pour
 qu'il ne puisse pas revenir.
+
+## Audit visuel du preview — les 8 patchs (12/09)
+
+### 5 d'abord : la nav était cassée sans feed
+
+Spec §3 renvoyait un `/vault` ou `/moment` sans `?vault=` vers le book. Sans feed il n'y a
+pas de rangées, donc pas d'id à choisir, donc **les deux desks étaient inatteignables** :
+l'onglet rebondissait et l'app avait l'air morte. Le redirect est supprimé — les desks
+tiennent debout tout seuls et disent ce qu'ils attendent.
+
+| onglet | sans API |
+|---|---|
+| LIST | `the book` · rail `FEED LOST` |
+| VAULT | `instrument` · un slot en gros, `—` + « awaiting feed », les six champs en tirets |
+| MOMENT | `the moment` · `—` + « no beat until feed », les quatre beats listés |
+| ORACLE | `oracle — the three rules` : divergence · declared loss · zero is not safety |
+
+Aucun écran blanc, aucun chiffre inventé. L'URL continue de dire la vérité.
+
+### 1 — le puits noir
+
+La statusline ferme toujours le panneau : `last poll` / `cause` / `contract`, en tirets tant
+qu'on n'a rien. Le rail et le book partagent la même hauteur **et le même filet du bas** —
+mesuré : `railBottom 807`, `bookBottom 807`.
+
+### 2 — fatigue d'ambre
+
+Nouveau token `--fg-idle: #8A93A0`. Sont passés en gris : onglets inactifs, labels de
+colonnes, footer, touches, sous-titre de marque, bordure du topbar, boutons.
+
+**L'ambre ne reste que sur trois choses** : l'onglet actif, les alertes, et le wordmark.
+**Le rouge ne reste que sur** : NO FEED et le risque.
+
+### 3 — chrome droit
+
+`border-radius: 0` sur panneaux, chips, boutons, picker, dialog, menus, champs. Une seule
+hauteur de contrôle, `--control: 30px` — mesuré : `.desk 30`, `.picker 30`, `connect 30`.
+L'onglet actif n'a plus de fond : un filet ambre de 2px, rien d'autre.
+
+### 4 — blotter DOWN
+
+Quatre colonnes au lieu de neuf : `instrument · phase · divergence · oracle`. La case grade
+pointillée et le rond vide sont supprimés — ils ressemblaient à des boutons ; ce sont des
+tirets cadratins, dans la même mono qu'un vrai chiffre. Une rangée fantôme est cliquable et
+mène à `/vault`.
+
+### 6 / 7 / 8
+
+Connect à 30px comme les onglets, dialog shadcn inchangé. Le `runline` n'existe plus : la
+commande et le bouton copy vivent dans **la** barre du bas, avec les touches ; sous 800px on
+garde `1–5` et on jette le reste. `Roboto` sort de la pile sans-serif (Plex est auto-hébergé
+en woff2, la retombée est `system-ui`). Le tracking ne reste que sur les labels — mesuré :
+**0 bouton** avec un `letter-spacing`.

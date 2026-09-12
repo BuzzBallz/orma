@@ -71,15 +71,14 @@ function Watch({ verdict, tone, said, aside, facts, action }: {
 
 const RUN_CMD = 'node tools/fixture-server.mjs'
 
-/** The command, at the foot of the desk, in mono. Secondary — it is not the headline. */
-function RunLine({ extra }: { extra?: React.ReactNode }) {
+/** The command to bring the feed back, in the one status line — never a second strip. */
+function RunHint() {
   const [copied, setCopied] = useState(false)
   return (
-    <div className="runline">
-      <span className="say">Start the API and the screen fills itself.</span>
+    <span className="h run">
       <code>{RUN_CMD}</code>
       <Button
-        variant="ghost" size="xs" className="btn-term"
+        variant="ghost" size="xs" className="btn-term btn-mini"
         onClick={() => {
           navigator.clipboard?.writeText(RUN_CMD).then(() => {
             setCopied(true)
@@ -90,8 +89,7 @@ function RunLine({ extra }: { extra?: React.ReactNode }) {
         {copied ? <Check size={11} strokeWidth={2.5} /> : <Copy size={11} strokeWidth={2.25} />}
         {copied ? 'copied' : 'copy'}
       </Button>
-      <span className="aside">{extra ?? 'Nothing to click. It reconnects on its own.'}</span>
-    </div>
+    </span>
   )
 }
 
@@ -105,6 +103,70 @@ function GhostDesk({ title }: { title: string }) {
         <span style={{ width: '62%' }} /><span style={{ width: '35%' }} />
       </div>
       <div className="empty">Everything on this desk comes from one request. We draw it when it lands, not before.</div>
+    </section>
+  )
+}
+
+/** /vault with nothing selected: one slot, blown up, saying exactly what it is waiting for. */
+function SlotDesk() {
+  return (
+    <section className="panel ghost-desk rail slotdesk">
+      <h2 className="panel-title">instrument</h2>
+      <div className="slot-big">
+        <span className="slot-dash">—</span>
+        <span className="slot-say">awaiting feed</span>
+      </div>
+      <dl className="slot-grid">
+        {['grade', 'phase', 'reported nav', 'correct nav', 'divergence', 'redemption'].map(k => (
+          <div key={k} style={{ display: 'contents' }}>
+            <dt className="label">{k}</dt><dd className="num mute">—</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  )
+}
+
+/** /moment with nothing selected. Four beats, none of them playable yet. */
+function BeatDesk() {
+  return (
+    <section className="panel ghost-desk rail slotdesk">
+      <h2 className="panel-title">the moment</h2>
+      <div className="slot-big">
+        <span className="slot-dash">—</span>
+        <span className="slot-say">no beat until feed</span>
+      </div>
+      <ol className="beat-list">
+        <li><span className="num mute">1</span> the two readers</li>
+        <li><span className="num mute">2</span> the gap opens</li>
+        <li><span className="num mute">3</span> we publish it</li>
+        <li><span className="num mute">4</span> the gate</li>
+      </ol>
+    </section>
+  )
+}
+
+/**
+ * /oracle. Three rules, stated. This desk explains the method, so it has something true
+ * to say with or without a feed — the numbers that obey these rules live on /moment.
+ */
+function RuleDesk() {
+  const RULES: [string, React.ReactNode][] = [
+    ['divergence', <>The gap between what a vault <b>reports</b> and what it <b>holds</b>, in basis points. One reader divides total assets by shares; the other subtracts the declared loss first.</>],
+    ['declared loss', <>A loss the broker has written down. The correct reader subtracts it; the naive one never sees it. That subtraction is the whole disagreement.</>],
+    ['zero is not safety', <>A loss nobody has declared reads fine on <b>both</b> sides. Zero divergence means the two readers agree, not that the vault is sound.</>],
+  ]
+  return (
+    <section className="panel rail ruledesk">
+      <h2 className="panel-title">oracle — the three rules</h2>
+      <dl className="rulelist">
+        {RULES.map(([k, v]) => (
+          <div key={k} style={{ display: 'contents' }}>
+            <dt className="label">{k}</dt>
+            <dd>{v}</dd>
+          </div>
+        ))}
+      </dl>
     </section>
   )
 }
@@ -126,10 +188,10 @@ function Desk() {
 
   const rows = vaults.data?.vaults ?? []
 
-  // A route with no ?vault= (except / and /oracle) redirects to / — spec §3.
-  useEffect(() => {
-    if (path !== '/' && path !== '/oracle' && !vaultId) navigate('/', null)
-  }, [path, vaultId, navigate])
+  // Spec §3 sent a vault-less /vault or /moment back to the book. That rule made both
+  // desks UNREACHABLE with no feed — no rows means no id to pick, so the tab bounced you
+  // straight back and read as broken. Owner's call: the desks stand on their own and say
+  // what they are waiting for. The URL keeps telling the truth either way.
 
   // Global keyboard — spec §5.3. Ignored inside form controls and inside the picker.
   useEffect(() => {
@@ -158,6 +220,8 @@ function Desk() {
   const primary = path === '/' ? vaults : detail
   const stamp = path === '/' ? vaults.data : detail.data
   const notFound = detail.code === 'VAULT_NOT_FOUND'
+
+  const feedDown = !vaults.data || vaults.fails > 0
 
   // B3 — the feed coming back is worth exactly one toast, on the edge, never on a timer.
   const wasDown = useRef(false)
@@ -205,7 +269,11 @@ function Desk() {
               ['contract', `v${EXPECTED_CONTRACT}`],
             ]}
           />
-          <VaultList vaults={[]} receivedAt={0} tick={tick} onOpen={() => {}} />
+          <VaultList
+            vaults={[]} receivedAt={0} tick={tick}
+            status={{ ageMs: vaults.ageMs, fails: vaults.fails, error: vaults.error, contract: EXPECTED_CONTRACT }}
+            onOpen={() => navigate('/vault', null)}
+          />
         </div>
       )
     }
@@ -213,11 +281,11 @@ function Desk() {
     if (path === '/oracle') {
       return (
         <div className="deskgrid">
-          <GhostDesk title="oracle" />
+          <RuleDesk />
           <Watch
-            verdict="ON /MOMENT" tone="var(--read-correct)"
+            verdict="ON /MOMENT" tone="var(--fg-dim)"
             said={<>The published reading already has a home. Publisher, object index, the six on-chain dimensions and the ledger aggregate are band 3 of the moment desk, off the same three-second request.</>}
-            aside={<>A second page would read the same object twice. Press <kbd>M</kbd>, or open it here.</>}
+            aside={<>A second page would read the same object twice.</>}
             action={
               <Button variant="outline" size="sm" className="btn-term" onClick={() => navigate('/moment')}>
                 the moment desk <ArrowUpRight size={12} strokeWidth={2.25} />
@@ -241,8 +309,11 @@ function Desk() {
                 facts={[['reading from', API_BASE], ['it said', vaults.error ?? 'nothing yet'], ['contract', `v${EXPECTED_CONTRACT}`]]}
               />
             )}
-            <VaultList vaults={[]} receivedAt={0} tick={tick} onOpen={() => {}} />
-            {vaults.fails > 0 && <RunLine />}
+            <VaultList
+              vaults={[]} receivedAt={0} tick={tick}
+              status={{ ageMs: vaults.ageMs, fails: vaults.fails, error: vaults.error, contract: EXPECTED_CONTRACT }}
+              onOpen={() => navigate('/vault', null)}
+            />
           </div>
         )
       }
@@ -250,8 +321,31 @@ function Desk() {
         <VaultList
           vaults={rows} receivedAt={vaults.receivedAt} tick={tick}
           stamp={vaults.data ?? undefined}
+          status={{ ageMs: vaults.ageMs, fails: vaults.fails, error: vaults.error, contract: EXPECTED_CONTRACT }}
           onOpen={id => navigate('/vault', id)}
         />
+      )
+    }
+
+    if (!vaultId) {
+      return (
+        <div className="deskgrid">
+          {path === '/vault'
+            ? <SlotDesk />
+            : <BeatDesk />}
+          <Watch
+            verdict="NO INSTRUMENT" tone="var(--fg-dim)"
+            said={path === '/vault'
+              ? <>Nothing is selected. This desk shows one vault at a time — every figure on it comes from one request for that vault, and we have not been asked for one yet.</>
+              : <>Nothing is selected. The moment is four beats through one vault, and it has no beat to play until a vault is picked and the feed answers.</>}
+            aside={<>Pick one from the book, or press <kbd>1</kbd>…<kbd>5</kbd> once the feed is up.</>}
+            action={
+              <Button variant="outline" size="sm" className="btn-term" onClick={() => navigate('/', null)}>
+                <ArrowLeft size={12} strokeWidth={2.25} /> the book
+              </Button>}
+            facts={[['reading from', API_BASE], ['instruments on the book', rows.length ? String(rows.length) : '—']]}
+          />
+        </div>
       )
     }
 
@@ -346,13 +440,17 @@ function Desk() {
           <div key={path} className={painted.current ? 'view' : undefined}>{body()}</div>
         </main>
       </TabsContent>
+      {/* One bar at the foot of the screen: how to bring the feed back, then the keys,
+          then who built it. Narrow screens keep the first key and drop the rest. */}
       <div className="hints">
-        {/* The dividers are real separators now, not a border-right on every item — which
-            also kills the hairline that used to dangle after the last shortcut. */}
+        {feedDown && <>
+          <RunHint />
+          <Separator orientation="vertical" className="hint-sep" />
+        </>}
         {HINTS.map(([k, label], i) => (
           <Fragment key={k}>
             {i > 0 && <Separator orientation="vertical" className="hint-sep" />}
-            <span className="h"><kbd>{k}</kbd> {label}</span>
+            <span className="h key"><kbd>{k}</kbd> {label}</span>
           </Fragment>
         ))}
         <span className="who">built for the XRPL lending hackathon · De Vinci Blockchain, 12–13 Sept 2026</span>
