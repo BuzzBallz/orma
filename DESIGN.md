@@ -81,6 +81,15 @@ un échec visible. Tout est dans `app/public/assets/`, sources et licences dans 
 | `operator-desk.jpg` | salle de contrôle BESSY II, 900×675, 145 Ko | Wikimedia Commons, **CC0**, auteur Nylki. Redimensionné et recompressé en local. |
 | `grain.png` | grain 128×128 tuilable, overlay 5 %, inerte | **généré en local** par un script jetable, pas téléchargé |
 | `mark.svg` | le sigle de la topbar | **dessiné pour ce projet**, délibérément pas la marque XRPL |
+| `fonts/plex-*.woff2` | IBM Plex Sans variable + Plex Mono 400/500, subset latin, 60 Ko | **OFL 1.1**, self-hostées. Aucune requête réseau à l'exécution. |
+
+### Webfonts : §6.2 relu, pas contourné
+
+Le spec interdit les webfonts parce qu'« une police manquante sur scène est un échec
+visible » — le risque décrit est le **réseau**, pas le fichier. Une fonte livrée dans le
+bundle et servie depuis la même origine ne peut pas échouer sur le wifi de la salle. Les
+stacks système restent en fallback avec `font-display: swap`, donc l'écran peint à la
+première frame dans tous les cas. Décision prise par Dev B le 12/09.
 
 **Pas de portraits.** Il n'existe aucun endroit humain dans cette app en lecture seule, et
 coller cinq visages d'inconnus comme s'ils étaient l'équipe serait fabriquer des gens.

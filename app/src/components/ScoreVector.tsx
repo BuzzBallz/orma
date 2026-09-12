@@ -19,12 +19,13 @@ function DimRow({ d }: { d: Dimension }) {
   return (
     <div style={{ padding: '10px 0', borderTop: '1px solid var(--line)' }}>
       <div className="row" style={{ gap: 12 }}>
-        <span className="label" style={{ width: 72, flex: '0 0 auto' }}>{d.key}</span>
+        <span className="label" style={{ width: 64, flex: '0 0 auto' }}>{d.key}</span>
 
-        <span style={{ flex: '0 1 140px', minWidth: 90, fontSize: 'var(--t-base)' }}>{d.label}</span>
+        <span style={{ flex: '0 0 132px', fontSize: 'var(--t-base)' }}>{d.label}</span>
 
         {/* Bar length is driven by the dimension's GRADE, never by `value`: value mixes seconds with ratios. */}
-        <span className="bar bar-sm" style={{ flex: '1 1 40px', minWidth: 40, ['--bar-tone' as string]: `var(${tone})` }}>
+        {/* The vector is the intellectual centre of the screen; its bars get the room. */}
+        <span className="bar bar-sm" style={{ flex: '1 1 100px', minWidth: 70, ['--bar-tone' as string]: `var(${tone})` }}>
           <i style={{ width: gradeFill(d.grade) * 100 + '%' }} />
         </span>
 
@@ -32,7 +33,7 @@ function DimRow({ d }: { d: Dimension }) {
           <Chip tone={tone}>{d.grade}</Chip>
         </span>
 
-        <span className="num" style={{ width: 96, flex: '0 0 auto', textAlign: 'right' }}>
+        <span className="num" style={{ width: 82, flex: '0 0 auto', textAlign: 'right' }}>
           {formatValue(d)}
         </span>
 

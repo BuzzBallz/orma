@@ -29,8 +29,13 @@ export function Sparkline({ samples, height = 120 }: { samples: Sample[]; height
   const t1 = samples[samples.length - 1].t
   const span = t1 - t0 || 1
 
-  const lo = Math.min(...samples.map(s => s.correct)) * 0.98
-  const hi = Math.max(...samples.map(s => s.naive)) * 1.02
+  // Give the domain real headroom: at 2% the two flat readings glue themselves to the
+  // top and bottom edges and stop reading as a measurement.
+  const lo0 = Math.min(...samples.map(s => s.correct))
+  const hi0 = Math.max(...samples.map(s => s.naive))
+  const pad = (hi0 - lo0) * 0.35 || Math.max(hi0 * 0.02, 0.01)
+  const lo = lo0 - pad
+  const hi = hi0 + pad
   const range = hi - lo
 
   // Both series flat and equal (AAAA0002): centre the single line, never divide by zero.
@@ -39,7 +44,13 @@ export function Sparkline({ samples, height = 120 }: { samples: Sample[]; height
 
   const line = (pick: (s: Sample) => number) => samples.map(s => `${x(s.t).toFixed(1)},${y(pick(s)).toFixed(1)}`).join(' ')
 
-  return box(
+  return (
+    <div style={{ position: 'relative' }}>
+      <span className="sparklegend">
+        <span><i className="sw naive" /> reported</span>
+        <span><i className="sw correct" /> correct</span>
+      </span>
+      {box(
     <>
       <polyline
         fill="none" vectorEffect="non-scaling-stroke" strokeWidth="2"
@@ -50,5 +61,7 @@ export function Sparkline({ samples, height = 120 }: { samples: Sample[]; height
         stroke="var(--accent)" points={line(s => s.correct)}
       />
     </>,
+  )}
+    </div>
   )
 }

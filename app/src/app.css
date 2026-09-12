@@ -1,4 +1,24 @@
 /* ============================================================
+   Type. IBM Plex, self-hosted from public/assets/fonts — no network request at
+   runtime, so spec §6.2's real concern (a font that fails on venue wifi) does not
+   apply. OFL 1.1; licence and provenance in public/assets/README.md.
+   font-display: swap with the system stack behind it: the screen paints either way.
+   ============================================================ */
+
+@font-face{
+  font-family: "Plex Sans"; font-style: normal; font-weight: 400 600;
+  font-display: swap; src: url("/assets/fonts/plex-sans-var.woff2") format("woff2");
+}
+@font-face{
+  font-family: "Plex Mono"; font-style: normal; font-weight: 400;
+  font-display: swap; src: url("/assets/fonts/plex-mono-400.woff2") format("woff2");
+}
+@font-face{
+  font-family: "Plex Mono"; font-style: normal; font-weight: 500;
+  font-display: swap; src: url("/assets/fonts/plex-mono-500.woff2") format("woff2");
+}
+
+/* ============================================================
    XRPL Vault Fragility Oracle — one stylesheet.
    Reference: a private-market credit desk. Dense, calm, expensive.
    Near-black ground, one cold accent, colour reserved for risk.
@@ -33,8 +53,8 @@
   --dead:    #7C8593;   /* terminal / defaulted */
   --accent:  #58C7F3;   /* the correct NAV reading, and the single UI accent */
 
-  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, Menlo, monospace;
-  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --mono: "Plex Mono", ui-monospace, "SF Mono", Consolas, Menlo, monospace;
+  --sans: "Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
   --t-hero: 96px;
   --t-xxl:  72px;
@@ -44,6 +64,8 @@
   --t-base: 14px;
   --t-sm:   12px;
   --t-xs:   11px;
+  --t-2xs:  10px;   /* chevrons and other glyph-only marks */
+  --t-verdict: 40px;
 
   --topbar: 56px;
 }
@@ -78,14 +100,14 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 .num, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; line-height: 1.15; }
 
 /* Display figures track tighter as they grow; the label is the counterweight. */
-.num[style*="--t-hero"], .num[style*="--t-xxl"]{ letter-spacing: -0.045em; }
-.num[style*="--t-xl"]{ letter-spacing: -0.03em; }
+.num[style*="--t-hero"], .num[style*="--t-xxl"]{ letter-spacing: -0.03em; }
+.num[style*="--t-xl"]{ letter-spacing: -0.02em; }
 
 /* The one label style in the app. */
 .label, .panel-title, table.tbl th, .hints{
   font: 500 var(--t-xs)/1.2 var(--sans);
   text-transform: uppercase;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   color: var(--fg-dim);
 }
 
@@ -97,9 +119,7 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 }
 /* The view owns the remaining height so a desk fills its frame instead of
    floating in the top-left quarter. */
-.page > *{ flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-/* A desk that is a single panel stretches to the frame too. */
-.page > * > .panel:only-child{ flex: 1 1 auto; }
+.page > *{ flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
 .grid12{ display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; }
 .grid12 > *, .stack > * { min-width: 0; }
 .col-1-7 { grid-column: span 7; }
@@ -236,11 +256,11 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 table.tbl{ width: 100%; border-collapse: collapse; font-size: var(--t-base); }
 table.tbl th{
   text-align: left;
-  padding: 0 8px 8px; border-bottom: 1px solid var(--line-2);
+  padding: 0 8px 12px; border-bottom: 1px solid var(--line-2);
   white-space: nowrap; background: none;
 }
 table.tbl td{
-  padding: 0 8px; height: 44px;
+  padding: 0 8px; height: 52px;
   border-bottom: 1px solid var(--line); white-space: nowrap;
   vertical-align: middle;
 }
@@ -266,7 +286,7 @@ tr.row-dead td{ text-decoration: line-through; opacity: 0.55; }
 .bar{ height: 8px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 2px; overflow: hidden; }
 .bar > i{ display: block; height: 100%; background: var(--bar-tone, var(--fg-dim)); }
 .bar.animate > i{ transition: width 600ms cubic-bezier(.2,.7,.2,1); }
-.bar-sm{ height: 5px; }
+.bar-sm{ height: 6px; }
 
 /* ---------- interaction + motion ----------
    DEMO OVERRIDE of spec §6.5, agreed for the pitch: fluid CSS motion is allowed.
@@ -387,7 +407,7 @@ kbd{
   font: var(--t-xs) var(--mono); color: var(--fg);
 }
 .picker-label{ max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.picker .chev{ color: var(--fg-mute); font-size: 10px; line-height: 1; transition: transform 160ms ease; }
+.picker .chev{ color: var(--fg-mute); font-size: var(--t-2xs); line-height: 1; transition: transform 160ms ease; }
 .picker-btn[aria-expanded="true"] .chev{ transform: rotate(180deg); }
 
 .picker-list{
@@ -409,14 +429,10 @@ kbd{
 
 .deskgrid{
   display: grid; grid-template-columns: minmax(0, 1fr) 240px;
-  grid-template-rows: minmax(0, 1fr);
-  gap: 12px; align-items: stretch; flex: 1 1 auto;
+  gap: 12px; align-items: stretch;   /* the room matches the book's height, whatever it is */
 }
 /* Feed down on the book: a word from whoever is on watch, the empty book, the room. */
-.deskgrid.down{
-  grid-template-columns: 264px minmax(0, 1fr) 240px;
-  grid-template-rows: minmax(0, 1fr) auto;   /* the desk stretches, the command sits at its foot */
-}
+.deskgrid.down{ grid-template-columns: 264px minmax(0, 1fr) 240px; }
 .deskgrid > .panel{ display: flex; flex-direction: column; }
 @media (max-width: 1240px){ .deskgrid.down{ grid-template-columns: 280px minmax(0, 1fr); } .deskgrid.down .ops{ display: none } }
 @media (max-width: 1100px){ .deskgrid, .deskgrid.down{ grid-template-columns: minmax(0, 1fr); } }
@@ -455,7 +471,7 @@ kbd{
 .watch{ display: flex; flex-direction: column; }
 .watch .verdict{
   font-family: var(--mono); font-variant-numeric: tabular-nums;
-  font-size: 40px; line-height: 1; letter-spacing: -0.04em;
+  font-size: var(--t-verdict); line-height: 1; letter-spacing: -0.03em;
   color: var(--status-tone, var(--fg)); margin: 4px 0 16px;
 }
 .watch .said{ font-size: var(--t-base); line-height: 1.6; color: var(--fg); margin: 0 0 8px; }
@@ -487,6 +503,17 @@ kbd{
   border-radius: 3px; padding: 5px 9px;
 }
 .runline .aside{ font-size: var(--t-xs); color: var(--fg-mute); }
+
+/* The sparkline says which line is which, where the lines are — the formulas are
+   two panels away. */
+.sparklegend{
+  position: absolute; top: 0; right: 0; display: flex; gap: 14px; z-index: 1;
+  font: var(--t-xs) var(--mono); letter-spacing: 0.08em; color: var(--fg-mute);
+}
+.sparklegend span{ display: inline-flex; align-items: center; gap: 6px; }
+.sparklegend .sw{ display: inline-block; width: 14px; height: 0; border-top-width: 2px; }
+.sparklegend .sw.naive{ border-top-style: dashed; border-top-color: var(--muted); }
+.sparklegend .sw.correct{ border-top-style: solid; border-top-color: var(--accent); }
 
 /* ---------- structural placeholders ----------
    Shape only. Every figure is an em-dash: nothing here is a number. */

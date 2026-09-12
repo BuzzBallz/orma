@@ -8,7 +8,7 @@ import { GatePanel } from '../components/GatePanel'
 import { Chip } from './../components/Chip'
 import { bpsToPct } from '../lib/format'
 
-const HEIGHTS = [280, 170, 180, 110]
+const HEIGHTS = [240, 210, 180, 110]
 
 function Band({ n, beat, children, footer }: {
   n: number; beat: number; children: React.ReactNode; footer?: React.ReactNode
@@ -93,7 +93,7 @@ export function Moment({ d, receivedAt, tick }: { d: Detail; receivedAt: number;
           <Reader title="our reader" value={d.vault.navCorrect}
             formula={correctFormula} pair="pair-correct" />
         </div>
-        <Sparkline samples={samples} height={104} />
+        <Sparkline samples={samples} height={92} />
       </Band>
 
       {/* BAND 2 — THE TRANSACTION THAT CAUSED IT */}
