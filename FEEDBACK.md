@@ -1,5 +1,21 @@
 # Developer feedback — building on XLS-65 / XLS-66
 
+> ## ⚠️ DRAFT — REWRITTEN SUNDAY FROM THE REAL BUILD
+>
+> **This is not the finished deliverable.** It was assembled from pre-event protocol reconnaissance, before
+> we had written a line of the product. The rulebook asks for *"your personal experience, in your own
+> words"*, and a report written before the build cannot honestly claim that.
+>
+> It stays in the repo as the **evidence base**: every claim below is verified against live Devnet with
+> transaction hashes, and the full 38-finding register is in [`FEEDBACK-APPENDIX.md`](FEEDBACK-APPENDIX.md).
+>
+> **It gets rewritten Sunday 10:30–12:00** from what actually happened building the product, using three
+> sources: the friction we hit during the build (primary), the `/xrpl-session-analysis` outputs the hook
+> produced, and this register (supporting). The three friction points may change — and if they do, that is
+> the process working.
+
+---
+
 | | |
 |---|---|
 | **Track** | **2** — closed-ended vault, Lending Protocol **V1.1** |
