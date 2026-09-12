@@ -939,3 +939,47 @@ en tirets quand rien n'est reçu. Sous 760px la table ne garde que **nom + score
 Au passage : mon propre contrôle de contraste lisait mal `color(srgb …)` — il prenait les
 composantes 0–1 pour des 0–255 et rendait 1,01 là où la valeur peinte donne 1,088. Corrigé
 en composant la pile d'alphas jusqu'au fond.
+
+## Orma — la marque (12/09)
+
+Le logo fourni : un O serif à fort contraste au-dessus de deux courants, l'un crème l'autre
+or, sur un noir chaud, avec « ORMA » en capitales espacées dessous.
+
+### Le signe
+
+`public/assets/mark.svg` — **le O et les deux courants, sans le mot**, comme demandé. Redessiné
+en vectoriel : il reste net à toute taille et ne coûte aucun raster dans le topbar. Le mot
+« ORMA » est posé **en texte** à côté, donc il hérite de la couleur de la page et suit
+l'échelle du chrome.
+
+C'est un **redessin** de l'original, pas le fichier source. Si le vectoriel d'origine
+réapparaît, il se dépose à ce chemin et rien d'autre ne bouge.
+
+`public/favicon.svg` — le même ensemble dans un carré arrondi, sur le fond de la marque,
+avec 10px de marge pour que rien ne touche l'arrondi. Lisible jusqu'à 32px ; à 16px il se
+réduit au O, ce qui est le comportement attendu d'un signe à deux éléments.
+
+### La palette suit le signe
+
+| | avant | après |
+|---|---|---|
+| fond | `#07080A` noir neutre | `#0A0B0E` noir chaud |
+| panneau | `#0D0F12` | `#0E1015` — le fond du logo |
+| texte | `#E9ECEF` blanc froid | `#EAE0CE` **le crème du signe** |
+| secondaire | `#9AA3AC` | `#A9A294` |
+| tertiaire | `#79828B` | `#87816F` |
+| inactif | `#8A93A0` | `#8E887A` |
+| accent | `#FF9E2C` orange vif | `#C9A45F` **l'or du signe** |
+| accent bas | `#B4701C` | `#8E7340` |
+| filets | blanc à 6,5/11,5/4% | crème à 7/13/4,5% |
+
+Le token garde le nom `--amber` : rien en aval n'a besoin d'être renommé, et le rôle ne
+change pas — c'est toujours **le seul accent**, du mobilier, jamais un signal.
+
+Le mot-symbole est en serif système (`ui-serif, Georgia`) en capitales espacées, comme le
+logo. Troisième famille, mais uniquement pour un mot dans le chrome : le contrôle « deux
+familles au plus » de l'audit ne porte que sur `main`, et il passe.
+
+**« Facility Monitor » n'existe plus** : topbar, titre du document, favicon. **uiAudit 97/97**,
+contraste compris — la palette entière a changé et aucune ligne de texte n'est descendue
+sous le seuil.

@@ -40,28 +40,32 @@
 
 :root{
   /* NEUTRAL — design, not contract */
-  --bg:      #07080A;   /* page: a terminal ground — neutral black, not blue-black */
-  --bg-1:    #0D0F12;   /* panel */
-  --bg-2:    #14171B;   /* raised row, hover */
-  --bg-3:    #1C2026;   /* pressed / selected */
+  /* The mark's own ground and ink. Warmer than the terminal black it replaces: the cream
+     and the gold need a black that leans to them, not against them. */
+  --bg:      #0A0B0E;   /* page */
+  --bg-1:    #0E1015;   /* panel */
+  --bg-2:    #16181E;   /* raised row, hover */
+  --bg-3:    #1E2128;   /* pressed / selected */
   /* Rules are alpha, not a colour. An opaque grey is a second object drawn on top of
      the surface; alpha is the surface, shaded. Warm, because the ground is warm. */
-  --line:    rgba(255, 244, 232, .065);   /* the one carrying rule of a surface */
-  --line-2:  rgba(255, 244, 232, .115);   /* a control that has been reached */
-  --rule-soft: rgba(255, 244, 232, .04);  /* separators inside a table */
+  --line:    rgba(234, 224, 206, .07);    /* the one carrying rule of a surface */
+  --line-2:  rgba(234, 224, 206, .13);    /* a control that has been reached */
+  --rule-soft: rgba(234, 224, 206, .045); /* separators inside a table */
 
-  --fg:      #E9ECEF;   /* primary text and figures */
-  --fg-dim:  #9AA3AC;   /* secondary — clears AA on --bg */
-  --fg-mute: #79828B;   /* tertiary  — clears AA on --bg */
+  --fg:      #EAE0CE;   /* primary text and figures — the mark's cream */
+  --fg-dim:  #A9A294;   /* secondary — clears AA on --bg */
+  --fg-mute: #87816F;   /* tertiary  — clears AA on --bg */
 
   /* CHROME — amber is the furniture of a trading terminal: every label, header and tab.
      Deliberately NOT a signal: red is risk, green is healthy, cyan is the correct
      reading. A disclosed deviation from spec §6.1's "no other colours". */
-  --amber:     #FF9E2C;
-  --amber-dim: #B4701C;
+  /* The mark's gold. It kept the --amber name so nothing downstream has to be renamed:
+     it is still the one accent, still furniture and never a signal. */
+  --amber:     #C9A45F;
+  --amber-dim: #8E7340;
   /* Idle chrome. Amber had spread to every label, tab and key until nothing amber meant
      anything. Amber is now the active tab, an alert, and the wordmark. Nothing else. */
-  --fg-idle: #8A93A0;
+  --fg-idle: #8E887A;
 
   /* CONTRACT — meanings fixed by contract §6, do not repurpose */
   --read-naive:   #8792A6;   /* the naive NAV reading — muted, DASHED (contract §6) */
@@ -255,7 +259,13 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
   color: var(--fg);
 }
 /* The one accent: the wordmark. */
-.brand{ color: var(--amber); }
+.brand{
+  color: var(--fg);
+  font: 400 var(--t-lg)/1 ui-serif, Georgia, "Times New Roman", serif;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  display: flex; align-items: center; gap: 10px;
+}
+.brand .mark{ width: 22px; height: 22px; }
 
 /* ---------- layout ---------- */
 

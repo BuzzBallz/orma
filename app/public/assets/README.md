@@ -14,10 +14,18 @@ failure.
 
 ## mark.svg
 
-- The brand sigil in the topbar. Drawn for this project.
-- **Deliberately not the XRPL logo.** Using the real trademark is not a call the
-  frontend gets to make, and an imitation of it would be worse. This is two readings of
-  one quantity — dashed and low, solid and true — which is the product in three strokes.
+- The Orma mark: the O over two currents, one cream, one gold. Drawn as vector so it
+  stays crisp at any size and costs no raster weight in the topbar.
+- **The wordmark is not in the file.** It is set in text beside the mark, so it inherits
+  the page's colour and scales with the chrome — and the glyph stays usable on its own.
+- This is a redrawing of the supplied logo, not the original artwork. If the original
+  vector turns up, drop it in at this path and nothing else has to change.
+
+## favicon.svg
+
+- The same lockup inside a rounded square, on the mark's own ground (#0E1015), with a
+  10px margin so nothing touches the corner radius. Reads down to 32px; at 16px it
+  reduces to the O, which is the intended behaviour for a two-element mark.
 
 ## fonts/
 

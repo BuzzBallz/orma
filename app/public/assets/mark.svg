@@ -1,11 +1,16 @@
-<!--
-  Sigil for the Vault Fragility Oracle. Drawn for this project — deliberately NOT the
-  XRPL trademark: two readings of the same quantity, one dashed and low, one solid and
-  true, with the gap between them as the subject. Same idea as the NAV split.
-  Colour is literal (#58C7F3 = --accent) because an <img> cannot inherit currentColor.
--->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
-  <path d="M2 15h20" stroke="#58C7F3" stroke-width="1.6" stroke-dasharray="3 2" opacity=".5"/>
-  <path d="M2 9h20" stroke="#58C7F3" stroke-width="1.6"/>
-  <path d="M6 9v6M18 9v6" stroke="#58C7F3" stroke-width="1" opacity=".3"/>
+<!-- Orma. The O over two currents: one cream, one gold. Drawn as vector for the topbar so
+     it stays crisp at any size and carries no raster weight. The wordmark is set in text
+     beside it, not baked into the glyph. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img">
+  <!-- high-contrast serif O: an outer ellipse with a narrower counter, stressed vertically -->
+  <path d="M32 6c10.5 0 18 8.9 18 21.5S42.5 49 32 49 14 40.1 14 27.5 21.5 6 32 6Zm0 4.6
+           c-5.6 0-8.9 6.6-8.9 16.9s3.3 16.9 8.9 16.9 8.9-6.6 8.9-16.9S37.6 10.6 32 10.6Z"
+        fill="var(--mark-cream, #EAE0CE)"/>
+  <!-- the upper current, cream -->
+  <path d="M7 54.2c5.6-3.6 9.9-3.6 14.5-.9 5.2 3 8.4 3.1 12.9.4 5.5-3.3 9.7-3.4 14.8-.6
+           3.2 1.8 6 1.9 8.8.4"
+        stroke="var(--mark-cream, #EAE0CE)" stroke-width="2.1" stroke-linecap="round"/>
+  <!-- the lower current, gold -->
+  <path d="M11 59.6c5.3-2.6 9.4-2.6 13.7-.4 4.9 2.5 8 2.5 12.2.1 5.2-2.9 9.2-3 14-.6"
+        stroke="var(--mark-gold, #C9A45F)" stroke-width="2.1" stroke-linecap="round"/>
 </svg>

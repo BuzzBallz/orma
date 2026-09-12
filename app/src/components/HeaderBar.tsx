@@ -52,8 +52,8 @@ export function HeaderBar({ health, healthUnreachable, vaults, activeVaultId, pa
   return (
     <header className="topbar">
       <span className="brand">
-        <img className="mark" src="/assets/mark.svg" alt="" width={18} height={18} />
-        Facility Monitor
+        <img className="mark" src="/assets/mark.svg" alt="" width={22} height={22} />
+        Orma
       </span>
 
       <Separator orientation="vertical" className="sep" />
