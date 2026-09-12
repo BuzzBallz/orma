@@ -120,7 +120,9 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 /* ---------- layout ---------- */
 
 .page{
-  max-width: 1440px; width: 100%; margin: 0 auto; padding: 16px 32px 32px;
+  max-width: 1440px; width: 100%; margin: 0 auto;
+  /* the pinned status line is 31px: the last panel must not live under it */
+  padding: 16px 32px calc(32px + 31px);
   flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0;
 }
 /* The view owns the remaining height so a desk fills its frame instead of floating in
@@ -410,7 +412,11 @@ kbd{
 /* ---------- hint strip ----------
    A status line along the bottom of the desk, not a floating cheat-sheet. */
 
+/* A terminal status line is pinned, not floated away by the scroll — and it must never
+   be painted over. The panels carry an entrance animation with a transform, which puts
+   them in the positioned layer; a plain block here loses to them. */
 .hints{
+  position: sticky; bottom: 0; z-index: 30;
   border-top: 1px solid var(--amber-dim);
   background: var(--bg);
   padding: 5px 32px;
@@ -557,7 +563,7 @@ tr.ghost:hover td > *{ transform: none; }
 }
 
 /* S3 owns one viewport: trim the chrome on that route only. */
-.page.tight{ padding-top: 12px; padding-bottom: 0; }
+.page.tight{ padding-top: 12px; padding-bottom: 0; }   /* S3 fits one viewport; nothing scrolls under */
 
 /* ============================================================
    MOTION PACK — added on Dev B's call, 12/09 ~14:00.
