@@ -101,3 +101,6 @@ Thumbs.db
 # Internal design notes. Working material, not a deliverable: it reads as scaffolding
 # next to the report and the code, and the repo is judged on what it ships.
 /DESIGN.md
+
+# Devnet faucet keys for replaying the gate demo on stage. Worthless, still private keys.
+/.demo-keys.json
