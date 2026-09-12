@@ -1,0 +1,74 @@
+{
+  "bakedAt": "2026-09-12T16:33:43Z",
+  "bakedDuring": "XRPL Lending Protocol Hackathon, Paris, 12-13 September 2026",
+  "network": "devnet",
+  "buildVersion": "3.4.0-rc5",
+  "label": "Kestrel Bridge Financing II",
+  "vaultId": "085917EFF9B774A32D585B1F3EB9B67DD33E804C850BC3574CE176100490BD00",
+  "loanBrokerId": "8EFB5119DDCAAFFB1863AEDF6C162D59C5ECA03EC7475F13EA2765A71E08E192",
+  "owner": "r4oakQeSqPU44Wvh3EK2aNenXWZT96UZAE",
+  "subscriptionDate": 842545867,
+  "redemptionDate": 842549467,
+  "loans": {
+    "big": "248856CECA4239F8270D8BDB821BC4F8864B800926C209009E6B36F0638DE8E9",
+    "small": "80D6557D1DE71475FCA9ECCC6AB7CFEB0163A93B0A65FCD3A1C61AC971B081BA"
+  },
+  "declaredOrder": [
+    {
+      "label": "30 XRP",
+      "loanId": "248856CECA4239F8270D8BDB821BC4F8864B800926C209009E6B36F0638DE8E9",
+      "hash": "7DBB3A4000F22BAB2A540074442BE40E38D80A8A5C9CBB32F92862B0C778554E"
+    },
+    {
+      "label": "10 XRP",
+      "loanId": "80D6557D1DE71475FCA9ECCC6AB7CFEB0163A93B0A65FCD3A1C61AC971B081BA",
+      "hash": "77FD7E37797617D553E651E93627F9EA002CED17BE1747D9F9BDA93BA77E652B"
+    }
+  ],
+  "expected": {
+    "actualCoverPaid": "500000",
+    "bestPossible": "700000",
+    "worstPossible": "500000",
+    "fairness": "0.0000"
+  },
+  "observed": {
+    "applicable": true,
+    "defaultCount": 2,
+    "actualCoverPaid": "500000",
+    "bestPossible": "700000",
+    "worstPossible": "500000",
+    "costToDepositors": "200000",
+    "spread": "200000",
+    "fairness": "0.0000",
+    "observedOrder": [
+      {
+        "loanId": "248856CECA4239F8270D8BDB821BC4F8864B800926C209009E6B36F0638DE8E9",
+        "at": "2026-09-12T16:33:40Z",
+        "hash": "7DBB3A4000F22BAB2A540074442BE40E38D80A8A5C9CBB32F92862B0C778554E",
+        "principal": "30000000",
+        "debtBefore": "40000000",
+        "coverConsumed": "400000"
+      },
+      {
+        "loanId": "80D6557D1DE71475FCA9ECCC6AB7CFEB0163A93B0A65FCD3A1C61AC971B081BA",
+        "at": "2026-09-12T16:33:41Z",
+        "hash": "77FD7E37797617D553E651E93627F9EA002CED17BE1747D9F9BDA93BA77E652B",
+        "principal": "10000000",
+        "debtBefore": "10000000",
+        "coverConsumed": "100000"
+      }
+    ],
+    "fairOrder": [
+      "10000000",
+      "30000000"
+    ]
+  },
+  "conduct": {
+    "grade": "E",
+    "score": 25,
+    "findings": [
+      "ORDERING_SELF_SERVING",
+      "DEFAULT_WITHOUT_IMPAIRMENT"
+    ]
+  }
+}

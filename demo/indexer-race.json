@@ -2,6 +2,7 @@
   "capturedAt": "2026-09-12T16:05:57Z",
   "capturedDuring": "XRPL Lending Protocol Hackathon, Paris, 12-13 September 2026",
   "network": "devnet",
+  "label": "Meridian Trade Finance I",
   "buildVersion": "3.4.0-rc5",
   "transactionHash": "9CFF971F35A9D162CE3A54C71961E64694A83A79321EB05DED8A36EEFAD14106",
   "transactionResult": "tesSUCCESS",

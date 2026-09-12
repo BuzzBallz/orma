@@ -6,6 +6,8 @@
  *
  * Env: PORT (8787), XRPL_WS, POLL_MS (4000), LOG_PRETTY=1, LOG_LEVEL, DEMO_KEY
  */
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { Client, Wallet } from 'xrpl'
 import { Reader } from './poll.mjs'
 import { createApi } from './api.mjs'
@@ -35,18 +37,47 @@ function parseArgs(argv) {
   return { vaults: [...new Set(vaults)], labels }
 }
 
-const { vaults, labels } = parseArgs(process.argv)
+/**
+ * Every baker writes its state to demo/<name>.json with a vaultId and a label. Reading
+ * them back means the demo starts with `npm start` instead of by copying two 64-character
+ * hex ids by hand, which is exactly the kind of thing that goes wrong when someone is
+ * watching. Explicit --vault arguments still win.
+ */
+function vaultsFromDemoDir() {
+  const vaults = []
+  const labels = {}
+  if (!existsSync('demo')) return { vaults, labels }
+  for (const f of readdirSync('demo').filter((n) => n.endsWith('.json')).sort()) {
+    try {
+      const j = JSON.parse(readFileSync(join('demo', f), 'utf8'))
+      if (typeof j.vaultId !== 'string' || !/^[A-Fa-f0-9]{64}$/.test(j.vaultId)) continue
+      const id = j.vaultId.toUpperCase()
+      vaults.push(id)
+      if (j.label) labels[id] = j.label
+    } catch { /* a malformed capture must not stop the reader from starting */ }
+  }
+  return { vaults, labels }
+}
+
+const cli = parseArgs(process.argv)
+const baked = vaultsFromDemoDir()
+// Explicit arguments win outright; otherwise fall back to whatever has been baked.
+const vaults = cli.vaults.length ? cli.vaults : baked.vaults
+const labels = cli.vaults.length ? cli.labels : { ...baked.labels, ...cli.labels }
 
 if (vaults.length === 0) {
   console.error(`
-  No vaults given.
+  No vaults given, and demo/ holds no baked facility.
 
     node src/index.mjs --vault <64-hex id>[:label] [--vault ...]
     VAULTS=<id>,<id> node src/index.mjs
 
-  Bake one first, or pass a known Devnet vault id.
+  Or bake one:  node src/demo/bake-ordering.mjs
 `)
   process.exit(1)
+}
+if (!cli.vaults.length) {
+  console.log(`  serving ${vaults.length} facility(ies) baked into demo/`)
 }
 
 for (const [id, label] of Object.entries(labels)) setLabel(id, label)

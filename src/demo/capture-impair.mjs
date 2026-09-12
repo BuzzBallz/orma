@@ -149,6 +149,9 @@ const out = {
   capturedAt: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
   capturedDuring: 'XRPL Lending Protocol Hackathon, Paris, 12-13 September 2026',
   network: 'devnet',
+  // index.mjs reads demo/*.json back to find what to serve, so the capture names the
+  // facility it created rather than leaving the opinion to render an unnamed one.
+  label: 'Meridian Trade Finance I',
   buildVersion,
   transactionHash: impair.result.hash,
   transactionResult: code(impair),
