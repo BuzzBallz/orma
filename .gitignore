@@ -76,3 +76,10 @@ build/
 .DS_Store
 Thumbs.db
 *.tar.gz
+.xrpl-devex/
+.claude/settings.local.json
+# Agent skill folders written by the DevEx capture installer: symlinks with absolute
+# local paths, machine specific.
+.codex/
+.cursor/
+.grok/
