@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import './app.css'
-import { API_BASE } from './lib/api'
+import { API_BASE, EXPECTED_CONTRACT } from './lib/api'
 import { usePoll } from './lib/usePoll'
 import { useTick } from './lib/useTick'
 import { useRoute, type RoutePath } from './lib/useRoute'
@@ -12,42 +12,111 @@ import { VaultList } from './screens/VaultList'
 import { Moment } from './screens/Moment'
 import { short } from './lib/format'
 
-const HINTS = [
-  ['1–5', 'jump to a vault'], ['L', 'the five vaults'], ['V', 'vault detail'],
-  ['M', 'the moment'], ['space', 'walk the four beats'],
+const HINTS: [string, string][] = [
+  ['1–5', 'instrument'], ['L', 'list'], ['V', 'vault'], ['M', 'moment'], ['space', 'beat'],
 ]
 
-function NoData({ error }: { error: string | null }) {
+/**
+ * The API-down state. Spec §5.1 rule 3 and §6.5: an instruction, never a spinner
+ * and never a skeleton. Composed as a desk status board — one verdict, one action,
+ * the technical facts kept true but subordinate.
+ */
+function Status({ kicker, verdict, tone, lede, facts, action, note }: {
+  kicker: string; verdict: string; tone: string
+  lede: React.ReactNode
+  facts: [string, React.ReactNode][]
+  action?: React.ReactNode
+  note?: React.ReactNode
+}) {
   return (
-    <div className="instruction">
-      <div className="lead">No response from {API_BASE}</div>
-      <div className="why">
-        {error ? `The last attempt failed with: ${error}.` : 'Nothing has answered on that port yet.'}
-        {' '}Nothing is cached, so there is no last-good payload to fall back to.
-      </div>
-      Start the API and this screen fills itself within three seconds:
-      <code>node tools/fixture-server.mjs</code>
-      <div className="next">
-        It serves the five vaults on :8787 with live countdowns. The polling loop is still running —
-        you do not need to reload.
-      </div>
+    <div className="status" style={{ ['--status-tone' as string]: tone }}>
+      <div className="kicker">{kicker}</div>
+      <div className="verdict">{verdict}</div>
+      <p className="lede">{lede}</p>
+      <dl className="facts">
+        {facts.map(([k, v]) => (
+          <div key={k} style={{ display: 'contents' }}>
+            <dt className="label">{k}</dt>
+            <dd>{v}</dd>
+          </div>
+        ))}
+      </dl>
+      {action}
+      {note && <div className="note">{note}</div>}
     </div>
   )
 }
 
-function NotFound({ vaultId, onBack }: { vaultId: string | null; onBack: () => void }) {
+function NoFeed({ error }: { error: string | null }) {
   return (
-    <div className="instruction">
-      <div className="lead">no vault {short(vaultId, 12)}</div>
-      <div className="why">
-        The API answered, but it holds no vault with that id. Polling continues, so if this id is
-        about to exist it will appear on its own.
-      </div>
-      <div className="next">
-        <a href="/" onClick={e => { e.preventDefault(); onBack() }}>← the five vaults that do exist</a>
-        {' '}· or press <kbd>1</kbd>–<kbd>5</kbd>
-      </div>
-    </div>
+    <Status
+      kicker="system"
+      verdict="NO FEED"
+      tone="var(--bad)"
+      lede={<>
+        The oracle is reading nothing. No payload has ever arrived, so there is no last-good
+        figure to hold on screen. <b>The polling loop is still running</b> — it recovers on its own.
+      </>}
+      facts={[
+        ['endpoint', API_BASE],
+        ['last error', error ?? 'no response'],
+        ['contract', `v${EXPECTED_CONTRACT} expected`],
+      ]}
+      action={
+        <div className="action">
+          <div className="say">Start the API. This screen fills itself within three seconds.</div>
+          <code>node tools/fixture-server.mjs</code>
+        </div>
+      }
+      note="Five vaults, countdowns computed from validated-ledger close time. No reload needed."
+    />
+  )
+}
+
+function UnknownInstrument({ vaultId, onBack }: { vaultId: string | null; onBack: () => void }) {
+  return (
+    <Status
+      kicker="instrument"
+      verdict="UNKNOWN"
+      tone="var(--warn)"
+      lede={<>
+        The feed answered and holds no vault under that id. Polling continues, so if the
+        instrument is about to exist it appears here on its own.
+      </>}
+      facts={[['requested', short(vaultId, 24)], ['feed', API_BASE]]}
+      action={
+        <div className="action">
+          <div className="say">
+            <a href="/" onClick={e => { e.preventDefault(); onBack() }}>Back to the book</a>
+            {' — or press '}<kbd>1</kbd>…<kbd>5</kbd>
+          </div>
+        </div>
+      }
+    />
+  )
+}
+
+function OracleDesk({ onGo }: { onGo: () => void }) {
+  return (
+    <Status
+      kicker="oracle"
+      verdict="BAND 3"
+      tone="var(--accent)"
+      lede={<>
+        The published reading lives on the moment desk: publisher, object index, the six
+        on-chain dimensions and the ledger aggregate, against the same three-second poll.
+        A second page would read the same object twice.
+      </>}
+      facts={[['reads', 'oracle object on devnet'], ['computed by', 'the ledger, not by us']]}
+      action={
+        <div className="action">
+          <div className="say">
+            <a href="/moment" onClick={e => { e.preventDefault(); onGo() }}>Open the moment desk</a>
+            {' — or press '}<kbd>M</kbd>
+          </div>
+        </div>
+      }
+    />
   )
 }
 
@@ -63,7 +132,7 @@ export default function App() {
 
   // A route with no ?vault= (except /) redirects to / — spec §3.
   useEffect(() => {
-    if (path !== '/' && !vaultId) navigate('/', null)
+    if (path !== '/' && path !== '/oracle' && !vaultId) navigate('/', null)
   }, [path, vaultId, navigate])
 
   // Global keyboard — spec §5.3. Ignored inside form controls.
@@ -84,14 +153,15 @@ export default function App() {
     return () => removeEventListener('keydown', onKey)
   }, [rows, path, navigate])
 
-  // The header stamp comes from whichever payload the current screen polls.
+  // The header stamp comes from whichever payload the current desk polls.
   const primary = path === '/' ? vaults : detail
   const stamp = path === '/' ? vaults.data : detail.data
   const notFound = detail.code === 'VAULT_NOT_FOUND'
 
   function body() {
+    if (path === '/oracle') return <OracleDesk onGo={() => navigate('/moment')} />
     if (path === '/') {
-      if (!vaults.data) return vaults.fails > 0 ? <NoData error={vaults.error} /> : null
+      if (!vaults.data) return vaults.fails > 0 ? <NoFeed error={vaults.error} /> : null
       return (
         <VaultList
           vaults={rows} receivedAt={vaults.receivedAt} tick={tick}
@@ -99,22 +169,10 @@ export default function App() {
         />
       )
     }
-    if (notFound && !detail.data) return <NotFound vaultId={vaultId} onBack={() => navigate('/', null)} />
-    if (!detail.data) return detail.fails > 0 ? <NoData error={detail.error} /> : null
+    if (notFound && !detail.data) return <UnknownInstrument vaultId={vaultId} onBack={() => navigate('/', null)} />
+    if (!detail.data) return detail.fails > 0 ? <NoFeed error={detail.error} /> : null
     if (path === '/vault') return <VaultDetail d={detail.data} receivedAt={detail.receivedAt} tick={tick} />
-    if (path === '/moment') return <Moment d={detail.data} receivedAt={detail.receivedAt} tick={tick} />
-    // S4 is droppable by design (spec §S4): everything on it already exists inside S3 band 3.
-    return (
-      <div className="instruction">
-        <div className="lead">The oracle reading lives on the moment screen</div>
-        <div className="why">
-          Publisher, object index, the six on-chain dimensions and the ledger aggregate are band 3
-          of <a href="/moment" onClick={e => { e.preventDefault(); navigate('/moment') }}>/moment</a>,
-          against the same poll. A second page would read the same object twice.
-        </div>
-        <div className="next">press <kbd>M</kbd></div>
-      </div>
-    )
+    return <Moment d={detail.data} receivedAt={detail.receivedAt} tick={tick} />
   }
 
   return (
@@ -127,19 +185,16 @@ export default function App() {
         path={path}
         ledgerIndex={stamp?.ledgerIndex ?? null}
         serverTime={stamp?.serverTime ?? null}
-        stale={primary.stale}
         onSelect={id => navigate(path === '/' ? '/vault' : path, id)}
         onNavigate={p => navigate(p)}
       />
       {primary.stale && <StaleBar ageMs={primary.ageMs} fails={primary.fails} error={primary.error} />}
-      <main className={'page' + (path === '/moment' ? ' tight' : '')}>
-        {body()}
-        <div className="hints">
-          {HINTS.map(([k, label]) => (
-            <span key={k} style={{ marginRight: 16 }}><kbd>{k}</kbd> {label}</span>
-          ))}
-        </div>
-      </main>
+      <main className={'page' + (path === '/moment' ? ' tight' : '')}>{body()}</main>
+      <div className="hints">
+        {HINTS.map(([k, label]) => (
+          <span className="h" key={k}><kbd>{k}</kbd> {label}</span>
+        ))}
+      </div>
     </>
   )
 }

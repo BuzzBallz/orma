@@ -21,6 +21,7 @@ function Band({ n, beat, children, footer }: {
         height: HEIGHTS[n - 1],
         opacity: lit ? 1 : 0.35,
         outline: beat === n ? '1px solid var(--accent)' : undefined,
+        outlineOffset: beat === n ? '-1px' : undefined,
         transition: 'opacity 200ms linear',
         overflow: 'hidden',
         display: 'flex', flexDirection: 'column', gap: 8,
@@ -141,7 +142,6 @@ export function Moment({ d, receivedAt, tick }: { d: Detail; receivedAt: number;
         <GatePanel vault={d.vault} phaseInfo={d.phaseInfo} score={d.score} />
       </Band>
 
-      <div className="caption mono">space ▸ next beat{beat > 0 ? ` · beat ${beat}/4` : ''}</div>
     </div>
   )
 }

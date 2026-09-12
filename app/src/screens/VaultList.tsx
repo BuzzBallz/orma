@@ -7,6 +7,11 @@ import { bpsToPct, short } from '../lib/format'
 
 type SortKey = 'gradeNumeric' | 'label' | 'phase' | 'secondsToRedemption' | 'navDivergenceBps' | 'loanCount' | 'trend'
 
+/** The row's rail follows the GRADE, because the grade is what ranks risk (contract §2). */
+const RAIL: Record<string, string | undefined> = {
+  '--bad': 'row-bad', '--warn': 'row-warn', '--ok': undefined, '--fg-dim': undefined,
+}
+
 function bpsTone(bps: number): string | undefined {
   if (bps === 0) return 'var(--fg-dim)'
   if (bps < 100) return 'var(--warn)'
@@ -47,17 +52,18 @@ export function VaultList({ vaults, receivedAt, tick, onOpen }: {
         aria-sort={sort.key === k ? (sort.asc ? 'ascending' : 'descending') : 'none'}
         onClick={() => toggle(k)}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(k) } }}
-      >{label}{sort.key === k ? (sort.asc ? ' ▲' : ' ▼') : ''}</th>
+      >{label}{sort.key === k && <span className="ord">{sort.asc ? '▲' : '▼'}</span>}</th>
     )
   }
 
   return (
     <section className="panel">
-      <div className="row" style={{ marginBottom: 8 }}>
-        <h2 className="panel-title" style={{ margin: 0 }}>five vaults · worst grade first</h2>
+      <div className="row" style={{ marginBottom: 16, alignItems: 'baseline' }}>
+        <h2 className="panel-title" style={{ margin: 0 }}>the book</h2>
+        <span className="num mute" style={{ fontSize: 'var(--t-xs)' }}>{vaults.length} instruments · worst grade first</span>
         <span className="spacer" />
         <span className="caption">
-          a vault can read 0 bps and still be the most dangerous book here — nothing has been declared yet
+          Zero divergence is not safety. A loss nobody has declared reads par on both sides.
         </span>
       </div>
       <div className="tbl-scroll">
@@ -65,11 +71,11 @@ export function VaultList({ vaults, receivedAt, tick, onOpen }: {
           <thead>
             <tr>
               <Th k="gradeNumeric" label="grade" />
-              <Th k="label" label="vault" />
+              <Th k="label" label="instrument" />
               <Th k="phase" label="phase" />
-              <Th k="secondsToRedemption" label="redemption" rt />
+              <Th k="secondsToRedemption" label="next moment" rt />
               <Th k="navDivergenceBps" label="divergence" rt />
-              <th className="rt">nav naive → correct</th>
+              <th className="rt">reported → correct</th>
               <Th k="loanCount" label="loans" rt />
               <Th k="trend" label="trend" />
               <th>oracle</th>
@@ -79,6 +85,7 @@ export function VaultList({ vaults, receivedAt, tick, onOpen }: {
             {rows.map(v => (
               <tr
                 key={v.vaultId}
+                className={RAIL[gradeTone(v.grade)]}
                 style={{ cursor: 'pointer' }}
                 tabIndex={0}
                 aria-label={`open ${v.label ?? v.vaultId}`}
@@ -86,7 +93,12 @@ export function VaultList({ vaults, receivedAt, tick, onOpen }: {
                 onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(v.vaultId) } }}
               >
                 <td><Chip tone={gradeTone(v.grade)}>{v.grade}</Chip></td>
-                <td>{v.label ?? short(v.vaultId, 8)}</td>
+                <td>
+                  <span className="inst">
+                    <span className="name">{v.label ?? short(v.vaultId, 8)}</span>
+                    <span className="id">{v.vaultId.slice(0, 12)}</span>
+                  </span>
+                </td>
                 <td className="mono" style={{ fontSize: 'var(--t-sm)' }}>{v.phase}</td>
                 <td className="rt">
                   <Countdown seconds={v.secondsToRedemption} receivedAt={receivedAt} tick={tick} mode="boundary" />
