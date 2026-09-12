@@ -271,6 +271,6 @@ export function reputation(events, ordering, broker) {
     },
     findings,
     // Devnet prunes to roughly 29 days, so this is a window rather than a lifetime.
-    caveat: 'Computed from retained ledger history only. Devnet retains roughly 29 days.',
+    caveat: 'Reconstructed from the public record only, which is retained for roughly 29 days. Conduct before that window is not visible here.',
   }
 }
