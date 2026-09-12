@@ -239,11 +239,16 @@ export function Facility({ d, history, collateral }: {
               </p>
             </Section>
 
-            <Section title="What could lead to a downgrade">
+            {/* Steps ALREADY APPLIED, not prospective triggers. The anchor carries a
+                zero delta and is dropped: "taking AAA to AAA" is not a reason. */}
+            <Section title="Why the score sits below the anchor">
               <ul className="op-list">
-                {d.score.notchTrace.slice(-3).map((s, i) => (
+                {d.score.notchTrace.filter(s => s.delta !== 0).slice(-4).map((s, i) => (
                   <li key={i}>{creditText(s.rule)} — {s.delta} notch{Math.abs(s.delta) === 1 ? '' : 'es'}, taking {s.from} to {s.to}.</li>
                 ))}
+                {d.score.notchTrace.every(s => s.delta === 0) && (
+                  <li>Nothing has been notched. The score stands at the anchor.</li>
+                )}
               </ul>
             </Section>
 
