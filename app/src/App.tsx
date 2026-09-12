@@ -152,7 +152,13 @@ export default function App() {
           </div>
         )
       }
-      return <VaultList vaults={rows} receivedAt={vaults.receivedAt} tick={tick} onOpen={id => navigate('/vault', id)} />
+      return (
+        <VaultList
+          vaults={rows} receivedAt={vaults.receivedAt} tick={tick}
+          stamp={vaults.data}
+          onOpen={id => navigate('/vault', id)}
+        />
+      )
     }
 
     if (notFound && !detail.data) {

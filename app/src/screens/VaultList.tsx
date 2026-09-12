@@ -3,7 +3,7 @@ import type { VaultRow } from '../lib/types'
 import { Chip } from '../components/Chip'
 import { Countdown } from '../components/Countdown'
 import { gradeTone } from '../lib/grades'
-import { short } from '../lib/format'
+import { fmtIso, short } from '../lib/format'
 import { useFlash } from '../lib/useFlash'
 
 type SortKey = 'gradeNumeric' | 'label' | 'phase' | 'secondsToRedemption' | 'navDivergenceBps' | 'loanCount' | 'trend'
@@ -107,8 +107,10 @@ function Row({ v, i, receivedAt, tick, onOpen }: {
  * in spec §9). Divergence is a secondary badge, never the sort: an undeclared loss reads
  * 0 bps and a divergence sort buries the most dangerous vault at the bottom.
  */
-export function VaultList({ vaults, receivedAt, tick, onOpen }: {
-  vaults: VaultRow[]; receivedAt: number; tick: number; onOpen: (vaultId: string) => void
+export function VaultList({ vaults, receivedAt, tick, stamp, onOpen }: {
+  vaults: VaultRow[]; receivedAt: number; tick: number
+  stamp?: { ledgerIndex: number; serverTime: string }
+  onOpen: (vaultId: string) => void
 }) {
   const [sort, setSort] = useState<{ key: SortKey; asc: boolean }>({ key: 'gradeNumeric', asc: true })
 
@@ -175,6 +177,12 @@ export function VaultList({ vaults, receivedAt, tick, onOpen }: {
           </tbody>
         </table>
       </div>
+      {stamp && (
+        <div className="readstamp">
+          read at ledger <b>{stamp.ledgerIndex}</b> · {fmtIso(stamp.serverTime)} · every figure
+          above came from that one response
+        </div>
+      )}
     </section>
   )
 }

@@ -117,9 +117,12 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
   max-width: 1440px; width: 100%; margin: 0 auto; padding: 16px 32px 32px;
   flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0;
 }
-/* The view owns the remaining height so a desk fills its frame instead of
-   floating in the top-left quarter. */
-.page > *{ flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+/* The view owns the remaining height so a desk fills its frame instead of floating in
+   the top-left quarter. NO min-height: 0 here — that lets the flex item shrink below its
+   content, and on a screen that is meant to scroll (S1 runs to ~1700px) the panels below
+   the fold end up rendering outside their own box. /moment keeps its single viewport
+   through its fixed band heights, not through shrinking. */
+.page > *{ flex: 1 1 auto; display: flex; flex-direction: column; gap: 12px; }
 .grid12{ display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; }
 .grid12 > *, .stack > * { min-width: 0; }
 .col-1-7 { grid-column: span 7; }
@@ -269,6 +272,21 @@ table.tbl tbody tr:last-child td{ border-bottom: 0; }
 table.tbl .rt{ text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
 table.tbl th.rt{ text-align: right; }
 .tbl-scroll{ overflow-x: auto; margin: 0 -20px; padding: 0 20px; }
+
+/* Identity | measurement. The hairline after `phase` splits nine columns into the two
+   questions a reader actually asks: which instrument, and how bad. */
+table.tbl th:nth-child(3), table.tbl td:nth-child(3){
+  border-right: 1px solid var(--line);
+  padding-right: 20px;
+}
+table.tbl th:nth-child(4), table.tbl td:nth-child(4){ padding-left: 20px; }
+
+/* The reading stamp sits under the rows, quieter than a caption. */
+.readstamp{
+  margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line);
+  font: var(--t-xs)/1.5 var(--mono); color: var(--fg-mute);
+}
+.readstamp b{ color: var(--fg-dim); font-weight: 500; }
 
 /* An instrument's identity: name over its id. */
 .inst{ display: flex; flex-direction: column; gap: 2px; }
