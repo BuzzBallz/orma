@@ -177,7 +177,7 @@ is decreasing. Hence:
 The party who chooses $\sigma$ is the `LoanBroker` owner, who is necessarily the vault owner
 (`LoanBrokerSet.cpp:109`), and is the party whose capital $C$ is consumed. The difference falls on the
 unit holders. This is the second lever: the first is *when* a loss is recognised, this is *in what
-order*. See [/concepts/ordering](/concepts/ordering) for the argument in prose.
+order*. See [/concepts](/concepts) for the argument in prose.
 
 **Measured on Devnet.** Kestrel Bridge Financing II, $p = \{30\ \text{XRP},\ 10\ \text{XRP}\}$,
 $D_0 = 40$ XRP, $c_{\min} = c_{\text{liq}} = 10000$:
@@ -228,7 +228,7 @@ Reconstructed from ledger history alone for the Kestrel broker, which declared t
 ```
 
 The 0.20 XRP of `costToDepositors` is depositor money. Nothing about recovering it required
-privileged access. Full shape at [/api/broker-history](/api/broker-history).
+privileged access. Full shape in [the API reference](/api-reference).
 
 ---
 
@@ -281,6 +281,14 @@ to bottom: the first threshold the value reaches wins, and D if none does.
 RECOG is a direct cut on seconds rather than a ratio: $\le 0$ AAA, $< 60$ A, $< 300$ BBB, $< 900$ BB,
 otherwise CCC.
 
+<Note>
+The `score.dimensions` array on the API carries **six** entries, in the order `LIQUIDITY`, `COVER`,
+`CONCENT`, `RECOG`, `DEADLINE`, `HEADLINE`. The sixth is not a sixth factor. `HEADLINE` is the
+composite of section 5 restated as a row so a table can render it next to its inputs, with
+`unit: "grade"` where the others carry `ratio`, `seconds` or `percent`. Averaging the six would be
+averaging the answer back into the question.
+</Note>
+
 ---
 
 ## 5. Composite grade by ordinal notching
@@ -326,7 +334,7 @@ later.
 
 Every notch applied is emitted in `notchTrace` on the API response, with `from`, `rule`, `delta` and
 `to`. That trace is the answer to "how did you choose your weights": there are no weights, there are
-notches, and each one is named. Context at [/concepts/scoring](/concepts/scoring).
+notches, and each one is named. Context in [/concepts](/concepts).
 
 ### Realised capital destruction
 
@@ -524,7 +532,7 @@ XLS-47 is live on Mainnet today, unlike the lending amendments, and `get_aggrega
 median and standard deviation across independent publishers inside the ledger. That is the point of
 publishing here rather than serving a number over HTTP: a second publisher who disagrees changes the
 aggregate without asking our permission. Orma reports `aggregate: null` honestly while it is the only
-publisher. More at [/publish/oracle](/publish/oracle).
+publisher. The invariants that make publishing it survive are below.
 
 <Note>
 Everything on this page runs on Devnet, at `wss://s.devnet.rippletest.net:51233`, network id 2,
@@ -616,5 +624,6 @@ Three further checks, in increasing order of effort:
   yourself with `BigInt('0x' + raw)` divided by $10^{\text{Scale}}$. It should agree with the API to
   the last digit, because both come from the same snapshot.
 
-Related: [/api/nav](/api/nav) for the valuation contract, [/concepts/ordering](/concepts/ordering) for
-the ordering argument in prose, [/publish/oracle](/publish/oracle) for the publication path.
+Related: [the API reference](/api-reference) for the valuation contract field by field,
+[/concepts](/concepts) for the ordering argument in prose, and [/nav-pointer](/nav-pointer) for the
+second publication path, the one inside the share token itself.

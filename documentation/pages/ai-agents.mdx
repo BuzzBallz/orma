@@ -24,11 +24,10 @@ writes those bugs confidently. The checklist in the second half is written to be
 An agent is handed vault shares as collateral. What it has is an MPT issuance id, 48 hex
 characters. It does not know the vault id, the owner, the broker, or that Orma exists.
 
-Share metadata is written once and can never be corrected. `MPTokenMetadata` is accepted on
-`VaultCreate`, rejected at deserialization on `VaultSet`, and `MPTokenIssuanceSet` returns
-`tecNO_PERMISSION` because the issuer is the vault pseudo-account, which carries
-`lsfDisableMaster` and has no regular key. A price written into that blob would be wrong within
-one ledger. A **pointer** stays true for the life of the vault, so that is what goes in:
+Share metadata is written once at `VaultCreate` and can never be corrected, by anyone, for the
+life of the vault. A price written into that blob would be wrong within one ledger; a **pointer**
+stays true. So a pointer is what goes in. The three transactions that establish the immutability
+are on [the NAV pointer page](/nav-pointer):
 
 ```json
 "orma": {
@@ -41,11 +40,10 @@ one ledger. A **pointer** stays true for the life of the vault, so that is what 
 }
 ```
 
-The pointer is a template, and not by preference. `MPTokenMetadata` is only settable on
-`VaultCreate`, which is submitted before the vault and its share issuance exist, so neither the
-`VaultID` nor the `MPTokenIssuanceID` is knowable at the moment the pointer has to be written.
-It does not need to be. Whoever reads the metadata got there by holding the token, so they
-already have the id to substitute. The whole object must fit in 1024 bytes.
+The pointer is a template, and not by preference: `VaultCreate` is submitted before the vault and
+its share issuance exist, so neither id is knowable when the pointer has to be written. It does not
+need to be. Whoever reads the metadata got there by holding the token, so they already have the id
+to substitute, which is the one thing an agent in this position always has.
 
 ### The call
 

@@ -254,8 +254,10 @@ decimal arithmetic. The captured impairment metadata is served verbatim at
 
 <Note>
   Orma is Devnet software. XLS-65 and XLS-66 are not enabled on Mainnet, so no part of the
-  measurement or gating layer can be pointed at production assets today. The XLS-47
-  publication path is the exception: Price Oracles are live on Mainnet now.
+  measurement or gating layer can be pointed at production assets today. Two of the three
+  rails are exceptions on their own: XLS-47 Price Oracles are live on Mainnet now, and so
+  are the XLS-70 credentials and XLS-80 permissioned domains the gate is built from. What
+  keeps the gate Devnet-only is the vault underneath it, not the gate.
 </Note>
 
 The grade is advisory and is labelled `"advisory": true` inside the `assessment` block of

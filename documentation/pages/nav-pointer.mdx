@@ -220,7 +220,8 @@ Five steps, all green. The issuer on that first line,
 `r3hE8HanpccSZdgmeHCfYFEkwxFjdDmmvt`, is the vault pseudo-account: the same account whose
 `lsfDisableMaster` flag makes the metadata permanent.
 
-The valuation document that comes back is the one described in [/api/nav](/api/nav), and
+The valuation document that comes back is the one described in
+[the API reference](/api-reference), and
 the pointer route serves it keyed by share token rather than by vault id, because the
 issuance id is the only identifier a holder has. It carries its own inputs. Trimmed to the
 valuation and its provenance:
@@ -340,6 +341,13 @@ exercised under Mainnet load either.
 demo can honestly commit to. The field is permanent, so in production the base must be a
 hostname you are willing to keep serving for the full life of the vault, on https. Writing
 a host you might move off is the one mistake this design cannot recover from.
+
+**The `icon` in that blob does not resolve.** `http://localhost:8787/assets/mark.svg` is
+written into the permanent metadata, and the reader serves eleven JSON routes and no static
+files, so that URL is a 404 today. Nothing in the resolution loop reads `icon`. It is an XLS-89
+discoverability field for explorers, and `resolveFromIssuance()` never fetches it, so the
+valuation path is unaffected. It is stated here because it is the same permanence
+trap as the base URL, caught one field later, and it cannot be corrected on this facility.
 
 **The pointer is a pointer.** It moves the trust question from "do you believe this number"
 to "do you believe this host", and `provenance` is what shrinks that second question: the

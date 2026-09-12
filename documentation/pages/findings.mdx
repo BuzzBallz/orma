@@ -95,6 +95,13 @@ to build one, sees it.
 `tfLoanImpair` (Flags 131072), transaction
 `8B9657E31D9130FE557682FE33E779789243EACEB0E0D97D83F5D6A3F477A1D5`:
 
+<Note>
+This capture predates the event: it is from the reconnaissance that found the behaviour, and it is
+the one cited in `FEEDBACK.md`. The same behaviour was reproduced during the event on the Meridian
+facility, transaction `075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3`, which is
+what the live demonstration uses. Two vaults, two transactions, one result.
+</Note>
+
 ```json
 {
   "ModifiedNode": {
@@ -405,7 +412,8 @@ design instead, and for the better: whatever goes in there must be a **stable po
 number written there would be a lie within one ledger. It also means a URL placed at creation has no
 migration path if the service ever moves, which is a real constraint on anyone building this pattern. Our
 share metadata on `000000014D667775372D5B78E07FFF294678C7F9CE82AFBC` carries a templated path rather than a
-resolved one for that reason:
+resolved one for that reason. Abridged to the part that matters here; the full 502-byte object, and why
+each field is in it, is on [the NAV pointer page](/nav-pointer):
 
 ```json
 {

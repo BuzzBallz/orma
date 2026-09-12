@@ -9,7 +9,8 @@ the transaction succeeds. A limited partner without one submits the same transac
 in the same wave, and the ledger returns `tecNO_AUTH`. Orma is not in the loop at the moment that happens.
 Nobody has to read our report, agree with it, or act on it.
 
-The measurement is on [the score](/scoring) and the [oracle](/oracle). This page is only about enforcement.
+The measurement is in [the mathematics](/mathematics) and its [oracle publication](/mathematics#8-publication-as-an-oracle-object).
+This page is only about enforcement.
 
 <Note>
 Devnet only. XLS-65 vaults and XLS-66 lending are not on Mainnet, so every hash below is a Devnet hash,
@@ -334,7 +335,7 @@ when that file is present.
 
 The route costs two extra ledger reads, the issuance and the domain, so its answer is cached for 30
 seconds. A domain changes when someone edits it, not every four seconds like the vault state behind
-[`/api/nav`](/api/nav).
+[`GET /api/vaults/{vaultId}/nav`](/api-reference).
 
 ## Running it yourself
 
@@ -370,4 +371,5 @@ by checksum and refuses the commit if one appears.
   The grade binds only where someone has decided it should.
 - It does not restrict withdrawal, by design, and there is no configuration that would change that.
 - It does not certify a facility. The credential is issued to an **LP** and asserts what that LP may enter.
-  The measurement of the facility itself is published separately as an [oracle object](/oracle).
+  The measurement of the facility itself is published separately as an
+  [oracle object](/mathematics#8-publication-as-an-oracle-object).

@@ -16,9 +16,11 @@ public ledger state, publishes the result where it can be acted on, and lets a t
 enforce it.
 
 <Warning>
-All four facilities run on Devnet. XLS-65 (vaults), XLS-66 (lending) and XLS-70
-(permissioned domains) are not live on Mainnet, so none of this can be pointed at a
-production facility today. Every transaction hash below resolves on `devnet.xrpl.org`.
+All four facilities run on Devnet. XLS-65 (vaults) and XLS-66 (lending) are not live on
+Mainnet, so none of this can be pointed at a production facility today. XLS-70
+(credentials) and XLS-80 (permissioned domains), which case 4 is built from, **are** live
+on Mainnet; what keeps case 4 Devnet-only is the vault underneath it. Every transaction
+hash below resolves on `devnet.xrpl.org`.
 </Warning>
 
 ---
@@ -247,37 +249,27 @@ Being measured looks adversarial and is not. The chain is short:
 5. A facility whose units are worth more to hold raises capital more easily.
 
 Calder's manager did step 1 by writing 502 bytes of JSON into `MPTokenMetadata` at
-`VaultCreate`:
+`VaultCreate`. Five XLS-89 fields so explorers will list the token, then one namespaced
+block that does the work:
 
 ```json
-{
-  "ticker": "ORMA-CSC3",
-  "name": "Calder Structured Credit III",
-  "icon": "http://localhost:8787/assets/mark.svg",
-  "asset_class": "rwa",
-  "issuer_name": "Orma",
-  "desc": "Redeemable claim on a closed-ended private credit facility. Valuation is net of recognised loss.",
-  "orma": {
-    "v": 1,
-    "instrument": "vault-share",
-    "nav_url": "http://localhost:8787/api/mpt/{mpt_issuance_id}/nav",
-    "nav_url_param": "{mpt_issuance_id}",
-    "nav_basis": "assets net of recognised loss, divided by units outstanding",
-    "doc": "https://orma.credit/nav"
-  }
+"orma": {
+  "v": 1,
+  "instrument": "vault-share",
+  "nav_url": "http://localhost:8787/api/mpt/{mpt_issuance_id}/nav",
+  "nav_url_param": "{mpt_issuance_id}",
+  "nav_basis": "assets net of recognised loss, divided by units outstanding",
+  "doc": "https://orma.credit/nav"
 }
 ```
 
 <Warning>
-This is write-once, permanently. `MPTokenMetadata` is accepted on `VaultCreate`, rejected
-at deserialization on `VaultSet`, and `MPTokenIssuanceSet` returns `tecNO_PERMISSION`
-because the issuer is the vault pseudo-account, which carries `lsfDisableMaster` and has
-no regular key. Nobody can ever update it, including the manager, including us.
-
-That is why the field holds a **pointer** and never a number: a number written there is a
-lie within one ledger. It is also why the hackathon build shipped a `localhost` URL into
-the metadata of a live Devnet token, which we cannot correct and are stating rather than
-hiding. The ceiling is 1024 bytes, and exceeding it is `temMALFORMED`, not a warning.
+This is write-once, permanently: no transaction and no key can update it, including the
+manager's and including ours. That is why the field holds a **pointer** and never a number,
+and it is why the hackathon build shipped a `localhost` URL into the metadata of a live
+Devnet token, which we cannot correct and are stating rather than hiding. The full object,
+the three transactions that establish the immutability, and the 1024-byte ceiling are on
+[the NAV pointer page](/nav-pointer).
 </Warning>
 
 ### The grade is the asset, not the threat
@@ -410,7 +402,9 @@ issuer, and every deposit is then checked against it by consensus.
 
 ## Limits
 
-- Devnet only. XLS-65, XLS-66 and XLS-70 are not on Mainnet.
+- Devnet only, because XLS-65 and XLS-66 are not on Mainnet. XLS-70 credentials and
+  XLS-80 permissioned domains are, so the enforcement half of case 4 has a production
+  path ahead of the measurement half.
 - Conduct history is bounded by `account_tx` retention, roughly 29 days.
 - The credential bar is a fixed threshold, `ORMA-IG` at BBB- or better. Nothing
   automatically reissues or revokes when a grade moves.
@@ -418,6 +412,7 @@ issuer, and every deposit is then checked against it by consensus.
 - Grades are advisory. `assessment.advisory` is `true` on every valuation response. The
   only thing that binds is the domain in case 4.
 
-Full field-by-field responses are in the API reference: [/api/nav](/api/nav),
-[/api/vaults](/api/vaults), [/api/broker-history](/api/broker-history),
-[/api/collateral](/api/collateral), [/api/gate](/api/gate).
+Full field-by-field responses for every route used above, namely `/api/vaults`,
+`/api/vaults/{vaultId}/nav`, `/api/vaults/{vaultId}/broker-history`,
+`/api/vaults/{vaultId}/collateral`, `/api/vaults/{vaultId}/gate` and
+`/api/mpt/{mptId}/resolve`, are in [the API reference](/api-reference).

@@ -400,12 +400,16 @@ node src/demo/rebake-all.mjs --hours 18
 
 Two further constraints on the window:
 
-- rippled refuses a `LoanSet` whose full term plus a 60 second buffer overruns `RedemptionDate`
-  with `tecNO_PERMISSION`. So `PaymentInterval × PaymentTotal + 60 < RedemptionDate − SubscriptionDate`.
-  The bakers all originate `PaymentInterval 60, PaymentTotal 3`, which floors the window at 240
-  seconds. Omitting the schedule entirely gives `PaymentInterval 60, PaymentTotal 1` and a floor of
-  120 seconds, but rippled independently requires `RedemptionDate − SubscriptionDate` to be at least
-  180 seconds, so 180 is the hard floor either way.
+- rippled refuses a `LoanSet` whose full term plus the 60 second `kLoanRedemptionBuffer` overruns
+  `RedemptionDate`, with `tecNO_PERMISSION`. The rule as `LoanSet.cpp` states it is
+  `StartDate + PaymentInterval × PaymentTotal + 60 ≤ RedemptionDate`, and `GracePeriod` is not part
+  of it. A loan cannot start before `SubscriptionDate`, so for sizing a window the conservative
+  restatement is `PaymentInterval × PaymentTotal + 60 ≤ RedemptionDate − SubscriptionDate`. The
+  bakers all originate `PaymentInterval 60, PaymentTotal 3`, which floors the window at 240 seconds.
+  Omitting the schedule entirely gives `PaymentInterval 60, PaymentTotal 1` and a floor of 120
+  seconds, but rippled independently requires `RedemptionDate − SubscriptionDate` to be at least 180
+  seconds, so 180 is the hard floor either way. See [/concepts](/concepts) for the isolation that
+  established it.
 - `VaultWithdraw` returns `tecTOO_SOON` for the **entire** Investment phase, regardless of
   available liquidity. That is a protocol fact, not an error, and the API reports it as
   `canWithdraw: false`.

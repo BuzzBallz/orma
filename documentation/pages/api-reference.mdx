@@ -427,7 +427,8 @@ Things in there that are easy to misread:
 
 - `oracle.dimensionsOnChain[].raw` is **hexadecimal**, because `AssetPrice` on an XLS-47 `PriceData`
   is a `UInt64` serialised as hex. `c4452` is 803922, which at `scale: 6` decodes to `0.803922`.
-  Writing `"100"` into that field means 256, not one hundred. Full detail on /oracle.
+  Writing `"100"` into that field means 256, not one hundred. Full detail in
+  [/mathematics](/mathematics#8-publication-as-an-oracle-object).
 - `coverRateMinimum` and `coverRateLiquidation` are in units of $10^{-5}$. A stated `10000` is
   $0.10$. **Both** are divided by $10^{5}$, which is why `maxLiquidatableNow` is
   $\lceil 10{,}000{,}000 \times 0.10 \times 0.10 \rceil = 100{,}000$ drops against a
@@ -439,7 +440,11 @@ Things in there that are easy to misread:
   `AssetsAvailable` sitting in the vault.
 - `impairable: false` on an already-impaired loan is correct. A loan may only be impaired once it is
   already past due, and only once.
-- `score.notchTrace` is the entire derivation. No weights are applied anywhere. See /scoring.
+- `score.notchTrace` is the entire derivation. No weights are applied anywhere. See
+  [/mathematics](/mathematics#5-composite-grade-by-ordinal-notching).
+- `score.dimensions` carries **six** entries, not five. The sixth, `HEADLINE`, is the composite
+  itself restated as a row so a table can render it alongside the factors. It is an output, not a
+  measured factor.
 
 ---
 
@@ -584,7 +589,7 @@ without the flag enforces nothing, and `note` says so rather than silently repor
 
 `issuerNamed` answers the rater's own question, am I cited in this domain, without asking the vault
 owner. The vault owner signs `PermissionedDomainSet` naming our issuer. We sign nothing, we are not
-consulted, and we cannot decline. That is the correct shape for a rating. More on /gate.
+consulted, and we cannot decline. That is the correct shape for a rating. More in [/gate](/gate).
 
 ---
 
@@ -761,7 +766,8 @@ $$\phi = \frac{T_{\text{observed}} - T_{\min}}{T_{\max} - T_{\min}}$$
 
 `"0.0000"` is the investor-worst sequence, `"1.0000"` the best, and it is defined as `"1.0000"` when
 the two extremes coincide. `recommendation` is the same arithmetic pointed forwards, and is only
-`applicable` with two or more distressed loans. Derivation on /ordering.
+`applicable` with two or more distressed loans. Derivation in
+[/mathematics](/mathematics#3-the-ordering-result).
 
 <Note>
 `LoanManage` carries no `LoanBrokerID`, and an impairment does not touch the `LoanBroker` object at
@@ -847,6 +853,8 @@ curl -s http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE
   ],
   "metadata": {
     "present": true,
+    // `meta` is the decoded MPTokenMetadata verbatim. The `icon` field is elided here for
+    // width; the full 502-byte object is on /nav-pointer.
     "meta": {
       "ticker": "ORMA-CSC3",
       "name": "Calder Structured Credit III",
@@ -1005,12 +1013,22 @@ hand while someone is watching.
 
 ## Operator routes
 
-There is one further family, `POST /api/demo/:action`, which mutates ledger state: baking a facility,
-impairing a loan, declaring a default, revoking a credential. It is not part of the read API and it
-is not documented per action here, because the actions available depend on what the running instance
-was started with.
+There is one further family, `POST /api/demo/:action`, reserved for actions that mutate ledger
+state during a live demo: impairing a loan, declaring a default, revoking a credential. It is not
+part of the read API, and it is not documented per action because the action set is supplied by the
+host rather than fixed by the server: `createApi(reader, { demo })` takes a map of action name to
+handler, and `/api/demo/:action` dispatches into it.
+
+<Note>
+`src/index.mjs` does **not** pass a `demo` map. In the shipped entrypoint the dispatcher is reachable
+but the map is empty, so every `POST /api/demo/:action` from loopback answers
+`404 {"error":{"code":"NOT_FOUND","message":"no demo action \"<name>\""}}`. Nothing here mutates the
+ledger as shipped. The facilities are built by the scripts in `src/demo/`, which are run from a
+terminal and take no key. Treat this family as an extension point, not as an available API.
+</Note>
 
 It is bound to loopback. A request whose remote address is neither `127.0.0.1` nor `::1` is refused
 with `403 FORBIDDEN` unless it carries an `X-Demo-Key` header matching the `DEMO_KEY` environment
-variable. An endpoint that can default a loan should not be reachable from venue wifi in a room full
-of hackers.
+variable. That check runs before the action lookup, so an unauthorised caller gets `403` whether or
+not the action exists. An endpoint that can default a loan should not be reachable from venue wifi in
+a room full of hackers.

@@ -170,7 +170,7 @@ Orma reports it as a fact with a reason attached, never as an error. From
 Because the exit is closed for the whole of Investment, a credit signal published during Investment
 cannot be acted on by selling. That is why the redemption cliff anchors the composite grade rather
 than sitting as one factor among five, and why Orma publishes where a third party can act on the
-signal instead of only displaying it. See [/scoring](/scoring).
+signal instead of only displaying it. See [the scoring method](/mathematics#4-the-five-measured-factors).
 </Note>
 
 ## The LoanBroker and first-loss capital
@@ -292,27 +292,17 @@ points. Same object, same instant, two answers.
 The delay is not merely invisible to careless tools. It is invisible to careful ones that watch
 transaction metadata. rippled omits from `PreviousFields` any field whose previous value was the
 type default. On the first impairment of a healthy vault, `LossUnrealized` moves from zero, and
-under cash basis nothing else on the Vault changes. So the metadata reads:
-
-```json
-"vaultNode": {
-  "previousFields": {},
-  "finalFields": {
-    "AssetsTotal": "51000000",
-    "AssetsAvailable": "41000000",
-    "LossUnrealized": "10000000"
-  }
-}
-```
-
-`PreviousFields` is empty. An indexer that diffs metadata sees no change at all on the most
-important credit event the protocol has. Captured in transaction
-`075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3`, result `tesSUCCESS`.
+under cash basis nothing else on the Vault changes, so `PreviousFields` is emitted **empty** and an
+indexer that diffs metadata sees no change at all on the most important credit event the protocol
+has. Captured in transaction
+`075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3`, result `tesSUCCESS`; the
+verbatim metadata node and the three-outcome asymmetry that lets it survive casual testing are in
+[/findings](/findings).
 
 <Tip>
 This is why Orma is a four second poller that re-reads full object state, and never a metadata
 differ. Re-reading cannot miss a field that was never diffed. See `src/poll.mjs`, and
-[/api/nav](/api/nav) for the reading it publishes.
+[the API reference](/api-reference) for the reading it publishes.
 </Tip>
 
 Delay also flatters the manager directly. `CoverRateMinimum` is keyed to `DebtTotal`, so the cover
@@ -353,14 +343,12 @@ $$\phi = \frac{T_{\text{observed}} - T_{\min}}{T_{\max} - T_{\min}}$$
 
 $\phi = 0$ is the investor-worst sequence and $\phi = 1$ the investor-best. Kestrel scored
 $\phi = 0.0000$. Reconstruction and scoring live in `src/history.mjs`, served at
-[/api/broker-history](/api/broker-history).
+[`GET /api/vaults/{vaultId}/broker-history`](/api-reference).
 
 <Note>
-Reconstructing this history needs a join that is not obvious. `LoanManage` carries no
-`LoanBrokerID`, and an impairment does not touch the `LoanBroker` object at all, so a filter over
-`account_tx` on the broker silently drops every impairment. `Loan.FinalFields.LoanBrokerID` in the
-same metadata closes the gap. Before that fix every default looked unsignalled, and a rule written
-to reward disclosure was penalising it.
+Reconstructing that history needs a join that is not obvious, and getting it wrong inverts the
+answer rather than emptying it. The reason, the affected-node set that proves it, and the four lines
+that close it are finding 4 in [/findings](/findings).
 </Note>
 
 ## One asymmetry, two levers, then enforcement
@@ -372,9 +360,10 @@ would see.
 
 Orma does three things about it, each on its own page:
 
-- **Measure** both levers from public ledger state, with no privileged access. See [/scoring](/scoring).
+- **Measure** both levers from public ledger state, with no privileged access. See [/mathematics](/mathematics).
 - **Publish** the result where it can be acted on: a native XLS-47 Oracle object carrying six
-  dimensions, plus a pointer inside the share token's own metadata. See [/oracle](/oracle).
+  dimensions, plus a pointer inside the share token's own metadata. See
+  [/mathematics](/mathematics#8-publication-as-an-oracle-object) and [/nav-pointer](/nav-pointer).
 - **Enforce** it with XLS-70 credentials and a permissioned domain, so an independent rater decides
   who may subscribe. See [/gate](/gate).
 
