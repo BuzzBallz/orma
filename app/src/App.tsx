@@ -4,7 +4,7 @@ import { API_MIXED_ORIGIN, SUSPECT_AFTER_FAILS, SUSPECT_BACKOFF_MS } from './lib
 import { usePoll } from './lib/usePoll'
 import { useTick } from './lib/useTick'
 import { useRoute, type RoutePath } from './lib/useRoute'
-import type { BrokerHistory, Collateral, Health, IndexerRace, VaultDetail as Detail, VaultsResponse } from './lib/types'
+import type { BrokerHistory, Collateral, Health, IndexerRace, Resolution, VaultDetail as Detail, VaultsResponse } from './lib/types'
 import { HeaderBar } from './components/HeaderBar'
 import { StaleBar } from './components/StaleBar'
 import { Portfolio } from './screens/Portfolio'
@@ -140,6 +140,14 @@ function Desk() {
   const histPath = path === '/facility' && vaultId ? `/api/vaults/${vaultId}/broker-history` : null
   const collPath = path === '/facility' && vaultId ? `/api/vaults/${vaultId}/collateral` : null
   const history = usePoll<BrokerHistory>(histPath, 20000)
+  // Exhibit 5 is keyed on the SHARE token, not on the vault: it is the lookup a holder
+  // has. It needs the detail payload to know the share id, so it starts one poll behind
+  // the rest and that is correct -- there is nothing to resolve until we know what the
+  // facility issues. 60s: a resolution walks the ledger and then a URL, and neither
+  // changes minute to minute.
+  const shareId = path === '/facility' ? detail.data?.vault?.shareMptId ?? null : null
+  const resolution = usePoll<Resolution>(
+    shareId ? `/api/mpt/${shareId}/resolve?units=1000000` : null, 60000)
   const collateral = usePoll<Collateral>(collPath, 20000)
 
   const race = usePoll<IndexerRace>(path === '/evidence' ? '/api/indexer-race' : null, 30000)
@@ -275,7 +283,12 @@ function Desk() {
         ? history.data : null
       const c = collateral.data && d.vault.shareMptId && collateral.data.shareMptId === d.vault.shareMptId
         ? collateral.data : null
-      return <Facility d={d} history={h} collateral={c} />
+      // Same identity check as the other two exhibits: the resolution must name the
+      // share token this facility actually issues, or it belongs to a different page.
+      const rz = resolution.data && d.vault.shareMptId
+        && resolution.data.issuanceId?.toUpperCase() === d.vault.shareMptId.toUpperCase()
+        ? resolution.data : null
+      return <Facility d={d} history={h} collateral={c} resolution={rz} />
     }
     return <Event d={detail.data} tick={tick} />
   }

@@ -203,3 +203,48 @@ export interface Collateral extends Stamped {
   totalOverstatement: string; totalOverstatementPct: string
   pledges: Pledge[]
 }
+
+// --- Exhibit 5: what a second lender can learn from the token alone ---------
+// A holder pledged vault units has an MPT issuance id and nothing else. The token's own
+// metadata carries a pointer to an honest valuation, so the loop is: read the issuance,
+// decode the metadata, substitute the token's id into the pointer, follow it.
+export interface ResolveStep { step: string; ok: boolean; detail: string | null }
+
+export interface Xls89Report {
+  conformant: boolean; missing: string[]; assetClassValid: boolean
+  assetClass: string | null; taxonomyNote: string | null
+}
+
+export interface NavDocument {
+  schema: string; asOf: string | null; ledgerIndex: number | null
+  instrument: {
+    kind: string; vaultId: string; shareMptId: string | null; unitsOutstanding: string
+    asset: Asset; vaultKind: string; phase: Phase; redemptionAt: string
+  }
+  unitValue: { held: string; reported: string; divergenceBps: number; basis: string }
+  valuation: { currency: string | null; scale: number; perUnitHeld: string; perUnitReported: string }
+  assessment: { grade: string; gradeNumeric: number; methodVersion: string; advisory: boolean } | null
+  provenance: {
+    network: string; source: string; assetsTotal: string; lossUnrealized: string
+    unitsOutstanding: string; recompute: string; buildVersion: string | null
+  }
+  // Present only when a quantity was asked for. `unpriced` when the document could not
+  // be valued — never a zero standing in for an unknown.
+  pledge?: {
+    units: string
+    valueHeld: string | null; valueReported: string | null; overstatement: string | null
+    unpriced?: string
+  }
+}
+
+export interface Resolution extends Stamped {
+  issuanceId: string; issuer?: string; unitsOutstanding?: string
+  resolved: boolean; opaque?: boolean; navUrl?: string
+  steps: ResolveStep[]
+  metadata: {
+    present: boolean; reason?: string | null; raw?: string | null
+    meta?: Record<string, unknown>; conformance?: Xls89Report
+  } | null
+  nav: NavDocument | null
+  pledge?: NavDocument['pledge']
+}

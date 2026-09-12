@@ -1315,3 +1315,9 @@ tr:hover .chip, .picker-list [data-highlighted] .chip{ transform: translateY(-1p
 .ev-verdict{ margin-top: 12px; }
 /* A 64-character hash must wrap rather than widen the panel and scroll the page. */
 .ev-hash{ font-family: var(--mono); word-break: break-all; }
+
+/* Exhibit 5. A step either held or it did not; nothing in between, so the two states
+   are the only colours used here and they are the contract's own. */
+.res-ok{ color: var(--ok); font-family: var(--mono); }
+.res-no{ color: var(--bad); font-family: var(--mono); }
+.res-verdict{ margin-top: 12px; color: var(--fg-dim); }
