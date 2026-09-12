@@ -39,33 +39,40 @@
    ============================================================ */
 
 :root{
-  /* NEUTRAL — design, not contract */
-  --bg:      #07080A;   /* page: a terminal ground — neutral black, not blue-black */
-  --bg-1:    #0D0F12;   /* panel */
-  --bg-2:    #14171B;   /* raised row, hover */
-  --bg-3:    #1C2026;   /* pressed / selected */
-  --line:    #20242A;   /* every hairline, 1px */
-  --line-2:  #2E343C;   /* emphasised hairline */
+  /* NEUTRAL — Orma. Design, not contract.
+     The ground and panel are the brand's, and the text is cream rather than white: on a
+     document that is read for minutes at a time, a warm off-white is the difference
+     between a screen and a page. Every neutral below is derived from those two so the
+     surface reads as one material and not as a grey UI with a cream headline. */
+  --bg:      #0A0B0E;   /* page */
+  --bg-1:    #0E1015;   /* panel */
+  --bg-2:    #15171D;   /* raised row, hover */
+  --bg-3:    #1D2028;   /* pressed / selected */
+  --line:    #1F222A;   /* every hairline, 1px */
+  --line-2:  #2C313B;   /* emphasised hairline */
 
-  --fg:      #E9ECEF;   /* primary text and figures */
-  --fg-dim:  #9AA3AC;   /* secondary — clears AA on --bg */
-  --fg-mute: #79828B;   /* tertiary  — clears AA on --bg */
+  --fg:      #EAE0CE;   /* primary text and figures — brand cream */
+  --fg-dim:  #B3AA99;   /* secondary — 8.5:1 on --bg, clears AA */
+  --fg-mute: #8C8578;   /* tertiary  — 5.4:1 on --bg, clears AA */
 
-  /* CHROME — amber is the furniture of a trading terminal: every label, header and tab.
+  /* CHROME — the brand gold is the furniture: the active tab, an alert, the wordmark.
      Deliberately NOT a signal: red is risk, green is healthy, cyan is the correct
-     reading. A disclosed deviation from spec §6.1's "no other colours". */
-  --amber:     #FF9E2C;
-  --amber-dim: #B4701C;
-  /* Idle chrome. Amber had spread to every label, tab and key until nothing amber meant
-     anything. Amber is now the active tab, an alert, and the wordmark. Nothing else. */
-  --fg-idle: #8A93A0;
+     reading. A disclosed deviation from spec §6.1's "no other colours".
+     Kept under the --amber names: they are used in roughly forty rules and renaming
+     them buys nothing a reader of this block does not already see. */
+  --amber:     #C9A45F;   /* brand gold, 8.5:1 on --bg */
+  --amber-dim: #8E7340;
+  /* Idle chrome. Gold had spread to every label, tab and key until nothing gold meant
+     anything. Gold is now the active tab, an alert, and the wordmark. Nothing else. */
+  --fg-idle: #8C8578;
 
   /* CONTRACT — meanings fixed by contract §6, do not repurpose */
   --read-naive:   #8792A6;   /* the naive NAV reading — muted, DASHED (contract §6) */
   --ok:      #35D64A;   /* healthy / current */
   --warn:    #D29922;   /* watch / overdue / due_soon */
   --bad:     #FF4A4A;   /* distress / impaired / defaultable — RISK ONLY */
-  --dead:    #79828B;   /* terminal / defaulted */
+  --dead:    #867F70;   /* terminal / defaulted — warmed to the cream palette, 4.9:1 on --bg.
+                           Contract §6 pins the token NAME, not the hex; the meaning is unchanged. */
   --read-correct: #58C7F3;   /* the correct NAV reading — accent, SOLID (contract §6) */
 
   /* BRAND, Orma. The mark is the O over two currents, one cream and one gold; the
