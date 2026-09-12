@@ -755,3 +755,50 @@ Règle appliquée : si ça n'aide pas à juger le crédit d'une facility, ça so
 non reçus. Onze termes de plus dans la liste de l'audit — `v1.0.0`, `contract v`, `build `,
 `endpoint`, `api base`, `failed poll`, `attempts`, `still asking`, `on watch`, `hackathon`,
 `methodology note` — pour que ça ne revienne pas.
+
+## Adoucissement du chrome — 12/09
+
+Le reproche : « tout droit, tout fileté, tout 11px tracked ». Passe de forme uniquement,
+aucun changement de contenu crédit.
+
+### Trois rayons, et seulement trois
+
+```
+--r-panel: 10px   panneaux, les deux pages de la note, le dialog, les menus
+--r-ctl:    8px   boutons, champs, sélecteur, l'onglet actif
+--r-chip:   6px   chips et badges
+--shadow-panel: 0 8px 24px rgba(0,0,0,.25)
+```
+
+L'ombre est **sur la feuille qu'on lit**, et sur rien d'autre : le panneau de la vue et les
+pages de la note. Pas sur chaque boîte.
+
+### Ce qui a été adouci
+
+| | avant | après |
+|---|---|---|
+| onglet actif | filet ambre de 2px sous le mot | **pilule arrondie** qui glisse derrière le label, ambre à 13%, 200ms |
+| survol de rangée | `inset 2px 0 0 amber` + décalage de 2px du contenu | **lavis** `--fg` à 5%, rien ne bouge |
+| grille de fond 24px | `--line-2` à 70% | **coupée** — une trame réglée derrière une note de recherche la fait lire comme un gabarit |
+| scanlines | 4% | **2%** |
+| grain | 5% | **3,5%** |
+| labels | `SMALL CAPS` + 0.08em partout | casse normale, tracking normal |
+| onglets | mono, majuscules, tracké | Plex Sans, casse normale |
+| titres de section | mono 11px majuscules | Plex Sans 18px |
+| titre de facility | 26px | **32px**, tracking -0.015em |
+| code d'état | mono 28px majuscules | Plex Sans 26px |
+| rangées | 26px, padding 8 | **32px**, padding 10 |
+| en-têtes de tableau | filet `--line-2` | filet `--line`, plus de majuscules |
+| cellules de la note | filet `--line` plein | `--line` à 60% |
+| réglage sous les rangées | `--line` plein, période 27px | **45%**, période 32px |
+| légende du portfolio | filet du bas | **supprimé** |
+| bandeau supérieur de la note | filet ambre de 2px | filet `--line-2` de 1px |
+| transitions | 140–180ms | **200ms** |
+
+`prefers-reduced-motion` reste intact : quatre blocs, tout coupé sauf le survol en couleur.
+
+### Aucun slop ajouté
+
+Pas d'orbe, pas de mesh, pas de glass, pas de rebond élastique, pas de webfont, pas un
+chiffre de plus. Le seul ajout visuel est **une** ombre courte sur la feuille lue, et une
+pilule de 8px derrière l'onglet actif.

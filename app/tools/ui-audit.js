@@ -233,7 +233,11 @@ window.uiAudit = async function uiAudit(opts = {}) {
     }
     // Labels only. Controls deliberately carry no tracking — a tab and a button are not
     // captions, and spacing them out is what made every uppercase word look like a label.
-    oneOf('one tracking for labels', '.panel-title,.label,.hints', e => cs(e).letterSpacing)
+    // Labels carry none. Headings carry one optical value, the same everywhere — a title
+    // and a caption are not the same category and must not be asserted as one.
+    oneOf('no tracking on labels', '.label,table.tbl th',
+      e => cs(e).letterSpacing === 'normal' ? 'none' : cs(e).letterSpacing)
+    oneOf('one tracking for headings', '.panel-title,.op-h', e => cs(e).letterSpacing)
     oneOf('no tracking on controls', '.desk,.btn-term,button.picker-btn',
       e => cs(e).letterSpacing === 'normal' || cs(e).letterSpacing === '0px' ? 'none' : cs(e).letterSpacing)
     oneOf('one grid gap', '.grid12,.stack', e => cs(e).gap)
