@@ -163,9 +163,11 @@ body{
 #root{ display: flex; flex-direction: column; }
 
 /* Grain. A locally generated 128px tile at 5% — enough to stop the flats reading as a
-   render, not enough to be a texture you notice. Over everything, inert by construction. */
-body::after{
-  content: ""; position: fixed; inset: 0; z-index: 100; pointer-events: none;
+   render, not enough to be a texture you notice. It rides the veil rather than body::after
+   so it mounts on idle with the rest of the dressing: noise.png (16 KB) is never fetched
+   while the first paint is happening. */
+.veil-grain{
+  position: fixed; inset: 0; z-index: 100; pointer-events: none;
   background-image: url('/assets/noise.png'); background-size: 128px 128px;
   opacity: .05;
 }
@@ -524,7 +526,7 @@ button:disabled, .btn:disabled, .picker-btn:disabled{
 .desk-ind{
   position: absolute; bottom: 0; left: 0; height: 2px;
   background: var(--amber);
-  transition: transform 180ms ease, width 180ms ease;
+  transition: transform 160ms ease, width 160ms ease;
   pointer-events: none;
 }
 .desk[data-active="true"]::after{ background: transparent; }
@@ -545,7 +547,7 @@ button:disabled, .btn:disabled, .picker-btn:disabled{
 @keyframes recharge { from { width: 0 } to { width: 100% } }
 
 /* A figure that actually moved — triggered by a change in an HTTP value, never a timer. */
-@keyframes flash { from { background: color-mix(in srgb, var(--read-correct) 22%, transparent) } to { background: transparent } }
+@keyframes flash { from { background: color-mix(in srgb, var(--ok) 24%, transparent) } to { background: transparent } }
 .flash{ animation: flash 120ms ease-out 1; }
 
 /* ---------- the signature pair ----------
@@ -979,7 +981,7 @@ tr:hover .chip, .picker-list [data-highlighted] .chip{ transform: translateY(-1p
     transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease !important;
   }
   tr:hover .chip, .picker-list [data-highlighted] .chip{ transform: none !important }
-  .ground{ display: none !important }
+  .ground, .veil, .veil-grain{ display: none !important }
 }
 
 @theme inline {

@@ -165,6 +165,19 @@ function Desk() {
     }
   }, [vaults.fails, vaults.data])
 
+  // C5 — the ground and the veil cost nothing at first paint. They mount on the first
+  // idle frame, after the desk and its five slots are already on screen, so noise.png is
+  // not even requested while the book is being drawn.
+  const [dressed, setDressed] = useState(false)
+  useEffect(() => {
+    const idle = window.requestIdleCallback ?? ((f: () => void) => setTimeout(f, 200) as unknown as number)
+    const id = idle(() => setDressed(true))
+    return () => {
+      if (window.cancelIdleCallback) window.cancelIdleCallback(id as number)
+      else clearTimeout(id as unknown as ReturnType<typeof setTimeout>)
+    }
+  }, [])
+
   // Views move on a route change, never on first paint.
   const painted = useRef(false)
   useEffect(() => { painted.current = true }, [])
@@ -282,15 +295,20 @@ function Desk() {
       value={path}
       onValueChange={v => navigate(v as RoutePath)}
     >
-      {/* Inert ground: grid, scanlines, vignette, and a sweep whose period IS the poll.
-          Fixed and pointer-events:none — it can never eat a click. */}
-      <div className="ground" aria-hidden style={{ ['--poll' as string]: POLL_MS + 'ms' }}>
-        <span className="g-vignette" />
-        <span className="g-sweep" />
-      </div>
-      {/* Over the desk, with the grain: scanlines. A tube's lines are in front of the
+      {/* Inert ground: grid, vignette, and a sweep whose period IS the poll. Fixed and
+          pointer-events:none — it can never eat a click. Mounted on idle, never before. */}
+      {dressed && (
+        <div className="ground" aria-hidden style={{ ['--poll' as string]: POLL_MS + 'ms' }}>
+          <span className="g-vignette" />
+          <span className="g-sweep" />
+        </div>
+      )}
+      {/* Over the desk: scanlines, then the grain. A tube's lines are in front of the
           phosphor, not behind it — behind a 92% panel they read as nothing at all. */}
-      <span className="veil" aria-hidden />
+      {dressed && <>
+        <span className="veil" aria-hidden />
+        <span className="veil-grain" aria-hidden />
+      </>}
       <Toaster position="bottom-right" closeButton={false} duration={4000} />
 
       <HeaderBar

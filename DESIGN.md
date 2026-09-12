@@ -489,3 +489,52 @@ Personne n'attend un bundle de wallet pour lire le book. Mesuré dans les quatre
 Aucune extension n'est installée dans ce navigateur. Le câblage est fait contre les codes
 d'erreur réels de la librairie et `WALLET_NOT_AVAILABLE` est prouvé de bout en bout ; les
 deux autres branches demandent une extension sur la machine de l'owner.
+
+## Étape 4 — vivant + smooth, et rien avant la première peinture (12/09)
+
+L'essentiel du fond vivant était déjà là depuis `2359e45`. Cette étape est le delta.
+
+### Ce qui a changé
+
+| | avant | après |
+|---|---|---|
+| C5 | grain en `body::after`, présent dès le premier octet de CSS | `.veil-grain`, **monté sur `requestIdleCallback`** avec le reste de l'habillage |
+| C7 | flash cyan (`--read-correct`) | **flash vert** (`--ok`) 24%, 120ms |
+| C9 | glissement de l'onglet 180ms | **160ms**, la même beat que tout le reste |
+
+### C5 — « overlays après rAF/idle », mesuré
+
+`fetchpriority="low"` ne s'écrit pas sur une tuile CSS : l'attribut vit sur un `<img>` ou un
+`<link>`, pas sur un `background-image`. Plutôt que de le simuler, on obtient **ce que
+l'attribut demandait**, et c'est mesurable — le `.ground` et le `.veil` ne sont pas rendus
+tant que le navigateur n'a pas une frame libre.
+
+```
+first-paint                 68 ms
+first-contentful-paint     112 ms
+noise.png                  145 ms   ← après la peinture, 16,2 Ko, "non-blocking"
+```
+
+16,2 Ko contre les 80 autorisés, générée localement, jamais téléchargée.
+
+### C7 — le flash est vert, et il ne ment pas sur le chiffre
+
+`@keyframes flash` peint **le fond de la cellule**, jamais la couleur du chiffre. Une valeur
+rouge reste rouge pendant que sa case clignote vert : le marqueur d'événement (« ça vient
+d'arriver ») ne peut pas écraser une tonalité de contrat §6 (« ça va mal »).
+
+Capturé en vol sur un vrai changement de ledger :
+`flash 0.12s bg=oklab(0.767947 -0.182103 0.12894 / 0.24)` — le `a` négatif, c'est le vert.
+
+### C8 — rien
+
+Le brief autorise « une photo desk sombre **ou RIEN** ». C'est rien. Une photo veut dire une
+licence à tracer et un fichier à servir, pour un état qui n'apparaît que si le backend
+meurt. La grille 24px se voit déjà dans le vide du rail DOWN et fait le travail.
+
+### Reduced motion
+
+`.ground`, `.veil`, `.veil-grain` sont coupés avec le reste. Le grain et les scanlines sont
+statiques, donc discutables ici — mais la sensibilité au bruit visuel voyage souvent avec la
+sensibilité au mouvement, et le brief dit « tout off sauf hover ». On coupe. Le hover reste,
+en couleur seule : c'est lui qui dit qu'une ligne est cliquable.
