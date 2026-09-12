@@ -102,4 +102,10 @@ if (failed.length) {
   console.log('  Restart the API so it picks up whatever did land, then rerun the ones that failed.\n')
   process.exit(1)
 }
-console.log('  Restart the API to serve them:  node src/index.mjs\n')
+// The metadata bake records a FAILING fifth step, because the reader loads demo/ at
+// startup and the facility it just created is seconds old. That is honest when written
+// and wrong once the reader restarts, and the artefact is committed as evidence.
+console.log('  Then, in order:')
+console.log('    node src/index.mjs                    serve them')
+console.log('    node src/demo/repair-resolution.mjs   close the pointer loop in the artefact')
+console.log('')
