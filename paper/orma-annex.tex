@@ -37,7 +37,7 @@
 \setlength{\topmargin}{-0.55in}
 \setlength{\headheight}{14pt}
 \setlength{\headsep}{16pt}
-\setlength{\textheight}{9.3in}
+\setlength{\textheight}{9.4in}
 \setlength{\parskip}{0pt}
 \setlength{\abovedisplayskip}{6pt plus 2pt minus 2pt}
 \setlength{\belowdisplayskip}{6pt plus 2pt minus 2pt}
@@ -140,10 +140,8 @@ $p_i$ & principal of exposure $i$ & \texttt{Loan.PrincipalOutstanding} \\
 on the wire as decimal strings of up to $19$ significant digits. All arithmetic runs at $40$
 significant digits with \texttt{decimal.js}; no monetary value passes through
 \texttt{Number()} or \texttt{parseFloat}, because a $53$-bit mantissa cannot represent every
-value the protocol admits.
-
-\paragraph{Rate scale.} $c_{\min}$ and $c_{\mathrm{liq}}$ are in units of $10^{-5}$. A
-stated \texttt{10000} means $0.10$. It does not mean $10000$ and it does not mean $100$.
+value the protocol admits. $c_{\min}$ and $c_{\mathrm{liq}}$ are in units of $10^{-5}$, so a
+stated \texttt{10000} means $0.10$: not $10000$, and not $100$.
 
 \paragraph{Accounting basis.} All facilities here run \texttt{LEVersion} $=1$, cash basis.
 The consequence that matters is that origination moves \texttt{DebtTotal}, not
@@ -169,12 +167,10 @@ Kestrel, first default & \texttt{FB23EC5313F85FA157D56966E0B0B1665068905988D925C
 Kestrel, second default & \texttt{DE49DF0D6136B96AD28B253CD32100E5715078FD2D0AE6D1DB747AFECB803D1F} \\
 Calder Structured Credit III, broker & \texttt{1C160EFFCA8208DFD8CE9B065A3C3C41CCA80758FBC3099BE27AACFBD1478173} \\
 Calder, share token issuance & \texttt{000000014D667775372D5B78E07FFF294678C7F9CE82AFBC} \\
+Kestrel, broker and vault owner & \texttt{rD26gw5goDqU784caePMoA82givcJBjStk} \\
 \bottomrule
 \end{tabular}
 \end{center}
-
-\noindent
-The Kestrel broker owner is \texttt{rD26gw5goDqU784caePMoA82givcJBjStk}.
 
 \section{The two readings of net asset value}
 
@@ -270,7 +266,7 @@ field & healthy, before & final, after \\
 \texttt{AssetsAvailable} & $41{,}000{,}000$ & $41{,}000{,}000$ \\
 \texttt{LossUnrealized} & $0$ & $10{,}000{,}000$ \\
 \midrule
-\multicolumn{3}{l}{\texttt{PreviousFields} emitted for the Vault node: \texttt{\{\}}} \\
+\multicolumn{3}{l}{\texttt{PreviousFields} emitted for the Vault node: \texttt{\symbol{123}\symbol{125}}} \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -281,7 +277,7 @@ With $S = 51{,}000{,}000$ units,
   \qquad
   \mathrm{NAV}_{\mathrm{held}} = \frac{41{,}000{,}000}{51{,}000{,}000} = 0.803922,
 \]
-the second truncated to the $6$ decimal places the share token is scaled to. The divergence
+the second rounded to nearest at the $6$ decimal places the valuation is reported to. The divergence
 is $10^4 \cdot 10{,}000{,}000 / 51{,}000{,}000 = 1960.7843\ldots$, so $\delta = 1961$ bp: the
 reported unit value overstates recoverable value by $19.61\%$. Two readers pointed at the
 same transaction on the same ledger at the same instant return $1.000000$ and $0.803922$.
@@ -366,9 +362,9 @@ $\sum_{i=1}^{k} \sum_{j<i} p_{\sigma(j)} = \sum_{j=1}^{k} (k-j)\, p_{\sigma(j)}$
 the claim after renaming the index.
 \end{proof}
 
-Only the second term depends on $\sigma$, and it enters with a minus sign. Minimising total
-cover consumed is therefore the same problem as maximising
-$\Sigma(\sigma) = \sum_i (k-i)\, p_{\sigma(i)}$, a sum of the principals against the fixed,
+Only the second term depends on $\sigma$, and it enters with a minus sign, so minimising
+total cover consumed is the same problem as maximising
+$\Sigma(\sigma) = \sum_i (k-i)\, p_{\sigma(i)}$: a sum of the principals against the fixed,
 strictly decreasing weight vector $(k-1, k-2, \ldots, 1, 0)$.
 
 \begin{theorem}[Ordering]
@@ -453,13 +449,13 @@ transaction history alone, across the two default transactions of Section~1.4
 \texttt{CoverAvailable} moved
 $10{,}000{,}000 \rightarrow 9{,}600{,}000 \rightarrow 9{,}500{,}000$ drops, consuming
 $400{,}000$ and $100{,}000$ drops, total $500{,}000$ drops $= 0.50$ XRP. Three independent
-computations agree: the iterative simulation that mirrors the ledger step by step, the
-closed form, and the ledger itself.
+computations agree: the step-by-step simulation, the closed form, and the ledger itself.
 
 Identical losses were realised in both rows; the only difference is the order of two
-transactions eight seconds apart. The $0.20$ XRP, $40\%$ of what the first-loss capital
-would otherwise have absorbed, was borne by the vault's investors, and the party who chose
-the order is the party it spared.
+transactions eight seconds apart. The $0.20$ XRP was borne by the vault's investors, and
+the party who chose the order is the party it spared. Measured against the $0.50$ XRP the
+first-loss capital did absorb, the investor-optimal order would have absorbed $40\%$ more;
+measured against that $0.70$ XRP, the choice withheld $28.6\%$ of it.
 
 \subsection{Sequence score}
 
@@ -518,13 +514,14 @@ $C_{\mathrm{rec}}$ the recoverable cover
 $\min(\lceil D c_{\min} c_{\mathrm{liq}} \rceil, C)$. \texttt{rippled} refuses a
 \texttt{LoanSet} whose term overruns the vault's \texttt{RedemptionDate}, so every
 performing loan is contractually repaid before redemption and a projected shortfall is
-exactly the non-performing book net of recoverable cover. Being fully lent is not a distress
-signal, and this construction is what stops it reading as one.
+exactly the non-performing book net of recoverable cover. Being fully lent is therefore not
+a distress signal here.
 \end{description}
 
-The bands are stated in full so they can be disputed. Each row is a floor: the first
-threshold the value meets or exceeds gives the grade, and a value below every threshold
-grades \texttt{D}.
+The bands are stated in full so they can be disputed. Each threshold is a floor: the first
+one the value meets or exceeds gives the grade, and a value below all of them grades
+\texttt{D}. Recognition lag is banded on seconds rather than a ratio: $0$ is AAA, under $60$
+is A, under $300$ is BBB, under $900$ is BB, beyond that CCC.
 
 \begin{center}
 \small
@@ -544,9 +541,6 @@ Redemption cliff & $1 - \mathrm{shortfall}\%/100$ &
 \end{tabular}
 \end{center}
 
-Recognition lag is banded on seconds rather than a ratio: $0$ is AAA, under $60$ is A, under
-$300$ is BBB, under $900$ is BB, beyond that CCC.
-
 \subsection{Composite by ordinal notching}
 
 Let $\mathcal{L} = [\text{AAA}, \text{AA+}, \ldots, \text{D}]$ with $|\mathcal{L}| = 20$,
@@ -564,21 +558,17 @@ accumulate. Every notch is emitted with its rule, so a grade is reproducible fro
 published trace rather than taken on trust.
 
 \begin{center}
-\begin{tabular}{lr}
+\small
+\begin{tabular}{lrlr}
 \toprule
-condition & $\Delta$ \\
+realised destruction $\rho$ & $\Delta$ & other conditions & $\Delta$ \\
 \midrule
-realised capital destruction $\rho \geq 75\%$ & $-14$ \\
-$\rho \geq 50\%$ & $-12$ \\
-$\rho \geq 25\%$ & $-8$ \\
-$\rho \geq 10\%$ & $-5$ \\
-$\rho \geq 2\%$ & $-3$ \\
-$\rho > 0\%$ & $-1$ \\
-recognition lag $> 300$ s & $-2$ \\
-recognition lag $> 0$ s and $\leq 300$ s & $-1$ \\
-largest exposure $\geq 75\%$ of the book & $-1$ \\
-liquidatable cover $< 5\%$ of the exposure it must absorb & $-1$ \\
-liquidity band at B or worse while in the Redemption phase & $-2$ \\
+$\rho \geq 75\%$ & $-14$ & recognition lag $> 300$ s & $-2$ \\
+$\rho \geq 50\%$ & $-12$ & recognition lag $> 0$ s and $\leq 300$ s & $-1$ \\
+$\rho \geq 25\%$ & $-8$ & largest exposure $\geq 75\%$ of the book & $-1$ \\
+$\rho \geq 10\%$ & $-5$ & liquidatable cover $< 5\%$ of the exposure & $-1$ \\
+$\rho \geq 2\%$ & $-3$ & liquidity band B or worse, in Redemption & $-2$ \\
+$\rho > 0\%$ & $-1$ & & \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -679,7 +669,7 @@ $V_{\mathrm{reported}}$ & $1.000000$ \\
 $V_{\mathrm{held}}$ & $0.803922$ \\
 overstatement $\Omega$ & $\mathbf{0.196078}$ \\
 \addlinespace
-$V_{\mathrm{lendable}}$ at $h = 0.20$, correctly applied & $0.643137$ \\
+$V_{\mathrm{lendable}}$ at $h = 0.20$, correctly applied & $0.643138$ \\
 haircut misapplied to $V_{\mathrm{reported}}$ & $0.800000$ \\
 residual misstatement $\Omega(1-h)$ & $0.156862$ \\
 \addlinespace
@@ -705,7 +695,7 @@ amendments activate. The hashes will not: Devnet is periodically reset.
 reconstructed from public transaction history, which the Devnet cluster retains for roughly
 $29$ days. Behaviour before that window is invisible, so every conduct figure is a lower
 bound on observable misconduct over a bounded window, not a statement about a manager's
-whole record. A facility with a clean score may simply be younger than the window.
+whole record.
 
 \paragraph{Par at $1.0$.} $\rho$ compares $A$ against $S$ and so assumes one unit was issued
 per unit of asset subscribed. For a closed-ended vault this holds structurally rather than
@@ -714,12 +704,14 @@ accrue between the first subscriber and the last, every subscriber enters at the
 value, and $S$ is exactly capital subscribed measured in asset units. \texttt{VaultKind} is
 immutable, so a facility cannot leave that regime later. The assumption fails for an
 open-ended vault, where subscribers enter at different unit values and $\rho$ would need the
-full subscription cash-flow history rather than $S$ alone; Orma declines to compute $\rho$
-there rather than compute it wrongly.
+full subscription cash-flow history rather than $S$ alone. No facility measured here can be
+one: \texttt{LoanBrokerSet} returns \texttt{tecNO\_PERMISSION} against any vault that is not
+closed-ended, so a vault that lends at all is in the regime by construction. An open-ended
+vault would need that cash-flow history added before $\rho$ meant anything on it.
 
 \paragraph{The closed form is not the implementation.} Lemma~\ref{lem:closed} drops the
 ceiling and the per-step $\min$ under (A1) to (A3). Where a step is capped by the defaulting
-principal or by remaining cover, the closed form is no longer exact, although
+principal or by remaining cover the closed form is no longer exact, although
 Theorem~\ref{thm:order} stays directionally valid because a cap can only reduce a step. The
 implementation therefore always evaluates the iterative recursion, which mirrors the ledger
 step for step including the ceiling and both caps, and uses the closed form only as an
@@ -727,13 +719,16 @@ independent check. On the measured facility the two agree exactly, which is the 
 computing both.
 
 \paragraph{Rounding, and the bands.} $\delta$ is an integer basis point rounded to nearest,
-so $1960.78$ is published as $1961$; unit values are truncated to the share token's $6$
-decimal places, and oracle values to the dimension's scale, $6$ decimals for NAV and $4$ for
-the other five. No figure here depends on a digit below those scales. The thresholds and
+halves away from zero, so $1960.78$ is published as $1961$. One deviation is worth stating
+outright: the project's internal specification writes that step with a floor, while the
+implementation rounds, and every published figure follows the implementation. A floor would
+report $1960$ where the ledger-facing code, the oracle object and the API all report $1961$.
+Unit values are likewise rounded to nearest at the $6$ decimal places the valuation is
+reported to, and oracle values at the dimension's scale, $6$ decimals for NAV and $4$ for the
+other five. No figure here depends on a digit below those scales. The thresholds and
 penalties in Section~5 are not derived from anything: they are a stated, ordinal,
-reproducible judgement, published in full precisely so a reader who disagrees can say where
-and by how much. The two results that are not judgements are Proposition~\ref{prop:empty}
-and Theorem~\ref{thm:order}, which follow from the protocol rules and hold whatever anyone
-thinks of the bands.
+reproducible judgement, published in full so a reader who disagrees can say where and by how
+much. The two results that are not judgements are Proposition~\ref{prop:empty} and
+Theorem~\ref{thm:order}, which follow from the protocol rules.
 
 \end{document}

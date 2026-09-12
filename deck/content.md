@@ -152,12 +152,14 @@ Forty findings, filed as we hit them. Our top three. // **One.** The empty chang
 <!-- time: 3:47 | duration: 8s -->
 
 ### on screen
-- five pull requests
-- the tutorial, green on rc5 in 79.6 s
-- 40 findings, every one with a hash
+- one pull request: the tutorial, green on rc5 in 79.6 s
+- four upstream threads, not duplicates
+- 40 findings, every one evidenced
 
 ### notes
-Five pull requests, a fixed tutorial that runs green on rc5, and forty findings with transaction hashes. All filed before this pitch.
+One pull request: the tutorial, green on rc5. // Reproductions onto four existing threads, not duplicates. // Forty findings, every one evidenced. // All filed before this pitch.
+
+*Say the count the 11:00 filing block actually filed, not the planned one. `docs/31-TASKS-FEEDBACK.md` F11: an honest four beats an inflated five, in front of the people who own the repositories.*
 
 ---
 

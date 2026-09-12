@@ -40,7 +40,7 @@ Every transaction type the project submits, grouped by the standard it belongs t
 
 | Transaction | What Orma uses it for |
 |---|---|
-| `VaultCreate` | Creates each demo facility. Every one is closed-ended: `VaultKind=1` with `SubscriptionDate` and `RedemptionDate`, because `LoanBrokerSet` returns `tecNO_PERMISSION` otherwise, and `VaultKind` is immutable. |
+| `VaultCreate` | Creates each demo facility. All four are closed-ended: `VaultKind=1` with `SubscriptionDate` and `RedemptionDate`, because `LoanBrokerSet` returns `tecNO_PERMISSION` otherwise, and `VaultKind` is immutable. |
 | `VaultDeposit` | Subscribes investor capital, and is the transaction the XLS-70 gate admits or refuses at Thorne. |
 | `VaultWithdraw` | Redemption. Also the proof that revoking a credential closes entry without trapping the exit. |
 
@@ -137,8 +137,8 @@ lender who holds a token and nothing else; that lender reads the token's metadat
 `nav_url`, and prices the pledge in five steps, none of which involve a relationship with us. A pledge of
 1,000,000 units prices at **1.000000 XRP** naively and **0.803922 XRP** on what the instrument points to.
 **0.196078 XRP of overstatement kept out of the second lender's book.** A haircut absorbs volatility; it does
-not absorb a misstatement. This manager impaired the loan before writing it off, which the conduct
-assessment scores **A** against Kestrel's E.
+not absorb a misstatement. This manager impaired the loan and has written nothing off, which the
+conduct assessment scores **A** against Kestrel's E.
 
 ### 4. Thorne Senior Secured I, enforcement
 
