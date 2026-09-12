@@ -2052,3 +2052,64 @@ valuation endpoint, since a redeemable claim has a price that the token itself c
 They are the difference between a vault share being an opaque MPT and being a **self-describing collateral
 instrument**. A broker who receives one as collateral should be able to read, from the token, what it is and
 where its honest valuation lives. Today they can read neither.
+
+---
+
+# Appendix E — Phase rejection matrix, and an overloaded result code
+
+Captured Sat 12 Sept on Devnet. Serves two purposes: it is the Track 2 minimum-bar
+evidence (rejected `VaultDeposit`, `VaultWithdraw` and `LoanSet` at the wrong phase),
+and it produced the clearest error-clarity finding of the event.
+
+Every rejection below sits next to a **control** that succeeds in the phase where the
+same transaction is legal. Without controls a rejection proves nothing: it could be a
+malformed transaction or a funding problem.
+
+| phase | transaction | expected | result | hash |
+|---|---|---|---|---|
+| OpenEnded | VaultDeposit (control) | succeed | `tesSUCCESS` | `9D7E7CFE00A554FA065C30A6...` |
+| OpenEnded | VaultWithdraw (control) | succeed | `tesSUCCESS` | `E394EA9BD518BEE31275EC9E...` |
+| OpenEnded | LoanBrokerSet on an OPEN vault | reject | `tecNO_PERMISSION` | `CE477E29A099A6BBC30EBA52...` |
+| Subscription | VaultDeposit (control) | succeed | `tesSUCCESS` | `202F9600CC1D85266FFB27B7...` |
+| Subscription | VaultWithdraw (control) | succeed | `tesSUCCESS` | `92558A56C122F770B8601217...` |
+| Subscription | LoanSet | reject | `tecTOO_SOON` | `E1121DED12D4A320FB58F77D...` |
+| Investment | VaultDeposit at wrong phase | reject | `tecEXPIRED` | `7A10D8053FEE687A008F17E2...` |
+| Investment | VaultWithdraw at wrong phase | reject | `tecTOO_SOON` | `CC104682C298DFB3619EE4C1...` |
+| Investment | LoanSet | succeed | `tecNO_PERMISSION` | `A926030097C2AD2F8ED4D1D6...` |
+| Redemption | VaultDeposit at wrong phase | reject | `tecEXPIRED` | `DEA67094F92657625C795FD3...` |
+| Redemption | VaultWithdraw (control) | succeed | `tesSUCCESS` | `D26222EC26111FFC4F77D3CC...` |
+| Redemption | LoanSet | reject | `tecEXPIRED` | `8A09A988DD3C5433B30E92F5...` |
+
+## The row that is not a failure
+
+`Investment | LoanSet | succeed | tecNO_PERMISSION` is the twelfth attempt, and it is a
+finding rather than a broken test. The loan was legal by phase, on a funded
+closed-ended vault with a broker and cover in place. Its term simply landed inside the
+redemption buffer.
+
+Isolated by varying one thing, on a vault with a 900 second redemption window:
+
+| term | window remaining | result |
+|---|---|---|
+| 180 s | 888 s | `tesSUCCESS` |
+| 1200 s | 879 s | **`tecNO_PERMISSION`** |
+
+So `tecNO_PERMISSION` on `LoanSet` means *this loan would mature after the vault
+redeems* — the same code `LoanBrokerSet` returns when the vault is *open-ended rather
+than closed-ended*. Two unrelated causes, one code, no message distinguishing them.
+
+This inverts the question we started with. The issue is not that a confusing error is
+returned where a permission error belongs; it is that the permission error is
+**overloaded**, and a developer originating a loan cannot tell whether their vault is
+the wrong kind or their loan outlives it.
+
+## Why this matters for the report
+
+Three codes, sensibly assigned, and the phase model is coherent once you know it.
+The problem is that none of it is written down: `tecTOO_SOON` appears zero times in
+the XLS-65 withdrawal failure conditions in our snapshot, and "investment phase"
+matches nowhere in either specification. Every developer building an LP-facing
+interface has to discover the lockup empirically, as we did.
+
+And `tecNO_PERMISSION` carries two unrelated meanings on two different transactions
+in the same flow, which is the single cheapest thing on this list to fix.
