@@ -75,3 +75,4 @@ build/
 /tmp/
 .DS_Store
 Thumbs.db
+*.tar.gz
