@@ -99,9 +99,19 @@ export async function fetchBrokerHistory(xrpl, ownerAccount, brokerId) {
         coverBefore, coverAfter,
         coverConsumed: Decimal.max(0, coverBefore.minus(coverAfter)),
         principal: Decimal.max(0, debtBefore.minus(debtAfter)),
-        // The exposure the action was taken against. On an impairment this is the only
-        // figure the transaction actually tells you.
-        exposure: num(loanNode?.FinalFields?.PrincipalOutstanding),
+        // The exposure the action was taken against.
+        //
+        // On a DEFAULT the ledger deletes PrincipalOutstanding from the loan (finding
+        // L9: a defaulted loan drops four required fields), so FinalFields carries
+        // nothing and the obvious read returns zero. PreviousFields still holds what it
+        // was, and failing that the broker's book shed exactly that principal.
+        exposure: (() => {
+          const fin = num(loanNode?.FinalFields?.PrincipalOutstanding)
+          if (fin.gt(0)) return fin
+          const prev = num(loanNode?.PreviousFields?.PrincipalOutstanding)
+          if (prev.gt(0)) return prev
+          return Decimal.max(0, debtBefore.minus(debtAfter))
+        })(),
       })
     } else if (type === 'LoanBrokerCoverDeposit' || type === 'LoanBrokerCoverWithdraw') {
       events.push({
@@ -231,18 +241,18 @@ export function reputation(events, ordering, broker) {
 
   if (ordering.applicable) {
     const f = Number(ordering.fairness)
-    if (f < 0.25) { score -= 35; findings.push({ code: 'ORDERING_SELF_SERVING', detail: `Declared defaults in an order close to the one that minimises their own first-loss contribution (fairness ${ordering.fairness}). Cost depositors ${ordering.costToDepositors} drops versus the fair order.` }) }
-    else if (f < 0.75) { score -= 15; findings.push({ code: 'ORDERING_MIXED', detail: `Ordering sits between the fair and the self-serving sequence (fairness ${ordering.fairness}).` }) }
-    else findings.push({ code: 'ORDERING_FAIR', detail: `Declared in an order close to the one that maximises cover paid to depositors (fairness ${ordering.fairness}).` })
+    if (f < 0.25) { score -= 35; findings.push({ code: 'ORDERING_SELF_SERVING', detail: `Declared losses in an order close to the one that minimises their own first-loss contribution (sequence score ${ordering.fairness}). The choice cost investors ${(Number(ordering.costToDepositors) / 1e6).toFixed(6)} XRP against the fair order.` }) }
+    else if (f < 0.75) { score -= 15; findings.push({ code: 'ORDERING_MIXED', detail: `The sequence sits between the fair and the self-serving one (sequence score ${ordering.fairness}).` }) }
+    else findings.push({ code: 'ORDERING_FAIR', detail: `Declared in an order close to the one that maximises first-loss capital applied on investors' behalf (sequence score ${ordering.fairness}).` })
   }
 
   if (undeclaredDefaults > 0) {
     score -= 20 * undeclaredDefaults
-    findings.push({ code: 'DEFAULT_WITHOUT_IMPAIRMENT', detail: `${undeclaredDefaults} loan(s) went straight to default with no prior impairment, so the loss was never signalled before it was realised.` })
+    findings.push({ code: 'DEFAULT_WITHOUT_IMPAIRMENT', detail: `${undeclaredDefaults} exposure${undeclaredDefaults === 1 ? ' was' : 's were'} written off with no prior warning, so the loss was never signalled before it was taken.` })
   }
   if (withdrawals.length > 0) {
     score -= 10 * withdrawals.length
-    findings.push({ code: 'COVER_WITHDRAWN', detail: `${withdrawals.length} first-loss capital withdrawal(s) on record. Maple's v1 pool cover was drained by stakers ahead of a looming default; this is the same shape.` })
+    findings.push({ code: 'COVER_WITHDRAWN', detail: `${withdrawals.length} withdrawal${withdrawals.length === 1 ? '' : 's'} of first-loss capital on record. Cover taken out ahead of a deteriorating book is the shape that preceded the losses at Maple in 2022.` })
   }
   if (defaults.length === 0) findings.push({ code: 'NO_DEFAULTS', detail: 'No defaults declared in the retained history.' })
 
