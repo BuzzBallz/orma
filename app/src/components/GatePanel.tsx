@@ -24,7 +24,7 @@ export function GatePanel({ vault, phaseInfo, score }: {
       <div className="num" style={{ fontSize: 'var(--t-lg)', color: tone, letterSpacing: '0.02em' }}>{label}</div>
       <div className="caption">{detail}</div>
       <span className="spacer" />
-      <div className="row" style={{ gap: 10 }}>
+      <div className="row" style={{ gap: 12 }}>
         <span className="label">gating on</span>
         <Chip tone={gradeTone(score.grade)} large>{score.grade}</Chip>
         <span className="num mute">{score.gradeNumeric}</span>

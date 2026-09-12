@@ -17,7 +17,7 @@ export function AlertList({ alerts }: { alerts: Alert[] }) {
       {alerts.length === 0 ? (
         <div className="empty">no active alerts</div>
       ) : (
-        <div className="stack" style={{ gap: 10 }}>
+        <div className="stack" style={{ gap: 12 }}>
           {alerts.map((a, i) => {
             const tone = toneOf(a.severity)
             return (

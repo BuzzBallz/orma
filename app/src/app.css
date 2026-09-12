@@ -129,7 +129,6 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 .row-wrap{ display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .readings{ display: flex; align-items: flex-start; gap: 32px; }
 .spacer{ flex: 1 1 auto; }
-.rule{ width: 1px; align-self: stretch; background: var(--line); }
 
 @media (max-width: 1100px){ .col-1-7, .col-8-12 { grid-column: span 12; } }
 
@@ -143,7 +142,6 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 }
 .panel-title{ margin: 0 0 12px; }
 .caption{ font-size: var(--t-sm); color: var(--fg-dim); line-height: 1.5; }
-.dim{ color: var(--fg-dim); }
 .mute{ color: var(--fg-mute); }
 .empty{ color: var(--fg-mute); font-size: var(--t-sm); padding: 12px 0; }
 
@@ -227,7 +225,7 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
   display: flex; align-items: center;
   padding: 0 14px;
   font: 500 var(--t-xs)/1 var(--sans);
-  text-transform: uppercase; letter-spacing: 0.14em;
+  text-transform: uppercase; letter-spacing: 0.12em;
   color: var(--fg-mute);
   background: none; border: 0; cursor: pointer;
 }
@@ -383,8 +381,7 @@ kbd{
   background: var(--bg);
   padding: 8px 32px;
   display: flex; gap: 24px; flex-wrap: wrap;
-  letter-spacing: 0.1em;
-  color: var(--fg-mute);
+  color: var(--fg-mute);   /* tracking comes from the shared .label rule */
 }
 .hints .h{ display: inline-flex; align-items: center; gap: 7px; }
 .hints kbd{ letter-spacing: 0; }
@@ -400,7 +397,7 @@ kbd{
 }
 .picker:hover{ border-color: var(--fg-mute); }
 .picker:focus-within{ border-color: var(--accent); }
-.picker > .label{ letter-spacing: 0.14em; color: var(--fg-mute); }
+.picker > .label{ color: var(--fg-mute); }   /* tracking comes from .label */
 .picker-btn{
   display: flex; align-items: center; gap: 10px;
   height: 100%; padding: 0 10px 0 0; min-width: 0;   /* or the label cannot ellipsis */
@@ -515,7 +512,6 @@ tr.ghost:hover td > *{ transform: none; }
   .hints{ padding: 8px 16px; gap: 12px; }
   /* At this width nothing should be crushed into a column: let rows break. */
   .row{ flex-wrap: wrap; }
-  .rail .facts{ grid-template-columns: minmax(0, 1fr); gap: 0; }
 }
 
 /* S3 owns one viewport: trim the chrome on that route only. */
