@@ -1,127 +1,189 @@
 import type { IndexerRace } from '../lib/types'
 
 /**
- * The one screen that is not written for the credit analyst.
+ * Evidence: the one claim this product rests on, shown rather than argued.
  *
- * Every other screen in this app deliberately avoids vocabulary a rating analyst would
- * not meet in a credit note. This one is addressed to the protocol engineers reviewing
- * the work, so it uses the protocol's own words — field names, result codes, a
- * transaction hash — because paraphrasing them here would destroy the evidence.
+ * A recognised loss lands on the record as a field that was absent before. Absent fields
+ * are not in a change set, so a reader that diffs the metadata is handed nothing and
+ * reports nothing — while a fifth of the facility's value has gone. Re-reading the object
+ * finds it.
  *
- * WHAT IT SHOWS. Two readers consume the identical transaction. One diffs the metadata,
- * which is what an indexer does. The other re-reads the object, which is what this
- * product does. The metadata diff is empty, so the first reader reports nothing while a
- * fifth of the fund's value has gone.
- *
- * It is the reason the rest of the app exists, so it is one tab away from the rest of
- * the app rather than in a separate demo harness.
+ * The page is a credit page, not a laboratory: a thesis, three figures, a table of the
+ * fields that moved, and the raw record folded away underneath for anyone who wants to
+ * check the transcription. Everything on it comes from the capture; nothing is computed
+ * here, and a field the capture does not carry prints an em-dash.
  */
-export function Evidence({ d }: { d: IndexerRace | null }) {
-  if (!d) {
-    return (
-      <div className="stack">
-        <section className="panel">
-          <h2 className="panel-title">Verification</h2>
-          <p className="caption meth">No capture has been received.</p>
-        </section>
-      </div>
-    )
-  }
 
-  const prevKeys = Object.keys(d.vaultNode.previousFields ?? {})
-  const empty = prevKeys.length === 0
-  const before = d.vaultNode.healthyBefore
-  const live = Boolean(d.capturedAt)
+/**
+ * The protocol documentation. It sits on this desk and nowhere else: it is written for
+ * the same reader this screen is, it leaves the application, and a credit analyst reading
+ * a rating note has no use for it in their chrome. Overridable so a preview build can
+ * point at a local copy.
+ */
+const DOCS_URL = import.meta.env.VITE_DOCS_URL
+  ?? 'https://frytegg.github.io/orma/'
+
+function DocsLink() {
+  return (
+    <a className="docs-link" href={DOCS_URL} target="_blank" rel="noreferrer noopener">
+      Protocol documentation
+      <svg viewBox="0 0 12 12" aria-hidden="true">
+        <path d="M4.5 2.5h5v5M9.5 2.5 4 8M8 9.5H2.5V4" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </a>
+  )
+}
+
+/** Only what a value needs to be legible in a column. Never reformats the digits. */
+function cell(v: unknown): string {
+  if (v === null || v === undefined || v === '') return '—'
+  return String(v)
+}
+
+/**
+ * The same page, with nothing in it.
+ *
+ * A record that has not arrived used to collapse this desk to one sentence in a panel,
+ * which told a reader nothing about what would be there when it did. The claim, the three
+ * figures and the table are the page; withheld, they read em-dash. The figures are the
+ * only three slots on this desk and they are held open whether or not the capture is in.
+ */
+function EvidenceSkeleton({ name }: { name?: string }) {
+  return (
+    <div className="stack">
+      <section className="panel ev">
+        <header className="ev-head">
+          <span className="label">Evidence</span>
+          <h2 className="ev-title">{name ?? 'Recognised loss'}</h2>
+          <p className="ev-thesis">
+            The first recognised loss does not show up on a metadata diff.
+          </p>
+        </header>
+
+        <div className="ev-band">
+          {['Reported', 'Held', 'Gap'].map(k => (
+            <div className="ev-fig" key={k}>
+              <span className="label">{k}</span>
+              <b className="ev-num ev-reported">—</b>
+            </div>
+          ))}
+        </div>
+        <p className="ev-under">No record has been received.</p>
+
+        <table className="tbl ev-tbl">
+          <thead>
+            <tr><th>Field</th><th>Before</th><th>After</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td className="ev-field">—</td>
+              <td className="ev-before">—</td>
+              <td className="rt ev-after">—</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div className="ev-prov">
+          <span className="label">Recorded</span>
+          <code>—</code>
+          <span className="spacer" />
+          <DocsLink />
+        </div>
+      </section>
+    </div>
+  )
+}
+
+export function Evidence({ d, name }: { d: IndexerRace | null; name?: string }) {
+  if (!d) return <EvidenceSkeleton name={name} />
+
+  const prev = d.vaultNode.previousFields ?? {}
+  const final = d.vaultNode.finalFields ?? {}
+  // The union, in the order the record presents it: every field the capture mentions gets
+  // a line, whether or not the change set admitted to it.
+  const fields = [...new Set([...Object.keys(final), ...Object.keys(prev)])]
+  const gap = d.readings.divergenceBps
+  const raw = JSON.stringify(prev, null, 2)
+  const rawFinal = JSON.stringify(final, null, 2)
 
   return (
     <div className="stack">
-      <section className="panel">
-        <h2 className="panel-title">What the two readers see</h2>
-        <p className="caption meth">{d.finding}</p>
-
-        <div className="race">
-          <div className="race-pane race-naive">
-            <div className="race-hd">Reader A — diffs the metadata</div>
-            <div className="race-val">{d.readings.naive.value}</div>
-            <div className="race-formula">{d.readings.naive.formula}</div>
-            <div className="race-note">Reports no change</div>
-          </div>
-          <div className="race-pane race-correct">
-            <div className="race-hd">Reader B — re-reads the object</div>
-            <div className="race-val">{d.readings.correct.value}</div>
-            <div className="race-formula">{d.readings.correct.formula}</div>
-            <div className="race-note">Reports the loss</div>
-          </div>
-        </div>
-
-        <div className="race-gap">
-          <b>{d.readings.divergenceBps.toLocaleString()} bp</b> apart, on the same transaction,
-          from the same ledger.
-        </div>
-      </section>
-
-      {/* The only text on this screen that must be legible from the back of a room. */}
-      <section className="panel">
-        <h2 className="panel-title">The metadata, unedited</h2>
-        <p className="caption meth">{d.why}</p>
-        <div className="ev-diff">
-          <div className="ev-lbl">PreviousFields</div>
-          <pre className={'ev-code' + (empty ? ' ev-empty' : '')}>
-            {JSON.stringify(d.vaultNode.previousFields ?? {}, null, 2)}
-          </pre>
-          <div className="ev-lbl">FinalFields</div>
-          <pre className="ev-code">{JSON.stringify(d.vaultNode.finalFields, null, 2)}</pre>
-        </div>
-        {empty && (
-          <p className="caption meth ev-verdict">
-            The change set is empty. Everything a metadata-diffing reader is given about this
-            vault, for this transaction, is on the left.
+      <section className="panel ev">
+        <header className="ev-head">
+          <span className="label">Evidence</span>
+          <h2 className="ev-title">{name ?? 'Recognised loss'}</h2>
+          <p className="ev-thesis">
+            The first recognised loss does not show up on a metadata diff.
           </p>
-        )}
-      </section>
+        </header>
 
-      {before && (
-        <section className="panel">
-          <h2 className="panel-title">And it was healthy a moment earlier</h2>
-          <p className="caption meth">
-            Read directly from the object before the transaction. Without this, an empty change
-            set is ambiguous — it could mean nothing moved. It did not mean that.
-          </p>
-          <table className="op-tbl" style={{ marginTop: 12 }}>
-            <thead><tr><th>Field</th><th>Before</th><th>After</th></tr></thead>
-            <tbody>
-              {Object.keys(d.vaultNode.finalFields).map(k => (
-                <tr key={k}>
-                  <td><b>{k}</b></td>
-                  <td className="op-says">{before[k] ?? '—'}</td>
-                  <td className="op-says">{d.vaultNode.finalFields[k]}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      )}
+        {/* The hero: three figures, set like the blotter sets figures. The gap is the only
+            thing on this page allowed a colour, and only when there is a gap to report. */}
+        <div className="ev-band">
+          <div className="ev-fig">
+            <span className="label">Reported</span>
+            <b className="ev-num ev-reported">{cell(d.readings.naive.value)}</b>
+          </div>
+          <div className="ev-fig">
+            <span className="label">Held</span>
+            <b className="ev-num ev-held">{cell(d.readings.correct.value)}</b>
+          </div>
+          <div className="ev-fig">
+            <span className="label">Gap</span>
+            <b className={'ev-num' + (gap > 0 ? ' ev-gap' : '')}>
+              {gap.toLocaleString('en-US').replace(/,/g, ' ')} bp
+            </b>
+          </div>
+        </div>
+        <p className="ev-under">Same transaction, same record.</p>
 
-      <section className="panel">
-        <h2 className="panel-title">Provenance</h2>
-        <table className="op-tbl">
+        <table className="tbl ev-tbl">
+          <thead>
+            <tr>
+              <th>Field</th>
+              <th>Before</th>
+              <th>After</th>
+            </tr>
+          </thead>
           <tbody>
-            <tr><td><b>Result</b></td><td className="op-says">{d.transactionResult}</td></tr>
-            {d.transactionHash && (
-              <tr><td><b>Transaction</b></td><td className="op-says ev-hash">{d.transactionHash}</td></tr>
-            )}
-            {d.vaultId && <tr><td><b>Vault</b></td><td className="op-says ev-hash">{d.vaultId}</td></tr>}
-            {d.buildVersion && <tr><td><b>rippled</b></td><td className="op-says">{d.buildVersion}</td></tr>}
-            {d.capturedAt && <tr><td><b>Captured</b></td><td className="op-says">{d.capturedAt}</td></tr>}
-            {d.capturedDuring && <tr><td><b>During</b></td><td className="op-says">{d.capturedDuring}</td></tr>}
+            {fields.map(k => (
+              <tr key={k}>
+                <td className="ev-field">{k}</td>
+                {/* An absent "before" is the finding, so it is stated the way every other
+                    absent figure in this product is stated: an em-dash. */}
+                <td className="ev-before">{cell(prev[k as keyof typeof prev])}</td>
+                <td className="rt ev-after">{cell(final[k])}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
-        {!live && (
-          <p className="caption meth ev-verdict">
-            This is the archived capture. Re-run the capture to replace it with one taken on
-            the current build.
-          </p>
-        )}
+
+        <p className="ev-formula">{d.readings.correct.formula}</p>
+
+        <div className="ev-prov">
+          <span className="label">Recorded</span>
+          <code>{d.transactionResult}</code>
+          {d.transactionHash && <code className="ev-hash">{d.transactionHash}</code>}
+          {d.capturedAt && <code>{d.capturedAt}</code>}
+          <span className="spacer" />
+          <DocsLink />
+        </div>
+
+        {/* Folded by default. The transcription above is the argument; this is the receipt,
+            and a receipt does not need to be open to be a receipt. */}
+        <details className="ev-raw">
+          <summary>Record</summary>
+          <div className="ev-raw-body">
+            <div className="ev-raw-col">
+              <span className="label">PreviousFields</span>
+              <pre>{raw}</pre>
+            </div>
+            <div className="ev-raw-col">
+              <span className="label">FinalFields</span>
+              <pre>{rawFinal}</pre>
+            </div>
+          </div>
+        </details>
       </section>
     </div>
   )

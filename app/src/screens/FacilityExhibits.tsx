@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react'
 import type { BrokerHistory, Collateral } from '../lib/types'
-import { Chip } from '../components/Chip'
-import { gradeTone } from '../lib/grades'
+import { GradeLetter } from '../components/GradeLetter'
 import { dropsToXrp, fmtIso, short } from '../lib/format'
 
 /**
@@ -54,9 +53,9 @@ export function ManagerConduct({ h }: { h: BrokerHistory | null }) {
   return (
     <Section title="Exhibit 3 · Manager conduct">
       <div className="kv" style={{ marginBottom: 12 }}>
-        <dt className="label">Conduct assessment</dt>
+        <dt className="label">Conduct Assessment</dt>
         <dd className="num">
-          <Chip tone={gradeTone(rep.grade)}>{rep.grade}</Chip> {rep.score} / 100
+          <GradeLetter grade={rep.grade} /> {rep.score} / 100
         </dd>
       </div>
 

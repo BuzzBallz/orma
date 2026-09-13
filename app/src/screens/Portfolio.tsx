@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { RotateCcw } from 'lucide-react'
 import type { VaultRow } from '../lib/types'
-import { Chip } from '../components/Chip'
+import { GradeLetter } from '../components/GradeLetter'
 import { Countdown } from '../components/Countdown'
 import { gradeTone, gradeIndex, GRADE_LADDER } from '../lib/grades'
 import { useFlash } from '../lib/useFlash'
@@ -28,8 +28,6 @@ function gapTone(bps: number): string | undefined {
   return 'var(--bad)'
 }
 
-const SLOTS = [1, 2, 3, 4, 5]
-
 function Th({ k, label, rt, sort, onSort }: {
   k: SortKey; label: string; rt?: boolean; sort: Sort; onSort: (k: SortKey) => void
 }) {
@@ -43,28 +41,6 @@ function Th({ k, label, rt, sort, onSort }: {
       onClick={() => onSort(k)}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSort(k) } }}
     >{label}{on && <span className="ord">{sort.asc ? '▲' : '▼'}</span>}</TableHead>
-  )
-}
-
-/** A line held open for a facility we have not been sent figures for. */
-function EmptyRow({ n, onOpen }: { n: number; onOpen: () => void }) {
-  return (
-    <TableRow
-      className="ghost" tabIndex={0} style={{ cursor: 'pointer' }}
-      aria-label={`facility slot ${n}, figures withheld`}
-      onClick={onOpen}
-      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
-    >
-      <TableCell>
-        <span className="inst">
-          <span className="name mute">Facility {n}</span>
-          <span className="id">figures withheld</span>
-        </span>
-      </TableCell>
-      <TableCell className="num mute">—</TableCell>
-      <TableCell className="rt num mute">—</TableCell>
-      <TableCell className="rt num mute">—</TableCell>
-    </TableRow>
   )
 }
 
@@ -92,7 +68,7 @@ function Row({ v, i, receivedAt, tick, onOpen }: {
       </TableCell>
       <TableCell>
         <Tooltip>
-          <TooltipTrigger asChild><span><Chip tone={gradeTone(v.grade)}>{v.grade}</Chip></span></TooltipTrigger>
+          <TooltipTrigger asChild><span><GradeLetter grade={v.grade} /></span></TooltipTrigger>
           <TooltipContent className="tip" side="right">
             <b>{v.grade}</b> — step {gradeIndex(v.grade) + 1} of {GRADE_LADDER.length} on the
             internal scale. AAA is the strongest, D the weakest. The portfolio is ordered
@@ -122,10 +98,8 @@ function Row({ v, i, receivedAt, tick, onOpen }: {
  * committee reads the worst name first, and the gap between reported and held value is
  * the reason this note exists.
  */
-export function Portfolio({ vaults, receivedAt, tick, stamp, status, onOpen }: {
+export function Portfolio({ vaults, receivedAt, tick, onOpen }: {
   vaults: VaultRow[]; receivedAt: number; tick: number
-  stamp?: { ledgerIndex: number; serverTime: string }
-  status?: { ageMs: number; fails: number; error: string | null; railOnScreen?: boolean }
   onOpen: (vaultId: string) => void
 }) {
   const withheld = vaults.length === 0
@@ -148,13 +122,13 @@ export function Portfolio({ vaults, receivedAt, tick, stamp, status, onOpen }: {
   return (
     <section className="panel blotter">
       <div className="row" style={{ marginBottom: 16, alignItems: 'baseline' }}>
-        <h2 className="panel-title" style={{ margin: 0 }}>portfolio</h2>
+        <h2 className="panel-title" style={{ margin: 0 }}>Portfolio</h2>
         <span className="num mute" style={{ fontSize: 'var(--t-xs)' }}>
-          {withheld ? 'figures withheld · weakest first' : `${vaults.length} facilities · weakest first`}
+          {withheld ? '' : `${vaults.length} Facilities · Weakest First`}
         </span>
         {sorted && (
           <Button variant="ghost" size="xs" className="btn-term" onClick={() => setSort(DEFAULT_SORT)}>
-            <RotateCcw size={11} strokeWidth={2.25} /> weakest first
+            <RotateCcw size={11} strokeWidth={2.25} /> Weakest First
           </Button>
         )}
         <span className="spacer" />
@@ -164,45 +138,50 @@ export function Portfolio({ vaults, receivedAt, tick, stamp, status, onOpen }: {
         <Table className="tbl">
           <TableHeader>
             {withheld ? (
+              /* The same six columns as a populated blotter. A withheld table that drops
+                 to four reads as a different document, and the reader is left wondering
+                 what the other two said. Same shape, nothing in it. */
               <TableRow>
-                <TableHead>facility</TableHead>
-                <TableHead>internal score</TableHead>
-                <TableHead className="rt">reported vs held</TableHead>
-                <TableHead className="rt">outlook</TableHead>
+                <TableHead>Facility</TableHead>
+                <TableHead>Internal Score</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="rt">Reported vs Held</TableHead>
+                <TableHead className="rt">Next Event</TableHead>
+                <TableHead>Outlook</TableHead>
               </TableRow>
             ) : (
               <TableRow>
-                <Th k="label" label="facility" sort={sort} onSort={toggle} />
-                <Th k="gradeNumeric" label="internal score" sort={sort} onSort={toggle} />
-                <Th k="phase" label="status" sort={sort} onSort={toggle} />
-                <Th k="navDivergenceBps" label="reported vs held" rt sort={sort} onSort={toggle} />
-                <Th k="secondsToRedemption" label="next event" rt sort={sort} onSort={toggle} />
-                <Th k="trend" label="outlook" sort={sort} onSort={toggle} />
+                <Th k="label" label="Facility" sort={sort} onSort={toggle} />
+                <Th k="gradeNumeric" label="Internal Score" sort={sort} onSort={toggle} />
+                <Th k="phase" label="Status" sort={sort} onSort={toggle} />
+                <Th k="navDivergenceBps" label="Reported vs Held" rt sort={sort} onSort={toggle} />
+                <Th k="secondsToRedemption" label="Next Event" rt sort={sort} onSort={toggle} />
+                <Th k="trend" label="Outlook" sort={sort} onSort={toggle} />
               </TableRow>
             )}
           </TableHeader>
           <TableBody>
-            {withheld
-              ? SLOTS.map(n => <EmptyRow key={n} n={n} onOpen={() => onOpen('')} />)
-              : rows.map((v, i) => (
-                <Row key={v.vaultId} v={v} i={i} receivedAt={receivedAt} tick={tick} onOpen={onOpen} />
-              ))}
+            {rows.map((v, i) => (
+              <Row key={v.vaultId} v={v} i={i} receivedAt={receivedAt} tick={tick} onOpen={onOpen} />
+            ))}
           </TableBody>
         </Table>
       </div>
 
-      <p className="caption blotter-say">
-        Reported value is what the facility states; held value is what it owns once a
-        recognised loss is taken off.
-      </p>
-
-      <div className="tbl-fill" aria-hidden />
-
-      {!stamp && !status?.railOnScreen && (
-        <div className="readstamp">
-          <span className="label">status</span> <b>figures withheld</b>
-        </div>
+      {/* No roster, no rows. The blotter used to hold five lines open, captioned
+          "Facility 1" through "Facility 5" — a number nobody had sent, on a screen whose
+          whole argument is that a reported figure and a held figure are not the same
+          thing. The columns stay, so a reader can see the shape figures arrive into, and
+          the line below says what is true: nothing is on file yet. */}
+      {withheld ? (
+        <p className="caption blotter-say">No facility is on file yet.</p>
+      ) : (
+        <p className="caption blotter-say">
+          Reported value is what the facility states; held value is what it owns once a
+          recognised loss is taken off.
+        </p>
       )}
+
     </section>
   )
 }

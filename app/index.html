@@ -3,9 +3,36 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Added to a home screen the page had no icon of its own; iOS would have
+         screenshotted the page instead. Full-bleed square on the brand ground —
+         Apple rounds the corners itself, so rounding them here would double up. -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Orma — credit opinions</title>
     <meta name="description" content="Internal credit scores and opinions on lending facilities, from figures supplied by the calculation agent." />
+
+    <!-- The card this link unfurls into.
+         Pasted into a chat window the link showed nothing at all, which is the first thing
+         anyone sees of the product and the one view we had left blank.
+         __SITE_ORIGIN__ is stamped at build time by the plugin in vite.config.ts: a
+         scraper fetches og:image with no page to resolve a relative path against, so the
+         URL has to be absolute — and since every preview deploy has its own hostname, the
+         deployment supplies its own rather than us hard-coding one that would be right on
+         exactly one of them. -->
+    <meta property="og:url" content="__SITE_ORIGIN__/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Orma" />
+    <meta property="og:title" content="Orma — credit opinions" />
+    <meta property="og:description" content="Internal credit scores and opinions on lending facilities, from figures supplied by the calculation agent." />
+    <meta property="og:image" content="__SITE_ORIGIN__/assets/og-card.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Orma — credit opinions on lending facilities, over the twenty-step internal scale from AAA to D." />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Orma — credit opinions" />
+    <meta name="twitter:description" content="Internal credit scores and opinions on lending facilities." />
+    <meta name="twitter:image" content="__SITE_ORIGIN__/assets/og-card.png" />
+    <meta name="theme-color" content="#0A0B0E" />
   </head>
   <body>
     <div id="root"></div>
