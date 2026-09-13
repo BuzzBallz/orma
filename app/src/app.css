@@ -23,6 +23,15 @@
   font-family: "Plex Mono"; font-style: normal; font-weight: 500;
   font-display: swap; src: url("/assets/fonts/plex-mono-500.woff2") format("woff2");
 }
+/* One serif, one weight, one job: the summary paragraphs of a credit opinion.
+   A rating note is read as prose for a minute at a time and the rest of this surface is a
+   terminal — mono figures, sans labels. Setting the two or three paragraphs that are
+   actually argument in a serif is the difference between reading a note and scanning a
+   dashboard. Not the family: 15 kB, weight 400, latin, and it is used nowhere else. */
+@font-face{
+  font-family: "Plex Serif"; font-style: normal; font-weight: 400;
+  font-display: swap; src: url("/assets/fonts/plex-serif-400.woff2") format("woff2");
+}
 /* The wordmark asks for 600 and nothing else does. Without this face the browser
    synthesised the weight — a faux bold, smeared differently by every engine, on the one
    word in the product that has to look the same on the presenter's Mac and on a juror's
@@ -91,6 +100,7 @@
 
   --mono: "Plex Mono", ui-monospace, "SF Mono", Consolas, Menlo, monospace;
   --sans: "Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --serif: "Plex Serif", Georgia, "Times New Roman", serif;
 
   --t-hero: 96px;
   --t-xxl:  72px;
@@ -195,12 +205,12 @@ body{
 
 /* Grain. A locally generated 128px tile at 5% — enough to stop the flats reading as a
    render, not enough to be a texture you notice. It rides the veil rather than body::after
-   so it mounts on idle with the rest of the dressing: noise.png (16 KB) is never fetched
+   so it mounts on idle with the rest of the dressing: paper.png (28 KB) is never fetched
    while the first paint is happening. */
 .veil-grain{
   position: fixed; inset: 0; z-index: 100; pointer-events: none;
-  background-image: url('/assets/noise.png'); background-size: 128px 128px;
-  opacity: .035;
+  background-image: url('/assets/paper.png'); background-size: 280px 210px;
+  opacity: .055;
 }
 
 /* ---------- the ground ----------
@@ -858,6 +868,67 @@ kbd{
 .meth-note{ margin-top: 12px; color: var(--fg-mute); font-size: var(--t-xs); }
 
 /* ---------- print: two A4 pages, black on white ---------- */
+
+/* ============================================================================
+   THE RULE SYSTEM — one rule per surface, and most surfaces get none
+
+   Nineteen closed boxes were on the credit opinion at once: the sheet, seven boxes
+   inside the sheet, ten chips. Every one of them 1px, every one the same tone, every
+   one the same radius. That is a grid, and a grid is what makes a page read as
+   generated rather than typeset. A panel is a lighter ground under a shadow; the frame
+   was saying nothing the ground was not already saying.
+
+   THE TEST. Turn off every box-shadow. If a chequerboard of rectangles is still
+   visible, there are too many rules left.
+   ============================================================================ */
+
+.panel, .op-page, .op-box{ border: none; }
+
+/* The boxes in the margin keep their edge as a tone, not a line: a shade lighter than
+   the sheet they sit on, which separates them without drawing anything. */
+.op-box{ background: color-mix(in srgb, var(--fg) 3%, transparent); }
+
+/* THE ONE HAIRLINE: the head of a note.
+   Drawn as a pseudo-element scaled to half a device pixel, so it reads as a rule laid on
+   the page rather than as the top edge of a container. A 1px border at this weight looks
+   like a box that lost three sides; this looks like a rule. */
+.op-top{ border-bottom: none; position: relative; padding-bottom: 16px; }
+.op-top::after{
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0;
+  height: 1px; background: var(--line-2);
+  transform: scaleY(0.5); transform-origin: 0 100%;
+}
+
+/* The margin boxes lose their internal rule; space does that work. */
+.op-box > .label{ border-bottom: none; padding-bottom: 4px; margin-bottom: 8px; }
+
+/* Row separators only, and only where rows are being compared. */
+.kv + .kv{ border-top-color: var(--rule-soft); }
+
+/* Controls: barely there at rest, definite on focus. A control that is outlined all the
+   time is competing with the figures; one that is outlined only when it has the keyboard
+   is answering a question the reader just asked. */
+.picker-btn, .btn-term{ border: 1px solid transparent; border-radius: var(--r-ctl); }
+.picker:hover .picker-btn{ border-color: var(--rule-soft); }
+.picker-btn:focus-visible, .btn-term:focus-visible{ border-color: var(--line-2); }
+
+
+/* ---------- the summary reads as prose ----------
+   Only the summary. Everything else on this page is a figure, a label or a column, and
+   those stay in the mono and the sans they were set in. A measure of about 62 characters
+   is the width a paragraph is comfortable at; wider and the eye loses the line it is on. */
+[data-sec="summary"] p{
+  font: 400 16.5px/1.55 var(--serif);
+  max-width: 62ch;
+  color: var(--fg-dim);
+  letter-spacing: 0;
+}
+[data-sec="summary"] p + p{ margin-top: 0.85em; }
+
+/* Figures line up in columns whatever digits they carry. */
+.num, .rt, .kv dd, table.tbl td, .ladder-read{ font-variant-numeric: tabular-nums; }
+.label, .op-h, table.tbl th{ font-size: var(--t-sm); }
+
 @media print{
   @page{ size: A4 portrait; margin: 14mm 13mm; }
 

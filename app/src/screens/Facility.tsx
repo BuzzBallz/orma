@@ -83,8 +83,10 @@ export function Ladder({ grade }: { grade?: string | null }) {
 }
 
 function Section({ title, children, tight }: { title: string; children: ReactNode; tight?: boolean }) {
+  // The section names itself so the stylesheet can treat one of them differently without
+  // a second class threaded through every call site. Only "summary" is styled off this.
   return (
-    <section className={'op-sec' + (tight ? ' tight' : '')}>
+    <section className={'op-sec' + (tight ? ' tight' : '')} data-sec={title.toLowerCase()}>
       <h3 className="op-h">{title}</h3>
       {children}
     </section>
