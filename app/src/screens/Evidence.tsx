@@ -21,7 +21,7 @@ import type { IndexerRace } from '../lib/types'
  * point at a local copy.
  */
 const DOCS_URL = import.meta.env.VITE_DOCS_URL
-  ?? 'https://ormaprotocol.mintlify.site/'
+  ?? 'https://frytegg.github.io/orma/'
 
 function DocsLink() {
   return (
