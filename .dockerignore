@@ -1,0 +1,7 @@
+# Allow-list, not a deny-list: the build context is only what the image copies. Everything
+# else stays out, above all .env and .demo-keys.json, which hold Devnet seeds.
+*
+!package.json
+!package-lock.json
+!src/**
+!demo/**

@@ -316,6 +316,39 @@ GET  /api/mpt/:mptIssuanceId/nav          # CORS-open: called by a party with no
 GET  /api/mpt/:mptIssuanceId/resolve      # CORS-open
 ```
 
+### Deploying
+
+The backend is a long-running process, a 4-second reader over a WebSocket, so it runs as a container. The
+frontend is static and runs on Vercel.
+
+**Backend.** `Dockerfile` and `railway.json` are at the root. On Railway, create a service from this
+repository: it builds the image, sets `PORT` and health-checks `/api/health`. Then generate a public domain
+for the service. Any other Docker host works the same way:
+
+```bash
+docker build -t orma-api . && docker run -p 8787:8787 orma-api
+```
+
+| Variable | Required | What it does |
+|---|---|---|
+| `PORT` | set by the platform | The port the API listens on, 8787 by default. |
+| `XRPL_WS` | no | Devnet WebSocket, `wss://s.devnet.rippletest.net:51233` by default. |
+| `PUBLISH_SEED` | no | Publishes the score as XLS-47 Oracle objects from that account. Set it on **one** running instance only: two processes publishing from the same account race each other for sequence numbers. Without it, every figure is still served and the oracle field reads `null`. |
+| `DEMO_KEY` | no | Opens the operator routes to requests carrying a matching `x-demo-key`. Without it they answer loopback only, which in a container means nobody. |
+| `VAULTS` | no | Comma-separated vault ids, overriding the facilities discovered in `demo/`. |
+
+**Frontend.** Import the repository into Vercel with **Root Directory `app`**; `app/vercel.json` already
+sets the Vite build and the single-page rewrite.
+
+| Variable | Value |
+|---|---|
+| `VITE_API_BASE` | The backend's public URL. It must be `https://`: an https page cannot call http. |
+| `VITE_XRPL_NETWORK` | `devnet` |
+| `VITE_DOCS_URL` | Optional. Defaults to https://ormaprotocol.mintlify.site/. |
+
+`VITE_` variables are inlined into the bundle at build time, so changing one needs a redeploy, and no
+secret may ever be one.
+
 ---
 
 ## Repository map
