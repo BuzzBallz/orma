@@ -47,7 +47,7 @@ During the lock-up the depositor watches the vault get worse, and cannot leave. 
 - Let it gate capital.
 
 ### notes
-Those two numbers, three pillars. // A reader that sees what the vault's own reporting does not. // A score published as a native XRPL object, so anyone can disagree with us on the ledger. // And a grade that gates capital, through a Permissioned Domain.
+Nobody can read it from outside. So we read it. // A reader that sees what the vault's own reporting does not. // A score published as a native XRPL object, so anyone can disagree with us on the ledger. // And a grade that gates capital, through a Permissioned Domain.
 
 One thing before the demo. The state is pre-baked: real Devnet transactions, from before this talk. Every number you see is read live. The two deposits at the end are signed live, in front of you.
 

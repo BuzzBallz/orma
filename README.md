@@ -252,9 +252,9 @@ was read from live Devnet during the event, and every claim carries a transactio
 
 ### `documentation/`
 
-The protocol documentation, ten pages of Mintlify MDX plus its configuration. `build.mjs` renders the same
-source into a static site and `deploy.sh` publishes it, so the pages live at
-https://frytegg.github.io/orma/ without a Mintlify account.
+The protocol documentation, ten pages of Mintlify MDX plus its configuration. It is published at
+https://ormaprotocol.mintlify.site/. `build.mjs` renders the same source into a static site and
+`deploy.sh` publishes that to GitHub Pages, so the pages survive the loss of the Mintlify account.
 
 ### `deck/`
 

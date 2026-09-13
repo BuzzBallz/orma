@@ -43,7 +43,7 @@
       {
         "group": "Build on it",
         "pages": [
-          "pages/api-reference",
+          "pages/http-api",
           "pages/ai-agents"
         ]
       },
