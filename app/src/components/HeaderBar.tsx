@@ -30,7 +30,7 @@ function StatusBadge({ health, unreachable }: { health: Health | null; unreachab
 // reaches for.
 /** Protocol documentation. Overridable so a preview build can point at its own copy. */
 const DOCS_URL = import.meta.env.VITE_DOCS_URL
-  ?? 'https://frytegg.github.io/xrpl-vault-fragility-oracle/'
+  ?? 'https://frytegg.github.io/orma/'
 
 const DESKS: [RoutePath, string][] = [
   ['/', 'Portfolio'], ['/facility', 'Facility'], ['/event', 'Event'], ['/methodology', 'Methodology'],

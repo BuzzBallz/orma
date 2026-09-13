@@ -168,7 +168,7 @@ One pull request: the tutorial, green on rc5. // Reproductions onto four existin
 
 ### on screen
 - **Orma**
-- **github.com/frytegg/xrpl-vault-fragility-oracle**
+- **github.com/frytegg/orma**
 - Track 2 · Loaded · Devnet · rippled 3.4.0-rc5 · xrpl 5.2.0 · Node 24.13.0
 - DevEx: `tender-gopher-21` · `<second pseudonym: read from Andrea's .xrpl-devex/identity.json>`
 

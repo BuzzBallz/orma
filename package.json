@@ -1,5 +1,5 @@
 {
-  "name": "xrpl-vault-fragility-oracle",
+  "name": "orma",
   "private": true,
   "type": "module",
   "version": "0.1.0",
