@@ -19,6 +19,19 @@ failure.
   frontend gets to make, and an imitation of it would be worse. This is two readings of
   one quantity — dashed and low, solid and true — which is the product in three strokes.
 
+## og-card.png
+
+- 1200x630, 25 kB, the card a pasted link unfurls into. Before it existed the link showed
+  a blank card in Slack, Discord and WhatsApp, which is the first thing most people see of
+  the product.
+- Composed locally from parts already in this folder: `mark.svg` rasterised by rsvg-convert
+  for the sigil, and IBM Plex Mono SemiBold for the type, so it carries the same mark and
+  the same letterforms as the topbar rather than an approximation of them.
+- The strip along the bottom is the twenty-step internal scale the credit opinion now
+  draws, marked at the same notch. Same motif, same meaning, two places.
+- Referenced from `index.html` by a **relative** path. Every preview deploy has its own
+  hostname, so an absolute og:image would be right on exactly one of them.
+
 ## fonts/
 
 Self-hosted, committed, served from this origin. **No Google Fonts request at runtime** —
@@ -31,6 +44,7 @@ fail on venue wifi.
 | `plex-sans-var.woff2` | IBM Plex Sans, variable 400–600, latin subset | 40 kB |
 | `plex-mono-400.woff2` | IBM Plex Mono 400, latin subset | 10 kB |
 | `plex-mono-500.woff2` | IBM Plex Mono 500, latin subset | 10 kB |
+| `plex-mono-600.woff2` | IBM Plex Mono 600, latin subset — the wordmark only | 10 kB |
 
 - Family: **IBM Plex** — drawn for technical and enterprise interfaces, with real tabular
   figures in the mono. Picked over Inter precisely because Inter is the default that makes
@@ -38,6 +52,10 @@ fail on venue wifi.
 - Licence: **SIL Open Font License 1.1** — https://github.com/IBM/plex/blob/master/LICENSE.txt
   Redistribution inside a project is exactly what the OFL is for.
 - Source of these binaries: the latin subsets Google Fonts serves for IBM Plex
-  (fonts.gstatic.com), downloaded once and committed. 60 kB for all three.
+  (fonts.gstatic.com), downloaded once and committed. 70 kB for all four.
+- `plex-mono-600.woff2` exists for one word. `.brand` sets the wordmark in Plex Mono 600
+  and no other rule asks for that weight; without the face the browser synthesised it,
+  and a synthesised bold is drawn differently by each engine. The brand name is the one
+  thing that must not change shape between the presenter's machine and a juror's.
 - `font-display: swap` with the system stack as the fallback, so the screen paints on the
   first frame either way.
