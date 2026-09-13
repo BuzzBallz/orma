@@ -225,7 +225,7 @@ And what we give back. // The documented first hour cannot complete — we wrote
 - **40 findings** · a three-page report, a thirty-three-page register
 - **Six developer-experience reports**, sent while we were building
 - A fix for the tutorial that does not run. **It runs.**
-- github.com/frytegg/orma
+- github.com/BuzzBallz/orma
 
 ### notes
 The mark, the way it opened, and under it the only list in the talk.
