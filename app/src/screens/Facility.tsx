@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { BrokerHistory, Collateral, Gate, Resolution, VaultDetail } from '../lib/types'
 import { Chip } from '../components/Chip'
-import { GRADE_LADDER, gradeIndex, gradeTone } from '../lib/grades'
+import { GRADE_LADDER, gradeFill, gradeIndex, gradeTone } from '../lib/grades'
 import { bpsToPct, dropsToXrp, duration, fmtIso, ratioToPct, rateToPct } from '../lib/format'
 import { creditText, facilityName, facilityRef, factorRows, outlookOf, splitFactors } from '../lib/credit'
 import { ManagerConduct, PledgedCollateral } from './FacilityExhibits'
@@ -27,32 +27,57 @@ function F({ k, v, note }: { k: string; v: ReactNode; note?: string }) {
  *
  * The unmarked notches are deliberately uncoloured. A twenty-step colour ramp would be a
  * chart of nothing — the tone belongs to this facility's own step, which is the only place
- * in the strip that carries a judgement. Position comes from `gradeIndex`, which reads the
- * grade the backend sent; nothing here is interpolated or invented.
+ * in the strip that carries a judgement.
+ *
+ * With no grade on file the strip still draws, every notch extinguished and the reading an
+ * em-dash. An empty scale is a true statement; a scale with a notch lit somewhere plausible
+ * would be a figure nobody sent.
  */
-function Ladder({ grade }: { grade: string }) {
-  const i = gradeIndex(grade)
-  if (i < 0) return null
+export function Ladder({ grade }: { grade?: string | null }) {
+  const i = grade ? gradeIndex(grade) : -1
+  const known = i >= 0
+  // gradeFill() is the payload's own position on the scale, 1.0 at AAA and 0.0 at D. It
+  // is what places the marker; nothing here interpolates, and an unknown grade places
+  // nothing at all rather than defaulting to a notch the backend never sent.
+  const fill = known ? gradeFill(GRADE_LADDER[i]) : null
+  const N = GRADE_LADDER.length
+  const W = 240, GAP = 2.2
+  const nw = (W - GAP * (N - 1)) / N
+  const x = (n: number) => n * (nw + GAP)
+
   return (
-    <div
-      className="ladder"
-      role="img"
-      aria-label={`${grade}: step ${i + 1} of ${GRADE_LADDER.length} on the internal scale, AAA strongest, D weakest`}
-    >
-      <div className="ladder-track">
-        {GRADE_LADDER.map((g, n) => (
-          <span
-            key={g}
-            className="ladder-notch"
-            data-here={n === i ? 'true' : undefined}
-            style={n === i ? { ['--tone' as string]: `var(${gradeTone(g)})` } : undefined}
-          />
-        ))}
-      </div>
-      <div className="ladder-ends" aria-hidden>
+    <div className="ladder">
+      <svg
+        className="ladder-svg" viewBox={`0 0 ${W} 26`} preserveAspectRatio="none"
+        role="img"
+        aria-label={known
+          ? `${grade}: step ${i + 1} of ${N} on the internal scale, AAA strongest, D weakest`
+          : `Internal scale, AAA to D. No grade on file.`}
+      >
+        {GRADE_LADDER.map((g, n) => {
+          const here = n === i
+          return (
+            <rect
+              key={g} x={x(n)} y={here ? 0 : 9} width={nw} height={here ? 26 : 8} rx="1.2"
+              className={here ? 'lad-here' : 'lad-off'}
+              style={here ? { fill: `var(${gradeTone(g)})` } : undefined}
+            />
+          )
+        })}
+      </svg>
+      <div className="ladder-ends">
         <span>AAA</span>
+        {/* The notch, named. A marked tick tells you where; only the label tells you what,
+            and a reader who does not carry AAA..D in their head needs both. Withheld, it
+            is an em-dash — the scale still draws, extinguished, and claims nothing. */}
+        <b className="ladder-read">
+          {known ? <>{grade} · {i + 1} of {N}</> : <>—</>}
+        </b>
         <span>D</span>
       </div>
+      {fill !== null && (
+        <span className="sr-only">Scale fill {(fill * 100).toFixed(0)} per cent.</span>
+      )}
     </div>
   )
 }
@@ -109,7 +134,10 @@ export function Facility({ d, history, collateral, resolution, gate }: {
           <img src="/assets/mark.svg" alt="" width={18} height={18} />
           <span className="op-lh-name">Orma</span>
           <span className="op-lh-rule" />
-          <span className="op-lh-kind">Credit opinion</span>
+          {/* The running head names the facility, not the document type: a loose sheet
+              picked up off a table should say which facility it is about. With no figures
+              on file it says so, rather than heading a blank note with a name. */}
+          <span className="op-lh-kind">{d.serverTime ? name : 'Figures withheld'}</span>
         </div>
 
         <header className="op-top">

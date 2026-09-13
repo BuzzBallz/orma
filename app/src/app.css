@@ -495,29 +495,23 @@ table.tbl th.rt{ text-align: right; }
    in it is the tone of this facility's own step. It reads as a rating scale with a
    position on it, which is what it is, rather than as a gauge. */
 .ladder{ margin-top: 12px; }
-.ladder-track{
-  display: grid;
-  grid-template-columns: repeat(20, 1fr);
-  gap: 2px;
-  align-items: end;
-  height: 16px;
-}
-.ladder-notch{
-  height: 7px;
-  border-radius: 1px;
-  background: var(--line-2);
-}
-.ladder-notch[data-here]{
-  height: 16px;
-  background: var(--tone);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tone) 35%, transparent);
-}
+.ladder-svg{ display: block; width: 100%; height: 26px; }
+.lad-off{ fill: var(--line-2); }
 .ladder-ends{
-  display: flex; justify-content: space-between;
-  margin-top: 6px;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+  margin-top: 7px;
   font: var(--t-2xs)/1 var(--mono);
   letter-spacing: 0.08em;
   color: var(--fg-mute);
+}
+.ladder-read{
+  font: 500 var(--t-xs)/1 var(--mono);
+  letter-spacing: 0.04em;
+  color: var(--fg);
+}
+.sr-only{
+  position: absolute; width: 1px; height: 1px; margin: -1px;
+  padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
 }
 
 /* The one line on the verification desk that speaks to the reader rather than to the
@@ -591,7 +585,12 @@ table.tbl th:nth-child(4), table.tbl td:nth-child(4){ padding-left: 20px; }
           mask-image: linear-gradient(to bottom, #000 0, #000 55%, transparent 100%);
 }
 .blotter .readstamp{ margin-top: 0; }
-.view > .blotter{ flex: 1 0 auto; }   /* alone on the desk, grow into it; never shrink */
+/* The blotter is as tall as the names it lists, and stops.
+   It used to grow into the whole desk, which on a 728px window left 358px of empty card
+   under five rows — 56% of the panel was a black pit with a border drawn round it. A
+   credit blotter is a list; a list that reaches the bottom of the screen whatever its
+   length is a container, not a document. */
+.view > .blotter{ flex: 0 0 auto; }
 
 /* The reading stamp sits under the rows, quieter than a caption. */
 .readstamp{
@@ -923,9 +922,10 @@ kbd{
   /* Page two repeats the identity rather than the letterhead: a reader holding one loose
      sheet should still know what they are holding. */
   .op-break .op-top.slim{ border-top: 0.6pt solid #000; padding-top: 2.5mm; }
-  .ladder-notch{ background: #ccc !important; }
-  .ladder-notch[data-here]{ background: #000 !important; box-shadow: none !important; }
+  .lad-off{ fill: #ccc !important; }
+  .lad-here{ fill: #000 !important; }
   .ladder-ends{ color: #666 !important; }
+  .ladder-read{ color: #000 !important; }
   .ev-addressed{ border-left-color: #999 !important; color: #444 !important; }
 }
 
