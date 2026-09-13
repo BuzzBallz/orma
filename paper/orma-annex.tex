@@ -102,8 +102,8 @@
 
 \begin{abstract}
 \noindent
-This is an annex, not a paper. It states the arithmetic behind Orma so a reader can check it
-without reading JavaScript. Every formula is implemented in the repository, and every
+This is the technical paper for Orma. It states the arithmetic the protocol runs on, so that
+a reader can check it rather than take it on trust, and without reading JavaScript. Every formula is implemented in the repository, and every
 measured figure was read from live XRP Ledger Devnet state during the De Vinci Blockchain
 XRPL Lending Protocol Hackathon, Paris, 12 and 13 September 2026, against \texttt{rippled}
 3.4.0-rc5. The central claim is combinatorial: total first-loss capital consumed across a
@@ -112,6 +112,11 @@ unilaterally by the party whose capital is consumed, and a closed form makes the
 choice computable from public state. On the measured facility it is worth $0.20$ XRP out of
 $0.70$.
 \end{abstract}
+
+% The title page carries the title and the abstract and nothing else. A jury reading this
+% on a laptop meets the claim first, on its own, rather than half a claim and the opening
+% of section 1 competing for the same screen.
+\clearpage
 
 \section{The setting}
 
@@ -218,6 +223,10 @@ delegation probe, delegate & \texttt{rHK8rwcvywYrv6AJ8HW1J8byKBiJEBRYH4} \\
 \bottomrule
 \end{tabular}
 \end{center}
+
+% This paragraph says "the first row below" and must not be separated from the table it
+% points at. Clearing the title page shifted the pagination and stranded it once already.
+\pagebreak
 
 \paragraph{The delegation probe.} The claim in Section~1.2 that lending authority cannot be
 delegated was re-proven on Devnet during the event, at 07:29 UTC on 13 September 2026,
