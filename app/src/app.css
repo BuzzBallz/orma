@@ -1776,3 +1776,4 @@ tr:hover .chip, .picker-list [data-highlighted] .chip{ transform: translateY(-1p
 .orc-median td b{ color: var(--fg); }
 .orc-contest .num{ font-variant-numeric: tabular-nums; }
 .orc-fetch{ margin-top: 6px; overflow-wrap: anywhere; }
+.cond-scale{ color: var(--fg-mute); letter-spacing: 0; }

@@ -155,6 +155,8 @@ export interface BrokerEvent {
   coverConsumed: string; principal: string
   /** The exposure the action was taken against. On an impairment, the only real figure. */
   exposure: string
+  /** What a cover deposit or withdrawal moved. Null on every other kind of action. */
+  amount: string | null
 }
 
 export interface Ordering {

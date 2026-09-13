@@ -159,6 +159,10 @@ export function createApi(reader, opts = {}) {
             coverAfter: e.brokerStateKnown ? e.coverAfter.toFixed(0) : null,
             coverConsumed: e.coverConsumed.toFixed(0), principal: e.principal.toFixed(0),
             exposure: e.exposure.toFixed(0),
+            // What a cover deposit or withdrawal MOVED. Without it the row that says
+            // "added first-loss capital" renders three zeros, on the exhibit whose whole
+            // subject is first-loss capital.
+            amount: e.amount ? e.amount.toFixed(0) : null,
           })),
           ordering,
           reputation: reputation(events, ordering, broker),

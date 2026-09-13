@@ -89,25 +89,37 @@ So the manager who disclosed and the manager who hid it **look identical from ou
 
 ---
 
-## S5 — The order
-<!-- time: 2:20 | duration: 40s -->
+## S5 — Kestrel, and the order nobody recorded
+<!-- time: 2:20 | duration: 55s | artifact: order -->
 
 ### on screen
-- largest loss first: **0.50 XRP** of cover
-- smallest first: **0.70 XRP**
-- the difference, **0.20 XRP**, is investor money
-- Calder, same tool: conduct **A**
+- **Kestrel Bridge Financing II** · two loans go bad, **30** and **10**
+- Declared largest first: **0.50 XRP** of the manager's own capital
+- Declared smallest first: **0.70 XRP**
+- Same losses. The **0.20** comes out of the depositors. Conduct **E**
 
 ### notes
-**Facility tab** first, then the picker → **Kestrel Bridge Financing II** → scroll to Exhibit 3. Picking from the Evidence tab used to leave you on Evidence; it now moves you, but change tab yourself so the movement is the one you rehearsed.
+**Facility tab** first, then the picker → **Kestrel Bridge Financing II** → scroll to Exhibit 3.
 
-Two bad loans, thirty XRP and ten. This manager declared the big one first. // That consumed **zero point five** of their own first-loss capital. // Small one first would have consumed **zero point seven**. // Same losses, same rates, only the order. // The **zero point two** is investor money, and the party who chose the order is the party it spared.
+Kestrel Bridge Financing II. The manager posted **ten XRP** of their own first-loss capital: that is the money that absorbs a loss before the depositors do. // Two bridge loans go bad. Thirty, and ten.
 
-Facility picker → **Calder Structured Credit III**.
+Cover on a default is sized against the manager's **total book**, not against the loan that failed. // So they declared the **thirty** first. That consumed **zero point four**. // And it dropped the book from forty to ten — so when they declared the second one, there was almost nothing left to size against. **Zero point one.** // **Half an XRP**, out of their own ten.
+
+Smallest first: zero point four, then zero point three. **Zero point seven.** // Same two losses, same rates, eight seconds apart. Only the order. // The **zero point two** is first-loss capital that never left the manager's pocket, so the depositors absorbed it instead. **Forty per cent more** should have come from them.
+
+Only the broker owner can declare a default, and the broker owner is always the vault owner. // So the party whose capital absorbs the loss is the party who picks the order that decides how much of it gets used. // The ledger recorded two defaults, eight seconds apart, and nothing whatever about the choice.
+
+**Conduct E.** And read the second finding: neither loan was ever flagged. The first thing an investor learned was that the money was gone.
+
+**Picker → Calder Structured Credit III.**
 
 Same tool, same exhibit, a different manager. // Conduct **A**: no loss written off at all, and the one distressed exposure flagged and left flagged. // **That** is what a new investor wants to see before they subscribe.
 
 *Say "default sequencing and cover sizing" and nothing wider. Do not extend "unilateral control" to impairment re-pricing. `41-SECURITY-DISCLOSURE.md` §9.*
+
+*Do not claim the ordering result is novel and do not disclaim it either. If pressed: the cover formula is in the spec; what is not in the spec is what happens when the same party chooses the sequence.*
+
+*The figures are XRP on Devnet. The ratio is the point: 0.50 against 0.70 is 40% more cover, and 0.20 of 0.70 is 29% of the loss-absorbing capital that should have been consumed and was not.*
 
 ---
 

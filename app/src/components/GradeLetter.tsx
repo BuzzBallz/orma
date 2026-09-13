@@ -1,4 +1,4 @@
-import { letterTone } from '../lib/grades'
+import { conductTone, letterTone } from '../lib/grades'
 
 /**
  * A grade, set as the letter it is.
@@ -13,15 +13,18 @@ import { letterTone } from '../lib/grades'
  * reads in the text colour, speculative reads as watch, distressed reads as risk. No new
  * hue, and never a grade this component invented — no grade prints an em-dash.
  */
-export function GradeLetter({ grade, size = 'md' }: {
+export function GradeLetter({ grade, size = 'md', scale = 'credit' }: {
   grade?: string | null
   size?: 'sm' | 'md' | 'lg'
+  /** Which scale this letter belongs to. Conduct runs A..E and is not the credit ladder. */
+  scale?: 'credit' | 'conduct'
 }) {
   if (!grade) return <span className="grade grade-na" aria-label="no grade on file">—</span>
+  const tone = scale === 'conduct' ? conductTone(grade) : letterTone(grade)
   return (
     <span
       className={'grade grade-' + size}
-      style={{ ['--tone' as string]: `var(${letterTone(grade)})` }}
+      style={{ ['--tone' as string]: `var(${tone})` }}
     >{grade}</span>
   )
 }

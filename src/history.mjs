@@ -46,6 +46,17 @@ const RIPPLE_EPOCH = 946684800
 const FLAG = { IMPAIR: 0x20000, UNIMPAIR: 0x40000, DEFAULT: 0x10000 }
 
 /** Pull LoanManage and cover-movement events for one broker out of account history. */
+/**
+ * What a transaction says it moved. XRP is a drops string; an issued asset or an MPT is an
+ * object carrying `value`. Returns null when the field is absent, so a caller can fall back.
+ */
+function txAmountDrops(amount) {
+  if (amount === undefined || amount === null) return null
+  if (typeof amount === 'string') return num(amount)
+  if (typeof amount === 'object' && amount.value !== undefined) return num(amount.value)
+  return null
+}
+
 export async function fetchBrokerHistory(xrpl, ownerAccount, brokerId) {
   const txs = await xrpl.accountTx(ownerAccount)
   const events = []
@@ -114,18 +125,39 @@ export async function fetchBrokerHistory(xrpl, ownerAccount, brokerId) {
         })(),
       })
     } else if (type === 'LoanBrokerCoverDeposit' || type === 'LoanBrokerCoverWithdraw') {
+      // FINDING X1, ON OUR OWN CODE, FOR THE SECOND TIME.
+      //
+      // The amount used to be read as the change in CoverAvailable. On the FIRST cover
+      // deposit that difference is always zero, because CoverAvailable was 0 beforehand,
+      // 0 is the type default, and rippled therefore omits it from PreviousFields. The
+      // fallback on line 82 -- correct for an impairment, which touches nothing -- then
+      // sets the before equal to the after and the movement disappears. So the row that
+      // says "added first-loss capital" reported adding none, on the exhibit whose entire
+      // subject is first-loss capital.
+      //
+      // The amount is on the TRANSACTION, which states it outright and cannot omit it.
+      // The diff is only a fallback now, for a top-up where the field really did move.
+      const stated = txAmountDrops(tx.Amount)
+      const moved = stated ?? coverAfter.minus(coverBefore).abs()
+      const deposit = type === 'LoanBrokerCoverDeposit'
       events.push({
-        kind: type === 'LoanBrokerCoverDeposit' ? 'cover_deposit' : 'cover_withdraw',
+        kind: deposit ? 'cover_deposit' : 'cover_withdraw',
         at,
         hash: entry.hash ?? tx.hash,
         loanId: null,
         ledgerIndex: entry.ledger_index ?? null,
         brokerStateKnown: known,
-        debtBefore, debtAfter, coverBefore, coverAfter,
+        debtBefore, debtAfter,
+        // Reconstruct the balance the change set could not state, rather than reporting
+        // the two as equal.
+        coverBefore: stated && coverBefore.eq(coverAfter)
+          ? Decimal.max(0, deposit ? coverAfter.minus(stated) : coverAfter.plus(stated))
+          : coverBefore,
+        coverAfter,
         coverConsumed: new Decimal(0),
         principal: new Decimal(0),
         exposure: new Decimal(0),
-        amount: coverAfter.minus(coverBefore).abs(),
+        amount: moved,
       })
     }
   }

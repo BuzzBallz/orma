@@ -20,6 +20,20 @@ export function gradeFill(g: string): number {
  * makes first: investment grade or not, and whether it has gone distressed. So AAA..BBB-
  * reads in the text colour, BB+..B- as watch, and CCC..D as risk.
  */
+/**
+ * Conduct is graded A to E, which is NOT the AAA..D credit ladder. Routing it through
+ * letterTone put "E", the worst conduct grade there is, in the muted colour this product
+ * uses for "no grade on file", and "A" in the colour of an investment grade rating two
+ * notches below the facility's own. Five steps, its own map.
+ */
+export function conductTone(g: string): '--fg' | '--warn' | '--bad' | '--fg-mute' {
+  const i = 'ABCDE'.indexOf(String(g).trim().toUpperCase())
+  if (i < 0) return '--fg-mute'
+  if (i === 0) return '--fg'
+  if (i <= 2) return '--warn'
+  return '--bad'
+}
+
 export function letterTone(g: string): '--fg' | '--warn' | '--bad' | '--fg-mute' {
   const i = gradeIndex(g)
   if (i < 0) return '--fg-mute'

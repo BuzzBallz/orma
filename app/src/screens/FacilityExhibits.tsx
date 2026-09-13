@@ -53,9 +53,11 @@ export function ManagerConduct({ h }: { h: BrokerHistory | null }) {
   return (
     <Section title="Exhibit 3 · Manager conduct">
       <div className="kv" style={{ marginBottom: 12 }}>
-        <dt className="label">Conduct Assessment</dt>
+        {/* Named as its own scale. Unlabelled, an "A" here reads two notches below the
+            facility's own AA on the rail a few centimetres above it. */}
+        <dt className="label">Conduct Assessment <span className="cond-scale">A–E</span></dt>
         <dd className="num">
-          <GradeLetter grade={rep.grade} /> {rep.score} / 100
+          <GradeLetter grade={rep.grade} scale="conduct" /> {rep.score} / 100
         </dd>
       </div>
 
@@ -120,7 +122,7 @@ export function ManagerConduct({ h }: { h: BrokerHistory | null }) {
         <thead>
           <tr>
             <th>Action</th><th className="rt">Exposure</th>
-            <th className="rt">Book before</th><th className="rt">Cover used</th><th>When</th>
+            <th className="rt">Book before</th><th className="rt">Cover moved</th><th>When</th>
           </tr>
         </thead>
         <tbody>
@@ -130,11 +132,21 @@ export function ManagerConduct({ h }: { h: BrokerHistory | null }) {
           {h.events.map((e, i) => (
             <tr key={(e.hash ?? '') + i}>
               <td><b>{ACTION[e.kind] ?? e.kind.replace(/_/g, ' ')}</b></td>
+              {/* A cover movement has no exposure and consumes nothing: its figure is
+                  the capital it moved, and it belongs in the cover column with a sign.
+                  Rendering three zeros made "added first-loss capital" read as a
+                  non-event on the exhibit about first-loss capital. */}
               <td className="rt num">{e.exposure === '0' ? '—' : dropsToXrp(e.exposure)}</td>
               {/* An em-dash, never 0.00. Flagging an exposure leaves the manager's own
                   book untouched, so the record does not state it at that moment. */}
               <td className="rt num">{e.debtBefore === null ? '—' : dropsToXrp(e.debtBefore)}</td>
-              <td className="rt num">{dropsToXrp(e.coverConsumed)}</td>
+              <td className="rt num">
+                {e.kind === 'cover_deposit' || e.kind === 'cover_withdraw'
+                  ? (e.amount && e.amount !== '0'
+                      ? (e.kind === 'cover_deposit' ? '+' : '−') + dropsToXrp(e.amount)
+                      : '—')
+                  : dropsToXrp(e.coverConsumed)}
+              </td>
               <td className="op-says">{fmtIso(e.at)}</td>
             </tr>
           ))}
