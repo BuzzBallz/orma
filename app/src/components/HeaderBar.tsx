@@ -47,6 +47,10 @@ function Stamp({ asOf, withheld, receivedAt, pollMs }: {
 // 'Evidence' last, and named for what it proves rather than for how it works: it is the
 // only tab addressed to an engineer, and it should not be the first thing an analyst
 // reaches for.
+/** Protocol documentation. Overridable so a preview build can point at its own copy. */
+const DOCS_URL = import.meta.env.VITE_DOCS_URL
+  ?? 'https://frytegg.github.io/orma/'
+
 const DESKS: [RoutePath, string][] = [
   ['/', 'Portfolio'], ['/facility', 'Facility'], ['/event', 'Event'], ['/methodology', 'Methodology'],
   ['/evidence', 'Evidence'],
@@ -104,6 +108,19 @@ export function HeaderBar({ health, healthUnreachable, vaults, activeVaultId, pa
           </TabsTrigger>
         ))}
       </TabsList>
+
+      {/* Not a tab. The documentation is a different document for a different reader and it
+          leaves this application, so putting it in the tab strip would be a small lie about
+          where a click takes you. It sits beside them instead, and is the first thing the
+          bar drops when a narrow window runs out of room. */}
+      <a className="docs-link" href={DOCS_URL} target="_blank" rel="noreferrer noopener">
+        Docs
+        <svg viewBox="0 0 12 12" aria-hidden="true">
+          <path d="M4.5 2.5h5v5M9.5 2.5 4 8M8 9.5H2.5V4" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </a>
+
+      <Separator orientation="vertical" className="sep" />
 
       <FacilityPicker vaults={vaults} activeVaultId={activeVaultId} onSelect={onSelect} />
 
