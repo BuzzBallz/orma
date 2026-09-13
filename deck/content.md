@@ -188,7 +188,7 @@ Measuring is advice. This is enforcement. // An independent vault owner named ou
 <!-- time: 4:35 | duration: 48s | artifact: report -->
 
 ### on screen
-- **QR code to `FEEDBACK.md`, top right**
+- **QR code to `FEEDBACK.pdf`, top right**
 - **X1** the empty change set
 - **D2** the documented first hour cannot complete
 - **M5** a broker's history cannot be reconstructed
