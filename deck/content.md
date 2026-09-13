@@ -20,7 +20,7 @@ Yesterday morning, in your workshop, you explicitly said: // "The human or AI co
 ---
 
 ## S2 - Locked in, and unreadable
-<!-- time: 0:15 | duration: 30s | artifact: lock -->
+<!-- time: 0:30 | duration: 30s | artifact: lock -->
 
 ### on screen
 - Risk does not disappear.
@@ -39,7 +39,7 @@ During the lock-up the depositor watches the vault get worse, and cannot leave. 
 
 
 ## S3 - Three pillars
-<!-- time: 0:45 | duration: 25s | artifact: layers -->
+<!-- time: 1:00 | duration: 25s | artifact: layers -->
 
 ### on screen
 - Read it correctly.
@@ -57,7 +57,7 @@ One thing before the demo. The state is pre-baked: real Devnet transactions, fro
 
 
 ## S4 — Meridian, and the loss nobody can see
-<!-- time: 0:52 | duration: 55s | artifact: split -->
+<!-- time: 1:25 | duration: 55s | artifact: split -->
 
 ### on screen
 - **Meridian Trade Finance I** · 51 in, 10 lent
@@ -90,7 +90,7 @@ So the manager who disclosed and the manager who hid it **look identical from ou
 ---
 
 ## S5 — The order
-<!-- time: 1:27 | duration: 40s -->
+<!-- time: 2:20 | duration: 40s -->
 
 ### on screen
 - largest loss first: **0.50 XRP** of cover
@@ -112,7 +112,7 @@ Same tool, same exhibit, a different manager. // Conduct **A**: no loss written 
 ---
 
 ## S6 — The token prices itself
-<!-- time: 2:07 | duration: 30s -->
+<!-- time: 3:00 | duration: 30s -->
 
 ### on screen
 - five steps, no relationship needed
@@ -131,8 +131,32 @@ An investor pledges their units to a second lender. That lender holds a token an
 
 ---
 
-## S7 — The gate
-<!-- time: 2:37 | duration: 20s -->
+## S7 — The score, where we cannot take it back
+<!-- time: 3:30 | duration: 30s | artifact: token -->
+
+### on screen
+- an **XLS-47 PriceOracle**, keyed to the vault id
+- six dimensions, read back off the object
+- us: **0.803922** · a second reader: **1.000000**
+- median, computed by **rippled**: **0.901961**
+
+### notes
+Stay on the facility. Scroll to Exhibit 7.
+
+Everything so far was our reading, and you have been asked to believe it. // This is that reading written to the ledger as a Price Oracle, keyed to the vault id, six dimensions in one object. // The values on the left are read **back** off the object, raw hex and all, so you can open it in an explorer and check the encoding without us.
+
+**Point at the contest table.**
+
+And here is why it is an oracle and not an API. // A second publisher posted their own reading of the same vault: **one point zero zero**, the naive number. They did not ask us. We cannot touch their document. // **rippled** computed the median across both. Not us. // If we are wrong, the spread is on the ledger and anyone can see it.
+
+*Two publishers, size 2, standard deviation 0.1386. The second reading is a throwaway Devnet account publishing the naive figure deliberately, and say so if asked: the point is not that someone disagrees, it is that they can, without our permission.*
+
+*An API can only be trusted. This can be contested. That single sentence is the whole argument for the third pillar, and it is the one to keep if the beat runs long.*
+
+---
+
+## S8 — The gate
+<!-- time: 4:00 | duration: 20s -->
 
 ### on screen
 - graded LP: `tesSUCCESS`
@@ -148,42 +172,29 @@ Measuring is advice. This is enforcement. // An independent vault owner named ou
 
 ---
 
-## S8 — Developer experience
-<!-- time: 2:57 | duration: 50s -->
+## S9 — Developer experience, and what we gave back
+<!-- time: 4:20 | duration: 48s | artifact: report -->
 
 ### on screen
 - **QR code to `FEEDBACK.md`, top right**
 - **X1** the empty change set
 - **D2** the documented first hour cannot complete
 - **M5** a broker's history cannot be reconstructed
-- severity strip: 40 findings, **7 / 19 / 14** (P0 / P1 / P2)
+- 40 findings · **7 / 19 / 14** · filed, not saved for the pitch
 
 ### notes
-Three lines with their finding ids, a QR code to `FEEDBACK.md`, and the 40-mark severity strip.
-
 Forty findings, filed as we hit them. Our top three. // **One.** The empty change set you saw in the first demo. One paragraph on the metadata page fixes it, and it was reported before us by the author of an XRPL explorer, who closed it himself as not-a-bug. He was half right. // **Two.** The documented first hour cannot complete. We shipped the fix. // **Three.** A broker's history cannot be reconstructed by filtering: `LoanManage` names no broker and an impairment does not touch the broker object, so every impairment vanishes and the consumer cannot tell. That one shipped a wrong answer in our own code before we caught it. // That code is the report.
+
+One pull request, reproductions onto existing threads rather than duplicates, and every finding evidenced. All filed before this pitch.
 
 *This is the highest-scoring slide in the deck. If you are over time, cut a demo beat, never this one.*
 
----
-
-## S9 — What we gave back
-<!-- time: 3:47 | duration: 8s -->
-
-### on screen
-- one pull request: the tutorial, green on rc5 in 79.6 s
-- four upstream threads, not duplicates
-- 40 findings, every one evidenced
-
-### notes
-One pull request: the tutorial, green on rc5. // Reproductions onto four existing threads, not duplicates. // Forty findings, every one evidenced. // All filed before this pitch.
-
-*Say the count the 11:00 filing block actually filed, not the planned one. `docs/31-TASKS-FEEDBACK.md` F11: an honest four beats an inflated five, in front of the people who own the repositories.*
+*Say the count the 11:00 filing block actually reached, not the planned one. An honest four beats an inflated five, in front of the people who own the repositories.*
 
 ---
 
 ## S10 — Close
-<!-- time: 3:55 | duration: 5s -->
+<!-- time: 5:08 | duration: 5s -->
 
 ### on screen
 - **Orma**

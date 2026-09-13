@@ -104,7 +104,7 @@
     <header class="shead">
       <span class="sid">S2</span>
       <span class="stitle">Locked in, and unreadable</span>
-      <span class="stime">0:15 &middot; 30s</span>
+      <span class="stime">0:30 &middot; 30s</span>
     </header>
     <div class="sbody">
       
@@ -122,7 +122,7 @@
     <header class="shead">
       <span class="sid">S3</span>
       <span class="stitle">Three pillars</span>
-      <span class="stime">0:45 &middot; 25s</span>
+      <span class="stime">1:00 &middot; 25s</span>
     </header>
     <div class="sbody">
       
@@ -141,7 +141,7 @@
     <header class="shead">
       <span class="sid">S4</span>
       <span class="stitle">Meridian, and the loss nobody can see</span>
-      <span class="stime">0:52 &middot; 55s</span>
+      <span class="stime">1:25 &middot; 55s</span>
     </header>
     <div class="sbody">
       
@@ -162,7 +162,7 @@
     <header class="shead">
       <span class="sid">S5</span>
       <span class="stitle">The order</span>
-      <span class="stime">1:27 &middot; 40s</span>
+      <span class="stime">2:20 &middot; 40s</span>
     </header>
     <div class="sbody">
       
@@ -180,7 +180,7 @@
     <header class="shead">
       <span class="sid">S6</span>
       <span class="stitle">The token prices itself</span>
-      <span class="stime">2:07 &middot; 30s</span>
+      <span class="stime">3:00 &middot; 30s</span>
     </header>
     <div class="sbody">
       
@@ -197,8 +197,28 @@
   <section class="slide" data-i="6">
     <header class="shead">
       <span class="sid">S7</span>
+      <span class="stitle">The score, where we cannot take it back</span>
+      <span class="stime">3:30 &middot; 30s</span>
+    </header>
+    <div class="sbody">
+      
+      <p class="line">an <b>XLS-47 PriceOracle</b>, keyed to the vault id</p>
+      <p class="line">six dimensions, read back off the object</p>
+      <p class="line">us: <b>0.803922</b> · a second reader: <b>1.000000</b></p>
+      <p class="line">median, computed by <b>rippled</b>: <b>0.901961</b></p>
+    </div>
+    <svg class="artifact" viewBox="0 0 64 64" fill="none" aria-hidden="true"><circle cx="26" cy="32" r="14" stroke="var(--fg)" stroke-width="2"/>
+    <path d="M40 32h14" stroke="var(--gold)" stroke-width="2" stroke-linecap="round"/>
+    <path d="M49 27l5 5-5 5" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <footer class="sfoot"><span>Orma</span><span>7 / 10</span></footer>
+    <aside class="notes"><p>Stay on the facility. Scroll to Exhibit 7.</p><p>Everything so far was our reading, and you have been asked to believe it. // This is that reading written to the ledger as a Price Oracle, keyed to the vault id, six dimensions in one object. // The values on the left are read <b>back</b> off the object, raw hex and all, so you can open it in an explorer and check the encoding without us.</p><p><b>Point at the contest table.</b></p><p>And here is why it is an oracle and not an API. // A second publisher posted their own reading of the same vault: <b>one point zero zero</b>, the naive number. They did not ask us. We cannot touch their document. // <b>rippled</b> computed the median across both. Not us. // If we are wrong, the spread is on the ledger and anyone can see it.</p><p>*Two publishers, size 2, standard deviation 0.1386. The second reading is a throwaway Devnet account publishing the naive figure deliberately, and say so if asked: the point is not that someone disagrees, it is that they can, without our permission.*</p><p>*An API can only be trusted. This can be contested. That single sentence is the whole argument for the third pillar, and it is the one to keep if the beat runs long.*</p></aside>
+  </section>
+
+  <section class="slide" data-i="7">
+    <header class="shead">
+      <span class="sid">S8</span>
       <span class="stitle">The gate</span>
-      <span class="stime">2:37 &middot; 20s</span>
+      <span class="stime">4:00 &middot; 20s</span>
     </header>
     <div class="sbody">
       
@@ -207,15 +227,15 @@
       <p class="line">refused by the ledger, not by us</p>
     </div>
     
-    <footer class="sfoot"><span>Orma</span><span>7 / 10</span></footer>
+    <footer class="sfoot"><span>Orma</span><span>8 / 10</span></footer>
     <aside class="notes"><p>Picker → <b>Thorne Senior Secured I</b> → scroll to Exhibit 6, it sits above Key Indicators. The chain is nine rows with a hash on each.</p><p>Measuring is advice. This is enforcement. // An independent vault owner named our issuer in their domain. We signed nothing, and we cannot decline. // Two investors, same second: one admitted, the other refused <b>by the ledger</b>, not by us.</p><p>*<code>[+]</code> at 5:00 only: and when we revoke, entry closes and the exit stays open. A rater who could trap capital would be a worse problem than the one we solve.*</p></aside>
   </section>
 
-  <section class="slide" data-i="7">
+  <section class="slide" data-i="8">
     <header class="shead">
-      <span class="sid">S8</span>
-      <span class="stitle">Developer experience</span>
-      <span class="stime">2:57 &middot; 50s</span>
+      <span class="sid">S9</span>
+      <span class="stitle">Developer experience, and what we gave back</span>
+      <span class="stime">4:20 &middot; 48s</span>
     </header>
     <div class="sbody">
       
@@ -223,35 +243,21 @@
       <p class="line"><b>X1</b> the empty change set</p>
       <p class="line"><b>D2</b> the documented first hour cannot complete</p>
       <p class="line"><b>M5</b> a broker's history cannot be reconstructed</p>
-      <p class="line">severity strip: 40 findings, <b>7 / 19 / 14</b> (P0 / P1 / P2)</p>
+      <p class="line">40 findings · <b>7 / 19 / 14</b> · filed, not saved for the pitch</p>
     </div>
-    
-    <footer class="sfoot"><span>Orma</span><span>8 / 10</span></footer>
-    <aside class="notes"><p>Three lines with their finding ids, a QR code to <code>FEEDBACK.md</code>, and the 40-mark severity strip.</p><p>Forty findings, filed as we hit them. Our top three. // <b>One.</b> The empty change set you saw in the first demo. One paragraph on the metadata page fixes it, and it was reported before us by the author of an XRPL explorer, who closed it himself as not-a-bug. He was half right. // <b>Two.</b> The documented first hour cannot complete. We shipped the fix. // <b>Three.</b> A broker's history cannot be reconstructed by filtering: <code>LoanManage</code> names no broker and an impairment does not touch the broker object, so every impairment vanishes and the consumer cannot tell. That one shipped a wrong answer in our own code before we caught it. // That code is the report.</p><p>*This is the highest-scoring slide in the deck. If you are over time, cut a demo beat, never this one.*</p></aside>
-  </section>
-
-  <section class="slide" data-i="8">
-    <header class="shead">
-      <span class="sid">S9</span>
-      <span class="stitle">What we gave back</span>
-      <span class="stime">3:47 &middot; 8s</span>
-    </header>
-    <div class="sbody">
-      
-      <p class="line">one pull request: the tutorial, green on rc5 in 79.6 s</p>
-      <p class="line">four upstream threads, not duplicates</p>
-      <p class="line">40 findings, every one evidenced</p>
-    </div>
-    
+    <svg class="artifact" viewBox="0 0 64 64" fill="none" aria-hidden="true"><rect x="16" y="10" width="32" height="44" rx="3" stroke="var(--fg)" stroke-width="2"/>
+    <path d="M24 24h16M24 32h16M24 40h9" stroke="var(--fg)" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="44" cy="44" r="7" fill="var(--bg)" stroke="var(--gold)" stroke-width="2"/>
+    <path d="M41 44l2 2 4-4" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
     <footer class="sfoot"><span>Orma</span><span>9 / 10</span></footer>
-    <aside class="notes"><p>One pull request: the tutorial, green on rc5. // Reproductions onto four existing threads, not duplicates. // Forty findings, every one evidenced. // All filed before this pitch.</p><p>*Say the count the 11:00 filing block actually filed, not the planned one. <code>docs/31-TASKS-FEEDBACK.md</code> F11: an honest four beats an inflated five, in front of the people who own the repositories.*</p></aside>
+    <aside class="notes"><p>Forty findings, filed as we hit them. Our top three. // <b>One.</b> The empty change set you saw in the first demo. One paragraph on the metadata page fixes it, and it was reported before us by the author of an XRPL explorer, who closed it himself as not-a-bug. He was half right. // <b>Two.</b> The documented first hour cannot complete. We shipped the fix. // <b>Three.</b> A broker's history cannot be reconstructed by filtering: <code>LoanManage</code> names no broker and an impairment does not touch the broker object, so every impairment vanishes and the consumer cannot tell. That one shipped a wrong answer in our own code before we caught it. // That code is the report.</p><p>One pull request, reproductions onto existing threads rather than duplicates, and every finding evidenced. All filed before this pitch.</p><p>*This is the highest-scoring slide in the deck. If you are over time, cut a demo beat, never this one.*</p><p>*Say the count the 11:00 filing block actually reached, not the planned one. An honest four beats an inflated five, in front of the people who own the repositories.*</p></aside>
   </section>
 
   <section class="slide" data-i="9">
     <header class="shead">
       <span class="sid">S10</span>
       <span class="stitle">Close</span>
-      <span class="stime">3:55 &middot; 5s</span>
+      <span class="stime">5:08 &middot; 5s</span>
     </header>
     <div class="sbody">
       

@@ -5,7 +5,7 @@ import { usePoll } from './lib/usePoll'
 import { facilityName } from './lib/credit'
 import { useTick } from './lib/useTick'
 import { useRoute, type RoutePath } from './lib/useRoute'
-import type { BrokerHistory, Collateral, Gate, Health, IndexerRace, Resolution, VaultDetail as Detail, VaultsResponse } from './lib/types'
+import type { BrokerHistory, Collateral, Gate, Health, IndexerRace, OracleContest, Resolution, VaultDetail as Detail, VaultsResponse } from './lib/types'
 import { HeaderBar } from './components/HeaderBar'
 import { StaleBar } from './components/StaleBar'
 import { Portfolio } from './screens/Portfolio'
@@ -226,6 +226,10 @@ function Desk() {
 
   const race = usePoll<IndexerRace>(path === '/evidence' ? '/api/indexer-race' : null, 30000)
 
+  // The contestability capture. A fixed historical artifact like the race capture, and on
+  // the facility desk because that is where the oracle object it argues about lives.
+  const contest = usePoll<OracleContest>(path === '/facility' ? '/api/oracle-aggregate' : null, 60000)
+
   const primary = path === '/' ? vaults : detail
   // The verification screen is not scoped to a facility, so it has no detail payload to
   // date itself from, and the header read "figures received" with no as-of beside it --
@@ -371,7 +375,7 @@ function Desk() {
         ? resolution.data : null
       const gt = gate.data && gate.data.vaultId?.toUpperCase() === d.vault.vaultId.toUpperCase()
         ? gate.data : null
-      return <Facility d={d} history={h} collateral={c} resolution={rz} gate={gt} />
+      return <Facility d={d} history={h} collateral={c} resolution={rz} gate={gt} contest={contest.data} />
     }
     return <Event d={detail.data} tick={tick} />
   }

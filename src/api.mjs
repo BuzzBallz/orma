@@ -276,6 +276,15 @@ export function createApi(reader, opts = {}) {
         return send(200, stamp(JSON.parse(readFileSync(path, 'utf8'))))
       }
 
+      // The contestability capture. Two publishers with no relationship, and rippled's own
+      // median across them. Tracked, for the same reason the race capture is: the claim that
+      // a ledger object can be argued with is the whole case for not being a REST API, and
+      // it cannot be made from one publisher.
+      if (key === 'GET /api/oracle-aggregate') {
+        if (!existsSync('demo/oracle-aggregate.json')) return fail(404, 'NOT_FOUND', 'no aggregate captured', false)
+        return send(200, stamp(JSON.parse(readFileSync('demo/oracle-aggregate.json', 'utf8'))))
+      }
+
       if (key === 'GET /api/demo/state') {
         return send(200, stamp({
           bakedVaults: reader.all().map((s) => ({

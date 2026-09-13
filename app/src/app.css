@@ -1768,3 +1768,10 @@ tr:hover .chip, .picker-list [data-highlighted] .chip{ transform: translateY(-1p
 }
 .docs-link:hover{ color: var(--amber); }
 .docs-link svg{ width: 11px; height: 11px; opacity: .8; }
+
+/* Exhibit 7. The raw column is the point of the exhibit rather than decoration: it is what
+   the ledger holds, so it is set like an identifier and not like prose. */
+.orc-raw{ font-family: var(--mono); font-size: var(--t-sm); }
+.orc-median td{ border-top: 1px solid var(--rule); }
+.orc-median td b{ color: var(--fg); }
+.orc-contest .num{ font-variant-numeric: tabular-nums; }

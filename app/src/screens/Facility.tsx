@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { BrokerHistory, Collateral, Gate, Resolution, VaultDetail } from '../lib/types'
+import type { BrokerHistory, Collateral, Gate, OracleContest, Resolution, VaultDetail } from '../lib/types'
 import { GradeLetter } from '../components/GradeLetter'
 import { GRADE_LADDER, gradeFill, gradeIndex, letterTone } from '../lib/grades'
 import { nextBeat } from '../lib/beats'
@@ -8,6 +8,7 @@ import { creditText, facilityName, facilityRef, factorRows, outlookOf, splitFact
 import { ManagerConduct, PledgedCollateral } from './FacilityExhibits'
 import { PledgeResolution } from './PledgeResolution'
 import { EntryGate } from './EntryGate'
+import { OracleObject } from './OracleObject'
 
 /** A labelled figure. Anything the payload does not carry prints n.a., never a guess. */
 function F({ k, v, note }: { k: string; v: ReactNode; note?: string }) {
@@ -90,12 +91,13 @@ function Section({ title, children, tight }: { title: string; children: ReactNod
  * indicators and profile. Every figure in it is a figure the calculation agent sent. Where
  * a figure was not sent, the line reads n.a. and nothing is inferred to fill it.
  */
-export function Facility({ d, history, collateral, resolution, gate }: {
+export function Facility({ d, history, collateral, resolution, gate, contest }: {
   d: VaultDetail
   history?: BrokerHistory | null
   collateral?: Collateral | null
   resolution?: Resolution | null
   gate?: Gate | null
+  contest?: OracleContest | null
 }) {
   const v = d.vault
   const name = facilityName(v)
@@ -381,6 +383,7 @@ export function Facility({ d, history, collateral, resolution, gate }: {
             <PledgedCollateral c={collateral ?? null} />
             <PledgeResolution r={resolution ?? null} />
             <EntryGate g={gate ?? null} />
+            <OracleObject o={d.oracle} contest={contest ?? null} />
 
             <Section title="Key Indicators">
               <table className="op-tbl">

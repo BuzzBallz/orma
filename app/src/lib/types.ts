@@ -81,8 +81,16 @@ export interface Oracle {
   lastUpdateAt: string | null                 // NULL if this document has never published (§0.0 A4)
   ageSeconds: number; stale: boolean
   explorerUrl: string
-  dimensionsOnChain: { key: string; value: string; scale: number }[]
+  dimensionsOnChain: { key: string; value: string; raw: string; scale: number }[]
   aggregate: OracleAggregate | null           // NULL with fewer than two publishers
+}
+
+/** The two-publisher capture: what the ledger says when someone disagrees with us. */
+export interface OracleContest extends Stamped {
+  label: string; vaultId: string; baseAsset: string; quoteAsset: string
+  publishers: { role: string; account: string; oracleDocumentId: number; provider: string; nav: string; basis: string; publishHash?: string | null }[]
+  aggregate: { median: string | null; mean: string | null; standardDeviation: string | null; size: number | null; ledgerIndex: number | null; computedBy: string } | null
+  answer: string
 }
 
 export interface Alert {

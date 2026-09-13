@@ -1,0 +1,19 @@
+{
+  "probedAt": "2026-09-13T09:58:08Z",
+  "probedDuring": "XRPL Lending Protocol Hackathon, Paris, 12-13 September 2026",
+  "network": "devnet",
+  "buildVersion": "3.4.0-rc5",
+  "question": "Can an account that is not the domain owner modify a PermissionedDomain that names it?",
+  "domainId": "FFBEC89D98B4E7CF52F4F254235086514A90CED0EC531941BDF747AF40C5A2FB",
+  "domainOwner": "rGFFSqqY1R3764FKF7crU5F6bYh9qaD45S",
+  "domainLive": true,
+  "attemptedBy": "rn57qjJ6MguKSxanroPzzptm7appsznyND",
+  "attempt": {
+    "transactionType": "PermissionedDomainSet",
+    "code": "tecNO_PERMISSION",
+    "hash": "C9F75AFD525FB743EFEDC9F0855C6F58FC0DD4F26BFB367EA571B9359C13119E",
+    "onLedger": true
+  },
+  "answer": "No. The ledger returned tecNO_PERMISSION. Being cited in a domain confers no authority over it.",
+  "whyItMatters": "The facility names an issuer unilaterally and the issuer cannot decline. This probe is the other half: the issuer also cannot alter the arrangement it was named in."
+}

@@ -1,0 +1,58 @@
+{
+  "probedAt": "2026-09-13T10:01:52Z",
+  "probedDuring": "XRPL Lending Protocol Hackathon, Paris, 12-13 September 2026",
+  "network": "devnet",
+  "buildVersion": "3.4.0-rc5",
+  "label": "Meridian Trade Finance I",
+  "vaultId": "864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835",
+  "baseAsset": "864C5A2DDCED78C6198B0703169D533B747A56E5",
+  "quoteAsset": "NAV",
+  "question": "Can a second publisher contest our reading without our permission, and does the ledger report the spread?",
+  "publishers": [
+    {
+      "role": "this service",
+      "account": "rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B",
+      "oracleDocumentId": 2,
+      "provider": "BuzzBallz Vault Solvency",
+      "nav": "0.803922",
+      "basis": "re-reads the vault object"
+    },
+    {
+      "role": "an independent second reader",
+      "account": "raiwYKSDdrhiediLdgJyGEzP1estXcmVcM",
+      "oracleDocumentId": 1,
+      "provider": "Naive metadata indexer",
+      "nav": "1.000000",
+      "basis": "diffs transaction metadata",
+      "publishHash": null
+    }
+  ],
+  "aggregate": {
+    "median": "0.901961",
+    "mean": "0.901961",
+    "standardDeviation": "0.1386480834414958655",
+    "size": 2,
+    "ledgerIndex": null,
+    "computedBy": "rippled, from get_aggregate_price. Neither publisher computed it and neither can alter it."
+  },
+  "aggregateError": null,
+  "answer": "Yes. Two publishers, no relationship between them, and rippled reports a median of 0.901961 across a spread neither of them controls.",
+  "reproduce": {
+    "command": "get_aggregate_price",
+    "base_asset": "864C5A2DDCED78C6198B0703169D533B747A56E5",
+    "quote_asset": "NAV",
+    "oracles": [
+      {
+        "account": "rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B",
+        "oracle_document_id": 2
+      },
+      {
+        "account": "raiwYKSDdrhiediLdgJyGEzP1estXcmVcM",
+        "oracle_document_id": 1
+      }
+    ]
+  },
+  "redacted": [
+    "The second publisher is a throwaway Devnet faucet account. Its seed was never written to disk."
+  ]
+}
