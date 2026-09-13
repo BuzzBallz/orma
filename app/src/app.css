@@ -70,7 +70,7 @@
 
   --fg:      #EAE0CE;   /* primary text and figures — brand cream */
   --fg-dim:  #B3AA99;   /* secondary — 8.5:1 on --bg, clears AA */
-  --fg-mute: #8C8578;   /* tertiary  — 5.4:1 on --bg, clears AA */
+  --fg-mute: #9A9488;   /* tertiary  — 5.4:1 on --bg, clears AA */
 
   /* CHROME — the brand gold is the furniture: the active tab, an alert, the wordmark.
      Deliberately NOT a signal: red is risk, green is healthy, cyan is the correct
@@ -81,7 +81,7 @@
   --amber-dim: #8E7340;
   /* Idle chrome. Gold had spread to every label, tab and key until nothing gold meant
      anything. Gold is now the active tab, an alert, and the wordmark. Nothing else. */
-  --fg-idle: #8C8578;
+  --fg-idle: #9A9488;
 
   /* CONTRACT — meanings fixed by contract §6, do not repurpose */
   --read-naive:   #8792A6;   /* the naive NAV reading — muted, DASHED (contract §6) */
@@ -109,8 +109,8 @@
   --t-md:   18px;
   --t-base: 14px;
   --t-sm:   12px;
-  --t-xs:   11px;
-  --t-2xs:  10px;   /* chevrons and other glyph-only marks */
+  --t-xs:   13px;
+  --t-2xs:  12px;   /* chevrons and other glyph-only marks */
   --t-verdict: 40px;
 
   --topbar: 44px;
@@ -1017,12 +1017,12 @@ kbd{
 .ev-tbl{ margin-top: 4px; max-width: 620px; }
 .ev-tbl td{ height: 30px; }
 .ev-tbl th:first-child, .ev-tbl td:first-child{ width: 46%; }
-.ev-field{ font-family: var(--mono); font-size: var(--t-sm); color: var(--fg-dim); }
-.ev-before{ font-family: var(--mono); font-size: var(--t-sm); color: var(--fg-mute); }
-.ev-after{ font-family: var(--mono); font-size: var(--t-sm); color: var(--fg); }
+.ev-field{ font-family: var(--mono); font-size: var(--t-base); color: var(--fg-dim); }
+.ev-before{ font-family: var(--mono); font-size: var(--t-base); color: var(--fg-mute); }
+.ev-after{ font-family: var(--mono); font-size: var(--t-base); color: var(--fg); }
 
 .ev-formula{
-  margin: 10px 0 0; font: 11px/1.5 var(--mono); color: var(--fg-mute);
+  margin: 10px 0 0; font: 12px/1.5 var(--mono); color: var(--fg-mute);
   letter-spacing: 0.02em;
 }
 
@@ -1031,7 +1031,7 @@ kbd{
   margin-top: 22px;
 }
 .ev-prov code{
-  font: 11px/1.5 var(--mono); color: var(--fg-mute); letter-spacing: 0.02em;
+  font: 12px/1.5 var(--mono); color: var(--fg-mute); letter-spacing: 0.02em;
 }
 .ev-hash{ overflow-wrap: anywhere; }
 
@@ -1057,7 +1057,7 @@ kbd{
   margin: 0; padding: 12px 14px; overflow-x: auto;
   background: color-mix(in srgb, var(--fg) 3%, transparent);
   border-radius: var(--r-ctl);
-  font: 11px/1.55 var(--mono); color: var(--fg-dim);
+  font: 12px/1.55 var(--mono); color: var(--fg-dim);
 }
 
 
@@ -1090,6 +1090,48 @@ kbd{
   .op-side{ position: static; }
   .op-page{ padding: 16px; }
 }
+
+
+/* ============================================================================
+   TYPE, ONE STEP UP
+
+   The surface was set for a terminal: a 10px label, an 11px chrome, a 12px figure
+   beside a 44px poster number. Read as a document rather than as a console, that is
+   small — and the smallest of it was carrying the labels, which are the words that say
+   what every figure means. Nothing here changes a layout or buys air with padding: the
+   sizes move, the boxes do not.
+   ============================================================================ */
+
+.kv dd{ font-size: var(--t-base); }
+.kv dt{ font-size: var(--t-2xs); letter-spacing: 0; }
+
+/* Page titles. The facility name was 32px and the verification title 28px, both louder
+   than the document needs; the panel titles were 18px and quieter than it needs. */
+.op-title{ font-size: 24px; }
+.ev-title{ font-size: 24px; }
+.panel-title{ font-size: 22px; }
+
+/* 44px was a poster. These are three figures to be compared, and at 32px the eye takes
+   all three in one go. */
+.ev-num{ font-size: clamp(26px, 3vw, 32px); }
+
+/* Chrome: tabs, the stamp, the picker. 11-12px is a toolbar; this is a desk. */
+.desk{ font-size: 14px; }
+.stamp, .picker-label, .picker-btn{ font-size: 13px; }
+
+/* The exhibit tables are tables. They were set a step under the blotter's cells, which
+   made the two read as different kinds of document on the same page — and it is the
+   exhibits that carry the factor scores a committee argues over. The bullets and the
+   rail prose come with them: they are read, not scanned. */
+.op-tbl{ font-size: var(--t-base); }
+.op-tbl td, .op-says{ font-size: var(--t-base); line-height: 1.4; }
+.op-tbl th{ font-size: var(--t-sm); }
+.op-list li{ font-size: var(--t-base); line-height: 1.5; }
+.op-profile{ font-size: var(--t-base); line-height: 1.5; }
+
+/* No label is tracked like a caption in a museum. */
+.label, .op-h, table.tbl th, .ev-tbl th, .ladder-ends, .kv-note{ letter-spacing: 0; }
+.ev-raw > summary{ letter-spacing: 0.02em; }
 
 @media print{
   @page{ size: A4 portrait; margin: 14mm 13mm; }
@@ -1517,6 +1559,12 @@ tr.ghost:hover td > *{ transform: none; }
   .hints{ padding: 8px 16px; gap: 12px; }
   /* At this width nothing should be crushed into a column: let rows break. */
   .row{ flex-wrap: wrap; }
+
+  /* iOS zooms the page when it meets text under 16px, which is a layout bug wearing a
+     typography costume. Body clears 16; the desks clear a thumb. */
+  body, .op-sec p, .ev-thesis, .caption, .said{ font-size: 16px; }
+  .op-sec p, .ev-thesis{ line-height: 1.55; }
+  .topbar .desk{ font-size: 14px; }
 
   /* The blotter keeps the two columns a phone can actually read: which facility, and
      what it scores. Status, the reported/held pair, the countdown and the outlook are
