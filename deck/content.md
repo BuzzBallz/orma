@@ -184,29 +184,40 @@ Measuring is advice. This is enforcement. // An independent vault owner named ou
 
 ---
 
-## S9 — Developer experience, and what we gave back
-<!-- time: 4:35 | duration: 48s | artifact: report -->
+## S9 — The report is the product
+
+<!-- time: 4:35 | duration: 55s | artifact: report -->
 
 ### on screen
 - **QR code to `FEEDBACK.pdf`, top right**
-- **X1** the empty change set
-- **D2** the documented first hour cannot complete
-- **M5** a broker's history cannot be reconstructed
-- 40 findings · **7 / 19 / 14** · filed, not saved for the pitch
+- Demo one was a bug: the change set comes back **empty**
+- Demo two was a bug: **our own code** got it wrong first
+- Demo three is why: nothing off the ledger can **prove** ledger state
+- **40 findings** · 7 / 19 / 14 · filed as we hit them, not saved for this pitch
 
 ### notes
-Forty findings, filed as we hit them. Our top three. // **One.** The empty change set you saw in the first demo. One paragraph on the metadata page fixes it, and it was reported before us by the author of an XRPL explorer, who closed it himself as not-a-bug. He was half right. // **Two.** The documented first hour cannot complete. We shipped the fix. // **Three.** A broker's history cannot be reconstructed by filtering: `LoanManage` names no broker and an impairment does not touch the broker object, so every impairment vanishes and the consumer cannot tell. That one shipped a wrong answer in our own code before we caught it. // That code is the report.
+We did not set out to write a feedback report. // **Every demo you just watched started as something that broke.**
 
-One pull request, reproductions onto existing threads rather than duplicates, and every finding evidenced. All filed before this pitch.
+**One.** The empty change set. // That is not a slide we wrote to be clever, it is the first thing that went wrong, and the reader exists because of it. // One paragraph on the metadata page fixes it. // And it was reported before us, by the author of an XRPL explorer — exactly the person this trap is built for. // He closed it himself. **"Not a bug."** // He was half right: the ledger is behaving as designed. What is missing is the sentence that would have told him so.
 
-*This is the highest-scoring slide in the deck. If you are over time, cut a demo beat, never this one.*
+**Two.** A manager's history cannot be rebuilt from the record by filtering: an impairment does not touch the manager's object, so it vanishes. // The conduct exhibit you just saw exists because we hit that. // And it shipped **a wrong answer inside our own code** first: the rule we wrote to reward disclosure was punishing it. We caught it because we were writing the finding up.
 
-*Say the count the 11:00 filing block actually reached, not the planned one. An honest four beats an inflated five, in front of the people who own the repositories.*
+**Three.** Nothing off the ledger can prove a fact about ledger state. There is no proof option to ask for. // **That** is why the score is a ledger object and not an API of ours. // The third demo is not a feature we chose. It is what that finding left us.
+
+And what we give back. // The documented first hour cannot complete — we wrote the fix and it is a pull request. // And the standard lists ten ways `LoanBrokerSet` can fail. The rule that stops every one of these vaults existing is not one of the ten. // Merge the three that have been open for weeks, and add the eleventh.
+
+**Forty findings.** Three of them changed the product while we were still building it. // That code takes you to all of them.
+
+*Keep the finding ids off the wall and in your pocket: X1 the empty change set, M5 the history, D2 the first hour, D1 the eleventh condition. The pull requests are `xrpl-dev-portal#3923`, `XRPL-Standards#587` and `#582`.*
+
+*This is the highest-scoring slide in the deck and the only one that ties the build to the brief. If you are over time, cut a demo beat, never this one.*
+
+*Say the count the filing block actually reached, not the planned one. An honest four beats an inflated five, in front of the people who own the repositories.*
 
 ---
 
 ## S10 — Close
-<!-- time: 5:23 | duration: 5s -->
+<!-- time: 5:30 | duration: 5s -->
 
 ### on screen
 - **Orma**

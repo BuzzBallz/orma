@@ -237,30 +237,30 @@
   <section class="slide" data-i="8">
     <header class="shead">
       <span class="sid">S9</span>
-      <span class="stitle">Developer experience, and what we gave back</span>
-      <span class="stime">4:35 &middot; 48s</span>
+      <span class="stitle">The report is the product</span>
+      <span class="stime">4:35 &middot; 55s</span>
     </header>
     <div class="sbody">
       
       <p class="line"><b>QR code to <code>FEEDBACK.pdf</code>, top right</b></p>
-      <p class="line"><b>X1</b> the empty change set</p>
-      <p class="line"><b>D2</b> the documented first hour cannot complete</p>
-      <p class="line"><b>M5</b> a broker's history cannot be reconstructed</p>
-      <p class="line">40 findings · <b>7 / 19 / 14</b> · filed, not saved for the pitch</p>
+      <p class="line">Demo one was a bug: the change set comes back <b>empty</b></p>
+      <p class="line">Demo two was a bug: <b>our own code</b> got it wrong first</p>
+      <p class="line">Demo three is why: nothing off the ledger can <b>prove</b> ledger state</p>
+      <p class="line"><b>40 findings</b> · 7 / 19 / 14 · filed as we hit them, not saved for this pitch</p>
     </div>
     <svg class="artifact" viewBox="0 0 64 64" fill="none" aria-hidden="true"><rect x="16" y="10" width="32" height="44" rx="3" stroke="var(--fg)" stroke-width="2"/>
     <path d="M24 24h16M24 32h16M24 40h9" stroke="var(--fg)" stroke-width="2" stroke-linecap="round"/>
     <circle cx="44" cy="44" r="7" fill="var(--bg)" stroke="var(--gold)" stroke-width="2"/>
     <path d="M41 44l2 2 4-4" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
     <footer class="sfoot"><span>Orma</span><span>9 / 10</span></footer>
-    <aside class="notes"><p>Forty findings, filed as we hit them. Our top three. // <b>One.</b> The empty change set you saw in the first demo. One paragraph on the metadata page fixes it, and it was reported before us by the author of an XRPL explorer, who closed it himself as not-a-bug. He was half right. // <b>Two.</b> The documented first hour cannot complete. We shipped the fix. // <b>Three.</b> A broker's history cannot be reconstructed by filtering: <code>LoanManage</code> names no broker and an impairment does not touch the broker object, so every impairment vanishes and the consumer cannot tell. That one shipped a wrong answer in our own code before we caught it. // That code is the report.</p><p>One pull request, reproductions onto existing threads rather than duplicates, and every finding evidenced. All filed before this pitch.</p><p>*This is the highest-scoring slide in the deck. If you are over time, cut a demo beat, never this one.*</p><p>*Say the count the 11:00 filing block actually reached, not the planned one. An honest four beats an inflated five, in front of the people who own the repositories.*</p></aside>
+    <aside class="notes"><p>We did not set out to write a feedback report. // <b>Every demo you just watched started as something that broke.</b></p><p><b>One.</b> The empty change set. // That is not a slide we wrote to be clever, it is the first thing that went wrong, and the reader exists because of it. // One paragraph on the metadata page fixes it. // And it was reported before us, by the author of an XRPL explorer — exactly the person this trap is built for. // He closed it himself. <b>"Not a bug."</b> // He was half right: the ledger is behaving as designed. What is missing is the sentence that would have told him so.</p><p><b>Two.</b> A manager's history cannot be rebuilt from the record by filtering: an impairment does not touch the manager's object, so it vanishes. // The conduct exhibit you just saw exists because we hit that. // And it shipped <b>a wrong answer inside our own code</b> first: the rule we wrote to reward disclosure was punishing it. We caught it because we were writing the finding up.</p><p><b>Three.</b> Nothing off the ledger can prove a fact about ledger state. There is no proof option to ask for. // <b>That</b> is why the score is a ledger object and not an API of ours. // The third demo is not a feature we chose. It is what that finding left us.</p><p>And what we give back. // The documented first hour cannot complete — we wrote the fix and it is a pull request. // And the standard lists ten ways <code>LoanBrokerSet</code> can fail. The rule that stops every one of these vaults existing is not one of the ten. // Merge the three that have been open for weeks, and add the eleventh.</p><p><b>Forty findings.</b> Three of them changed the product while we were still building it. // That code takes you to all of them.</p><p>*Keep the finding ids off the wall and in your pocket: X1 the empty change set, M5 the history, D2 the first hour, D1 the eleventh condition. The pull requests are <code>xrpl-dev-portal#3923</code>, <code>XRPL-Standards#587</code> and <code>#582</code>.*</p><p>*This is the highest-scoring slide in the deck and the only one that ties the build to the brief. If you are over time, cut a demo beat, never this one.*</p><p>*Say the count the filing block actually reached, not the planned one. An honest four beats an inflated five, in front of the people who own the repositories.*</p></aside>
   </section>
 
   <section class="slide" data-i="9">
     <header class="shead">
       <span class="sid">S10</span>
       <span class="stitle">Close</span>
-      <span class="stime">5:23 &middot; 5s</span>
+      <span class="stime">5:30 &middot; 5s</span>
     </header>
     <div class="sbody">
       
