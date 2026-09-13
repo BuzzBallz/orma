@@ -249,5 +249,5 @@ above reproduce it from scratch in a few minutes.
 
 Found while building an indexer that tracks vault solvency on Devnet. The workaround is three lines — never
 diff `PreviousFields`, re-read the Vault object after every `LoanManage`, coalesce an absent `LossUnrealized`
-to `"0"`, and parse the decimal strings at full precision. Working out that it was necessary took a day, and
-from the timestamps on #6487 it looks like it took @zgrguric one too.
+to `"0"`, and parse the decimal strings at full precision. Working out that it was necessary took us a day,
+and we only trusted the conclusion after reproducing it twice.
