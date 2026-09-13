@@ -8,7 +8,7 @@ import type { BrokerHistory, Collateral, Gate, Health, IndexerRace, Resolution, 
 import { HeaderBar } from './components/HeaderBar'
 import { StaleBar } from './components/StaleBar'
 import { Portfolio } from './screens/Portfolio'
-import { Facility } from './screens/Facility'
+import { Facility, Ladder } from './screens/Facility'
 import { Event } from './screens/Event'
 import { Methodology } from './screens/Methodology'
 import { Evidence } from './screens/Evidence'
@@ -73,6 +73,10 @@ function FacilityPlaceholder() {
           </div>
         ))}
       </dl>
+      {/* The scale is part of the document, so it is drawn here too — extinguished, and
+          reading an em-dash. Leaving it out would make the withheld desk a different shape
+          from the one figures arrive into; lighting a notch would invent a grade. */}
+      <Ladder />
     </section>
   )
 }
@@ -189,10 +193,6 @@ function Desk() {
   const painted = useRef(false)
   useEffect(() => { painted.current = true }, [])
 
-  const portfolioStatus = {
-    ageMs: vaults.ageMs, fails: vaults.fails, error: vaults.error,
-  }
-
   function body() {
     if (path === '/evidence') {
       return <Evidence d={race.data} />
@@ -215,7 +215,6 @@ function Desk() {
             )}
             <Portfolio
               vaults={[]} receivedAt={0} tick={tick}
-              status={{ ...portfolioStatus, railOnScreen: vaults.fails > 0 }}
               onOpen={() => navigate('/facility', null)}
             />
           </div>
@@ -224,8 +223,6 @@ function Desk() {
       return (
         <Portfolio
           vaults={rows} receivedAt={vaults.receivedAt} tick={tick}
-          stamp={vaults.data ?? undefined}
-          status={portfolioStatus}
           onOpen={id => navigate('/facility', id)}
         />
       )

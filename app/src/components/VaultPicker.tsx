@@ -20,8 +20,11 @@ export function FacilityPicker({ vaults, activeVaultId, onSelect }: {
     : vaults.length ? 'select a facility' : 'none on file'
 
   return (
+    // No caption. The tab beside this already says "Facility"; captioning the control
+    // "facility" too put the same word twice in one bar and told the reader nothing about
+    // which of the two did what. The tab chooses the view, this chooses the name — and it
+    // says which name it is holding, which is the only label it needs.
     <span className="picker" data-picker onKeyDown={e => e.stopPropagation()}>
-      <span className="label">facility</span>
       <DropdownMenu>
         <DropdownMenuTrigger disabled={vaults.length === 0} className="picker-btn">
           <span className="picker-label">{label}</span>
