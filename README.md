@@ -332,9 +332,11 @@ GET  /api/mpt/:mptIssuanceId/resolve      # CORS-open
 The backend is a long-running process, a 4-second reader over a WebSocket, so it runs as a container. The
 frontend is static and runs on Vercel.
 
-**Backend.** `Dockerfile` and `railway.json` are at the root. On Railway, create a service from this
-repository: it builds the image, sets `PORT` and health-checks `/api/health`. Then generate a public domain
-for the service. Any other Docker host works the same way:
+**Backend.** `Dockerfile`, `render.yaml` and `railway.json` are at the root; no CLI is needed for either
+platform. On **Render**: New, then Blueprint, then this repository. It reads `render.yaml`, builds the image,
+injects `PORT`, health-checks `/api/health`, and asks only for the two values marked `sync: false`. On
+**Railway**: create a service from this repository and generate a public domain for it. Any other Docker
+host works the same way:
 
 ```bash
 docker build -t orma-api . && docker run -p 8787:8787 orma-api

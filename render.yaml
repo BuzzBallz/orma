@@ -1,0 +1,41 @@
+# Render blueprint for the reader and its HTTP API.
+#
+# The frontend is static and deploys separately from app/ (Vercel, root directory `app`).
+# This describes the long-running half: a 4-second poller over a WebSocket to Devnet, which
+# is why it is a container and not a serverless function.
+#
+# To use it: Render dashboard -> New -> Blueprint -> pick this repository. Render reads this
+# file, creates the service with the health check and the environment already set, and asks
+# only for the values marked `sync: false`.
+services:
+  - type: web
+    name: orma-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    # Paris. Change it if the judges are somewhere else; it only affects latency.
+    region: frankfurt
+    autoDeploy: true
+    # Answers 200 before the first ledger read lands, so a deploy is not held up by the
+    # WebSocket handshake. `ok` turns true once a snapshot exists.
+    healthCheckPath: /api/health
+    envVars:
+      # PORT is injected by Render and read by the API. Do not set it here.
+      - key: NODE_ENV
+        value: production
+      - key: XRPL_WS
+        value: wss://s.devnet.rippletest.net:51233
+      - key: LOG_LEVEL
+        value: info
+      # Publishing the score as XLS-47 Oracle objects. Left unset on purpose.
+      #
+      # TWO PROCESSES MUST NOT PUBLISH FROM THE SAME ACCOUNT: they race each other for
+      # sequence numbers and both fail. If the demo laptop is publishing, either leave this
+      # empty here, or give this service a DIFFERENT seed. Without it every figure is still
+      # served and the oracle field reads null.
+      - key: PUBLISH_SEED
+        sync: false
+      # Opens the operator routes to requests carrying a matching x-demo-key. Without it
+      # they answer loopback only, which inside a container means nobody.
+      - key: DEMO_KEY
+        sync: false
