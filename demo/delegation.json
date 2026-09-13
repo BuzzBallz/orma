@@ -1,0 +1,51 @@
+{
+  "probedAt": "2026-09-13T07:29:41Z",
+  "probedDuring": "XRPL Lending Protocol Hackathon, Paris, 12-13 September 2026",
+  "network": "devnet",
+  "buildVersion": "3.4.0-rc5",
+  "question": "Can a vault owner delegate LoanManage authority to an independent third party under XLS-75?",
+  "answer": "No. Delegation works on this network, and the lending suite is specifically not delegable.",
+  "control": {
+    "permission": "Payment",
+    "code": "tesSUCCESS",
+    "hash": "547DA71992D469ACA345A0B3CEAD07864E2801919201B256EA606C3A7910AF17",
+    "note": "Positive control. Delegation demonstrably works on this network."
+  },
+  "lendingSuite": [
+    {
+      "permission": "LoanManage",
+      "code": "temMALFORMED",
+      "onLedger": false
+    },
+    {
+      "permission": "VaultCreate",
+      "code": "temMALFORMED",
+      "onLedger": false
+    },
+    {
+      "permission": "VaultDeposit",
+      "code": "temMALFORMED",
+      "onLedger": false
+    },
+    {
+      "permission": "LoanBrokerSet",
+      "code": "temMALFORMED",
+      "onLedger": false
+    },
+    {
+      "permission": "LoanSet",
+      "code": "temMALFORMED",
+      "onLedger": false
+    },
+    {
+      "permission": "VaultWithdraw",
+      "code": "temMALFORMED",
+      "onLedger": false
+    }
+  ],
+  "whyNoHashes": "A tem result is rejected at submission. It never reaches a ledger and is never assigned a slot, so it has no transaction hash. The positive control carries one because it succeeded.",
+  "accounts": {
+    "owner": "rG1rKEDnW2HWkQdjjREtC78kPFKpwGu2H2",
+    "delegate": "rHK8rwcvywYrv6AJ8HW1J8byKBiJEBRYH4"
+  }
+}
