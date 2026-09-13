@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { RotateCcw } from 'lucide-react'
 import type { VaultRow } from '../lib/types'
-import { Chip } from '../components/Chip'
+import { GradeLetter } from '../components/GradeLetter'
 import { Countdown } from '../components/Countdown'
 import { gradeTone, gradeIndex, GRADE_LADDER } from '../lib/grades'
 import { useFlash } from '../lib/useFlash'
@@ -97,7 +97,7 @@ function Row({ v, i, receivedAt, tick, onOpen }: {
       </TableCell>
       <TableCell>
         <Tooltip>
-          <TooltipTrigger asChild><span><Chip tone={gradeTone(v.grade)}>{v.grade}</Chip></span></TooltipTrigger>
+          <TooltipTrigger asChild><span><GradeLetter grade={v.grade} /></span></TooltipTrigger>
           <TooltipContent className="tip" side="right">
             <b>{v.grade}</b> — step {gradeIndex(v.grade) + 1} of {GRADE_LADDER.length} on the
             internal scale. AAA is the strongest, D the weakest. The portfolio is ordered
@@ -151,13 +151,13 @@ export function Portfolio({ vaults, receivedAt, tick, onOpen }: {
   return (
     <section className="panel blotter">
       <div className="row" style={{ marginBottom: 16, alignItems: 'baseline' }}>
-        <h2 className="panel-title" style={{ margin: 0 }}>portfolio</h2>
+        <h2 className="panel-title" style={{ margin: 0 }}>Portfolio</h2>
         <span className="num mute" style={{ fontSize: 'var(--t-xs)' }}>
-          {withheld ? 'weakest first' : `${vaults.length} facilities · weakest first`}
+          {withheld ? 'Weakest First' : `${vaults.length} Facilities · Weakest First`}
         </span>
         {sorted && (
           <Button variant="ghost" size="xs" className="btn-term" onClick={() => setSort(DEFAULT_SORT)}>
-            <RotateCcw size={11} strokeWidth={2.25} /> weakest first
+            <RotateCcw size={11} strokeWidth={2.25} /> Weakest First
           </Button>
         )}
         <span className="spacer" />
@@ -171,21 +171,21 @@ export function Portfolio({ vaults, receivedAt, tick, onOpen }: {
                  to four reads as a different document, and the reader is left wondering
                  what the other two said. Same shape, nothing in it. */
               <TableRow>
-                <TableHead>facility</TableHead>
-                <TableHead>internal score</TableHead>
-                <TableHead>status</TableHead>
-                <TableHead className="rt">reported vs held</TableHead>
-                <TableHead className="rt">next event</TableHead>
-                <TableHead>outlook</TableHead>
+                <TableHead>Facility</TableHead>
+                <TableHead>Internal Score</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="rt">Reported vs Held</TableHead>
+                <TableHead className="rt">Next Event</TableHead>
+                <TableHead>Outlook</TableHead>
               </TableRow>
             ) : (
               <TableRow>
-                <Th k="label" label="facility" sort={sort} onSort={toggle} />
-                <Th k="gradeNumeric" label="internal score" sort={sort} onSort={toggle} />
-                <Th k="phase" label="status" sort={sort} onSort={toggle} />
-                <Th k="navDivergenceBps" label="reported vs held" rt sort={sort} onSort={toggle} />
-                <Th k="secondsToRedemption" label="next event" rt sort={sort} onSort={toggle} />
-                <Th k="trend" label="outlook" sort={sort} onSort={toggle} />
+                <Th k="label" label="Facility" sort={sort} onSort={toggle} />
+                <Th k="gradeNumeric" label="Internal Score" sort={sort} onSort={toggle} />
+                <Th k="phase" label="Status" sort={sort} onSort={toggle} />
+                <Th k="navDivergenceBps" label="Reported vs Held" rt sort={sort} onSort={toggle} />
+                <Th k="secondsToRedemption" label="Next Event" rt sort={sort} onSort={toggle} />
+                <Th k="trend" label="Outlook" sort={sort} onSort={toggle} />
               </TableRow>
             )}
           </TableHeader>

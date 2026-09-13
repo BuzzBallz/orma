@@ -61,18 +61,18 @@ export function Event({ d, tick }: { d: VaultDetail; tick: number }) {
     <div className="stack">
       <section className="panel">
         <div className="row" style={{ marginBottom: 14, alignItems: 'baseline' }}>
-          <h2 className="panel-title" style={{ margin: 0 }}>next event</h2>
+          <h2 className="panel-title" style={{ margin: 0 }}>Next Event</h2>
           <span className="num mute" style={{ fontSize: 'var(--t-xs)' }}>{facilityName(v)}</span>
           <span className="spacer" />
           <span className="num mute" style={{ fontSize: 'var(--t-xs)' }}>
-            figures received {fmtIso(d.serverTime)}
+            Figures Received {fmtIso(d.serverTime)}
           </span>
         </div>
 
         {next ? (
           <div className="ev-lead">
             <div>
-              <div className="label">next</div>
+              <div className="label">Next</div>
               <div className="ev-what">{next.what}</div>
               <div className="ev-who">{next.who}</div>
             </div>

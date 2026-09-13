@@ -30,7 +30,7 @@ export function SignInButton() {
           onFocus={prefetch}
           onClick={() => { prefetch(); setOpen(true) }}
         >
-          <UserRound size={12} strokeWidth={2.25} /> sign in
+          <UserRound size={12} strokeWidth={2.25} /> Sign In
         </Button>
         <SignInDialog open={open} onOpenChange={setOpen} />
       </>

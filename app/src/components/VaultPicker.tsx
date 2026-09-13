@@ -1,8 +1,7 @@
 import { ChevronDown } from 'lucide-react'
 import type { VaultRow } from '../lib/types'
-import { gradeTone } from '../lib/grades'
 import { facilityName } from '../lib/credit'
-import { Chip } from './Chip'
+import { GradeLetter } from './GradeLetter'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -17,7 +16,7 @@ export function FacilityPicker({ vaults, activeVaultId, onSelect }: {
 
   const label = active
     ? facilityName(active)
-    : vaults.length ? 'select a facility' : 'none on file'
+    : vaults.length ? 'Select a Facility' : 'None on File'
 
   return (
     // No caption. The tab beside this already says "Facility"; captioning the control
@@ -28,11 +27,11 @@ export function FacilityPicker({ vaults, activeVaultId, onSelect }: {
       <DropdownMenu>
         <DropdownMenuTrigger disabled={vaults.length === 0} className="picker-btn">
           <span className="picker-label">{label}</span>
-          {active && <Chip tone={gradeTone(active.grade)}>{active.grade}</Chip>}
+          {active && <GradeLetter grade={active.grade} size="sm" />}
           <ChevronDown className="chev" size={12} strokeWidth={2.25} aria-hidden />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" sideOffset={6} data-picker className="picker-list">
-          <DropdownMenuLabel className="label">facilities · weakest first</DropdownMenuLabel>
+          <DropdownMenuLabel className="label">Facilities · Weakest First</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {vaults.map(v => (
             <DropdownMenuItem
@@ -42,7 +41,7 @@ export function FacilityPicker({ vaults, activeVaultId, onSelect }: {
             >
               <span className="picker-name">{facilityName(v)}</span>
               <span className="spacer" />
-              <Chip tone={gradeTone(v.grade)}>{v.grade}</Chip>
+              <GradeLetter grade={v.grade} size="sm" />
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>

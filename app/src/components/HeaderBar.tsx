@@ -20,13 +20,13 @@ function StatusBadge({ health, unreachable }: { health: Health | null; unreachab
     >
       <Icon size={12} strokeWidth={2.25} aria-hidden />
       <span className={'dot' + (withheld ? ' waiting' : '')} />
-      {withheld ? 'figures withheld' : 'figures received'}
+      {withheld ? 'Figures Withheld' : 'Figures Received'}
     </Badge>
   )
 }
 
-// 'verification' last, and named for what it proves rather than for how it works: it is
-// the only tab addressed to an engineer, and it should not be the first thing an analyst
+// 'Evidence' last, and named for what it proves rather than for how it works: it is the
+// only tab addressed to an engineer, and it should not be the first thing an analyst
 // reaches for.
 /** Protocol documentation. Overridable so a preview build can point at its own copy. */
 const DOCS_URL = import.meta.env.VITE_DOCS_URL
@@ -79,7 +79,7 @@ export function HeaderBar({ health, healthUnreachable, vaults, activeVaultId, pa
           desk that is watched live the time is the part that says the figures are current,
           and the date is today. Splitting it here is what lets the facility picker keep a
           usable width instead of absorbing the whole overflow. */}
-      <span className="meta keep">as of <b>
+      <span className="meta keep">As of <b>
         {asOf
           ? <><span className="on-day">{fmtIso(asOf).slice(0, 11)}</span>{fmtIso(asOf).slice(11)}</>
           : '—'}
@@ -100,7 +100,7 @@ export function HeaderBar({ health, healthUnreachable, vaults, activeVaultId, pa
           reader, it leaves this application, and pretending otherwise by putting it in the
           tab strip would be a small lie about where a click takes you. */}
       <a className="docs-link" href={DOCS_URL} target="_blank" rel="noreferrer noopener">
-        docs
+        Docs
         <svg viewBox="0 0 12 12" aria-hidden="true">
           <path d="M4.5 2.5h5v5M9.5 2.5 4 8M8 9.5H2.5V4" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>

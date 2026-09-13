@@ -70,14 +70,14 @@ export function Evidence({ d, name }: { d: IndexerRace | null; name?: string }) 
             </b>
           </div>
         </div>
-        <p className="ev-under">same transaction, same record.</p>
+        <p className="ev-under">Same transaction, same record.</p>
 
         <table className="tbl ev-tbl">
           <thead>
             <tr>
-              <th>field</th>
-              <th>before</th>
-              <th>after</th>
+              <th>Field</th>
+              <th>Before</th>
+              <th>After</th>
             </tr>
           </thead>
           <tbody>

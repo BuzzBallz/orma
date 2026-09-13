@@ -8,7 +8,7 @@ export function StaleBar({ ageMs }: { ageMs: number; fails?: number }) {
       {/* The badge in the chrome already says figures are withheld. Repeating it here put
           the same two words twice on one screen and left the bar's own job — saying how old
           the figures below are — as an afterthought. The age is the whole point of the bar. */}
-      <span className="k">last received</span>
+      <span className="k">Last Received</span>
       <span>the numbers below are {Math.floor(ageMs / 1000)}s old</span>
     </div>
   )

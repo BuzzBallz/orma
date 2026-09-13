@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { BrokerHistory, Collateral, Gate, Resolution, VaultDetail } from '../lib/types'
-import { Chip } from '../components/Chip'
-import { GRADE_LADDER, gradeFill, gradeIndex, gradeTone } from '../lib/grades'
+import { GradeLetter } from '../components/GradeLetter'
+import { GRADE_LADDER, gradeFill, gradeIndex, letterTone } from '../lib/grades'
 import { bpsToPct, dropsToXrp, duration, fmtIso, ratioToPct, rateToPct } from '../lib/format'
 import { creditText, facilityName, facilityRef, factorRows, outlookOf, splitFactors } from '../lib/credit'
 import { ManagerConduct, PledgedCollateral } from './FacilityExhibits'
@@ -19,65 +19,55 @@ function F({ k, v, note }: { k: string; v: ReactNode; note?: string }) {
 }
 
 /**
- * The internal scale, drawn.
+ * The internal scale: one track, filled to where this facility sits.
  *
- * "3 of 20" is precise and says nothing about distance: a reader who does not carry the
- * ladder in their head cannot tell whether the third step is near the top or halfway down.
- * Every notch is here, AAA on the left and D on the right, and exactly one is marked.
+ * It was twenty separate rectangles, which drew the mechanism rather than the reading —
+ * a reader had to count boxes to learn anything. A rating is a position on a continuum,
+ * so it is now a continuum: the track runs AAA to D and the fill runs from AAA to here.
+ * The further right it reaches, the worse the facility is, which is the direction a
+ * credit reader already expects a risk bar to move in.
  *
- * The unmarked notches are deliberately uncoloured. A twenty-step colour ramp would be a
- * chart of nothing — the tone belongs to this facility's own step, which is the only place
- * in the strip that carries a judgement.
+ * The fill comes from `gradeFill`, which is the payload's own position on the scale —
+ * 1.0 at AAA and 0.0 at D. The track fills in the opposite direction, so the fraction is
+ * its complement expressed in steps: AAA is 1/20, D is 20/20. Nothing is interpolated.
  *
- * With no grade on file the strip still draws, every notch extinguished and the reading an
- * em-dash. An empty scale is a true statement; a scale with a notch lit somewhere plausible
- * would be a figure nobody sent.
+ * With no grade on file the track is empty. Not a faint fill, not a fill at some
+ * plausible middle — empty, and the reading is an em-dash. A bar with something in it is
+ * a claim, and there is nothing here to claim.
  */
 export function Ladder({ grade }: { grade?: string | null }) {
+  const N = GRADE_LADDER.length
   const i = grade ? gradeIndex(grade) : -1
   const known = i >= 0
-  // gradeFill() is the payload's own position on the scale, 1.0 at AAA and 0.0 at D. It
-  // is what places the marker; nothing here interpolates, and an unknown grade places
-  // nothing at all rather than defaulting to a notch the backend never sent.
-  const fill = known ? gradeFill(GRADE_LADDER[i]) : null
-  const N = GRADE_LADDER.length
-  const W = 240, GAP = 2.2
-  const nw = (W - GAP * (N - 1)) / N
-  const x = (n: number) => n * (nw + GAP)
+  const fill = known ? 1 - gradeFill(GRADE_LADDER[i]) * ((N - 1) / N) : 0
+  const pct = (fill * 100).toFixed(2) + '%'
 
   return (
     <div className="ladder">
-      <svg
-        className="ladder-svg" viewBox={`0 0 ${W} 26`} preserveAspectRatio="none"
+      <div
+        className="lad-track"
         role="img"
         aria-label={known
           ? `${grade}: step ${i + 1} of ${N} on the internal scale, AAA strongest, D weakest`
-          : `Internal scale, AAA to D. No grade on file.`}
+          : 'Internal scale, AAA to D. No grade on file.'}
       >
-        {GRADE_LADDER.map((g, n) => {
-          const here = n === i
-          return (
-            <rect
-              key={g} x={x(n)} y={here ? 0 : 9} width={nw} height={here ? 26 : 8} rx="1.2"
-              className={here ? 'lad-here' : 'lad-off'}
-              style={here ? { fill: `var(${gradeTone(g)})` } : undefined}
-            />
-          )
-        })}
-      </svg>
+        {known && (
+          <span
+            className="lad-fill"
+            style={{ width: pct, ['--tone' as string]: `var(${letterTone(grade!)})` }}
+          />
+        )}
+      </div>
       <div className="ladder-ends">
         <span>AAA</span>
-        {/* The notch, named. A marked tick tells you where; only the label tells you what,
-            and a reader who does not carry AAA..D in their head needs both. Withheld, it
-            is an em-dash — the scale still draws, extinguished, and claims nothing. */}
+        {/* The position, named. The bar says how far along; only this says what that
+            step is called, and a reader who does not carry AAA..D in their head needs
+            both. Withheld, it is an em-dash and the track above it is empty. */}
         <b className="ladder-read">
           {known ? <>{grade} · {i + 1} of {N}</> : <>—</>}
         </b>
         <span>D</span>
       </div>
-      {fill !== null && (
-        <span className="sr-only">Scale fill {(fill * 100).toFixed(0)} per cent.</span>
-      )}
     </div>
   )
 }
@@ -144,11 +134,11 @@ export function Facility({ d, history, collateral, resolution, gate }: {
 
         <header className="op-top">
           <div className="op-kind">
-            <span className="label">credit opinion</span>
+            <span className="label">Credit Opinion</span>
             <span className="op-date">
               {d.serverTime
-                ? <>figures received {fmtIso(d.serverTime)}</>
-                : <>figures withheld</>}
+                ? <>Figures Received {fmtIso(d.serverTime)}</>
+                : <>Figures Withheld</>}
             </span>
           </div>
           <h1 className="op-title">{name}</h1>
@@ -229,7 +219,7 @@ export function Facility({ d, history, collateral, resolution, gate }: {
                         <td><b>{f.name}</b></td>
                         <td className="op-says">{f.says}</td>
                         <td className="rt">
-                          {worst ? <Chip tone={gradeTone(worst.grade)}>{worst.grade}</Chip> : 'n.a.'}
+                          <GradeLetter grade={worst?.grade} />
                         </td>
                       </tr>
                     )
@@ -243,23 +233,23 @@ export function Facility({ d, history, collateral, resolution, gate }: {
             <div className="op-box">
               <div className="label">Ratings</div>
               <dl className="op-ratings">
-                <F k="internal score" v={<Chip tone={gradeTone(v.grade)} large>{v.grade}</Chip>} />
-                <F k="outlook" v={outlook} />
-                <F k="status" v={v.phase} />
-                <F k="scale position" v={`${gradeIndex(v.grade) + 1} of ${GRADE_LADDER.length}`} />
-                <F k="scored at" v={d.score.computedAt ? fmtIso(d.score.computedAt) : 'n.a.'} />
+                <F k="Internal Score" v={<GradeLetter grade={v.grade} size="lg" />} />
+                <F k="Outlook" v={outlook} />
+                <F k="Status" v={v.phase} />
+                <F k="Scale Position" v={`${gradeIndex(v.grade) + 1} of ${GRADE_LADDER.length}`} />
+                <F k="Scored At" v={d.score.computedAt ? fmtIso(d.score.computedAt) : 'n.a.'} />
               </dl>
               <Ladder grade={v.grade} />
             </div>
 
             <div className="op-box">
-              <div className="label">At a glance</div>
+              <div className="label">At a Glance</div>
               <dl className="op-ratings">
-                <F k="reported unit value" v={v.navNaive} />
-                <F k="held unit value" v={v.navCorrect} />
-                <F k="reported vs held" v={`${v.navDivergenceBps} bps`} note={`(${gapPct})`} />
-                <F k="exposures" v={`${v.loanCount}`} note={`· ${v.distressedLoanCount} non-performing`} />
-                <F k="remaining term" v={v.secondsToRedemption > 0 ? duration(v.secondsToRedemption) : 'past due'} />
+                <F k="Reported Unit Value" v={v.navNaive} />
+                <F k="Held Unit Value" v={v.navCorrect} />
+                <F k="Reported vs Held" v={`${v.navDivergenceBps} bps`} note={`(${gapPct})`} />
+                <F k="Exposures" v={`${v.loanCount}`} note={`· ${v.distressedLoanCount} non-performing`} />
+                <F k="Remaining Term" v={v.secondsToRedemption > 0 ? duration(v.secondsToRedemption) : 'past due'} />
               </dl>
             </div>
 
@@ -280,7 +270,7 @@ export function Facility({ d, history, collateral, resolution, gate }: {
       {/* ─────────────────────────── page 2 ─────────────────────────── */}
       <div className="op-page op-break">
         <header className="op-top slim">
-          <span className="label">credit opinion · continued</span>
+          <span className="label">Credit Opinion · Continued</span>
           <span className="op-date">{name}</span>
         </header>
 
@@ -341,7 +331,7 @@ export function Facility({ d, history, collateral, resolution, gate }: {
                     <tr key={dim.key} data-dim={dim.key}>
                       <td><b>{creditText(dim.label)}</b></td>
                       <td className="rt num">{dim.value}{dim.unit === 'pct' ? '%' : dim.unit && dim.unit !== 'none' ? ` ${dim.unit}` : ''}</td>
-                      <td className="rt"><Chip tone={gradeTone(dim.grade)}>{dim.grade}</Chip></td>
+                      <td className="rt"><GradeLetter grade={dim.grade} /></td>
                       <td className="op-says">{creditText(dim.explain)}</td>
                     </tr>
                   ))}
@@ -402,7 +392,7 @@ export function Facility({ d, history, collateral, resolution, gate }: {
             </div>
 
             <div className="op-box">
-              <div className="label">Asset performance</div>
+              <div className="label">Asset Performance</div>
               <p className="op-profile">
                 {v.distressedLoanCount} of {v.loanCount} exposures non-performing.{' '}
                 {overdue > 0
@@ -413,7 +403,7 @@ export function Facility({ d, history, collateral, resolution, gate }: {
             </div>
 
             <div className="op-box">
-              <div className="label">Liquidity and redemptions</div>
+              <div className="label">Liquidity and Redemptions</div>
               <p className="op-profile">
                 {dropsToXrp(v.assetsAvailable)} available of {dropsToXrp(v.assetsTotal)}.
                 Redemption {fmtIso(v.redemptionAt)}

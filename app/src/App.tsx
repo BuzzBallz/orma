@@ -68,7 +68,7 @@ function FacilityPlaceholder() {
         <span className="slot-dash">—</span>
       </div>
       <dl className="slot-grid">
-        {['internal score', 'outlook', 'status', 'reported vs held', 'coverage', 'remaining term'].map(k => (
+        {['Internal Score', 'Outlook', 'Status', 'Reported vs Held', 'Coverage', 'Remaining Term'].map(k => (
           <div key={k} style={{ display: 'contents' }}>
             <dt className="label">{k}</dt><dd className="num mute">n.a.</dd>
           </div>
@@ -215,7 +215,7 @@ function Desk() {
               <Note
                 heading="Figures withheld" tone="var(--bad)"
                 said={<>The five facilities are on file. No figure is shown until one is received.</>}
-                facts={[['last received', vaults.ageMs > 0 ? `${Math.round(vaults.ageMs / 1000)}s ago` : 'not yet']]}
+                facts={[['Last Received', vaults.ageMs > 0 ? `${Math.round(vaults.ageMs / 1000)}s ago` : 'not yet']]}
               />
             )}
             <Portfolio
