@@ -213,9 +213,15 @@ export function Facility({ d, history, collateral, resolution, gate }: {
               <p>
                 {d.phaseInfo.canWithdraw
                   ? <>Withdrawals are open.</>
-                  : <>Withdrawals are closed{d.phaseInfo.withdrawBlockedReason ? <>: {creditText(d.phaseInfo.withdrawBlockedReason)}</> : '.'}</>}
-                {' '}The next scheduled boundary is {fmtIso(d.phaseInfo.nextBoundaryAt)},
-                in {duration(Math.abs(d.phaseInfo.secondsToNextBoundary))}.
+                  : <>Withdrawals are closed{d.phaseInfo.withdrawBlockedReason ? <>: {creditText(d.phaseInfo.withdrawBlockedReason)}</> : null}.</>}
+                {/* A boundary that has already gone by is said to have gone by. Taking the
+                    absolute value and always writing "in" turned every overrun into time
+                    still in hand, which is the one direction a credit note must not err in. */}
+                {d.phaseInfo.secondsToNextBoundary < 0
+                  ? <> That boundary was {fmtIso(d.phaseInfo.nextBoundaryAt)},
+                      {' '}{duration(-d.phaseInfo.secondsToNextBoundary)} ago.</>
+                  : <> The next scheduled boundary is {fmtIso(d.phaseInfo.nextBoundaryAt)},
+                      {' '}in {duration(d.phaseInfo.secondsToNextBoundary)}.</>}
               </p>
               <p>
                 Resolution depends on whether performing exposures mature before the
