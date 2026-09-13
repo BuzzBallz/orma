@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import type { BrokerHistory, Collateral, Gate, Resolution, VaultDetail } from '../lib/types'
 import { GradeLetter } from '../components/GradeLetter'
 import { GRADE_LADDER, gradeFill, gradeIndex, letterTone } from '../lib/grades'
+import { nextBeat } from '../lib/beats'
 import { bpsToPct, dropsToXrp, duration, fmtIso, ratioToPct, rateToPct } from '../lib/format'
 import { creditText, facilityName, facilityRef, factorRows, outlookOf, splitFactors } from '../lib/credit'
 import { ManagerConduct, PledgedCollateral } from './FacilityExhibits'
@@ -109,6 +110,7 @@ export function Facility({ d, history, collateral, resolution, gate }: {
     : null
   const overdue = d.loans.filter(l => l.secondsUntilDue < 0).length
   const redemptionShortfall = d.phaseInfo.projectedShortfall
+  const next = nextBeat(d)
 
   return (
     <article className="opinion">
@@ -173,7 +175,7 @@ export function Facility({ d, history, collateral, resolution, gate }: {
             </Section>
 
             <div className="op-two">
-              <Section title="Credit strengths" tight>
+              <Section title="Credit Strengths" tight>
                 {strengths.length ? (
                   <ul className="op-list">
                     {strengths.map(s => (
@@ -193,7 +195,7 @@ export function Facility({ d, history, collateral, resolution, gate }: {
                   </p>
                 )}
               </Section>
-              <Section title="Credit challenges" tight>
+              <Section title="Credit Challenges" tight>
                 <ul className="op-list">
                   {challenges.map(s => (
                     <li key={s.key}>
@@ -204,7 +206,7 @@ export function Facility({ d, history, collateral, resolution, gate }: {
               </Section>
             </div>
 
-            <Section title="Exhibit 1 · Factor scores">
+            <Section title="Exhibit 1 · Factor Scores">
               <table className="op-tbl">
                 <thead>
                   <tr><th>Factor</th><th>What it measures</th><th className="rt">Score</th></tr>
@@ -229,6 +231,11 @@ export function Facility({ d, history, collateral, resolution, gate }: {
             </Section>
           </div>
 
+          {/* The rail carries the reading; the column beside it carries the argument.
+              Everything here used to be spread down the left-hand side as a loose list, or
+              was two pages away in a prose box — a reader had to scroll, and then open a
+              second tab, to answer "how bad, against what, and when". It is four blocks
+              now, and on a tall window it stays put while the note scrolls under it. */}
           <aside className="op-side">
             <div className="op-box">
               <div className="label">Ratings</div>
@@ -236,20 +243,51 @@ export function Facility({ d, history, collateral, resolution, gate }: {
                 <F k="Internal Score" v={<GradeLetter grade={v.grade} size="lg" />} />
                 <F k="Outlook" v={outlook} />
                 <F k="Status" v={v.phase} />
-                <F k="Scale Position" v={`${gradeIndex(v.grade) + 1} of ${GRADE_LADDER.length}`} />
                 <F k="Scored At" v={d.score.computedAt ? fmtIso(d.score.computedAt) : 'n.a.'} />
               </dl>
+            </div>
+
+            {/* The scale, on its own. Its reading names the step — "AAA · 1 of 20" — which
+                is the scale position that used to sit above it as a second row saying the
+                same thing twice. */}
+            <div className="op-box op-scale">
               <Ladder grade={v.grade} />
             </div>
 
             <div className="op-box">
               <div className="label">At a Glance</div>
               <dl className="op-ratings">
-                <F k="Reported Unit Value" v={v.navNaive} />
-                <F k="Held Unit Value" v={v.navCorrect} />
-                <F k="Reported vs Held" v={`${v.navDivergenceBps} bps`} note={`(${gapPct})`} />
-                <F k="Exposures" v={`${v.loanCount}`} note={`· ${v.distressedLoanCount} non-performing`} />
+                <F k="Reported" v={v.navNaive} />
+                <F k="Held" v={v.navCorrect} />
+                <F k="Gap" v={`${v.navDivergenceBps} bps`} note={`(${gapPct})`} />
+                {/* Coverage was a paragraph on page two. The figure a reader wants first is
+                    what is posted against what is required; the paragraph still says the
+                    rest. */}
+                <F
+                  k="Coverage"
+                  v={dropsToXrp(d.broker.coverAvailable)}
+                  note={`of ${dropsToXrp(d.broker.coverRequired)} required`}
+                />
                 <F k="Remaining Term" v={v.secondsToRedemption > 0 ? duration(v.secondsToRedemption) : 'past due'} />
+                <F k="Exposures" v={`${v.loanCount}`} note={`· ${v.distressedLoanCount} non-performing`} />
+              </dl>
+            </div>
+
+            {/* What falls due next, so the calendar tab is a place to go for detail rather
+                than a place to go for the headline. Same builder as that desk uses, so the
+                two can never disagree. */}
+            <div className="op-box">
+              <div className="label">Next Event</div>
+              <dl className="op-ratings">
+                <F k={next ? next.what : 'Nothing on file'} v={next?.when ? fmtIso(next.when) : '—'} />
+                <F
+                  k="Due"
+                  v={next
+                    ? next.inSeconds < 0
+                      ? `${duration(-next.inSeconds)} ago`
+                      : `in ${duration(next.inSeconds)}`
+                    : '—'}
+                />
               </dl>
             </div>
 
@@ -306,7 +344,7 @@ export function Facility({ d, history, collateral, resolution, gate }: {
 
             {/* Steps ALREADY APPLIED, not prospective triggers. The anchor carries a
                 zero delta and is dropped: "taking AAA to AAA" is not a reason. */}
-            <Section title="Why the score sits below the anchor">
+            <Section title="Why the Score Sits Below the Anchor">
               <ul className="op-list">
                 {d.score.notchTrace.filter(s => s.delta !== 0).slice(-4).map((s, i) => (
                   <li key={i}>{creditText(s.rule)} — {s.delta} notch{Math.abs(s.delta) === 1 ? '' : 'es'}, taking {s.from} to {s.to}.</li>
@@ -321,7 +359,7 @@ export function Facility({ d, history, collateral, resolution, gate }: {
                 with. This is the same five factors, ungrouped, in the order the
                 calculation agent sends them, each with the figure it was scored on —
                 nothing summarised away. */}
-            <Section title="Exhibit 2 · Measured factors">
+            <Section title="Exhibit 2 · Measured Factors">
               <table className="op-tbl factors">
                 <thead>
                   <tr><th>Factor</th><th className="rt">Measured</th><th className="rt">Score</th><th>Basis</th></tr>
@@ -344,7 +382,7 @@ export function Facility({ d, history, collateral, resolution, gate }: {
             <PledgeResolution r={resolution ?? null} />
             <EntryGate g={gate ?? null} />
 
-            <Section title="Key indicators">
+            <Section title="Key Indicators">
               <table className="op-tbl">
                 <thead>
                   <tr><th>Indicator</th><th className="rt">Value</th><th>Basis</th></tr>

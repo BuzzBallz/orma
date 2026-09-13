@@ -60,25 +60,79 @@ function Note({ heading, tone, said, aside, facts, action }: {
 }
 
 /** /facility with nothing selected: the shape of the note, with every field held open. */
-function FacilityPlaceholder() {
+/** One held-open rail row. */
+function Slot({ k }: { k: string }) {
   return (
-    <section className="panel ghost-desk rail slotdesk">
-      <h2 className="panel-title">credit opinion</h2>
-      <div className="slot-big">
-        <span className="slot-dash">—</span>
-      </div>
-      <dl className="slot-grid">
-        {['Internal Score', 'Outlook', 'Status', 'Reported vs Held', 'Coverage', 'Remaining Term'].map(k => (
-          <div key={k} style={{ display: 'contents' }}>
-            <dt className="label">{k}</dt><dd className="num mute">n.a.</dd>
+    <div className="kv">
+      <dt className="label">{k}</dt>
+      <dd className="num mute">n.a.</dd>
+    </div>
+  )
+}
+
+/**
+ * The credit opinion with every field held open.
+ *
+ * It used to be a different document: one narrow column of dashes beside a red banner
+ * announcing the state. But a reader arriving at a withheld desk should be looking at the
+ * shape figures will arrive into, not at a notice — and the state is already said once, in
+ * the chrome, which is where it belongs. So this is the same two columns, the same four
+ * rail blocks, in the same order, reading n.a. and em-dash throughout.
+ */
+function FacilityPlaceholder({ name, said }: { name?: string; said?: React.ReactNode }) {
+  return (
+    <article className="opinion">
+      <div className="op-page">
+        <header className="op-top">
+          <div className="op-kind">
+            <span className="label">Credit Opinion</span>
+            <span className="op-date">—</span>
           </div>
-        ))}
-      </dl>
-      {/* The scale is part of the document, so it is drawn here too — extinguished, and
-          reading an em-dash. Leaving it out would make the withheld desk a different shape
-          from the one figures arrive into; lighting a notch would invent a grade. */}
-      <Ladder />
-    </section>
+          <h1 className="op-title mute">{name ?? '—'}</h1>
+          <p className="op-sub">Lending facility · — · internal score — · outlook —</p>
+        </header>
+
+        <div className="op-grid">
+          <div className="op-main">
+            <section className="op-sec" data-sec="summary">
+              <h3 className="op-h">Summary</h3>
+              <p>{said ?? <>No figure is shown until one is received.</>}</p>
+            </section>
+          </div>
+
+          <aside className="op-side">
+            <div className="op-box">
+              <div className="label">Ratings</div>
+              <dl className="op-ratings">
+                <Slot k="Internal Score" /><Slot k="Outlook" />
+                <Slot k="Status" /><Slot k="Scored At" />
+              </dl>
+            </div>
+
+            {/* The scale is part of the document, so it is drawn here too — extinguished,
+                and reading an em-dash. Leaving it out would make the withheld desk a
+                different shape from the one figures arrive into; filling it would invent
+                a grade. */}
+            <div className="op-box op-scale"><Ladder /></div>
+
+            <div className="op-box">
+              <div className="label">At a Glance</div>
+              <dl className="op-ratings">
+                <Slot k="Reported" /><Slot k="Held" /><Slot k="Gap" />
+                <Slot k="Coverage" /><Slot k="Remaining Term" /><Slot k="Exposures" />
+              </dl>
+            </div>
+
+            <div className="op-box">
+              <div className="label">Next Event</div>
+              <dl className="op-ratings">
+                <Slot k="Nothing on file" /><Slot k="Due" />
+              </dl>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </article>
   )
 }
 
@@ -86,7 +140,7 @@ function FacilityPlaceholder() {
 function EventPlaceholder() {
   return (
     <section className="panel ghost-desk rail slotdesk">
-      <h2 className="panel-title">next event</h2>
+      <h2 className="panel-title">Next Event</h2>
       <div className="slot-big">
         <span className="slot-dash">—</span>
         <span className="slot-say">no scheduled event on file</span>
@@ -244,9 +298,9 @@ function Desk() {
               : <>The calendar covers one facility. Choose one from the portfolio.</>}
             action={
               <Button variant="outline" size="sm" className="btn-term" onClick={() => navigate('/', null)}>
-                <ArrowLeft size={12} strokeWidth={2.25} /> portfolio
+                <ArrowLeft size={12} strokeWidth={2.25} /> Portfolio
               </Button>}
-            facts={rows.length ? [['facilities on file', String(rows.length)]] : []}
+            facts={rows.length ? [['Facilities on File', String(rows.length)]] : []}
           />
         </div>
       )
@@ -261,9 +315,9 @@ function Desk() {
             said={<>No facility on file under that reference.</>}
             action={
               <Button variant="outline" size="sm" className="btn-term" onClick={() => navigate('/', null)}>
-                <ArrowLeft size={12} strokeWidth={2.25} /> portfolio
+                <ArrowLeft size={12} strokeWidth={2.25} /> Portfolio
               </Button>}
-            facts={[['reference', vaultId.slice(0, 12).toUpperCase()]]}
+            facts={[['Reference', vaultId.slice(0, 12).toUpperCase()]]}
           />
         </div>
       )
@@ -271,9 +325,23 @@ function Desk() {
 
     if (!detail.data) {
       if (detail.fails === 0) return null
+      // No banner. The chrome already reads "As of — Withheld", and a red heading beside
+      // a page of em-dashes was the same fact a third time. The desk shows the shape the
+      // figures will arrive into and says, once, why it is empty.
+      if (path === '/facility') {
+        // The blotter already knows this facility's name even while its detail is
+        // unreachable, so the page can be headed properly instead of by an em-dash.
+        const known = rows.find(r => r.vaultId === vaultId)
+        return (
+          <FacilityPlaceholder
+            name={known ? facilityName(known) : undefined}
+            said={<>This facility is on file. No figure is shown until one is received.</>}
+          />
+        )
+      }
       return (
         <div className="deskgrid">
-          {path === '/facility' ? <FacilityPlaceholder /> : <EventPlaceholder />}
+          <EventPlaceholder />
           <Note
             heading="Figures withheld" tone="var(--bad)"
             said={<>This facility is on file. No figure is shown until one is received.</>}

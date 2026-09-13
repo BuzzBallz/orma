@@ -804,7 +804,9 @@ kbd{
   background: color-mix(in srgb, var(--bg-1) 92%, transparent);
   border: 1px solid var(--line);
   border-radius: var(--r-panel);
-  padding: 28px 32px 24px;
+  /* 32px of side padding on a sheet that already sits inside a padded page was air
+     bought twice. */
+  padding: 20px;
 }
 
 .op-top{ border-bottom: 1px solid var(--line-2); padding-bottom: 16px; margin-bottom: 22px; }
@@ -817,7 +819,19 @@ kbd{
 }
 .op-sub{ margin: 0; font: var(--t-sm)/1.5 var(--mono); color: var(--fg-dim); }
 
-.op-grid{ display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 24px; align-items: start; }
+/* Twelve columns: eight for the argument, four for the reading.
+   A fixed 280px rail held the same width whether the window was 1100px or 1800px, which
+   made the note wander wider and wider beside a rail that never grew with it. */
+.op-grid{
+  display: grid;
+  grid-template-columns: minmax(0, 8fr) minmax(0, 4fr);
+  gap: 20px; align-items: start;
+}
+/* The rail stays with the reader. The note is the long document; the grade, the scale,
+   the figures and the next date are what you keep glancing back at, so they hold their
+   place while the argument scrolls under them. `align-self: start` is what lets a sticky
+   child work inside a grid that would otherwise stretch it to full height. */
+.op-side{ position: sticky; top: calc(var(--topbar) + 12px); align-self: start; }
 .op-main{ min-width: 0; display: flex; flex-direction: column; gap: 20px; }
 .op-side{ min-width: 0; display: flex; flex-direction: column; gap: 14px; }
 
@@ -854,7 +868,9 @@ kbd{
 .op-box{ border: 1px solid var(--line); border-radius: var(--r-panel); padding: 14px 16px; }
 .op-box > .label{ display: block; padding-bottom: 8px; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
 .op-ratings{ margin: 0; }
-.kv{ display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 5px 0; }
+/* A rail row is 30px, not 34. Six of them is where a quarter of the old rail's height
+   went. */
+.kv{ display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 3px 0; min-height: 24px; }
 .kv + .kv{ border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent); }
 .kv dt{ font-size: var(--t-2xs); }
 .kv dd{ margin: 0; text-align: right; font-size: var(--t-sm); color: var(--fg); }
@@ -1060,6 +1076,22 @@ kbd{
 .grade-md{ font-size: var(--t-base); }
 .grade-lg{ font-size: var(--t-lg); }
 .grade-na{ color: var(--fg-mute); }
+
+
+/* The scale gets its own block in the rail, so it is not a footnote under the ratings. */
+.op-box.op-scale{ padding-top: 12px; padding-bottom: 12px; }
+.op-box.op-scale .ladder{ margin-top: 0; }
+
+/* The sheet ends where its content ends. */
+.opinion, .op-page{ flex: 0 0 auto; }
+
+/* Under 1100px the rail is not a rail: it is the next thing you read, in the same order,
+   and nothing about a single column benefits from being pinned. */
+@media (max-width: 1100px){
+  .op-grid{ grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .op-side{ position: static; }
+  .op-page{ padding: 16px; }
+}
 
 @media print{
   @page{ size: A4 portrait; margin: 14mm 13mm; }
