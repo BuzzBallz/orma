@@ -44,7 +44,7 @@ function parse(md) {
     const body = nl === -1 ? '' : block.slice(nl + 1)
 
     const [, id, title] = heading.match(/^(S\d+)\s*[—:-]\s*(.+)$/) || [null, '', heading]
-    const meta = body.match(/<!--\s*time:\s*([^|]+)\|\s*duration:\s*([^|>]+?)\s*(?:\|\s*layout:\s*([a-z]+)\s*)?-->/)
+    const meta = body.match(/<!--\s*time:\s*([^|]+)\|\s*duration:\s*([^|>]+?)\s*(?:\|\s*layout:\s*([a-z]+)\s*)?(?:\|\s*artifact:\s*([a-z-]+)\s*)?-->/)
 
     const onScreenRaw = (body.match(/###[ \t]*on screen[ \t]*\n([\s\S]*?)(?=\n###|\n---|$)/i) || [])[1] || ''
     const notesRaw = (body.match(/###[ \t]*notes[ \t]*\n([\s\S]*?)(?=\n###|\n---|$)/i) || [])[1] || ''
@@ -59,6 +59,7 @@ function parse(md) {
       time: meta ? meta[1].trim() : '',
       duration: meta ? meta[2].trim() : '',
       layout: meta && meta[3] ? meta[3].trim() : '',
+      artifact: meta && meta[4] ? meta[4].trim() : '',
       lines,
       notes: notesRaw.trim().split(/\n{2,}/).map((p) => p.replace(/\n/g, ' ').trim()).filter(Boolean),
     })
@@ -82,6 +83,54 @@ const MARK = `<svg class="mark" viewBox="0 0 64 64" fill="none" aria-hidden="tru
       <path d="M11 59.6c5.3-2.6 9.4-2.6 13.7-.4 4.9 2.5 8 2.5 12.2.1 5.2-2.9 9.2-3 14-.6" stroke="#C9A45F" stroke-width="2.1" stroke-linecap="round"/>
     </svg>`
 
+/**
+ * One glyph per slide, drawn here rather than fetched.
+ *
+ * Deliberately line art in the brand's two colours, at low weight and set to the side: a
+ * slide's job is to hold one idea, and an illustration that competes with the sentence has
+ * taken the job away from it. Nothing is a third-party mark, so nothing has to be cleared.
+ */
+const A = (d) => `<svg class="artifact" viewBox="0 0 64 64" fill="none" aria-hidden="true">${d}</svg>`
+const GLYPHS = {
+  // a shackle closed over a body: the lock-up
+  lock: A(`<rect x="16" y="29" width="32" height="24" rx="3" stroke="var(--fg)" stroke-width="2"/>
+    <path d="M23 29v-7a9 9 0 0 1 18 0v7" stroke="var(--gold)" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="32" cy="40" r="3" fill="var(--gold)"/>`),
+  // three bars, the three pillars
+  layers: A(`<rect x="12" y="14" width="40" height="9" rx="2" stroke="var(--fg)" stroke-width="2"/>
+    <rect x="12" y="27" width="40" height="9" rx="2" stroke="var(--fg)" stroke-width="2"/>
+    <rect x="12" y="40" width="40" height="9" rx="2" stroke="var(--gold)" stroke-width="2"/>`),
+  // two readings of one thing, one dashed and low, one solid: the contract's own convention
+  split: A(`<path d="M10 32h16" stroke="var(--fg)" stroke-width="2"/>
+    <path d="M26 32 44 18" stroke="var(--fg)" stroke-width="2" stroke-dasharray="4 4"/>
+    <path d="M26 32 44 46" stroke="var(--gold)" stroke-width="2"/>
+    <circle cx="46" cy="18" r="3" stroke="var(--fg)" stroke-width="2"/>
+    <circle cx="46" cy="46" r="3" fill="var(--gold)"/>`),
+  // a sequence, reordered: the ordering lever
+  order: A(`<rect x="12" y="16" width="14" height="14" rx="2" stroke="var(--gold)" stroke-width="2"/>
+    <rect x="12" y="36" width="9" height="9" rx="2" stroke="var(--fg)" stroke-width="2"/>
+    <path d="M34 23h16M34 40h16" stroke="var(--fg)" stroke-width="2" stroke-linecap="round"/>
+    <path d="M45 18l5 5-5 5" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`),
+  // a token that carries a pointer outward
+  token: A(`<circle cx="26" cy="32" r="14" stroke="var(--fg)" stroke-width="2"/>
+    <path d="M40 32h14" stroke="var(--gold)" stroke-width="2" stroke-linecap="round"/>
+    <path d="M49 27l5 5-5 5" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`),
+  // one way through, one refused
+  gate: A(`<path d="M18 12v40M46 12v40" stroke="var(--fg)" stroke-width="2" stroke-linecap="round"/>
+    <path d="M10 26h12" stroke="var(--gold)" stroke-width="2" stroke-linecap="round"/>
+    <path d="M28 26h8" stroke="var(--gold)" stroke-width="2" stroke-linecap="round"/>
+    <path d="M50 40l8 0M54 36l-4 4 4 4" stroke="var(--fg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`),
+  // a record with a mark against it: the findings
+  report: A(`<rect x="16" y="10" width="32" height="44" rx="3" stroke="var(--fg)" stroke-width="2"/>
+    <path d="M24 24h16M24 32h16M24 40h9" stroke="var(--fg)" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="44" cy="44" r="7" fill="var(--bg)" stroke="var(--gold)" stroke-width="2"/>
+    <path d="M41 44l2 2 4-4" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`),
+  // a clock, for the one immutable date
+  clock: A(`<circle cx="32" cy="32" r="20" stroke="var(--fg)" stroke-width="2"/>
+    <path d="M32 20v12l8 5" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`),
+}
+
+
 const slideHtml = slides.map((s, i) => `
   <section class="slide${s.layout ? ' ' + s.layout : ''}" data-i="${i}">
     <header class="shead">
@@ -93,6 +142,7 @@ const slideHtml = slides.map((s, i) => `
       ${s.layout === 'cover' ? MARK + '<p class="wordmark">Orma</p>' : ''}
       ${s.lines.map((l) => `<p class="line">${inline(l)}</p>`).join('\n      ')}
     </div>
+    ${s.artifact && GLYPHS[s.artifact] ? GLYPHS[s.artifact] : ''}
     <footer class="sfoot"><span>Orma</span><span>${i + 1} / ${slides.length}</span></footer>
     <aside class="notes">${s.notes.map((n) => `<p>${inline(n)}</p>`).join('')}</aside>
   </section>`).join('\n')
@@ -133,12 +183,24 @@ const html = `<!doctype html>
     border-bottom:1px solid var(--line);padding-bottom:1.6vh}
   .sid{color:var(--gold)}
   .stitle{color:var(--dim);text-transform:none;letter-spacing:.02em;font-size:1.25vw}
-  .stime{margin-left:auto}
+  /* Scheduled time and duration are rehearsal aids, not something a jury should read off
+     the wall. Shown only with the speaker notes, so pressing S gives the presenter both
+     and presenting gives the audience neither. */
+  .stime{margin-left:auto;display:none}
+  body.notes .stime{display:inline}
   .sbody{flex:1;display:flex;flex-direction:column;justify-content:center;gap:2.4vh}
   /* One idea per slide, so the type is large and there is deliberately little of it. */
   .line{margin:0;font-size:3.4vw;line-height:1.22;letter-spacing:-.015em;font-weight:500}
   .line code{font-family:var(--mono);font-size:.86em;color:var(--gold)}
   .line b{color:var(--gold);font-weight:600}
+  /* Set to the side and held back: the sentence is the slide, this only anchors it. */
+  .artifact{
+    position:absolute; right:7vw; top:50%; transform:translateY(-50%);
+    width:15vh; height:15vh; opacity:.5; pointer-events:none;
+  }
+  .slide.cover .artifact{ display:none }
+  @media print{ .artifact{ width:150px; height:150px; right:90px } }
+
   .sfoot{display:flex;justify-content:space-between;
     font:500 1vw/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--mute);
     border-top:1px solid var(--line);padding-top:1.6vh}

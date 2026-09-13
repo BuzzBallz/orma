@@ -19,32 +19,42 @@ Yesterday morning, in your workshop, you explicitly said: // "The human or AI co
 
 ---
 
-## S2 — One party, two levers
-<!-- time: 0:15 | duration: 25s -->
+## S2 - Locked in, and unreadable
+<!-- time: 0:15 | duration: 30s | artifact: lock -->
 
 ### on screen
-- LoanBroker owner = vault owner
-- two levers: **when**, and **in what order**
+- Risk does not disappear.
+- It moves to **one immutable timestamp**.
 
 ### notes
-Two lines, nothing else.
+Your tri-party slide says the intermediary absorbs first losses, and earns a spread for managing risk. // That design is good: closed-ended vaults block the exit race that made those failures worse on other chains. Withdrawals are refused for the whole Investment phase.
 
-The loan broker owner **is** the vault owner. Same account, by protocol. // They hold two levers. // **When** to recognise a loss: until they do, the reported value reads clean. // And **in what order** to realise them: cover is sized against the broker's *total* book, so each default shrinks the base for the next. // Both move money toward the manager. Neither is visible with the standard tools.
+But risk does not disappear. It moves to one public, immutable timestamp.
 
----
+During the lock-up the depositor watches the vault get worse, and cannot leave. Nobody prices that, simply because from outside nobody can read it.
 
-## S3 — What Orma is
-<!-- time: 0:40 | duration: 12s -->
+*Both facts are measured, not asserted: VaultWithdraw returns tecTOO_SOON for the entire Investment phase regardless of liquidity, and RedemptionDate is immutable because VaultSet rejects it at deserialization. Keep the result code off the wall and in your pocket, for the questions.*
+
+*Say "closed-ended vaults", not "XLS-66": the phase rules are XLS-65. And "the exit race that made those failures worse", not "the thing that killed Maple", because Maple died of credit losses on undercollateralised loans and of cover withdrawn ahead of the defaults, which no lock-up would have prevented.*
+
+
+## S3 - Three pillars
+<!-- time: 0:45 | duration: 25s | artifact: layers -->
 
 ### on screen
-- measure → publish → enforce
-- Meridian · Kestrel · Calder · Thorne
-- four facilities, live on Devnet
+- Read it correctly.
+- Publish it where anyone can disagree.
+- Let it gate capital.
 
 ### notes
-Orma measures both, publishes them as a ledger object and inside the share token, and lets a third party gate capital on the result. // All of it on Devnet, built today.
+Those two numbers, three pillars. // A reader that sees what the vault's own reporting does not. // A score published as a native XRPL object, so anyone can disagree with us on the ledger. // And a grade that gates capital, through a Permissioned Domain.
 
----
+One thing before the demo. The state is pre-baked: real Devnet transactions, from before this talk. Every number you see is read live. The two deposits at the end are signed live, in front of you.
+
+*"Disagree with us on the ledger" is the strongest line in the deck. It is the whole argument for a native oracle object over an API: an API can only be trusted, an oracle object can be contested by a second publisher without asking us.*
+
+*The live-deposit promise is made at minute one and has to be kept at minute three. The keys are in .demo-keys.json and the gate facility must still be in its Subscription phase. Check both before you walk up, or drop the sentence.*
+
 
 ## S4 — Two readers, one transaction
 <!-- time: 0:52 | duration: 35s -->
