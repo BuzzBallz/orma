@@ -201,8 +201,10 @@ change what a developer must build:
 `XRPLF/XRPL-Standards` **PR #587 "Closed-ended Vault"** — opened 2026-07-21 by `a1q123456`, last updated
 2026-09-08, +495 lines, not a draft, **unmerged**. It is authored by the same three people as XLS-65
 (Jingchen Wu, Vita Tumas, Gregory Tsipenyuk). It mentions `VaultKind` on 32 lines, `SubscriptionDate` on 39
-and `RedemptionDate` on 48 (33, 47 and 58 occurrences). It is a complete, correct specification of the phase model, the
-`MIN_INVESTMENT_PERIOD` bounds, and the `LoanSet` phase gate. It matches everything we observed on the wire.
+and `RedemptionDate` on 48 (33, 47 and 58 occurrences). It specifies the phase model and the `LoanSet` phase gate, and both
+match what we observed on the wire. Its `MIN_INVESTMENT_PERIOD` does not: §2.4 gives 60 seconds, and Devnet
+brackets at 180 (179 -> `temMALFORMED`, 180 -> `tesSUCCESS`,
+`0C6127F4E9042C5EB1DD85A7274FC0748F19D9D1839256459ED5D206D9A14D06`). Raised on the PR itself.
 
 It is simply not published. `xrpl.js` PR #3456 and `xrpl-py` PR #1034 — the library support for this feature,
 both also unmerged — cite it as their source. So the library maintainers can read it and application
@@ -1063,7 +1065,8 @@ it searched clean across rippled, `xrpl.js` and XRPL-Standards.
 rippled accepts up to 20. That is `XRPLF/xrpl.js#3435` "OracleSet validation rejects valid Scale values
 11-20 (SCALE_MAX should be 20, not 10)", open since 2026-08-12. We reproduced both ends on Devnet — 20 →
 `tesSUCCESS` `E95ABBCE6E6E3F720A14253BDBE17BF535A5210CAE8CC6A3E852B4E5D3EDCB80`, 21 → `temMALFORMED` — and
-have added those hashes to the issue rather than opening a second one.)
+added those hashes to the issue rather than opening a second one. The `Scale: 0` contradiction above is a
+different boundary and is filed separately.)
 
 **Suggested fix:** pick one convention. Either accept an explicit default and ignore it, or document the
 "omit to default" rule on every field it applies to and make the client validators agree with it.

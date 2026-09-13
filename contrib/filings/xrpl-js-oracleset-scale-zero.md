@@ -145,8 +145,7 @@ Adjacent but distinct. #3435 is about `SCALE_MAX = 10`
 ([line 17](https://github.com/XRPLF/xrpl.js/blob/af603090aea2cd959741372683e80e2206f24ff9/packages/xrpl/src/models/transactions/oracleSet.ts#L17),
 enforced at lines 183-186) blocking the valid range 11-20. This issue is about the bottom of the range
 rather than the top, and it is enforced by a different check in the same function. Fixing one does not fix
-the other. Our Devnet hashes for the 11-20 boundary belong on #3435 rather than here, so they are going
-there as a comment and are not repeated above.
+the other. Our Devnet hashes for the 11-20 boundary belong on #3435 rather than here, and have been posted there.
 
 ## Environment
 
