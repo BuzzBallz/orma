@@ -75,7 +75,15 @@ export function HeaderBar({ health, healthUnreachable, vaults, activeVaultId, pa
 
       <Separator orientation="vertical" className="sep" />
 
-      <span className="meta keep">as of <b>{asOf ? fmtIso(asOf) : '—'}</b></span>
+      {/* The date is in its own span so a narrow bar can drop it and keep the clock: on a
+          desk that is watched live the time is the part that says the figures are current,
+          and the date is today. Splitting it here is what lets the facility picker keep a
+          usable width instead of absorbing the whole overflow. */}
+      <span className="meta keep">as of <b>
+        {asOf
+          ? <><span className="on-day">{fmtIso(asOf).slice(0, 11)}</span>{fmtIso(asOf).slice(11)}</>
+          : '—'}
+      </b></span>
 
       <span className="spacer" />
 

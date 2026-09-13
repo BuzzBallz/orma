@@ -342,8 +342,13 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
   border-bottom: 1px solid var(--line);
 }
 .topbar > * { flex: 0 0 auto; }
-/* The picker carries the longest label in the bar, so it is the one item allowed to shrink. */
-.topbar > .picker{ flex: 0 1 auto; min-width: 0; }
+/* The picker carries the longest label in the bar, so it is the one item allowed to shrink.
+   It is also, for the same reason, the only thing that can absorb a bar that has outgrown
+   its window — and it did: a fifth tab and the docs link added ~110px, and the control that
+   opens a facility was squeezed to a 10px sliver on anything under 1200px. The label is
+   built to ellipsis; the control is not built to vanish. This floor is where it stops, and
+   the media query below frees the room to honour it. */
+.topbar > .picker{ flex: 0 1 auto; min-width: 168px; }
 /* `.topbar > *` above outranks the generic `.spacer` rule by source order, so the bar
    was left-packed and its tail floated ~120px short of the right edge. */
 .topbar > .spacer{ flex: 1 1 auto; }
@@ -390,7 +395,30 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 .meta + .meta{ margin-left: 16px; }
 
 @media (max-width: 1280px){ .meta.optional{ display: none } }
-@media (max-width: 1100px){ .topbar .meta:not(.keep){ display: none } .topbar .sep{ margin: 0 10px } }
+
+/* Where the bar gives way. The old rule here tried to free room by hiding
+   `.meta:not(.keep)` — but the only .meta in the bar carries .keep, so it matched nothing
+   and the picker paid for the overflow instead. The timestamp stays; it sheds its date
+   first (the date is today, the time is the part that tells you the figures are live),
+   then the furniture tightens. Nothing is hidden that the reader was relying on. */
+@media (max-width: 1340px){
+  .topbar{ padding: 0 20px; }
+  .topbar .sep{ margin: 0 8px; }
+  .topbar .meta .on-day{ display: none; }
+}
+/* Below this the clock goes too, and its separator with it. What is lost is the exact
+   second; what remains is the status badge and its live tick, which is what actually
+   answers "are these figures current?" — and on a facility or an event the full stamp is
+   repeated in the document header anyway. The picker is worth more than the seconds. */
+@media (max-width: 1120px){
+  .topbar .sep{ margin: 0 6px; }
+  .topbar .meta.keep, .topbar .sep:has(+ .meta){ display: none; }
+}
+/* Last thing to go: the documentation link. It leaves the app, so it is the one item in
+   the bar nobody needs mid-demonstration. */
+@media (max-width: 1000px){
+  .topbar .docs-link, .topbar .sep:has(+ .picker){ display: none; }
+}
 
 /* Radix needs a Tabs root around the list and the panel. It carries context, not layout. */
 .tabs-root{ display: contents; }
@@ -457,6 +485,21 @@ table.tbl th.rt{ text-align: right; }
 .tbl-scroll{ overflow-x: auto; margin: 0 -20px; padding: 0 20px; }
 .tbl-scroll [data-slot="table-container"]{ overflow: visible; }
 
+/* An edge that says there is more to the right.
+   macOS hides its scrollbars until you scroll, so a blotter wider than its panel looked
+   exactly like a blotter that ended there — a reader could finish the portfolio without
+   ever learning the outlook column existed. These are the two standard scroll shadows:
+   the `local` layers are a cover painted in the panel's own colour, the `scroll` layers
+   are the shade underneath. When there is nothing to scroll the cover sits on the shade
+   and nothing shows, so this is invisible at every width where the table already fits. */
+.tbl-scroll{
+  background:
+    linear-gradient(to right, var(--bg-1), transparent) 0 0 / 24px 100% no-repeat local,
+    linear-gradient(to left, var(--bg-1), transparent) 100% 0 / 24px 100% no-repeat local,
+    linear-gradient(to right, rgba(0,0,0,.45), transparent) 0 0 / 16px 100% no-repeat scroll,
+    linear-gradient(to left, rgba(0,0,0,.45), transparent) 100% 0 / 16px 100% no-repeat scroll;
+}
+
 /* Identity | measurement. The hairline after `phase` splits nine columns into the two
    questions a reader actually asks: which instrument, and how bad. */
 table.tbl th:nth-child(3), table.tbl td:nth-child(3){
@@ -512,8 +555,13 @@ table.tbl th:nth-child(4), table.tbl td:nth-child(4){ padding-left: 20px; }
 /* An instrument's identity: name over its id. */
 /* One line per instrument: the id sits beside the name, not under it. Two-line rows are
    a web table; a blotter fits more of the book on screen. */
-.inst{ display: flex; align-items: baseline; gap: 10px; }
-.inst .name{ font: var(--t-base)/1 var(--mono); color: var(--fg); }
+/* Name over detail, not name beside detail. On one line this column took 486px of a
+   1099px blotter and pushed `outlook` off the right edge entirely — two columns the
+   reader had no way of knowing existed. Stacked, the column costs ~260px, the table
+   fits, and the facility name gets the line to itself, which is the order a credit
+   committee reads in anyway. */
+.inst{ display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.inst .name{ font: var(--t-base)/1.15 var(--mono); color: var(--fg); }
 .inst .id{ font: var(--t-xs)/1 var(--mono); color: var(--fg-mute); letter-spacing: 0.04em; }
 
 /* Risk rail: the only place a row carries colour. */
