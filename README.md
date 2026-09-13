@@ -188,8 +188,19 @@ overran the redemption buffer; `FEEDBACK-APPENDIX.md`, Appendix E, isolates that
 | Vault shares pledged on ledger to that lender | `EscrowCreate` | `tesSUCCESS` | [`3322B921…1C1536`](https://devnet.xrpl.org/transactions/3322B9214FB87822BA5699423691DAED4A043121D1E17080673F6292E01C1536) |
 | Delegation positive control: `Payment` delegates, the lending permissions return `temMALFORMED` and never reach a ledger | `DelegateSet` | `tesSUCCESS` | [`547DA719…10AF17`](https://devnet.xrpl.org/transactions/547DA71992D469ACA345A0B3CEAD07864E2801919201B256EA606C3A7910AF17) |
 
-The live Oracle object for Kestrel is [`C67EBC7A…80DCC1`](https://devnet.xrpl.org/objects/C67EBC7AC5B0091873B7D50A87DBC88AFE98566954AEF7631018C5EF1980DCC1),
-published by [`rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B`](https://devnet.xrpl.org/accounts/rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B).
+The live Oracle object for Kestrel is `C67EBC7A…80DCC1`, published by
+[`rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B`](https://devnet.xrpl.org/accounts/rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B).
+`devnet.xrpl.org` has no route for a bare ledger index, so fetch the object itself rather than
+following a link to it:
+
+```json
+{ "command": "ledger_entry", "oracle": { "account": "rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B", "oracle_document_id": 3 } }
+```
+
+Two publishers disagree about Meridian on purpose, so `get_aggregate_price` has something to
+aggregate: ours reads the vault object and reports `0.803922`, a second account diffs metadata
+and reports `1.000000`, and rippled returns a median of `0.901961` across the two. The capture is
+in [`demo/oracle-aggregate.json`](demo/oracle-aggregate.json) with the request to reproduce it.
 
 ---
 

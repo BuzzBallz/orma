@@ -231,7 +231,13 @@ export class OraclePublisher {
       lastUpdateAt: node.LastUpdateTime ? new Date(node.LastUpdateTime * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z') : null,
       ageSeconds: node.LastUpdateTime ? Math.max(0, Math.floor(Date.now() / 1000) - node.LastUpdateTime) : null,
       stale: node.LastUpdateTime ? Math.floor(Date.now() / 1000) - node.LastUpdateTime > 60 : true,
-      explorerUrl: node.index ? `https://devnet.xrpl.org/objects/${node.index}` : null,
+      // The transaction that last wrote this object, NOT the object index. devnet.xrpl.org
+      // has no route for a bare ledger index: /objects/<index> renders a client-side 404,
+      // which on stage is worse than no link at all. A transaction page always resolves.
+      lastPublishTx: node.PreviousTxnID ?? null,
+      explorerUrl: node.PreviousTxnID
+        ? `https://devnet.xrpl.org/transactions/${node.PreviousTxnID}`
+        : `https://devnet.xrpl.org/accounts/${this.wallet.address}`,
       dimensionsOnChain: dims,
       aggregate: null,
     }

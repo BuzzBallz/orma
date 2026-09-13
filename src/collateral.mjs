@@ -65,6 +65,10 @@ export async function findShareEscrows(xrpl, shareMptId, accounts) {
         finishAfter: o.FinishAfter ?? null,
         cancelAfter: o.CancelAfter ?? null,
         condition: o.Condition ?? null,
+        // Same reasoning as the oracle object: the explorer resolves transactions, not
+        // bare ledger indexes. For an escrow that has not been finished or cancelled this
+        // is its EscrowCreate.
+        lastTxId: o.PreviousTxnID ?? null,
       })
     }
   }
@@ -110,7 +114,10 @@ export function presentCollateral(escrows, snap, haircutPct = 0) {
       maxLendable: lendable.toFixed(0),
       finishAfter: e.finishAfter,
       cancelAfter: e.cancelAfter,
-      explorerUrl: e.escrowId ? `${EXPLORER}/objects/${e.escrowId}` : null,
+      lastTxId: e.lastTxId ?? null,
+      explorerUrl: e.lastTxId
+        ? `${EXPLORER}/transactions/${e.lastTxId}`
+        : e.pledgor ? `${EXPLORER}/accounts/${e.pledgor}` : null,
     }
   })
   const totalShares = pledges.reduce((a, p) => a.plus(num(p.shares)), new Decimal(0))

@@ -59,7 +59,19 @@ export function OracleObject({ o, contest }: { o: Oracle | null; contest?: Oracl
         published by <b>{short(o.publisher, 10)}</b>
         {o.lastUpdateAt ? <> at <b>{fmtIso(o.lastUpdateAt)}</b></> : null}
         {o.stale ? <> — <span className="res-no">stale</span></> : null}.{' '}
-        <a href={o.explorerUrl} target="_blank" rel="noreferrer noopener">{short(o.objectIndex, 10)}</a>
+        {/* The transaction, not the object index: devnet.xrpl.org has no route for a bare
+            ledger index and renders a client-side 404 on one. The index is still printed,
+            because it is the thing being talked about, and the request under it fetches the
+            object itself from any node. */}
+        <a href={o.explorerUrl} target="_blank" rel="noreferrer noopener">
+          {o.lastPublishTx ? <>last written by {short(o.lastPublishTx, 8)}</> : <>the publishing account</>}
+        </a>
+      </p>
+      <p className="caption meth orc-fetch">
+        Object <span className="orc-raw">{o.objectIndex}</span>. Fetch it from any node:{' '}
+        <span className="orc-raw">
+          ledger_entry {'{'} oracle: {'{'} account: "{o.publisher}", oracle_document_id: {o.oracleDocumentId} {'}'} {'}'}
+        </span>
       </p>
 
       {/* The whole case for a ledger object over an API, made on the ledger. */}

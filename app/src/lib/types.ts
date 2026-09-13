@@ -80,6 +80,8 @@ export interface Oracle {
   baseAssetHex: string
   lastUpdateAt: string | null                 // NULL if this document has never published (§0.0 A4)
   ageSeconds: number; stale: boolean
+  /** The OracleSet that last wrote this object. The explorer has no route for a bare index. */
+  lastPublishTx: string | null
   explorerUrl: string
   dimensionsOnChain: { key: string; value: string; raw: string; scale: number }[]
   aggregate: OracleAggregate | null           // NULL with fewer than two publishers
