@@ -1,18 +1,18 @@
 /**
- * One deliverable: the three-page report and the register that evidences it, in one PDF.
+ * The developer feedback deliverable: a three-page report, and the register that evidences it.
  *
- * WHY THIS EXISTS. The report says every claim in it is evidenced with transaction hashes in
- * the register. Published beside it, that register was a 149 KB markdown file at the
- * repository root, which is the wrong shape twice over: it crowded the one deliverable a
- * judge is looking for, and GitHub rendered it as a second document competing with the
- * first. Bound after the report it is what it always was, an appendix.
+ * TWO DOCUMENTS, ON PURPOSE. The report is three pages and has to stay three pages: it is
+ * read end to end by someone who did not ask for it, and length is the thing that stops
+ * that happening. The register is thirty-three pages of evidence, read by lookup. Binding
+ * them together made a 36 page document that is neither. They are rendered separately and
+ * the report cites the appendix by name.
  *
  * The renderer is deliberately small and knows only what the register actually uses:
  * headings, tables, fenced code, lists, block quotes, rules, and inline emphasis, code and
  * links. No images, no raw HTML; both were checked before this was written.
  *
  * Run: node feedback/build.mjs
- * Out: feedback/print.html, and FEEDBACK.pdf at the repository root.
+ * Out: FEEDBACK.pdf at the repository root, three pages, and feedback/appendix.pdf.
  */
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
@@ -102,13 +102,15 @@ function render(md) {
 
 const ROOT = resolve(import.meta.dirname, '..')
 const report = readFileSync(resolve(ROOT, 'feedback/feedback.html'), 'utf8')
-const appendix = readFileSync(resolve(ROOT, 'feedback/register.md'), 'utf8')
+const register = readFileSync(resolve(ROOT, 'feedback/register.md'), 'utf8')
 
 // The register is set smaller and unjustified: it is a reference table, read by lookup
 // rather than end to end, and justification on 190 table rows only makes them harder to scan.
-const style = `
+// It inherits the report's page setup, so the two documents print as one pair.
+const head = report.slice(0, report.indexOf('</head>'))
+const appendixHtml = `${head}
 <style>
-  .appx { page-break-before: always; font-size: 8.6pt; text-align: left; hyphens: none; }
+  body.appx { font-size: 8.6pt; text-align: left; hyphens: none; }
   .appx h1 { font-size: 14pt; margin: 0 0 2mm; }
   .appx h2 { font-size: 10.5pt; margin: 5mm 0 1.5mm; page-break-after: avoid; }
   .appx h3, .appx h4 { font-size: 9.2pt; margin: 3.5mm 0 1mm; page-break-after: avoid; }
@@ -125,14 +127,10 @@ const style = `
   .appx blockquote { margin: 2mm 0 2mm 4mm; color: #4a443c; font-style: italic; }
   .appx hr { border: 0; border-top: .3pt solid #ddd8d0; margin: 4mm 0; }
   .appx a { color: inherit; }
-</style>`
-
-const html = report
-  .replace('</head>', `${style}\n</head>`)
-  .replace('</body>', `<section class="appx">\n${render(appendix)}\n</section>\n</body>`)
-
-const printPath = resolve(ROOT, 'feedback/print.html')
-writeFileSync(printPath, html)
+</style>
+</head><body class="appx">
+${render(register)}
+</body></html>`
 
 const CHROME = [
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
@@ -141,19 +139,35 @@ const CHROME = [
   '/usr/bin/google-chrome',
 ].find((p) => existsSync(p))
 
+/** Print one HTML file to one PDF, and say how many pages came out. */
+function printPdf(htmlPath, pdfPath) {
+  execFileSync(CHROME, [
+    '--headless', '--disable-gpu', '--no-sandbox', '--no-pdf-header-footer',
+    `--print-to-pdf=${pdfPath}`,
+    `file:///${htmlPath.replaceAll(String.fromCharCode(92), '/')}`,
+  ], { stdio: 'pipe' })
+  const buf = readFileSync(pdfPath)
+  const pages = (buf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length
+  return { pages, kb: Math.round(buf.length / 1024) }
+}
+
+const reportHtml = resolve(ROOT, 'feedback/print-report.html')
+const appendixPath = resolve(ROOT, 'feedback/print-appendix.html')
+writeFileSync(reportHtml, report)
+writeFileSync(appendixPath, appendixHtml)
+
 if (!CHROME) {
-  console.log(`\n  wrote ${printPath}`)
-  console.log('  No Chrome found. Open that file and print it to FEEDBACK.pdf by hand.\n')
+  console.log(`  wrote ${reportHtml}`)
+  console.log(`  wrote ${appendixPath}`)
+  console.log('  No Chrome found. Open each and print it by hand.')
   process.exit(0)
 }
 
-const out = resolve(ROOT, 'FEEDBACK.pdf')
-execFileSync(CHROME, [
-  '--headless', '--disable-gpu', '--no-sandbox',
-  '--no-pdf-header-footer',
-  `--print-to-pdf=${out}`,
-  `file:///${printPath.split('\\').join('/')}`,
-], { stdio: 'pipe' })
-
-const { size } = (await import('node:fs')).statSync(out)
-console.log(`\n  report + register -> FEEDBACK.pdf  (${Math.round(size / 1024)} KB)\n`)
+const a = printPdf(reportHtml, resolve(ROOT, 'FEEDBACK.pdf'))
+const b = printPdf(appendixPath, resolve(ROOT, 'feedback/appendix.pdf'))
+console.log('')
+console.log(`  FEEDBACK.pdf           ${a.pages} pages, ${a.kb} KB   the report`)
+console.log(`  feedback/appendix.pdf  ${b.pages} pages, ${b.kb} KB   the register`)
+console.log('')
+// The report earns attention by being short. If it stops being short, say so loudly.
+if (a.pages > 3) console.error('  THE REPORT IS OVER THREE PAGES. It is meant to be read end to end; fix it before shipping.')

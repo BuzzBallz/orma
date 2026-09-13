@@ -161,7 +161,7 @@ One closed-ended vault walked through Subscription, Investment and Redemption, w
 for the first three rows. Each rejected
 `VaultDeposit`, `VaultWithdraw` and `LoanSet` sits next to a control that succeeds in the phase where the
 same transaction is legal. The Investment-phase `LoanSet` returned `tecNO_PERMISSION` because its term
-overran the redemption buffer; the register's Appendix E isolates that.
+overran the redemption buffer; `feedback/appendix.pdf`, Appendix E, isolates that.
 
 | Phase | Attempt | Expected | Result | Explorer |
 |---|---|---|---|---|
@@ -426,12 +426,15 @@ self-contained deck that opens in a browser and prints to PDF. No slide toolchai
 
 ### `FEEDBACK.pdf` and `feedback/`
 
-`FEEDBACK.pdf` is the developer feedback deliverable, and the only one: a three-page report written from
-the build, with the full 40-finding register bound behind it as an appendix. Thirty-six pages, signed,
-every claim carrying a transaction hash, repro steps and tracker status.
+`FEEDBACK.pdf` is the developer feedback report: **three pages**, written from the build, signed. It is
+short on purpose, because it is read by someone who did not ask for it.
 
-`feedback/` holds what it is made of. `feedback.html` is the report, `register.md` is the register, and
-`build.mjs` renders the two into the PDF with headless Chrome:
+Its evidence is `feedback/appendix.pdf`, the full 40-finding register — 33 pages, every claim carrying a
+transaction hash, repro steps and tracker status.
+
+`feedback/` holds what both are made of. `feedback.html` is the report, `register.md` is the register, and
+`build.mjs` renders each into its own PDF with headless Chrome, refusing to stay quiet if the report ever
+grows past three pages:
 
 ```bash
 node feedback/build.mjs
@@ -458,7 +461,7 @@ The three that cost us the most:
    the join. Before that fix, every default looked unsignalled, and the conduct rule written to reward
    disclosure was penalising it. That one shipped a wrong answer inside our own code before we caught it.
 
-The register is the appendix of `FEEDBACK.pdf`. The contribution is `contrib/tutorial-fix/`.
+The register is `feedback/appendix.pdf`. The contribution is `contrib/tutorial-fix/`.
 
 ---
 

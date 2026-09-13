@@ -1,7 +1,7 @@
 # Appendix — full feedback register, XLS-65 / XLS-66
 
-> **This is the supporting evidence for the three-page developer report it is bound behind in
-> `/FEEDBACK.pdf`: the complete 40-finding register, with transaction hashes,
+> **This is the supporting evidence for `/FEEDBACK.pdf`, the three-page developer report at the
+> repository root: the complete 40-finding register, with transaction hashes,
 > file and line references, verbatim error strings, upstream issue and PR numbers, and the three findings
 > we withdrew. Nothing here is rewritten for the report; the report selects from it.**
 

@@ -116,4 +116,5 @@ documentation/site/
 # Demo start logs. Noise, regenerated on every run.
 /.demo-backend.log
 /.demo-frontend.log
-feedback/print.html
+feedback/print-report.html
+feedback/print-appendix.html
