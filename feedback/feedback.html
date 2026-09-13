@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Orma — developer feedback on XLS-65 and XLS-66</title>
+<style>
+  @page { size: A4; margin: 14mm 17mm 13mm; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { margin: 0; color: #1d1b18; font: 10.5pt/1.42 "Iowan Old Style", "Palatino Linotype",
+         Palatino, "Book Antiqua", Georgia, serif; text-align: justify; hyphens: auto; }
+  .head { display: grid; grid-template-columns: repeat(4, auto); gap: 1.4mm 5mm; text-align: left;
+          font: 7.2pt/1.3 ui-monospace, Menlo, Consolas, monospace; color: #555;
+          border-block: .6pt solid #1d1b18; padding-block: 1.8mm; margin-bottom: 3.4mm; }
+  .head b { display: block; color: #1d1b18; font-size: 6.4pt; letter-spacing: .06em;
+            text-transform: uppercase; font-weight: 600; }
+  .head .foot { grid-column: 1 / -1; font-style: italic; font-family: inherit; color: #6b645a; }
+  .titlerow { display: flex; align-items: flex-start; gap: 3mm; }
+  .titlerow svg { width: 6mm; height: 6mm; flex: 0 0 auto; margin-top: 1mm; }
+  h1 { font-weight: 400; font-size: 17.5pt; line-height: 1.15; margin: 0 0 1mm; text-align: left; }
+  .dek { font-style: italic; margin: 0 0 2.6mm; text-align: left; }
+  h2 { font-size: 8pt; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
+       margin: 3.4mm 0 1.1mm; text-align: left; break-after: avoid; }
+  p { margin: 0 0 1.9mm; orphans: 3; widows: 3; }
+  .tag { font: 7.2pt/1.35 ui-monospace, Menlo, Consolas, monospace; color: #6b645a;
+         margin: -.8mm 0 2.3mm; text-align: left; break-inside: avoid; break-before: avoid; }
+  a { color: inherit; text-decoration-thickness: .4pt; }
+  code { font: 9pt ui-monospace, Menlo, Consolas, monospace; }
+  .sign { margin-top: 4mm; text-align: right; break-inside: avoid;
+          font: 16pt/1.1 "Snell Roundhand", "Bradley Hand", "Segoe Script", cursive; }
+  .sign small { display: block; margin-top: 1mm; color: #6b645a;
+                font: 7.4pt/1.3 ui-monospace, Menlo, Consolas, monospace; }
+</style></head>
+<body>
+
+<div class="head">
+  <div><b>Track</b>2 · closed-ended vault, Lending Protocol V1.1</div>
+  <div><b>Flavour</b>Loaded · XLS-47 Oracle, XLS-70 Credentials, XLS-80 Permissioned Domains, XLS-85 Token Escrow, MPT shares</div>
+  <div><b>Environment</b>XRPL Devnet · wss://s.devnet.rippletest.net:51233 · network_id 2 · rippled 3.4.0-rc5 (rc4 when we started)</div>
+  <div><b>Libraries</b>xrpl 5.2.0 · ripple-binary-codec 2.11.0 · Node 24.13.0 · frontend xrpl-connect 0.8.2 · DevEx tender-gopher-21, keen-auk-43</div>
+  <div class="foot">The brief pins xrpl.js@5.2.0-beta.0; stable 5.2.0 shipped 8 h 40 min before kickoff and we pinned it. Every claim here is evidenced with transaction hashes in <a href="https://github.com/frytegg/orma/blob/main/FEEDBACK-APPENDIX.md">FEEDBACK-APPENDIX.md</a>: 40 findings, 7 P0, 19 P1, 14 P2, 3 withdrawn.</div>
+</div>
+
+<div class="titlerow">
+  <svg viewBox="0 0 64 64" fill="none" aria-hidden="true"><path d="M32 6c10.5 0 18 8.9 18 21.5S42.5 49 32 49 14 40.1 14 27.5 21.5 6 32 6Zm0 4.6c-5.6 0-8.9 6.6-8.9 16.9s3.3 16.9 8.9 16.9 8.9-6.6 8.9-16.9S37.6 10.6 32 10.6Z" fill="#1d1b18"/><path d="M7 54.2c5.6-3.6 9.9-3.6 14.5-.9 5.2 3 8.4 3.1 12.9.4 5.5-3.3 9.7-3.4 14.8-.6 3.2 1.8 6 1.9 8.8.4" stroke="#1d1b18" stroke-width="2.1" stroke-linecap="round"/><path d="M11 59.6c5.3-2.6 9.4-2.6 13.7-.4 4.9 2.5 8 2.5 12.2.1 5.2-2.9 9.2-3 14-.6" stroke="#8a6d2f" stroke-width="2.1" stroke-linecap="round"/></svg>
+  <div>
+    <h1>What the ledger would not tell us</h1>
+    <p class="dek">Forty-eight hours reading a closed-ended vault honestly, for the two people who ran the workshop.</p>
+  </div>
+</div>
+
+<p>We built Orma, a reader that grades closed-ended lending vaults from the ledger, publishes the grade as a native XLS-47 oracle and lets it gate deposits through a Permissioned Domain. The protocol turned out to be well designed and hard to read: its rules are right, but too many of them live in C++ comments, unmerged pull requests and result codes that carry four meanings.</p>
+
+<p>The design deserves praise first. A closed-ended vault forbids maturity transformation at the ledger level: <code>VaultWithdraw</code> is refused for the whole Investment phase, and no <code>LoanSet</code> may mature after <code>RedemptionDate</code>. Maple and Goldfinch retrofitted lockups only after a run, Maple with 54 million dollars of sour debt on its books; XLS-66 made the run mechanism illegal. We built with coding agents, and re-ran every claim below on Devnet.</p>
+
+<h2>The first hour</h2>
+
+<p>The toolchain moved under us first. For seventeen days before the event <code>npm install xrpl</code> gave 5.1.0, which could not serialise a closed-ended <code>VaultCreate</code>; the failure surfaced as a codec error inside <code>Wallet.sign()</code> after <code>validate()</code> had passed it. Version 5.2.0 fixed that on the night of 11 September, so two of our findings became release notes before we could file them, the best fate a finding can have. Python has no such luck: no published <code>xrpl-py</code> can counterparty-sign a <code>LoanSet</code>.</p>
+
+<p>Then the wall. <code>LoanBrokerSet</code> on a vault we owned returned <code>tecNO_PERMISSION</code>, though the documentation says only that the submitter must be the owner. Two hours went on key derivation and field shapes before we read <code>LoanBrokerSet.cpp</code>, where a comment says that only a closed-ended vault may host a broker. <code>VaultKind</code>, <code>SubscriptionDate</code> and <code>RedemptionDate</code> appear zero times in the published XLS-65 and XLS-66; that specification is pull request 587, open since 21 July. rippled computes the reason and discards it. The C++ comments were the most accurate documentation that exists.</p>
+
+<p>This is why the documented first hour cannot complete. The lending tutorial dies at <code>Setting up tutorial: 5/7</code> with <code>TypeError: Cannot read properties of undefined</code>: <code>lendingSetup.js</code> creates an open-ended vault, <code>LoanBrokerSet</code> returns <code>tecNO_PERMISSION</code>, <code>submitAndWait</code> does not throw on a <code>tec</code>, and a <code>.find()</code> over the metadata returns <code>undefined</code>. The developer sees a stack trace, not a result code, a vault kind or an amendment name. Our fix creates the vault closed-ended, checks results before indexing <code>AffectedNodes</code>, polls <code>close_time</code> before <code>LoanSet</code> and bumps the pinned <code>xrpl ^4.6.0</code>. The corrected chain runs green in 79.6 seconds on rc5 and is ready to file.</p>
+<p class="tag">D2 · documentation/tutorials · P0 · xrpl-dev-portal, xrpl ^4.6.0 · <a href="https://github.com/frytegg/orma/tree/main/contrib/tutorial-fix">contrib/tutorial-fix/</a> · D1, L1, L2</p>
+
+<p>In your workshop you remarked that doing with a closed vault what belongs to an open one should give a no-permission result rather than an error. On the lending path that result is the confusing one, because it carries four meanings: not closed-ended, or not the owner, on <code>LoanBrokerSet</code>; maturing after redemption, on <code>LoanSet</code>; already impaired, on <code>LoanManage</code>. At 17:31 on Saturday a <code>LoanSet</code> that should have succeeded came back with it, and only the term told us why.</p>
+<p class="tag">U1 · UX · P1 · rippled 3.4.0-rc5 · src/dev/check-loanset-overload.mjs · Appendix E</p>
+
+<h2>The empty change set</h2>
+
+<p>Shota gave us the case that makes a wrong reading dangerous. Bob deposits 100 RLUSD into vault A, receives 100 shares, and pledges them to a different broker, who lends to him from vault B; Bob loops the position the way people loop on Aave. Broker B must value the shares, and the obvious valuation is <code>AssetsTotal / shares</code>, which one-to-one issuance invites. After an impairment in vault A the honest one is <code>(AssetsTotal − LossUnrealized) / shares</code>. Broker B is under-collateralised, cannot tell, and the loop multiplies the error.</p>
+
+<p>Here is what happened when we tried to catch that moment. On the first <code>LoanManage</code> with <code>tfLoanImpair</code> against a healthy vault, the Vault node's <code>PreviousFields</code> is empty while <code>FinalFields</code> carries a non-zero <code>LossUnrealized</code>. rippled omits any field whose previous value was the type default, and under cash-basis accounting an impairment changes nothing else on the Vault, so an indexer that diffs metadata sees a node touched but unchanged. We captured it twice on rc5, at 18:06 and 23:07 on Saturday: <code>AssetsTotal</code> 51,000,000 to 51,000,000, <code>AssetsAvailable</code> 41,000,000 to 41,000,000, <code>LossUnrealized</code> 0 to 10,000,000. The naive value reads 1.000000 and the correct one 0.803922, 1,961 basis points apart; the reported figure overstates by 19.61 per cent of itself. The trap is asymmetric, which is why it survives testing: unimpairment and a second impairment both diff correctly. It cost us nothing, because Orma re-reads the objects rather than diffing metadata, and would have cost anyone else the vault. The prior art is the strongest evidence: <code>rippled#6487</code>, opened on 5 March by the operator of the XRPLWin explorer, exactly the author this catches, describes the identical behaviour and was closed by its reporter the same day as "Not a bug." No maintainer replied. He was half right; the missing half is one paragraph saying that an empty <code>PreviousFields</code> does not mean unchanged.</p>
+<p class="tag">X1 · missing primitive · P0 · rippled 3.4.0-rc5, any client · tx <a href="https://devnet.xrpl.org/transactions/075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3">075FE6D2…49229C3</a> · §5</p>
+
+<p>Maxime came to us with an idea: put a pointer to an honest valuation inside the share's own <code>MPTokenMetadata</code>, so it travels with the token. We built it that evening. The metadata persists when set at <code>VaultCreate</code>, but <code>VaultSet</code> cannot update it and <code>MPTokenIssuanceSet</code> by the owner returns <code>tecNO_PERMISSION</code>, because the issuer is the vault pseudo-account. The channel is write-once forever and settable only on the transaction that creates the vault, so the metadata can never name the object it describes; our pointer is a template the reader completes from the token it holds. rippled warns there that it is not XLS-89 conformant, the only reason we knew XLS-89 existed, on the one transaction after which nothing can be fixed.</p>
+<p class="tag">Share metadata, write-once · documentation/tutorials · P1 · demo/metadata-vault.json · Appendix D1–D3</p>
+
+<h2>The history that lies, and the maths nobody evaluated</h2>
+
+<p>We found the next one by building. On Saturday around 18:20 we baked a vault whose only credit event was one impairment, and our broker track record showed one event where we had submitted two. <code>LoanManage</code> carries a <code>LoanID</code> and no <code>LoanBrokerID</code>, and an impairment does not touch the <code>LoanBroker</code> object at all, so a filter over <code>account_tx</code> drops every impairment and keeps defaults, which do move <code>DebtTotal</code>. Nothing errored, and the consequence inverted our intent: our conduct score counts impairments to decide whether a loss was signalled before it was taken, so an honest manager who flagged a loan early was penalised twenty points, and the output looked plausible. Twenty-five minutes to find, and it would have shipped silently. The join is free once you know to look: <code>Loan.FinalFields.LoanBrokerID</code> is in the same metadata.</p>
+<p class="tag">M5 · a broker's history cannot be reconstructed · missing primitive · P1 · rc5 · tx <a href="https://devnet.xrpl.org/transactions/9CFF971F35A9D162CE3A54C71961E64694A83A79321EB05DED8A36EEFAD14106">9CFF971F…D14106</a> · src/history.mjs</p>
+
+<p>When Alex showed Shota the default-ordering result, he already knew the maths, and asked how hard the first-loss arithmetic had been to find and to understand. Easy to find, thirty minutes too slow to understand, and he asked us to write here that a business example with real numbers beside the formula would have saved those minutes. Cover liquidated on a default is capped by <code>ceil(DebtTotal × CoverRateMinimum/1e5 × CoverRateLiquidation/1e5)</code>, and <code>DebtTotal</code> is the broker's whole book at that instant, so each default shrinks the base for the next. On the facility we called Kestrel, two loans of 30 and 10 XRP defaulted largest-first consumed 0.50 XRP of first-loss capital; smallest-first would have consumed 0.70. Same losses, forty per cent more cover absorbed in the order fairer to depositors, and only the broker owner chooses. The one worked example in the specification is a single isolated default, exactly the case where order cannot matter. An unevaluated rule reads as a rule with no consequences.</p>
+<p class="tag">D11 · documentation/tutorials · P1 · XLS-66 §3.10.5, eq. 35 · demo/ordering-vault.json · U3, L9</p>
+
+<h2>Six amendments in one flow</h2>
+
+<p>The gate worked at 22:55 on Saturday: a graded depositor's <code>VaultDeposit</code> succeeded, an ungraded one returned <code>tecNO_AUTH</code>, and after revocation the deposit still failed while withdrawal succeeded, so entry closes and exit stays open, which is right. <code>tecNO_AUTH</code> was the most precise code we met all weekend. Two traps. <code>DomainID</code> is not on the Vault entry but on the share issuance, so the obvious lookup returns nothing, which reads exactly like open to everyone. And our first run proved its own test wrong: in a 25-second window the revocation steps returned <code>tecEXPIRED</code>, because the phase rule preempts the credential rule, which is never evaluated. A correct code, wholly misleading about what was tested.</p>
+<p class="tag">C1 · documentation/tutorials · P1 · rc5 · demo/gate-vault.json · Appendix C1</p>
+
+<p>Three more, briefly. Delegation does not compose with lending: granting <code>Payment</code> succeeded as our control, and every lending transaction returned <code>temMALFORMED</code>, with nothing to say the suite is out of scope. The oracle was the cleanest composition, since <code>get_aggregate_price</code> computes the median across publishers inside the ledger, though <code>OracleSet</code> is not a merge and a reused document fills with ghosts. And a vault whose asset is another vault's share returned <code>tecWRONG_ASSET</code>, with the reason only in <code>VaultCreate.cpp</code>, though people close to the protocol read the specification as permitting it. Escrow of shares works and puts Shota's pledge on the ledger. Here we owe a retraction: the same escrow appears in both parties' owner directories, we summed both, doubled the collateral, briefly reported a missing index, and withdrew it the same day.</p>
+
+<p>Two last frictions. Each lending scenario cost four to six minutes of waiting, and immutable dates make every vault single-use, so nobody will write a test suite against this. And <code>xrpl-connect</code> 0.8.2 imports <code>xrpl</code> without declaring it, and ships no type declarations despite a "Type Safe" badge. That badge annoyed me most: a package that promises types and ships none costs more than one that promises nothing.</p>
+<p class="tag">C4, C5 · UX · P1 · tx <a href="https://devnet.xrpl.org/transactions/547DA71992D469ACA345A0B3CEAD07864E2801919201B256EA606C3A7910AF17">547DA719…10AF17</a> · xrpl-connect 0.8.2 · client libraries · P2 · U8, U2</p>
+
+<h2>Your six questions</h2>
+
+<p>The three-phase model is coherent once learned and nowhere written: "investment phase" matches nothing in either specification. <code>VaultKind</code>, <code>SubscriptionDate</code> and <code>RedemptionDate</code> are self-explanatory as names, absent from the published standards, and omitted by xrpl.js 5.2.0's <code>VaultInfoResponse</code>. The phase codes are sensible, though <code>tecTOO_SOON</code> during Investment reads like a hiccup rather than a lock until redemption, and the final-payment constraint was not clear before trial. On the explorer the first impairment looks unchanged to anything that diffs metadata, and a broker's impairments vanish from <code>account_tx</code>. Cash-basis accounting behaved as the Track 2 note says, and is exactly what makes the change set empty.</p>
+
+<h2>What we would fix, what we give back, what we got wrong</h2>
+
+<p>First, one paragraph on the metadata page saying that <code>PreviousFields</code> omits default-valued fields. Then the tutorial's <code>VaultCreate</code> and result check, with 3923, 587 and 582 merged. Then a broker's actions made attributable, and the reason rippled already computes returned with the code. What worked: the closed-ended design, <code>tecNO_AUTH</code>, the revocation asymmetry, aggregation inside the ledger, escrow of shares, the C++ comments, and a release that fixed two of our bugs before we could report them. We give back the tutorial fix, verified green on rc5 and ready to file, and the register of forty findings with hashes; none of it is filed upstream yet. We got four things wrong: a probe that misread the permission code, the escrow claim we retracted, a headline we marked new that 6487 had described first, and an SDK we said did not exist. A report you cannot catch being wrong is worth less than one that shows its corrections.</p>
+
+<div class="sign">Alexandre Lemiere &amp; Andrea Gonzalez
+  <small>Paris, 13 September 2026 · @frytegg · @andreagnzz · Team BuzzBallz</small></div>
+
+</body></html>
