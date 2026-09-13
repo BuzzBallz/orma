@@ -1,25 +1,21 @@
 # Orma — deck content
 
 <!-- 10 slides, 4:00 total. Matches docs/45-RUNSHEET.md beat for beat, slide for slide. -->
-<!-- Renderer: one slide per `## S` heading. Nothing above the first `## S1` is a slide. -->
-<!-- Design: almost no text on screen, big numbers, one idea per slide. The speaker carries the argument. -->
-<!-- Team BuzzBallz. Alexandre Lemiere (backend, protocol, research), Andrea Gonzalez (frontend). -->
+<!-- Renderer: one slide per level-two heading. Nothing above the first one is rendered. -->
 
----
-
-## S1 — The empty object
-<!-- time: 0:00 | duration: 15s -->
+## S1 - Orma
+<!-- time: 0:00 | duration: 30s | layout: cover -->
 
 ### on screen
-- `"PreviousFields": {}`
-- this is everything the indexer was told
 
 ### notes
-Live on the Verification tab, the `{}` block filling the panel.
+The mark alone. Nothing to read, because for thirty seconds they are listening, not reading.
 
-A lending vault takes fifty-one XRP. It lends ten. The borrower stops paying and the manager writes the loan down. // The fund is now worth eighty cents on the unit. // **This is everything an indexer watching that ledger was told.**
+Yesterday morning, in your workshop, you explicitly said: // "The human or AI controlling the loan broker from the SAV needs to do a liquidity buffer and liquidity management in order to know when the depositors will want to withdraw, in case of specific events or crisis for instance, to be attractive on the market." // We spent the weekend building the instrument that makes that measurable, from a third party outside, directly on the ledger, for closed-ended vaults.
 
-*Beat. Let them read the braces.*
+*Check the quote against what was actually said before you put it in quotation marks. They will compare it to their memory, and a paraphrase presented as a quotation costs credibility at the worst possible moment.*
+
+*30s against a 15s budget. That is 12% of the talk on the opening. Deliberate if you take it from elsewhere; a problem if you do not.*
 
 ---
 

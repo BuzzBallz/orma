@@ -16,6 +16,18 @@
     position:fixed;inset:0;display:none;flex-direction:column;
     padding:5vh 7vw;background:var(--bg);
   }
+  /* An opening slide carries the mark and nothing else: no section label, no timing, no
+     page number. The speaker carries the words. Any lines the slide does have are set
+     below the mark, so the same layout works whether or not it has text. */
+  .slide.cover{ align-items:center; justify-content:center; gap:4vh; }
+  .slide.cover .shead, .slide.cover .sfoot{ display:none; }
+  .slide.cover .sbody{ flex:0 0 auto; align-items:center; text-align:center; gap:2vh; }
+  .slide.cover .mark{ width:22vh; height:22vh; }
+  .slide.cover .wordmark{
+    font:600 4.6vh/1 var(--mono); letter-spacing:.26em; text-transform:uppercase;
+    color:var(--fg); margin:0;
+  }
+  .slide.cover .line{ font-size:2.2vw; color:var(--dim); max-width:52ch; font-weight:400; }
   .slide.on{display:flex}
   .shead{display:flex;align-items:baseline;gap:1.2rem;
     font:500 1.1vw/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--mute);
@@ -38,9 +50,11 @@
     padding:2vh 7vw;font-size:1.15vw;line-height:1.6;color:var(--dim)}
   body.notes .slide.on .notes{display:block}
   .notes p{margin:0 0 .8em}
-  #clock{position:fixed;top:1.2vh;right:1.2vw;z-index:10;
+  /* A rehearsal tool, not part of the presentation. Hidden until T starts it, so it is
+     never on screen in front of a jury unless the presenter asked for it. */
+  #clock{position:fixed;top:1.2vh;right:1.2vw;z-index:10;display:none;
     font:600 1.1vw/1 var(--mono);letter-spacing:.06em;color:var(--mute)}
-  #clock.run{color:var(--gold)}
+  #clock.run{display:block;color:var(--gold)}
   #clock.over{color:#FF4A4A}
   /* Printing is how this becomes a PDF, so every slide must exist on its own page. */
   @media print{
@@ -55,18 +69,22 @@
 <body>
 <div id="clock">0:00</div>
 
-  <section class="slide" data-i="0">
+  <section class="slide cover" data-i="0">
     <header class="shead">
       <span class="sid">S1</span>
-      <span class="stitle">The empty object</span>
-      <span class="stime">0:00 &middot; 15s</span>
+      <span class="stitle">Orma</span>
+      <span class="stime">0:00 &middot; 30s</span>
     </header>
     <div class="sbody">
-      <p class="line"><code>"PreviousFields": {}</code></p>
-      <p class="line">this is everything the indexer was told</p>
+      <svg class="mark" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+      <path d="M32 6c10.5 0 18 8.9 18 21.5S42.5 49 32 49 14 40.1 14 27.5 21.5 6 32 6Zm0 4.6c-5.6 0-8.9 6.6-8.9 16.9s3.3 16.9 8.9 16.9 8.9-6.6 8.9-16.9S37.6 10.6 32 10.6Z" fill="#EAE0CE"/>
+      <path d="M7 54.2c5.6-3.6 9.9-3.6 14.5-.9 5.2 3 8.4 3.1 12.9.4 5.5-3.3 9.7-3.4 14.8-.6 3.2 1.8 6 1.9 8.8.4" stroke="#EAE0CE" stroke-width="2.1" stroke-linecap="round"/>
+      <path d="M11 59.6c5.3-2.6 9.4-2.6 13.7-.4 4.9 2.5 8 2.5 12.2.1 5.2-2.9 9.2-3 14-.6" stroke="#C9A45F" stroke-width="2.1" stroke-linecap="round"/>
+    </svg><p class="wordmark">Orma</p>
+      
     </div>
     <footer class="sfoot"><span>Orma</span><span>1 / 10</span></footer>
-    <aside class="notes"><p>Live on the Verification tab, the <code>{}</code> block filling the panel.</p><p>A lending vault takes fifty-one XRP. It lends ten. The borrower stops paying and the manager writes the loan down. // The fund is now worth eighty cents on the unit. // <b>This is everything an indexer watching that ledger was told.</b></p><p>*Beat. Let them read the braces.*</p></aside>
+    <aside class="notes"><p>The mark alone. Nothing to read, because for thirty seconds they are listening, not reading.</p><p>Yesterday morning, in your workshop, you explicitly said: // "The human or AI controlling the loan broker from the SAV needs to do a liquidity buffer and liquidity management in order to know when the depositors will want to withdraw, in case of specific events or crisis for instance, to be attractive on the market." // We spent the weekend building the instrument that makes that measurable, from a third party outside, directly on the ledger, for closed-ended vaults.</p><p>*Check the quote against what was actually said before you put it in quotation marks. They will compare it to their memory, and a paraphrase presented as a quotation costs credibility at the worst possible moment.*</p><p>*30s against a 15s budget. That is 12% of the talk on the opening. Deliberate if you take it from elsewhere; a problem if you do not.*</p></aside>
   </section>
 
   <section class="slide" data-i="1">
@@ -76,6 +94,7 @@
       <span class="stime">0:15 &middot; 25s</span>
     </header>
     <div class="sbody">
+      
       <p class="line">LoanBroker owner = vault owner</p>
       <p class="line">two levers: <b>when</b>, and <b>in what order</b></p>
     </div>
@@ -90,6 +109,7 @@
       <span class="stime">0:40 &middot; 12s</span>
     </header>
     <div class="sbody">
+      
       <p class="line">measure → publish → enforce</p>
       <p class="line">Meridian · Kestrel · Calder · Thorne</p>
       <p class="line">four facilities, live on Devnet</p>
@@ -105,6 +125,7 @@
       <span class="stime">0:52 &middot; 35s</span>
     </header>
     <div class="sbody">
+      
       <p class="line">diffs metadata: <b>1.000000</b></p>
       <p class="line">re-reads the object: <b>0.803922</b></p>
       <p class="line">1,961 bp apart, same transaction</p>
@@ -121,6 +142,7 @@
       <span class="stime">1:27 &middot; 40s</span>
     </header>
     <div class="sbody">
+      
       <p class="line">largest loss first: <b>0.50 XRP</b> of cover</p>
       <p class="line">smallest first: <b>0.70 XRP</b></p>
       <p class="line">the difference, <b>0.20 XRP</b>, is investor money</p>
@@ -137,6 +159,7 @@
       <span class="stime">2:07 &middot; 30s</span>
     </header>
     <div class="sbody">
+      
       <p class="line">five steps, none of them ours</p>
       <p class="line">priced naively: <b>1.000000</b></p>
       <p class="line">priced on the pointer: <b>0.803922</b></p>
@@ -153,6 +176,7 @@
       <span class="stime">2:37 &middot; 20s</span>
     </header>
     <div class="sbody">
+      
       <p class="line">graded LP: <code>tesSUCCESS</code></p>
       <p class="line">ungraded LP: <code>tecNO_AUTH</code></p>
       <p class="line">refused by the ledger, not by us</p>
@@ -168,6 +192,7 @@
       <span class="stime">2:57 &middot; 50s</span>
     </header>
     <div class="sbody">
+      
       <p class="line"><b>QR code to <code>FEEDBACK.md</code>, top right</b></p>
       <p class="line"><b>X1</b> the empty change set</p>
       <p class="line"><b>D2</b> the documented first hour cannot complete</p>
@@ -185,6 +210,7 @@
       <span class="stime">3:47 &middot; 8s</span>
     </header>
     <div class="sbody">
+      
       <p class="line">one pull request: the tutorial, green on rc5 in 79.6 s</p>
       <p class="line">four upstream threads, not duplicates</p>
       <p class="line">40 findings, every one evidenced</p>
@@ -200,6 +226,7 @@
       <span class="stime">3:55 &middot; 5s</span>
     </header>
     <div class="sbody">
+      
       <p class="line"><b>Orma</b></p>
       <p class="line"><b>github.com/frytegg/orma</b></p>
       <p class="line">Track 2 · Loaded · Devnet · rippled 3.4.0-rc5 · xrpl 5.2.0 · Node 24.13.0</p>

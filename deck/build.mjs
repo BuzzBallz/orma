@@ -44,13 +44,13 @@ function parse(md) {
     const body = nl === -1 ? '' : block.slice(nl + 1)
 
     const [, id, title] = heading.match(/^(S\d+)\s*[—:-]\s*(.+)$/) || [null, '', heading]
-    const meta = body.match(/<!--\s*time:\s*([^|]+)\|\s*duration:\s*([^>]+?)\s*-->/)
+    const meta = body.match(/<!--\s*time:\s*([^|]+)\|\s*duration:\s*([^|>]+?)\s*(?:\|\s*layout:\s*([a-z]+)\s*)?-->/)
 
-    const onScreenRaw = (body.match(/###\s*on screen\s*\n([\s\S]*?)(?=\n###|\n---|$)/i) || [])[1] || ''
-    const notesRaw = (body.match(/###\s*notes\s*\n([\s\S]*?)(?=\n###|\n---|$)/i) || [])[1] || ''
+    const onScreenRaw = (body.match(/###[ \t]*on screen[ \t]*\n([\s\S]*?)(?=\n###|\n---|$)/i) || [])[1] || ''
+    const notesRaw = (body.match(/###[ \t]*notes[ \t]*\n([\s\S]*?)(?=\n###|\n---|$)/i) || [])[1] || ''
 
     const lines = onScreenRaw.split('\n').map((l) => l.trim())
-      .filter((l) => l && !l.startsWith('<!--'))
+      .filter((l) => l && !l.startsWith('<!--') && !l.startsWith('###'))
       .map((l) => l.replace(/^[-*]\s+/, ''))
 
     slides.push({
@@ -58,6 +58,7 @@ function parse(md) {
       title,
       time: meta ? meta[1].trim() : '',
       duration: meta ? meta[2].trim() : '',
+      layout: meta && meta[3] ? meta[3].trim() : '',
       lines,
       notes: notesRaw.trim().split(/\n{2,}/).map((p) => p.replace(/\n/g, ' ').trim()).filter(Boolean),
     })
@@ -65,20 +66,31 @@ function parse(md) {
   return slides
 }
 
-const slides = parse(readFileSync(SRC, 'utf8'))
+// Normalise line endings once, here. The content file is edited on Windows and arrives
+// CRLF; every regex below then only has to think about \n, which is one fewer thing to
+// get wrong in a parser that is edited under time pressure.
+const slides = parse(readFileSync(SRC, 'utf8').replace(/\r\n/g, '\n'))
 if (!slides.length) {
   console.error(`  ${SRC} produced no slides. Check the heading format: "## S1 — Title".`)
   process.exit(1)
 }
 
+/** The mark, inline, so the deck stays a single file that works from any directory. */
+const MARK = `<svg class="mark" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+      <path d="M32 6c10.5 0 18 8.9 18 21.5S42.5 49 32 49 14 40.1 14 27.5 21.5 6 32 6Zm0 4.6c-5.6 0-8.9 6.6-8.9 16.9s3.3 16.9 8.9 16.9 8.9-6.6 8.9-16.9S37.6 10.6 32 10.6Z" fill="#EAE0CE"/>
+      <path d="M7 54.2c5.6-3.6 9.9-3.6 14.5-.9 5.2 3 8.4 3.1 12.9.4 5.5-3.3 9.7-3.4 14.8-.6 3.2 1.8 6 1.9 8.8.4" stroke="#EAE0CE" stroke-width="2.1" stroke-linecap="round"/>
+      <path d="M11 59.6c5.3-2.6 9.4-2.6 13.7-.4 4.9 2.5 8 2.5 12.2.1 5.2-2.9 9.2-3 14-.6" stroke="#C9A45F" stroke-width="2.1" stroke-linecap="round"/>
+    </svg>`
+
 const slideHtml = slides.map((s, i) => `
-  <section class="slide" data-i="${i}">
+  <section class="slide${s.layout ? ' ' + s.layout : ''}" data-i="${i}">
     <header class="shead">
       <span class="sid">${esc(s.id)}</span>
       <span class="stitle">${inline(s.title)}</span>
       <span class="stime">${esc(s.time)}${s.duration ? ` &middot; ${esc(s.duration)}` : ''}</span>
     </header>
     <div class="sbody">
+      ${s.layout === 'cover' ? MARK + '<p class="wordmark">Orma</p>' : ''}
       ${s.lines.map((l) => `<p class="line">${inline(l)}</p>`).join('\n      ')}
     </div>
     <footer class="sfoot"><span>Orma</span><span>${i + 1} / ${slides.length}</span></footer>
@@ -103,6 +115,18 @@ const html = `<!doctype html>
     position:fixed;inset:0;display:none;flex-direction:column;
     padding:5vh 7vw;background:var(--bg);
   }
+  /* An opening slide carries the mark and nothing else: no section label, no timing, no
+     page number. The speaker carries the words. Any lines the slide does have are set
+     below the mark, so the same layout works whether or not it has text. */
+  .slide.cover{ align-items:center; justify-content:center; gap:4vh; }
+  .slide.cover .shead, .slide.cover .sfoot{ display:none; }
+  .slide.cover .sbody{ flex:0 0 auto; align-items:center; text-align:center; gap:2vh; }
+  .slide.cover .mark{ width:22vh; height:22vh; }
+  .slide.cover .wordmark{
+    font:600 4.6vh/1 var(--mono); letter-spacing:.26em; text-transform:uppercase;
+    color:var(--fg); margin:0;
+  }
+  .slide.cover .line{ font-size:2.2vw; color:var(--dim); max-width:52ch; font-weight:400; }
   .slide.on{display:flex}
   .shead{display:flex;align-items:baseline;gap:1.2rem;
     font:500 1.1vw/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--mute);
@@ -125,9 +149,11 @@ const html = `<!doctype html>
     padding:2vh 7vw;font-size:1.15vw;line-height:1.6;color:var(--dim)}
   body.notes .slide.on .notes{display:block}
   .notes p{margin:0 0 .8em}
-  #clock{position:fixed;top:1.2vh;right:1.2vw;z-index:10;
+  /* A rehearsal tool, not part of the presentation. Hidden until T starts it, so it is
+     never on screen in front of a jury unless the presenter asked for it. */
+  #clock{position:fixed;top:1.2vh;right:1.2vw;z-index:10;display:none;
     font:600 1.1vw/1 var(--mono);letter-spacing:.06em;color:var(--mute)}
-  #clock.run{color:var(--gold)}
+  #clock.run{display:block;color:var(--gold)}
   #clock.over{color:#FF4A4A}
   /* Printing is how this becomes a PDF, so every slide must exist on its own page. */
   @media print{
