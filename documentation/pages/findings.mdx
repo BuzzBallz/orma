@@ -473,7 +473,9 @@ omitted pair is kept rather than removed, reusing an `OracleDocumentID` for a di
 is exactly what happens when demo vaults are rebaked against a stable publishing account, accumulates the
 old pairs under the new ones until the series passes the ledger's ceiling and `OracleSet` returns
 `tecARRAY_TOO_LARGE`. At that point **nothing at all can be published to that document**. The object is not
-corrupt, it is full of ghosts, and the only way back is to delete and recreate it. From `src/oracle.mjs`:
+corrupt, it is full of ghosts. Either name every ghost with no `AssetPrice` to erase it one by one, or
+delete the document and recreate it — which is what this publisher does, because it does not know what the
+ghosts were. From `src/oracle.mjs`:
 
 ```js
 if (result === 'tecARRAY_TOO_LARGE') {

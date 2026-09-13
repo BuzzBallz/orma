@@ -174,7 +174,9 @@ export class OraclePublisher {
       // the new ones until the series passes the ledger's ceiling and nothing can be
       // published at all. The object is not corrupt, it is full of ghosts.
       //
-      // Deleting and recreating is the only way back: there is no "remove this pair".
+      // A pair CAN be removed one at a time, by listing it with no AssetPrice: OracleSet.cpp
+      // erases it. We delete and recreate because we do not know what the stale pairs were,
+      // which is the situation any publisher that reuses a document id is in.
       if (result === 'tecARRAY_TOO_LARGE') {
         log.warn('document id carries stale pairs, recreating', { docId })
         try {
