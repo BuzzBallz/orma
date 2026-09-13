@@ -68,6 +68,10 @@ function vaultsFromDemoDir() {
       const j = JSON.parse(readFileSync(join('demo', f), 'utf8'))
       if (typeof j.vaultId !== 'string' || !/^[A-Fa-f0-9]{64}$/.test(j.vaultId)) continue
       const id = j.vaultId.toUpperCase()
+      // Not every capture in demo/ is a facility bake. The oracle aggregate names the
+      // vault it is about, which made the startup line claim five facilities for four
+      // vaults and put a duplicate id in front of the reader.
+      if (vaults.includes(id)) continue
       vaults.push(id)
       if (j.label) labels[id] = j.label
     } catch { /* a malformed capture must not stop the reader from starting */ }
