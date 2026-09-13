@@ -64,10 +64,10 @@ nav{position:static;height:auto;border-right:0;border-bottom:1px solid var(--lin
       <a href="mathematics.html">The mathematics</a>
       <a href="nav-pointer.html">The NAV pointer: a self-describing collateral instrument</a>
       <a href="gate.html">The gate</a>
-      <a href="api-reference.html">API reference</a>
+      <a href="http-api.html">API reference</a>
       <a href="ai-agents.html">AI agents</a>
       <a href="use-cases.html">Use cases</a>
-      <a href="findings.html">findings</a>
+      <a href="findings.html">What building this taught us</a>
   </nav>
   <main>
     <h1>Quickstart</h1>
@@ -171,7 +171,7 @@ AAA	100	1.000000	1.000000	0bp	Thorne Senior Secured I</code></pre>
     "overstatement": "196078"
   }
 }</code></pre>
-<p>Amounts are drops. A lender valuing that pledge naively is over by 0.196078 XRP on every XRP of stated value. See <a href="nav-pointer.html">/nav-pointer</a> and <a href="api-reference.html">the API reference</a>.</p>
+<p>Amounts are drops. A lender valuing that pledge naively is over by 0.196078 XRP on every XRP of stated value. See <a href="nav-pointer.html">/nav-pointer</a> and <a href="http-api.html">the API reference</a>.</p>
 <p><b>Check who holds the gate.</b> <code>DomainID</code> is not on the <code>Vault</code> ledger entry, it is on the share issuance, so the obvious lookup returns nothing and reads exactly like "open to everyone".</p>
 <pre class="code" data-lang="bash"><code>curl -s http://localhost:8787/api/vaults/4A5A8E3716D52E334AEB077ADB09456EF4A941CC26021A8EAD37F95B00190DF5/gate</code></pre>
 <pre class="code" data-lang="json"><code>{

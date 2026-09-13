@@ -64,10 +64,10 @@ nav{position:static;height:auto;border-right:0;border-bottom:1px solid var(--lin
       <a href="mathematics.html" class="on">The mathematics</a>
       <a href="nav-pointer.html">The NAV pointer: a self-describing collateral instrument</a>
       <a href="gate.html">The gate</a>
-      <a href="api-reference.html">API reference</a>
+      <a href="http-api.html">API reference</a>
       <a href="ai-agents.html">AI agents</a>
       <a href="use-cases.html">Use cases</a>
-      <a href="findings.html">findings</a>
+      <a href="findings.html">What building this taught us</a>
   </nav>
   <main>
     <h1>The mathematics</h1>
@@ -171,7 +171,7 @@ export const rateToDec = (r) =&gt; num(r).div(RATE_SCALE)</code></pre>
   "fairness": "0.0000",
   "fairOrder": ["10000000", "30000000"]
 }</code></pre>
-<p>The 0.20 XRP of <code>costToDepositors</code> is depositor money. Nothing about recovering it required privileged access. Full shape in <a href="api-reference.html">the API reference</a>.</p>
+<p>The 0.20 XRP of <code>costToDepositors</code> is depositor money. Nothing about recovering it required privileged access. Full shape in <a href="http-api.html">the API reference</a>.</p>
 <hr>
 <h2 id="4-the-five-measured-factors">4. The five measured factors</h2>
 <p>Each is scored independently on a 20-step ordinal ladder from AAA to D. <b>No weights are applied anywhere.</b> A weighted average lets a strong factor pay for a broken one, and that is not the question an investor is asking.</p>
@@ -323,7 +323,7 @@ await client.disconnect()</code></pre>
 <p>  <code>debtBefore</code> and <code>coverConsumed</code>. Check each against   $\lceil D \cdot c_{\min} \cdot c_{\text{liq}} \rceil$ using the rates on the broker, then check the   total against <code>coverForOrder</code> run over the same principals in the two extreme orders.</p>
 <ul><li><b>The oracle.</b> Fetch the object by its index on the Devnet explorer and decode <code>AssetPrice</code></li></ul>
 <p>  yourself with <code>BigInt('0x' + raw)</code> divided by $10^{\text{Scale}}$. It should agree with the API to   the last digit, because both come from the same snapshot.</p>
-<p>Related: <a href="api-reference.html">the API reference</a> for the valuation contract field by field, <a href="concepts.html">/concepts</a> for the ordering argument in prose, and <a href="nav-pointer.html">/nav-pointer</a> for the second publication path, the one inside the share token itself.</p>
+<p>Related: <a href="http-api.html">the API reference</a> for the valuation contract field by field, <a href="concepts.html">/concepts</a> for the ordering argument in prose, and <a href="nav-pointer.html">/nav-pointer</a> for the second publication path, the one inside the share token itself.</p>
     <div class="foot">
       Orma — built at the XRPL Lending Protocol Hackathon, Paris, 12-13 September 2026,
       by Alexandre Lemiere and Andrea Gonzalez. Devnet only.

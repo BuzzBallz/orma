@@ -64,10 +64,10 @@ nav{position:static;height:auto;border-right:0;border-bottom:1px solid var(--lin
       <a href="mathematics.html">The mathematics</a>
       <a href="nav-pointer.html">The NAV pointer: a self-describing collateral instrument</a>
       <a href="gate.html" class="on">The gate</a>
-      <a href="api-reference.html">API reference</a>
+      <a href="http-api.html">API reference</a>
       <a href="ai-agents.html">AI agents</a>
       <a href="use-cases.html">Use cases</a>
-      <a href="findings.html">findings</a>
+      <a href="findings.html">What building this taught us</a>
   </nav>
   <main>
     <h1>The gate</h1>
@@ -222,7 +222,7 @@ const RED = SUB + WINDOW   // WINDOW defaults to 3600 seconds</code></pre>
 <p><code>issuerNamed</code> is the rater's own question, answered without asking the vault owner: am I cited in this domain. It is <code>true</code> here, and <code>rGFFSqqY1R3764FKF7crU5F6bYh9qaD45S</code> never signed anything of ours to make it so. <code>raterAddress</code> comes from the <code>RATER_ADDRESS</code> environment variable, or from <code>demo/gate-vault.json</code> when that file is present.</p>
 <p><code>note</code> is non-null exactly when the answer needs a caveat:</p>
 <div class="tw"><table><thead><tr><th><code>note</code></th><th>what happened</th></tr></thead><tbody><tr><td><code>no share issuance to read a domain from</code></td><td>the vault has no share <code>MPTokenIssuance</code> to read</td></tr><tr><td><code>open to any depositor</code></td><td>no <code>DomainID</code> on the issuance, and not private</td></tr><tr><td><code>marked private but carries no domain, so nothing is enforced</code></td><td><code>tfVaultPrivate</code> set, no domain attached</td></tr><tr><td><code>carries a domain but is not flagged private, so nothing is enforced</code></td><td>the inert-domain case from step 4</td></tr></tbody></table></div>
-<p>The route costs two extra ledger reads, the issuance and the domain, so its answer is cached for 30 seconds. A domain changes when someone edits it, not every four seconds like the vault state behind <a href="api-reference.html"><code>GET /api/vaults/{vaultId}/nav</code></a>.</p>
+<p>The route costs two extra ledger reads, the issuance and the domain, so its answer is cached for 30 seconds. A domain changes when someone edits it, not every four seconds like the vault state behind <a href="http-api.html"><code>GET /api/vaults/{vaultId}/nav</code></a>.</p>
 <h2 id="running-it-yourself">Running it yourself</h2>
 <pre class="code" data-lang="bash"><code>node src/demo/bake-gate.mjs --window 3600 --label "Thorne Senior Secured I"</code></pre>
 <p>The script funds four Devnet accounts, runs all nine transactions, reads the gate back through the same <code>gateStatus()</code> the API uses, and writes <code>demo/gate-vault.json</code>. It exits non-zero unless all four claims hold:</p>

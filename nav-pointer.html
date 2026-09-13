@@ -64,10 +64,10 @@ nav{position:static;height:auto;border-right:0;border-bottom:1px solid var(--lin
       <a href="mathematics.html">The mathematics</a>
       <a href="nav-pointer.html" class="on">The NAV pointer: a self-describing collateral instrument</a>
       <a href="gate.html">The gate</a>
-      <a href="api-reference.html">API reference</a>
+      <a href="http-api.html">API reference</a>
       <a href="ai-agents.html">AI agents</a>
       <a href="use-cases.html">Use cases</a>
-      <a href="findings.html">findings</a>
+      <a href="findings.html">What building this taught us</a>
   </nav>
   <main>
     <h1>The NAV pointer: a self-describing collateral instrument</h1>
@@ -181,7 +181,7 @@ await c.disconnect()</code></pre>
   ]
 }</code></pre>
 <p>Five steps, all green. The issuer on that first line, <code>r3hE8HanpccSZdgmeHCfYFEkwxFjdDmmvt</code>, is the vault pseudo-account: the same account whose <code>lsfDisableMaster</code> flag makes the metadata permanent.</p>
-<p>The valuation document that comes back is the one described in <a href="api-reference.html">the API reference</a>, and the pointer route serves it keyed by share token rather than by vault id, because the issuance id is the only identifier a holder has. It carries its own inputs. Trimmed to the valuation and its provenance:</p>
+<p>The valuation document that comes back is the one described in <a href="http-api.html">the API reference</a>, and the pointer route serves it keyed by share token rather than by vault id, because the issuance id is the only identifier a holder has. It carries its own inputs. Trimmed to the valuation and its provenance:</p>
 <pre class="code" data-lang="json"><code>{
   "schema": "orma.nav/1",
   "unitValue": {

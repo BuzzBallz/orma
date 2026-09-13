@@ -64,10 +64,10 @@ nav{position:static;height:auto;border-right:0;border-bottom:1px solid var(--lin
       <a href="mathematics.html">The mathematics</a>
       <a href="nav-pointer.html">The NAV pointer: a self-describing collateral instrument</a>
       <a href="gate.html">The gate</a>
-      <a href="api-reference.html">API reference</a>
+      <a href="http-api.html">API reference</a>
       <a href="ai-agents.html">AI agents</a>
       <a href="use-cases.html">Use cases</a>
-      <a href="findings.html">findings</a>
+      <a href="findings.html">What building this taught us</a>
   </nav>
   <main>
     <h1>Concepts</h1>
@@ -166,7 +166,7 @@ withdrawBlockedReason: inInvestment ? 'tecTOO_SOON' : null,</code></pre>
 <p>$$\text{NAV}_{\text{naive}} = \frac{A}{S}, \qquad \text{NAV}_{\text{held}} = \frac{A - L}{S}$$</p>
 <p>Meridian Trade Finance I, measured live: $A = 51{,}000{,}000$ drops, $L = 10{,}000{,}000$, $S = 51{,}000{,}000$. Naive reads $1.000000$ and held reads $0.803922$, a divergence of 1961 basis points. Same object, same instant, two answers.</p>
 <p>The delay is not merely invisible to careless tools. It is invisible to careful ones that watch transaction metadata. rippled omits from <code>PreviousFields</code> any field whose previous value was the type default. On the first impairment of a healthy vault, <code>LossUnrealized</code> moves from zero, and under cash basis nothing else on the Vault changes, so <code>PreviousFields</code> is emitted <b>empty</b> and an indexer that diffs metadata sees no change at all on the most important credit event the protocol has. Captured in transaction <code>075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3</code>, result <code>tesSUCCESS</code>; the verbatim metadata node and the three-outcome asymmetry that lets it survive casual testing are in <a href="findings.html">/findings</a>.</p>
-<div class="callout tip"><span class="ck">Tip</span><div><p>This is why Orma is a four second poller that re-reads full object state, and never a metadata</p><p>differ. Re-reading cannot miss a field that was never diffed. See <code>src/poll.mjs</code>, and</p><p><a href="api-reference.html">the API reference</a> for the reading it publishes.</p></div></div>
+<div class="callout tip"><span class="ck">Tip</span><div><p>This is why Orma is a four second poller that re-reads full object state, and never a metadata</p><p>differ. Re-reading cannot miss a field that was never diffed. See <code>src/poll.mjs</code>, and</p><p><a href="http-api.html">the API reference</a> for the reading it publishes.</p></div></div>
 <p>Delay also flatters the manager directly. <code>CoverRateMinimum</code> is keyed to <code>DebtTotal</code>, so the cover they must hold, and the cover actually liquidated when they finally act, both shrink with the book.</p>
 <h2 id="lever-two-in-what-order-to-realise">Lever two: in what order to realise</h2>
 <p>Because $T$ is keyed to <code>DebtTotal</code> at the instant of the default, and <code>DebtTotal</code> is decremented as each default lands, every default shrinks the base for the next one. Total cover consumed across a fixed set of defaults therefore depends on the <b>order</b> they are declared in.</p>
@@ -178,7 +178,7 @@ withdrawBlockedReason: inInvestment ? 'tecTOO_SOON' : null,</code></pre>
 <div class="tw"><table><thead><tr><th>Declared</th><th>Principal</th><th><code>DebtTotal</code> before</th><th>Cover consumed</th></tr></thead><tbody><tr><td>2026-09-12T21:11:02Z</td><td>30 XRP</td><td>40 XRP</td><td>0.40 XRP</td></tr><tr><td>2026-09-12T21:11:10Z</td><td>10 XRP</td><td>10 XRP</td><td>0.10 XRP</td></tr><tr><td></td><td></td><td><b>total</b></td><td><b>0.50 XRP</b></td></tr></tbody></table></div>
 <p>Declaring the small loan first would have consumed 0.70 XRP. Identical losses, a 40 percent difference in what the first-loss capital absorbed, and the 0.20 XRP difference falls on the unit holders. Orma places the observed sequence between the two extremes as a sequence score:</p>
 <p>$$\phi = \frac{T_{\text{observed}} - T_{\min}}{T_{\max} - T_{\min}}$$</p>
-<p>$\phi = 0$ is the investor-worst sequence and $\phi = 1$ the investor-best. Kestrel scored $\phi = 0.0000$. Reconstruction and scoring live in <code>src/history.mjs</code>, served at <a href="api-reference.html"><code>GET /api/vaults/{vaultId}/broker-history</code></a>.</p>
+<p>$\phi = 0$ is the investor-worst sequence and $\phi = 1$ the investor-best. Kestrel scored $\phi = 0.0000$. Reconstruction and scoring live in <code>src/history.mjs</code>, served at <a href="http-api.html"><code>GET /api/vaults/{vaultId}/broker-history</code></a>.</p>
 <div class="callout note"><span class="ck">Note</span><div><p>Reconstructing that history needs a join that is not obvious, and getting it wrong inverts the</p><p>answer rather than emptying it. The reason, the affected-node set that proves it, and the four lines</p><p>that close it are finding 4 in <a href="findings.html">/findings</a>.</p></div></div>
 <h2 id="one-asymmetry-two-levers-then-enforcement">One asymmetry, two levers, then enforcement</h2>
 <p>The vault owner and the broker owner are the same account. That single asymmetry gives one party two levers over investor money: <b>when</b> a loss is recognised, and <b>in what order</b> losses are realised. Both are discretionary, both move money, and neither leaves a signal that a metadata-diffing tool would see.</p>
