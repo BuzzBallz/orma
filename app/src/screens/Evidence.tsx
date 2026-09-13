@@ -15,26 +15,6 @@ import { dropsToXrp } from '../lib/format'
  * here, and a field the capture does not carry prints an em-dash.
  */
 
-/**
- * The protocol documentation. It sits on this desk and nowhere else: it is written for
- * the same reader this screen is, it leaves the application, and a credit analyst reading
- * a rating note has no use for it in their chrome. Overridable so a preview build can
- * point at a local copy.
- */
-const DOCS_URL = import.meta.env.VITE_DOCS_URL
-  ?? 'https://ormaprotocol.mintlify.site/'
-
-function DocsLink() {
-  return (
-    <a className="docs-link" href={DOCS_URL} target="_blank" rel="noreferrer noopener">
-      Protocol documentation
-      <svg viewBox="0 0 12 12" aria-hidden="true">
-        <path d="M4.5 2.5h5v5M9.5 2.5 4 8M8 9.5H2.5V4" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </a>
-  )
-}
-
 /** Only what a value needs to be legible in a column. Never reformats the digits. */
 function cell(v: unknown): string {
   if (v === null || v === undefined || v === '') return '—'
@@ -87,8 +67,6 @@ function EvidenceSkeleton({ name }: { name?: string }) {
         <div className="ev-prov">
           <span className="label">Recorded</span>
           <code>—</code>
-          <span className="spacer" />
-          <DocsLink />
         </div>
       </section>
     </div>
@@ -177,8 +155,6 @@ export function Evidence({ d, name }: { d: IndexerRace | null; name?: string }) 
           <code>{d.transactionResult}</code>
           {d.transactionHash && <code className="ev-hash">{d.transactionHash}</code>}
           {d.capturedAt && <code>{d.capturedAt}</code>}
-          <span className="spacer" />
-          <DocsLink />
         </div>
 
         {/* Folded by default. The transcription above is the argument; this is the receipt,
