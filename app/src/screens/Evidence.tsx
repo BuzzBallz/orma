@@ -35,6 +35,19 @@ export function Evidence({ d }: { d: IndexerRace | null }) {
 
   return (
     <div className="stack">
+      {/* Who this is for, said out loud.
+          Every other desk is written for a credit analyst and keeps protocol vocabulary off
+          the screen. This one deliberately does not — the raw record is the evidence, and
+          paraphrasing a field name would break the reference a reader is being asked to
+          check. Naming the audience is what reconciles the two: an analyst learns in one
+          line that this page is not addressed to them, and the engineer it *is* addressed
+          to still gets the record verbatim. Nothing below is softened. */}
+      <p className="ev-addressed">
+        This section is addressed to the engineers reviewing the protocol work. It quotes the
+        record verbatim — field names and result codes included — because paraphrasing it
+        would destroy the evidence. Every other section is written for the credit reader.
+      </p>
+
       <section className="panel">
         <h2 className="panel-title">What the two readers see</h2>
         <p className="caption meth">{d.finding}</p>

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { BrokerHistory, Collateral, Gate, Resolution, VaultDetail } from '../lib/types'
 import { Chip } from '../components/Chip'
-import { gradeIndex, gradeTone } from '../lib/grades'
+import { GRADE_LADDER, gradeIndex, gradeTone } from '../lib/grades'
 import { bpsToPct, dropsToXrp, duration, fmtIso, ratioToPct, rateToPct } from '../lib/format'
 import { creditText, facilityName, facilityRef, factorRows, outlookOf, splitFactors } from '../lib/credit'
 import { ManagerConduct, PledgedCollateral } from './FacilityExhibits'
@@ -14,6 +14,45 @@ function F({ k, v, note }: { k: string; v: ReactNode; note?: string }) {
     <div className="kv">
       <dt className="label">{k}</dt>
       <dd className="num">{v ?? 'n.a.'}{note && <span className="kv-note"> {note}</span>}</dd>
+    </div>
+  )
+}
+
+/**
+ * The internal scale, drawn.
+ *
+ * "3 of 20" is precise and says nothing about distance: a reader who does not carry the
+ * ladder in their head cannot tell whether the third step is near the top or halfway down.
+ * Every notch is here, AAA on the left and D on the right, and exactly one is marked.
+ *
+ * The unmarked notches are deliberately uncoloured. A twenty-step colour ramp would be a
+ * chart of nothing — the tone belongs to this facility's own step, which is the only place
+ * in the strip that carries a judgement. Position comes from `gradeIndex`, which reads the
+ * grade the backend sent; nothing here is interpolated or invented.
+ */
+function Ladder({ grade }: { grade: string }) {
+  const i = gradeIndex(grade)
+  if (i < 0) return null
+  return (
+    <div
+      className="ladder"
+      role="img"
+      aria-label={`${grade}: step ${i + 1} of ${GRADE_LADDER.length} on the internal scale, AAA strongest, D weakest`}
+    >
+      <div className="ladder-track">
+        {GRADE_LADDER.map((g, n) => (
+          <span
+            key={g}
+            className="ladder-notch"
+            data-here={n === i ? 'true' : undefined}
+            style={n === i ? { ['--tone' as string]: `var(${gradeTone(g)})` } : undefined}
+          />
+        ))}
+      </div>
+      <div className="ladder-ends" aria-hidden>
+        <span>AAA</span>
+        <span>D</span>
+      </div>
     </div>
   )
 }
@@ -59,6 +98,20 @@ export function Facility({ d, history, collateral, resolution, gate }: {
 
       {/* ─────────────────────────── page 1 ─────────────────────────── */}
       <div className="op-page">
+        {/* Letterhead, print only.
+            On screen the mark sits in the topbar, and the topbar is the first thing the
+            print sheet drops — so a printed opinion left the building with no indication of
+            who had issued it. This is the same mark.svg the chrome uses, not a second
+            drawing: an <img> rather than a background, because "print backgrounds" is off by
+            default in every browser and a letterhead that depends on that setting is not a
+            letterhead. Print turns it black; on paper the cream would be nothing at all. */}
+        <div className="op-letterhead" aria-hidden>
+          <img src="/assets/mark.svg" alt="" width={18} height={18} />
+          <span className="op-lh-name">Orma</span>
+          <span className="op-lh-rule" />
+          <span className="op-lh-kind">Credit opinion</span>
+        </div>
+
         <header className="op-top">
           <div className="op-kind">
             <span className="label">credit opinion</span>
@@ -163,9 +216,10 @@ export function Facility({ d, history, collateral, resolution, gate }: {
                 <F k="internal score" v={<Chip tone={gradeTone(v.grade)} large>{v.grade}</Chip>} />
                 <F k="outlook" v={outlook} />
                 <F k="status" v={v.phase} />
-                <F k="scale position" v={`${gradeIndex(v.grade) + 1} of 20`} />
+                <F k="scale position" v={`${gradeIndex(v.grade) + 1} of ${GRADE_LADDER.length}`} />
                 <F k="scored at" v={d.score.computedAt ? fmtIso(d.score.computedAt) : 'n.a.'} />
               </dl>
+              <Ladder grade={v.grade} />
             </div>
 
             <div className="op-box">

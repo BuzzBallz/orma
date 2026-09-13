@@ -23,6 +23,14 @@
   font-family: "Plex Mono"; font-style: normal; font-weight: 500;
   font-display: swap; src: url("/assets/fonts/plex-mono-500.woff2") format("woff2");
 }
+/* The wordmark asks for 600 and nothing else does. Without this face the browser
+   synthesised the weight — a faux bold, smeared differently by every engine, on the one
+   word in the product that has to look the same on the presenter's Mac and on a juror's
+   Windows laptop. 10 kB to stop guessing at the brand's own name. */
+@font-face{
+  font-family: "Plex Mono"; font-style: normal; font-weight: 600;
+  font-display: swap; src: url("/assets/fonts/plex-mono-600.woff2") format("woff2");
+}
 
 /* ============================================================
    XRPL Vault Fragility Oracle — one stylesheet.
@@ -482,6 +490,49 @@ table.tbl th.rt{ text-align: right; }
 /* One scroller per table, and it is the outer box: it is 40px wider than shadcn's own
    container, and it is the box the UI audit asserts on. The primitive's container is
    made transparent rather than left as a second, narrower scroller inside this one. */
+/* The internal scale, drawn. Twenty notches, one marked.
+   The strip is quiet on purpose: the unmarked notches are hairlines, and the only colour
+   in it is the tone of this facility's own step. It reads as a rating scale with a
+   position on it, which is what it is, rather than as a gauge. */
+.ladder{ margin-top: 12px; }
+.ladder-track{
+  display: grid;
+  grid-template-columns: repeat(20, 1fr);
+  gap: 2px;
+  align-items: end;
+  height: 16px;
+}
+.ladder-notch{
+  height: 7px;
+  border-radius: 1px;
+  background: var(--line-2);
+}
+.ladder-notch[data-here]{
+  height: 16px;
+  background: var(--tone);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tone) 35%, transparent);
+}
+.ladder-ends{
+  display: flex; justify-content: space-between;
+  margin-top: 6px;
+  font: var(--t-2xs)/1 var(--mono);
+  letter-spacing: 0.08em;
+  color: var(--fg-mute);
+}
+
+/* The one line on the verification desk that speaks to the reader rather than to the
+   record. It sits outside the panels because it is about the page, not about a finding —
+   and it is deliberately quiet: a reader who is not its audience should be able to leave
+   after it without feeling they have been shouted at. */
+.ev-addressed{
+  max-width: 76ch;
+  margin: 0 0 4px;
+  padding-left: 12px;
+  border-left: 2px solid var(--amber-dim);
+  font: var(--t-sm)/1.55 var(--sans);
+  color: var(--fg-dim);
+}
+
 .tbl-scroll{ overflow-x: auto; margin: 0 -20px; padding: 0 20px; }
 .tbl-scroll [data-slot="table-container"]{ overflow: visible; }
 
@@ -810,6 +861,23 @@ kbd{
 /* ---------- print: two A4 pages, black on white ---------- */
 @media print{
   @page{ size: A4 portrait; margin: 14mm 13mm; }
+
+  /* The palette, restated for paper.
+     The screen tokens are a cream-on-black system, and they were carried into print
+     untouched: measured against white, the factor names and every figure in the note came
+     out at 1.31:1 — thirty-nine elements at or under AA, which is to say the substance of
+     the opinion printed as a smudge. Remapping the tokens here fixes all of them in one
+     place instead of chasing selectors, and keeps the meanings contract §6 fixes: risk is
+     still red, healthy still green, the correct reading still the accent. Only the
+     luminance moves, because the ground moved. */
+  :root{
+    --fg: #111; --fg-dim: #333; --fg-mute: #555; --fg-idle: #555;
+    --amber: #000; --amber-dim: #444;
+    --ok: #12692a; --warn: #7a5200; --bad: #b00020; --dead: #555;
+    --read-correct: #05527a; --read-naive: #555;
+    --line: #dcdcdc; --line-2: #9a9a9a; --rule-soft: #ececec;
+  }
+
   html, body{ background: #fff !important; color: #111 !important; }
   .topbar, .hints, .feedbar, .wbanner, .ground, .veil, .veil-grain,
   .toaster, [data-sonner-toaster], .desks, .picker, .wallet{ display: none !important; }
@@ -827,7 +895,42 @@ kbd{
   .op-says, .op-date, .op-foot{ color: #666 !important; }
   .chip{ border-color: #666 !important; background: none !important; color: #000 !important; }
   .op-grid{ grid-template-columns: minmax(0, 1fr) 62mm; gap: 8mm; }
+
+  /* The letterhead. Hidden on screen, where the topbar already carries the mark. */
+  .op-letterhead{
+    display: flex !important;
+    align-items: center;
+    gap: 7px;
+    margin: 0 0 7mm;
+    padding-bottom: 2.5mm;
+    border-bottom: 0.6pt solid #000;
+  }
+  .op-letterhead img{
+    /* One asset, two grounds. brightness(0) flattens the cream and the gold to black and
+       keeps the shape, so the printed mark is the drawn mark and not a second file to
+       keep in step with the first. */
+    filter: brightness(0);
+  }
+  .op-lh-name{
+    font: 600 12pt/1 var(--mono);
+    letter-spacing: 0.08em; text-transform: uppercase; color: #000;
+  }
+  .op-lh-rule{ flex: 1 1 auto; }
+  .op-lh-kind{
+    font: 8pt/1 var(--mono);
+    letter-spacing: 0.14em; text-transform: uppercase; color: #555;
+  }
+  /* Page two repeats the identity rather than the letterhead: a reader holding one loose
+     sheet should still know what they are holding. */
+  .op-break .op-top.slim{ border-top: 0.6pt solid #000; padding-top: 2.5mm; }
+  .ladder-notch{ background: #ccc !important; }
+  .ladder-notch[data-here]{ background: #000 !important; box-shadow: none !important; }
+  .ladder-ends{ color: #666 !important; }
+  .ev-addressed{ border-left-color: #999 !important; color: #444 !important; }
 }
+
+/* The letterhead is a print artefact and nothing else. */
+.op-letterhead{ display: none; }
 
 /* ---------- the desks that stand without a feed ---------- */
 
