@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import './app.css'
 import { API_MIXED_ORIGIN, SUSPECT_AFTER_FAILS, SUSPECT_BACKOFF_MS } from './lib/api'
 import { usePoll } from './lib/usePoll'
+import { facilityName } from './lib/credit'
 import { useTick } from './lib/useTick'
 import { useRoute, type RoutePath } from './lib/useRoute'
 import type { BrokerHistory, Collateral, Gate, Health, IndexerRace, Resolution, VaultDetail as Detail, VaultsResponse } from './lib/types'
@@ -195,7 +196,11 @@ function Desk() {
 
   function body() {
     if (path === '/evidence') {
-      return <Evidence d={race.data} />
+      // The capture is not facility-scoped, so the page takes its title from whichever
+      // facility the picker is holding. With none chosen it falls back to naming the
+      // finding rather than borrowing a name the record never claimed.
+      const open = vaultId ? rows.find(r => r.vaultId === vaultId) : undefined
+      return <Evidence d={race.data} name={open ? facilityName(open) : undefined} />
     }
 
     if (path === '/methodology') {

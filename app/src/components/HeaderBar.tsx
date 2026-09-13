@@ -34,7 +34,7 @@ const DOCS_URL = import.meta.env.VITE_DOCS_URL
 
 const DESKS: [RoutePath, string][] = [
   ['/', 'Portfolio'], ['/facility', 'Facility'], ['/event', 'Event'], ['/methodology', 'Methodology'],
-  ['/evidence', 'Verification'],
+  ['/evidence', 'Evidence'],
 ]
 
 export function HeaderBar({ health, healthUnreachable, vaults, activeVaultId, path, asOf, receivedAt, pollMs, onSelect }: {

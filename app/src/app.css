@@ -524,19 +524,6 @@ table.tbl th.rt{ text-align: right; }
   padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
 }
 
-/* The one line on the verification desk that speaks to the reader rather than to the
-   record. It sits outside the panels because it is about the page, not about a finding —
-   and it is deliberately quiet: a reader who is not its audience should be able to leave
-   after it without feeling they have been shouted at. */
-.ev-addressed{
-  max-width: 76ch;
-  margin: 0 0 4px;
-  padding-left: 12px;
-  border-left: 2px solid var(--amber-dim);
-  font: var(--t-sm)/1.55 var(--sans);
-  color: var(--fg-dim);
-}
-
 .tbl-scroll{ overflow-x: auto; margin: 0 -20px; padding: 0 20px; }
 .tbl-scroll [data-slot="table-container"]{ overflow: visible; }
 
@@ -929,6 +916,99 @@ kbd{
 .num, .rt, .kv dd, table.tbl td, .ladder-read{ font-variant-numeric: tabular-nums; }
 .label, .op-h, table.tbl th{ font-size: var(--t-sm); }
 
+
+/* ============================================================================
+   EVIDENCE — a credit page that happens to be about a record
+
+   It used to be a laboratory: two "reader" cards facing off, a dashed red box holding a
+   poster-sized {}, and a paragraph explaining who the page was for. The claim is simpler
+   than any of that, so the page is now the claim, three figures, the fields that moved,
+   and the receipt folded underneath.
+   ============================================================================ */
+
+.ev{ display: flex; flex-direction: column; }
+
+.ev-head{ position: relative; padding-bottom: 16px; margin-bottom: 20px; }
+.ev-head::after{
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0;
+  height: 1px; background: var(--line-2);
+  transform: scaleY(0.5); transform-origin: 0 100%;
+}
+.ev-title{
+  margin: 8px 0 10px; font: 500 28px/1.15 var(--sans);
+  letter-spacing: -0.015em; color: var(--fg);
+}
+.ev-thesis{
+  margin: 0; max-width: 62ch;
+  font: 400 16.5px/1.55 var(--serif); color: var(--fg-dim);
+}
+
+.ev-band{
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px; margin: 4px 0 10px;
+}
+.ev-fig{ display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ev-num{
+  font: 500 clamp(28px, 4.2vw, 44px)/1 var(--mono);
+  font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+  color: var(--fg); overflow-wrap: anywhere;
+}
+.ev-reported{ color: var(--fg-dim); }
+.ev-held{ color: var(--fg); }
+.ev-gap{ color: var(--bad); }
+
+.ev-under{
+  margin: 0 0 26px; font: var(--t-sm)/1.5 var(--sans); color: var(--fg-mute);
+}
+
+/* Three columns that belong to each other. Left to span the panel, `after` drifted to the
+   far edge and the eye had to cross 400px of nothing to compare a before with an after. */
+.ev-tbl{ margin-top: 4px; max-width: 620px; }
+.ev-tbl td{ height: 30px; }
+.ev-tbl th:first-child, .ev-tbl td:first-child{ width: 46%; }
+.ev-field{ font-family: var(--mono); font-size: var(--t-sm); color: var(--fg-dim); }
+.ev-before{ font-family: var(--mono); font-size: var(--t-sm); color: var(--fg-mute); }
+.ev-after{ font-family: var(--mono); font-size: var(--t-sm); color: var(--fg); }
+
+.ev-formula{
+  margin: 10px 0 0; font: 11px/1.5 var(--mono); color: var(--fg-mute);
+  letter-spacing: 0.02em;
+}
+
+.ev-prov{
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  margin-top: 22px;
+}
+.ev-prov code{
+  font: 11px/1.5 var(--mono); color: var(--fg-mute); letter-spacing: 0.02em;
+}
+.ev-hash{ overflow-wrap: anywhere; }
+
+.ev-raw{ margin-top: 14px; }
+.ev-raw > summary{
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 4px 0; cursor: pointer; list-style: none;
+  font: var(--t-xs)/1 var(--mono); letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--fg-mute);
+}
+.ev-raw > summary::-webkit-details-marker{ display: none; }
+.ev-raw > summary::before{
+  content: '\25B8'; font-size: var(--t-2xs); transition: transform 180ms ease;
+}
+.ev-raw[open] > summary::before{ transform: rotate(90deg); }
+.ev-raw > summary:hover{ color: var(--fg-dim); }
+.ev-raw-body{
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px; margin-top: 12px;
+}
+.ev-raw-col{ display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ev-raw pre{
+  margin: 0; padding: 12px 14px; overflow-x: auto;
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
+  border-radius: var(--r-ctl);
+  font: 11px/1.55 var(--mono); color: var(--fg-dim);
+}
+
 @media print{
   @page{ size: A4 portrait; margin: 14mm 13mm; }
 
@@ -954,6 +1034,14 @@ kbd{
   main.page{ padding: 0 !important; }
   .opinion{ gap: 0; max-width: none; }
   .op-page{ background: #fff !important; border: 0; padding: 0; }
+  /* Every panel, not only the opinion sheet. The print palette darkens the text on the
+     assumption the ground went white with it; a panel that kept its dark fill turned that
+     into dark-on-dark. Anything that paints a surface gets the paper. */
+  .panel, .op-box, .ev-raw pre{ background: #fff !important; }
+  .ev-tbl td, .ev-tbl th{ border-bottom-color: #ddd !important; }
+  .ev-field, .ev-before{ color: #555 !important; }
+  .ev-after{ color: #111 !important; }
+  .ev-formula, .ev-prov code, .ev-under{ color: #666 !important; }
   .op-break{ break-before: page; padding-top: 0; }
   .op-title{ color: #000; font-size: 22px; }
   .op-top{ border-bottom-color: #000; }
@@ -997,7 +1085,13 @@ kbd{
   .lad-here{ fill: #000 !important; }
   .ladder-ends{ color: #666 !important; }
   .ladder-read{ color: #000 !important; }
-  .ev-addressed{ border-left-color: #999 !important; color: #444 !important; }
+  .ev-raw{ display: none !important; }
+  .ev-title{ color: #000; font-size: 20pt; }
+  .ev-thesis{ color: #222; }
+  .ev-num{ color: #000 !important; font-size: 22pt; }
+  .ev-reported{ color: #555 !important; }
+  .ev-gap{ color: #b00020 !important; }
+  .ev-head::after{ background: #000; }
 }
 
 /* The letterhead is a print artefact and nothing else. */
@@ -1482,59 +1576,6 @@ tr:hover .chip, .picker-list [data-highlighted] .chip{ transform: translateY(-1p
     font-family: var(--mono);
   }
 }
-/* ---------------------------------------------------------------------------
-   VERIFICATION — the split reading, and the metadata behind it.
-
-   Contract §6 fixes the two reading colours and their line styles: the naive
-   reading is muted and DASHED, the correct reading is accent and SOLID. Those
-   are meanings, not decoration, so they are reused here exactly as the figures
-   screens use them and are never restyled locally.
-
-   The figures are set at --t-xxl because this panel is read from the back of a
-   room, not from a desk. Everything else on the screen is deliberately quiet so
-   that the empty object below is the thing the eye lands on.
---------------------------------------------------------------------------- */
-.race{
-  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px; margin-top: 16px;
-}
-@media (max-width: 720px){ .race{ grid-template-columns: minmax(0, 1fr); } }
-
-.race-pane{ padding: 16px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg-1); }
-.race-naive{ border-style: dashed; border-color: var(--read-naive); }
-.race-correct{ border-style: solid; border-color: var(--read-correct); }
-
-.race-hd{
-  font-size: var(--t-sm); color: var(--fg-mute);
-  letter-spacing: .04em; margin-bottom: 10px;
-}
-.race-val{
-  font-family: var(--mono); font-size: var(--t-xxl); line-height: 1;
-  font-variant-numeric: tabular-nums; letter-spacing: -.02em;
-}
-.race-naive   .race-val{ color: var(--read-naive); }
-.race-correct .race-val{ color: var(--read-correct); }
-.race-formula{ font-family: var(--mono); font-size: var(--t-sm); color: var(--fg-mute); margin-top: 10px; }
-.race-note{ font-size: var(--t-sm); color: var(--fg-dim); margin-top: 6px; }
-.race-naive   .race-note{ color: var(--bad); }
-.race-correct .race-note{ color: var(--ok); }
-
-.race-gap{ margin-top: 14px; font-size: var(--t-sm); color: var(--fg-dim); }
-.race-gap b{ font-family: var(--mono); color: var(--fg); font-size: var(--t-md); }
-
-/* The empty object is the evidence. It gets the room. */
-.ev-diff{ display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin-top: 14px; }
-.ev-lbl{ font-family: var(--mono); font-size: var(--t-sm); color: var(--fg-mute); margin-top: 8px; }
-.ev-code{
-  font-family: var(--mono); font-size: var(--t-md); color: var(--fg);
-  background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
-  padding: 14px; margin: 0; overflow-x: auto; white-space: pre;
-}
-.ev-empty{
-  color: var(--bad); border-color: var(--bad);
-  font-size: var(--t-xl); text-align: center; padding: 26px 14px;
-}
-.ev-verdict{ margin-top: 12px; }
 /* A 64-character hash must wrap rather than widen the panel and scroll the page. */
 .ev-hash{ font-family: var(--mono); word-break: break-all; }
 
