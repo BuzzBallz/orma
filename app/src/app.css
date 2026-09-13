@@ -419,22 +419,22 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
    and the picker paid for the overflow instead. The timestamp stays; it sheds its date
    first (the date is today, the time is the part that tells you the figures are live),
    then the furniture tightens. Nothing is hidden that the reader was relying on. */
-@media (max-width: 1340px){
+@media (max-width: 1220px){
   .topbar{ padding: 0 20px; }
   .topbar .sep{ margin: 0 8px; }
   .topbar .meta .on-day{ display: none; }
 }
-/* Below this the clock goes too, and its separator with it. What is lost is the exact
-   second; what remains is the status badge and its live tick, which is what actually
-   answers "are these figures current?" — and on a facility or an event the full stamp is
-   repeated in the document header anyway. The picker is worth more than the seconds. */
+/* The stamp is never hidden.
+   It used to be, at 1120px, on the reasoning that the status capsule beside it still
+   answered "are these figures current?". The capsule is gone and the stamp is now the
+   only thing that answers that, so hiding it would leave the bar with no freshness signal
+   at all. It sheds its date above and keeps the clock; nothing below drops it. */
 @media (max-width: 1120px){
   .topbar .sep{ margin: 0 6px; }
-  .topbar .meta.keep, .topbar .sep:has(+ .meta){ display: none; }
 }
 /* Last thing to go: the documentation link. It leaves the app, so it is the one item in
    the bar nobody needs mid-demonstration. */
-@media (max-width: 1000px){
+@media (max-width: 1060px){
   .topbar .docs-link, .topbar .sep:has(+ .picker){ display: none; }
 }
 
@@ -704,10 +704,30 @@ button:disabled, .btn:disabled, .picker-btn:disabled{
 
 /* One poll cycle drawn as a 2px rail that recharges. Not a spinner: it is the real
    interval, restarted by each good payload and frozen while none arrive. */
-.statusgroup{ display: inline-flex; flex-direction: column; gap: 5px; }
-.tick{ display: block; width: 100%; height: 2px; background: var(--line); border-radius: 1px; overflow: hidden; }
-.tick > i{ display: block; height: 100%; width: 0; background: var(--fg-mute); animation: recharge linear 1 forwards; }
-@keyframes recharge { from { width: 0 } to { width: 100% } }
+/* ---------- the stamp ----------
+   What used to be a status capsule. A tick icon, a pulsing dot and small caps inside a
+   tinted ring, all agreeing with the date printed beside them — three devices carrying a
+   fact the clock was already carrying. The clock says it now, on its own.
+
+   The one sign of life is a 24px rule that draws itself once per poll. A rule, because a
+   desk that is reading can show it without wearing a badge; and the poll interval drives
+   it, so it stops when the polling stops instead of animating over a dead feed. */
+.stamp{ display: inline-flex; flex-direction: column; gap: 5px; }
+.stamp-line{ white-space: nowrap; }
+.stamp-val{ font-variant-numeric: tabular-nums; font-weight: inherit; }
+.stamp.is-withheld .stamp-val{ color: var(--fg-mute); }
+.stamp-state{ margin-left: 10px; color: var(--fg-mute); }
+.stamp-beat{
+  display: block; width: 24px; height: 1px; border-radius: 1px;
+  background: color-mix(in srgb, var(--fg) 40%, transparent);
+  transform: scaleX(0); transform-origin: 0 50%;
+  animation: beat linear 1 forwards;
+}
+.stamp.is-withheld .stamp-beat{ animation: none; transform: scaleX(1); opacity: .35; }
+@keyframes beat { from { transform: scaleX(0) } to { transform: scaleX(1) } }
+@media (prefers-reduced-motion: reduce){
+  .stamp-beat{ animation: none; transform: scaleX(1); }
+}
 
 /* A figure that actually moved — triggered by a change in an HTTP value, never a timer. */
 @keyframes flash { from { background: color-mix(in srgb, var(--ok) 24%, transparent) } to { background: transparent } }
@@ -1455,6 +1475,12 @@ tr.ghost:hover td > *{ transform: none; }
   .topbar{ height: auto; flex-wrap: wrap; gap: 8px; padding: 10px 16px; }
   .topbar .sep{ display: none; }
   .desks{ height: 36px; margin-left: 0; }
+  /* Five desks at desktop padding are 379px wide, which is four more than a 375px phone
+     has. The labels are the one thing on this bar that must stay readable, so the padding
+     gives way instead — and the strip may scroll if a narrower phone still needs it. */
+  .desks{ max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .desks::-webkit-scrollbar{ display: none; }
+  .topbar .desk{ padding: 0 9px; }
   .picker{ flex: 1 0 100%; }
   .picker-label{ max-width: none; }
   .picker-list{ min-width: 0; }

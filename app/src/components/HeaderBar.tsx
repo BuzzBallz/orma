@@ -1,27 +1,46 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import { CircleAlert, CircleCheck } from 'lucide-react'
 import type { Health, VaultRow } from '../lib/types'
 import type { RoutePath } from '../lib/useRoute'
 import { fmtIso } from '../lib/format'
 import { FacilityPicker } from './VaultPicker'
 import { SignInButton } from './WalletButton'
-import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { TabsList, TabsTrigger } from '@/components/ui/tabs'
 
-/** Received, or withheld. Those are the only two states a reader needs from this corner. */
-function StatusBadge({ health, unreachable }: { health: Health | null; unreachable: boolean }) {
-  const withheld = !health || unreachable
-  const Icon = withheld ? CircleAlert : CircleCheck
+/**
+ * Received, or withheld — said by the timestamp itself.
+ *
+ * This corner used to be a capsule: a tick icon, a pulsing dot, small caps inside a
+ * tinted ring. Three devices to carry one fact, and the fact they carried was already
+ * sitting next to them as a date. A desk that is current says so by showing the time it
+ * is current to; it does not need a badge agreeing with the clock.
+ *
+ * Withheld, the stamp goes to an em-dash and one word stands beside it in the same weight
+ * as the rest of the bar. The only sign of life is a 24px rule under the stamp that draws
+ * itself once per poll — a rule, not a pill, and it is the poll interval that drives it,
+ * never a decorative loop.
+ */
+function Stamp({ asOf, withheld, receivedAt, pollMs }: {
+  asOf: string | null; withheld: boolean; receivedAt: number; pollMs: number
+}) {
+  const stamp = !withheld && asOf ? fmtIso(asOf) : null
   return (
-    <Badge
-      variant="outline" className="pill"
-      style={{ ['--pill-tone' as string]: withheld ? 'var(--bad)' : 'var(--ok)' }}
-    >
-      <Icon size={12} strokeWidth={2.25} aria-hidden />
-      <span className={'dot' + (withheld ? ' waiting' : '')} />
-      {withheld ? 'Figures Withheld' : 'Figures Received'}
-    </Badge>
+    <span className={'stamp' + (withheld ? ' is-withheld' : '')}>
+      <span className="stamp-line">
+        As of{' '}
+        <b className="stamp-val">
+          {stamp
+            ? <><span className="on-day">{stamp.slice(0, 11)}</span>{stamp.slice(11)}</>
+            : '—'}
+        </b>
+        {withheld && <span className="stamp-state">Withheld</span>}
+      </span>
+      <span
+        className="stamp-beat" aria-hidden
+        key={receivedAt}
+        style={{ animationDuration: pollMs + 'ms', animationPlayState: receivedAt ? 'running' : 'paused' }}
+      />
+    </span>
   )
 }
 
@@ -66,24 +85,18 @@ export function HeaderBar({ health, healthUnreachable, vaults, activeVaultId, pa
 
       <Separator orientation="vertical" className="sep" />
 
-      <span className="statusgroup">
-        <StatusBadge health={health} unreachable={healthUnreachable} />
-        <span className="tick" aria-hidden>
-          <i key={receivedAt} style={{ animationDuration: pollMs + 'ms', animationPlayState: receivedAt ? 'running' : 'paused' }} />
-        </span>
-      </span>
-
-      <Separator orientation="vertical" className="sep" />
-
       {/* The date is in its own span so a narrow bar can drop it and keep the clock: on a
           desk that is watched live the time is the part that says the figures are current,
           and the date is today. Splitting it here is what lets the facility picker keep a
           usable width instead of absorbing the whole overflow. */}
-      <span className="meta keep">As of <b>
-        {asOf
-          ? <><span className="on-day">{fmtIso(asOf).slice(0, 11)}</span>{fmtIso(asOf).slice(11)}</>
-          : '—'}
-      </b></span>
+      <span className="meta keep">
+        <Stamp
+          asOf={asOf}
+          withheld={!health || healthUnreachable}
+          receivedAt={receivedAt}
+          pollMs={pollMs}
+        />
+      </span>
 
       <span className="spacer" />
 
