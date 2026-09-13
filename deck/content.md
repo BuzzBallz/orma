@@ -216,18 +216,40 @@ And what we give back. // The documented first hour cannot complete — we wrote
 
 ---
 
-## S10 — Close
-<!-- time: 5:30 | duration: 5s -->
+## S10 — What we shipped
+<!-- time: 5:30 | duration: 25s | artifact: layers -->
 
 ### on screen
-- **Orma**
-- **github.com/frytegg/orma**
-- Track 2 · Loaded · Devnet · rippled 3.4.0-rc5 · xrpl 5.2.0 · Node 24.13.0
-- DevEx: `tender-gopher-21` · `<second pseudonym: read from Andrea's .xrpl-devex/identity.json>`
+- The protocol, **live on Devnet**. Four facilities, **sixteen** transaction types.
+- Documentation, and a paper that states the arithmetic.
+- **40 findings** · a three-page report and a thirty-three-page register.
+- **Six developer-experience reports**, sent while we were building.
+- A fix for the tutorial that does not run. **It runs.**
 
 ### notes
-The repo URL, big. The compliance block under it.
+The protocol is live on Devnet: four facilities, sixteen transaction types, every figure in this talk read off the ledger while you watched. // Documentation, and a paper that states the arithmetic so you can check it instead of trusting us.
 
-Orma. The repo is on the slide. // Thank you.
+Forty findings. A three-page report, and the register behind it. // Six developer-experience reports, sent **while we were building**, not assembled afterwards for a slide.
+
+And the tutorial that cannot complete: we wrote the fix, and it runs green on rc5.
+
+*Every line here is a thing that exists. Nothing on this slide is "about to be".*
+
+*If the filing block ran before you walk up, add the count out loud and do not change the slide: "and as of this morning, N of them are filed upstream." If it did not, say nothing about filing. A jury that includes the maintainers can check in ten seconds.*
+
+---
+
+## S11 — Close
+<!-- time: 5:55 | duration: 5s | layout: cover -->
+
+### on screen
+- github.com/frytegg/orma
+
+### notes
+The mark alone, the way it opened. The repo URL underneath it.
+
+Thank you.
 
 *Stop. Do not summarise. Take the questions.*
+
+*`github.com/frytegg/orma` — say it once, slowly, if anyone is writing.*

@@ -96,7 +96,7 @@
       
     </div>
     
-    <footer class="sfoot"><span>Orma</span><span>1 / 10</span></footer>
+    <footer class="sfoot"><span>Orma</span><span>1 / 11</span></footer>
     <aside class="notes"><p>The mark alone. Nothing to read, because for thirty seconds they are listening, not reading.</p><p>Yesterday morning, in your workshop, you explicitly said: // "The human or AI controlling the loan broker from the SAV needs to do a liquidity buffer and liquidity management in order to know when the depositors will want to withdraw, in case of specific events or crisis for instance, to be attractive on the market." // We spent the weekend building the instrument that makes that measurable, from a third party outside, directly on the ledger, for closed-ended vaults.</p><p>*Check the quote against what was actually said before you put it in quotation marks. They will compare it to their memory, and a paraphrase presented as a quotation costs credibility at the worst possible moment.*</p><p>*30s against a 15s budget. That is 12% of the talk on the opening. Deliberate if you take it from elsewhere; a problem if you do not.*</p></aside>
   </section>
 
@@ -114,7 +114,7 @@
     <svg class="artifact" viewBox="0 0 64 64" fill="none" aria-hidden="true"><rect x="16" y="29" width="32" height="24" rx="3" stroke="var(--fg)" stroke-width="2"/>
     <path d="M23 29v-7a9 9 0 0 1 18 0v7" stroke="var(--gold)" stroke-width="2" stroke-linecap="round"/>
     <circle cx="32" cy="40" r="3" fill="var(--gold)"/></svg>
-    <footer class="sfoot"><span>Orma</span><span>2 / 10</span></footer>
+    <footer class="sfoot"><span>Orma</span><span>2 / 11</span></footer>
     <aside class="notes"><p>Your tri-party slide says the intermediary absorbs first losses, and earns a spread for managing risk. // That design is good: closed-ended vaults block the exit race that made those failures worse on other chains. Withdrawals are refused for the whole Investment phase.</p><p>But risk does not disappear. It moves to one public, immutable timestamp.</p><p>During the lock-up the depositor watches the vault get worse, and cannot leave. Nobody prices that, simply because from outside nobody can read it.</p><p>*Both facts are measured, not asserted: VaultWithdraw returns tecTOO_SOON for the entire Investment phase regardless of liquidity, and RedemptionDate is immutable because VaultSet rejects it at deserialization. Keep the result code off the wall and in your pocket, for the questions.*</p><p>*Say "closed-ended vaults", not "XLS-66": the phase rules are XLS-65. And "the exit race that made those failures worse", not "the thing that killed Maple", because Maple died of credit losses on undercollateralised loans and of cover withdrawn ahead of the defaults, which no lock-up would have prevented.*</p></aside>
   </section>
 
@@ -133,7 +133,7 @@
     <svg class="artifact" viewBox="0 0 64 64" fill="none" aria-hidden="true"><rect x="12" y="14" width="40" height="9" rx="2" stroke="var(--fg)" stroke-width="2"/>
     <rect x="12" y="27" width="40" height="9" rx="2" stroke="var(--fg)" stroke-width="2"/>
     <rect x="12" y="40" width="40" height="9" rx="2" stroke="var(--gold)" stroke-width="2"/></svg>
-    <footer class="sfoot"><span>Orma</span><span>3 / 10</span></footer>
+    <footer class="sfoot"><span>Orma</span><span>3 / 11</span></footer>
     <aside class="notes"><p>Nobody can read it from outside. So we read it. // A reader that sees what the vault's own reporting does not. // A score published as a native XRPL object, so anyone can disagree with us on the ledger. // And a grade that gates capital, through a Permissioned Domain.</p><p>One thing before the demo. The state is pre-baked: real Devnet transactions, from before this talk, every one of them with a hash on screen. Every number you see is read live, off the ledger, now.</p><p>*"Disagree with us on the ledger" is the strongest line in the deck. It is the whole argument for a native oracle object over an API: an API can only be trusted, an oracle object can be contested by a second publisher without asking us.*</p><p>*The live-deposit promise is made at minute one and has to be kept at minute three. The keys are in .demo-keys.json and the gate facility must still be in its Subscription phase. Check both before you walk up, or drop the sentence.*</p></aside>
   </section>
 
@@ -154,7 +154,7 @@
     <path d="M26 32 44 46" stroke="var(--gold)" stroke-width="2"/>
     <circle cx="46" cy="18" r="3" stroke="var(--fg)" stroke-width="2"/>
     <circle cx="46" cy="46" r="3" fill="var(--gold)"/></svg>
-    <footer class="sfoot"><span>Orma</span><span>4 / 10</span></footer>
+    <footer class="sfoot"><span>Orma</span><span>4 / 11</span></footer>
     <aside class="notes"><p>*Slide for twelve seconds, then switch to the browser and stay there until S8. Two switches in the whole talk, not five.*</p><p>Meridian Trade Finance I. A trade finance facility: it funds invoices. Fifty-one units in, ten lent against one invoice. // The borrower stops paying, and the manager writes the loan down. On the ledger. Correctly. // <b>This is the honest manager.</b> Now watch what his investor's dashboard sees.</p><p><b>Switch to the browser. Evidence tab. It all fits on one screen, and Record is open on arrival.</b></p><p>Reported, one point zero zero. // Held, zero point eight zero. // <b>Nineteen hundred and sixty-one basis points apart</b>, on the same transaction, from the same record. // Put a hundred million through that facility and the gap is nineteen point six million that nobody's risk system has recorded.</p><p><b>Point at the Change set column.</b></p><p>And here is why. Three dashes. The change set is <b>empty</b> — <code>PreviousFields</code>, bottom left, is two braces. // <code>LossUnrealized</code> was zero before, and zero is the type default, so rippled leaves it out of the diff entirely. // Nothing in it says this vault moved.</p><p>So the manager who disclosed and the manager who hid it <b>look identical from outside</b>. That is what we set out to fix.</p><p>*Every cell in that column is an em-dash, because <code>previousFields</code> is <code>{}</code> and the column renders the change set, not the prior state. Do not say "the other two fields did not move": true of the ledger, not of what is on the wall. Say "the change set is empty".*</p><p>*The worked line under the formula is there so the two headline figures can be reproduced from the screen: (51.000000 - 10.000000) / 51.000000 = 0.803922. If someone asks where the denominator comes from, it is the share issuance, not the Vault.*</p><p>*The 51 and the 10 are XRP on Devnet. The hundred-million line is an explicit scaling, said as one. Never present a Devnet figure as a real balance sheet.*</p><p>*Meridian is graded AA with a 19.6% loss, and that is on screen behind you. It is correct — the score rewards recognising a loss — but <code>46-QA-CAVEATS.md</code> §7 is the answer if it is asked.*</p></aside>
   </section>
 
@@ -175,7 +175,7 @@
     <rect x="12" y="36" width="9" height="9" rx="2" stroke="var(--fg)" stroke-width="2"/>
     <path d="M34 23h16M34 40h16" stroke="var(--fg)" stroke-width="2" stroke-linecap="round"/>
     <path d="M45 18l5 5-5 5" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    <footer class="sfoot"><span>Orma</span><span>5 / 10</span></footer>
+    <footer class="sfoot"><span>Orma</span><span>5 / 11</span></footer>
     <aside class="notes"><p><b>Facility tab</b> first, then the picker → <b>Kestrel Bridge Financing II</b> → scroll to Exhibit 3.</p><p>Kestrel Bridge Financing II. The manager posted <b>ten XRP</b> of their own first-loss capital: that is the money that absorbs a loss before the depositors do. // Two bridge loans go bad. Thirty, and ten.</p><p>Cover on a default is sized against the manager's <b>total book</b>, not against the loan that failed. // So they declared the <b>thirty</b> first. That consumed <b>zero point four</b>. // And it dropped the book from forty to ten — so when they declared the second one, there was almost nothing left to size against. <b>Zero point one.</b> // <b>Half an XRP</b>, out of their own ten.</p><p>Smallest first: zero point four, then zero point three. <b>Zero point seven.</b> // Same two losses, same rates, eight seconds apart. Only the order. // The <b>zero point two</b> is first-loss capital that never left the manager's pocket, so the depositors absorbed it instead. <b>Forty per cent more</b> should have come from them.</p><p>Only the broker owner can declare a default, and the broker owner is always the vault owner. // So the party whose capital absorbs the loss is the party who picks the order that decides how much of it gets used. // The ledger recorded two defaults, eight seconds apart, and nothing whatever about the choice.</p><p><b>Conduct E.</b> And read the second finding: neither loan was ever flagged. The first thing an investor learned was that the money was gone.</p><p><b>Picker → Calder Structured Credit III.</b></p><p>Same tool, same exhibit, a different manager. // Conduct <b>A</b>: no loss written off at all, and the one distressed exposure flagged and left flagged. // <b>That</b> is what a new investor wants to see before they subscribe.</p><p>*Say "default sequencing and cover sizing" and nothing wider. Do not extend "unilateral control" to impairment re-pricing. <code>41-SECURITY-DISCLOSURE.md</code> §9.*</p><p>*Do not claim the ordering result is novel and do not disclaim it either. If pressed: the cover formula is in the spec; what is not in the spec is what happens when the same party chooses the sequence.*</p><p>*The figures are XRP on Devnet. The ratio is the point: 0.50 against 0.70 is 40% more cover, and 0.20 of 0.70 is 29% of the loss-absorbing capital that should have been consumed and was not.*</p></aside>
   </section>
 
@@ -193,7 +193,7 @@
       <p class="line"><b>0.196078 XRP</b> kept off the second lender's book</p>
     </div>
     
-    <footer class="sfoot"><span>Orma</span><span>6 / 10</span></footer>
+    <footer class="sfoot"><span>Orma</span><span>6 / 11</span></footer>
     <aside class="notes"><p>Stay on Calder. Scroll to Exhibit 5.</p><p>An investor pledges their units to a second lender. That lender holds a token and nothing else. // They read the token's own metadata, follow the pointer it declares, and price the pledge. Five steps, and not one of them needs a relationship with the facility. // Priced naively: <b>one point zero zero</b>. Priced on what the instrument points to: <b>zero point eight zero</b>. // <b>Zero point one nine of overstatement, kept out of the second lender's book.</b></p><p>*The pointer on the wall is our own endpoint on this laptop, and steps four and five say so in green. Volunteer it before it is asked: "in production that URL is whatever the issuer wrote into the token. The point is the lender learns where to look from the token, not from us."*</p><p>*<code>[+]</code> at 5:00 only: on Kestrel that same exhibit stops at step two: no metadata, nothing readable. That is every vault today.*</p></aside>
   </section>
 
@@ -213,7 +213,7 @@
     <svg class="artifact" viewBox="0 0 64 64" fill="none" aria-hidden="true"><circle cx="26" cy="32" r="14" stroke="var(--fg)" stroke-width="2"/>
     <path d="M40 32h14" stroke="var(--gold)" stroke-width="2" stroke-linecap="round"/>
     <path d="M49 27l5 5-5 5" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    <footer class="sfoot"><span>Orma</span><span>7 / 10</span></footer>
+    <footer class="sfoot"><span>Orma</span><span>7 / 11</span></footer>
     <aside class="notes"><p>Stay on the facility. Scroll to Exhibit 7.</p><p>Everything so far was our reading, and you have been asked to believe it. // This is that reading written to the ledger as a Price Oracle, keyed to the vault id, six dimensions in one object. // The values on the left are read <b>back</b> off the object, raw hex and all, so you can open it in an explorer and check the encoding without us.</p><p><b>Point at the contest table.</b></p><p>And here is why it is an oracle and not an API. // A second publisher posted their own reading of the same vault: <b>one point zero zero</b>, the naive number. They did not ask us. We cannot touch their document. // <b>rippled</b> computed the median across both. Not us. // If we are wrong, the spread is on the ledger and anyone can see it.</p><p>*Two publishers, size 2, standard deviation 0.1386. The second reading is a throwaway Devnet account publishing the naive figure deliberately, and say so if asked: the point is not that someone disagrees, it is that they can, without our permission.*</p><p>*An API can only be trusted. This can be contested. That single sentence is the whole argument for the third pillar, and it is the one to keep if the beat runs long.*</p></aside>
   </section>
 
@@ -230,7 +230,7 @@
       <p class="line">refused by the ledger, not by us</p>
     </div>
     
-    <footer class="sfoot"><span>Orma</span><span>8 / 10</span></footer>
+    <footer class="sfoot"><span>Orma</span><span>8 / 11</span></footer>
     <aside class="notes"><p>Picker → <b>Thorne Senior Secured I</b> → scroll to Exhibit 6, it sits above Key Indicators. The chain is nine rows with a hash on each.</p><p>Measuring is advice. This is enforcement. // An independent vault owner named our issuer in their domain. We signed nothing, and we cannot decline. // Two investors, same second: one admitted, the other refused <b>by the ledger</b>, not by us.</p><p>*<code>[+]</code> at 5:00 only: and when we revoke, entry closes and the exit stays open. A rater who could trap capital would be a worse problem than the one we solve.*</p></aside>
   </section>
 
@@ -252,26 +252,48 @@
     <path d="M24 24h16M24 32h16M24 40h9" stroke="var(--fg)" stroke-width="2" stroke-linecap="round"/>
     <circle cx="44" cy="44" r="7" fill="var(--bg)" stroke="var(--gold)" stroke-width="2"/>
     <path d="M41 44l2 2 4-4" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    <footer class="sfoot"><span>Orma</span><span>9 / 10</span></footer>
+    <footer class="sfoot"><span>Orma</span><span>9 / 11</span></footer>
     <aside class="notes"><p>We did not set out to write a feedback report. // <b>Every demo you just watched started as something that broke.</b></p><p><b>One.</b> The empty change set. // That is not a slide we wrote to be clever, it is the first thing that went wrong, and the reader exists because of it. // One paragraph on the metadata page fixes it. // And it was reported before us, by the author of an XRPL explorer — exactly the person this trap is built for. // He closed it himself. <b>"Not a bug."</b> // He was half right: the ledger is behaving as designed. What is missing is the sentence that would have told him so.</p><p><b>Two.</b> A manager's history cannot be rebuilt from the record by filtering: an impairment does not touch the manager's object, so it vanishes. // The conduct exhibit you just saw exists because we hit that. // And it shipped <b>a wrong answer inside our own code</b> first: the rule we wrote to reward disclosure was punishing it. We caught it because we were writing the finding up.</p><p><b>Three.</b> Nothing off the ledger can prove a fact about ledger state. There is no proof option to ask for. // <b>That</b> is why the score is a ledger object and not an API of ours. // The third demo is not a feature we chose. It is what that finding left us.</p><p>And what we give back. // The documented first hour cannot complete — we wrote the fix and it is a pull request. // And the standard lists ten ways <code>LoanBrokerSet</code> can fail. The rule that stops every one of these vaults existing is not one of the ten. // Merge the three that have been open for weeks, and add the eleventh.</p><p><b>Forty findings.</b> Three of them changed the product while we were still building it. // That code takes you to all of them.</p><p>*Keep the finding ids off the wall and in your pocket: X1 the empty change set, M5 the history, D2 the first hour, D1 the eleventh condition. The pull requests are <code>xrpl-dev-portal#3923</code>, <code>XRPL-Standards#587</code> and <code>#582</code>.*</p><p>*This is the highest-scoring slide in the deck and the only one that ties the build to the brief. If you are over time, cut a demo beat, never this one.*</p><p>*Say the count the filing block actually reached, not the planned one. An honest four beats an inflated five, in front of the people who own the repositories.*</p></aside>
   </section>
 
   <section class="slide" data-i="9">
     <header class="shead">
       <span class="sid">S10</span>
-      <span class="stitle">Close</span>
-      <span class="stime">5:30 &middot; 5s</span>
+      <span class="stitle">What we shipped</span>
+      <span class="stime">5:30 &middot; 25s</span>
     </header>
     <div class="sbody">
       
-      <p class="line"><b>Orma</b></p>
-      <p class="line"><b>github.com/frytegg/orma</b></p>
-      <p class="line">Track 2 · Loaded · Devnet · rippled 3.4.0-rc5 · xrpl 5.2.0 · Node 24.13.0</p>
-      <p class="line">DevEx: <code>tender-gopher-21</code> · <code>&lt;second pseudonym: read from Andrea's .xrpl-devex/identity.json&gt;</code></p>
+      <p class="line">The protocol, <b>live on Devnet</b>. Four facilities, <b>sixteen</b> transaction types.</p>
+      <p class="line">Documentation, and a paper that states the arithmetic.</p>
+      <p class="line"><b>40 findings</b> · a three-page report and a thirty-three-page register.</p>
+      <p class="line"><b>Six developer-experience reports</b>, sent while we were building.</p>
+      <p class="line">A fix for the tutorial that does not run. <b>It runs.</b></p>
+    </div>
+    <svg class="artifact" viewBox="0 0 64 64" fill="none" aria-hidden="true"><rect x="12" y="14" width="40" height="9" rx="2" stroke="var(--fg)" stroke-width="2"/>
+    <rect x="12" y="27" width="40" height="9" rx="2" stroke="var(--fg)" stroke-width="2"/>
+    <rect x="12" y="40" width="40" height="9" rx="2" stroke="var(--gold)" stroke-width="2"/></svg>
+    <footer class="sfoot"><span>Orma</span><span>10 / 11</span></footer>
+    <aside class="notes"><p>The protocol is live on Devnet: four facilities, sixteen transaction types, every figure in this talk read off the ledger while you watched. // Documentation, and a paper that states the arithmetic so you can check it instead of trusting us.</p><p>Forty findings. A three-page report, and the register behind it. // Six developer-experience reports, sent <b>while we were building</b>, not assembled afterwards for a slide.</p><p>And the tutorial that cannot complete: we wrote the fix, and it runs green on rc5.</p><p>*Every line here is a thing that exists. Nothing on this slide is "about to be".*</p><p>*If the filing block ran before you walk up, add the count out loud and do not change the slide: "and as of this morning, N of them are filed upstream." If it did not, say nothing about filing. A jury that includes the maintainers can check in ten seconds.*</p></aside>
+  </section>
+
+  <section class="slide cover" data-i="10">
+    <header class="shead">
+      <span class="sid">S11</span>
+      <span class="stitle">Close</span>
+      <span class="stime">5:55 &middot; 5s</span>
+    </header>
+    <div class="sbody">
+      <svg class="mark" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+      <path d="M32 6c10.5 0 18 8.9 18 21.5S42.5 49 32 49 14 40.1 14 27.5 21.5 6 32 6Zm0 4.6c-5.6 0-8.9 6.6-8.9 16.9s3.3 16.9 8.9 16.9 8.9-6.6 8.9-16.9S37.6 10.6 32 10.6Z" fill="#EAE0CE"/>
+      <path d="M7 54.2c5.6-3.6 9.9-3.6 14.5-.9 5.2 3 8.4 3.1 12.9.4 5.5-3.3 9.7-3.4 14.8-.6 3.2 1.8 6 1.9 8.8.4" stroke="#EAE0CE" stroke-width="2.1" stroke-linecap="round"/>
+      <path d="M11 59.6c5.3-2.6 9.4-2.6 13.7-.4 4.9 2.5 8 2.5 12.2.1 5.2-2.9 9.2-3 14-.6" stroke="#C9A45F" stroke-width="2.1" stroke-linecap="round"/>
+    </svg><p class="wordmark">Orma</p>
+      <p class="line">github.com/frytegg/orma</p>
     </div>
     
-    <footer class="sfoot"><span>Orma</span><span>10 / 10</span></footer>
-    <aside class="notes"><p>The repo URL, big. The compliance block under it.</p><p>Orma. The repo is on the slide. // Thank you.</p><p>*Stop. Do not summarise. Take the questions.*</p></aside>
+    <footer class="sfoot"><span>Orma</span><span>11 / 11</span></footer>
+    <aside class="notes"><p>The mark alone, the way it opened. The repo URL underneath it.</p><p>Thank you.</p><p>*Stop. Do not summarise. Take the questions.*</p><p>*<code>github.com/frytegg/orma</code> — say it once, slowly, if anyone is writing.*</p></aside>
   </section>
 <script>
   const slides = [...document.querySelectorAll('.slide')]
