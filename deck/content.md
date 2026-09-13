@@ -124,7 +124,7 @@ Same tool, same exhibit, a different manager. // Conduct **A**: no loss written 
 ---
 
 ## S6 — The token prices itself
-<!-- time: 3:00 | duration: 30s -->
+<!-- time: 3:15 | duration: 30s -->
 
 ### on screen
 - five steps, no relationship needed
@@ -144,7 +144,7 @@ An investor pledges their units to a second lender. That lender holds a token an
 ---
 
 ## S7 — The score, where we cannot take it back
-<!-- time: 3:30 | duration: 30s | artifact: token -->
+<!-- time: 3:45 | duration: 30s | artifact: token -->
 
 ### on screen
 - an **XLS-47 PriceOracle**, keyed to the vault id
@@ -168,7 +168,7 @@ And here is why it is an oracle and not an API. // A second publisher posted the
 ---
 
 ## S8 — The gate
-<!-- time: 4:00 | duration: 20s -->
+<!-- time: 4:15 | duration: 20s -->
 
 ### on screen
 - graded LP: `tesSUCCESS`
@@ -185,7 +185,7 @@ Measuring is advice. This is enforcement. // An independent vault owner named ou
 ---
 
 ## S9 — Developer experience, and what we gave back
-<!-- time: 4:20 | duration: 48s | artifact: report -->
+<!-- time: 4:35 | duration: 48s | artifact: report -->
 
 ### on screen
 - **QR code to `FEEDBACK.md`, top right**
@@ -206,7 +206,7 @@ One pull request, reproductions onto existing threads rather than duplicates, an
 ---
 
 ## S10 — Close
-<!-- time: 5:08 | duration: 5s -->
+<!-- time: 5:23 | duration: 5s -->
 
 ### on screen
 - **Orma**
