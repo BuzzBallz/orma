@@ -432,8 +432,11 @@ Unchanged on rippled **3.4.0-rc5**: a fresh impairment submitted on 2026-09-12,
 
 ### Why
 
-rippled omits from `PreviousFields` any field whose previous value equalled the type default.
-`LossUnrealized`'s type default is 0, so there is no previous value to record. And under cash-basis
+`PreviousFields` records the prior value of fields that were **present** on the object and changed. A
+field sitting at its type default is not serialised onto the object at all, so it has no prior value to
+record. `LossUnrealized`'s type default is 0, so on a healthy vault the field is simply not there.
+(The rule is presence, not value: the same transaction records the Loan's previous `Flags` of `0`,
+because `Flags` *was* on the object.) And under cash-basis
 accounting (D1.b) impairment changes *nothing else* on the Vault node — `AssetsTotal` and `AssetsAvailable`
 are untouched. The net result is a `ModifiedNode` that an indexer reads as **touched but unchanged**.
 
@@ -477,7 +480,7 @@ once before we guarded it.
 ### Suggested fix, cheapest first
 
 1. **Document it.** One paragraph on the transaction-metadata page: *"`PreviousFields` omits any field whose
-   previous value equalled the type default. A `ModifiedNode` may therefore appear with an empty
+   not present on the object beforehand. A `ModifiedNode` may therefore appear with an empty
    `PreviousFields` while `FinalFields` carries a new non-zero value. Do not infer 'unchanged' from an empty
    `PreviousFields`."* Cross-link it from the `Vault` ledger-entry page and from `LoanManage`. This costs
    nothing and would have saved us a day.

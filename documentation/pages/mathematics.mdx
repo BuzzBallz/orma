@@ -498,10 +498,11 @@ Each of these corrupts data silently rather than erroring.
 
 1. `OracleSet` is **not a merge**. A pair already on the object but omitted from the transaction is
    kept with its `AssetPrice` and `Scale` stripped, so publishing one dimension blanks the other
-   five. The publisher always resends all six. From the other side, there is no way to remove a pair,
+   five. The publisher always resends all six. Removing one takes listing it with no `AssetPrice`,
    so reusing a document id for a different set of assets accumulates stale pairs until the series
-   passes the ledger's ceiling and `OracleSet` returns `tecARRAY_TOO_LARGE`; the only way back is
-   `OracleDelete` then recreate. Document ids come from an explicit table, never from a hash of the
+   passes the ledger's ceiling and `OracleSet` returns `tecARRAY_TOO_LARGE`. Recovery is either
+   listing every stale pair with no price, or `OracleDelete` then recreate, which is what this
+   publisher does because it does not know what the stale pairs were. Document ids come from an explicit table, never from a hash of the
    vault id, because the id is a `UInt32` scoped to (account, id) and a collision would silently
    overwrite another vault's scores.
 2. `LastUpdateTime` must **strictly increase**. Equal or lower gives `tecINVALID_UPDATE_TIME`, burning

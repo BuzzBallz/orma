@@ -75,7 +75,7 @@ Reported, one point zero zero. // Held, zero point eight zero. // **Nineteen hun
 
 **Point at the Change set column.**
 
-And here is why. Three dashes. The change set is **empty** — `PreviousFields`, bottom left, is two braces. // `LossUnrealized` was zero before, and zero is the type default, so rippled leaves it out of the diff entirely. // Nothing in it says this vault moved.
+And here is why. Three dashes. The change set is **empty** — `PreviousFields`, bottom left, is two braces. // `LossUnrealized` was not on the object at all before this — a field at its default is not stored — so there is no previous value for the change set to record. // Nothing in it says this vault moved.
 
 So the manager who disclosed and the manager who hid it **look identical from outside**. That is what we set out to fix.
 

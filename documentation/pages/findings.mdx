@@ -460,7 +460,8 @@ per vault with `AssetClass: "risk"` and a 40-hex `BaseAsset` derived from the va
 
 1. **`OracleSet` is not a merge.** A `(BaseAsset, QuoteAsset)` pair already on the object but omitted from
    the transaction is **kept, with its `AssetPrice` and `Scale` stripped**. Publishing one dimension blanks
-   the other five. There is no operation that removes a pair.
+   the other five. To remove one, list it with its assets and **no** `AssetPrice`: `OracleSet.cpp` erases a
+   pair submitted without a price. Omitting it is what keeps it.
 2. `LastUpdateTime` must **strictly increase**, or `tecINVALID_UPDATE_TIME` burns a fee and a sequence
    number. One update per second per object, maximum.
 3. A `LastUpdateTime` in the **future bricks the object** until wall clock catches up. Never add a safety
