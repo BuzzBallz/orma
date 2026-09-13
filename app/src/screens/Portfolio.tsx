@@ -28,8 +28,6 @@ function gapTone(bps: number): string | undefined {
   return 'var(--bad)'
 }
 
-const SLOTS = [1, 2, 3, 4, 5]
-
 function Th({ k, label, rt, sort, onSort }: {
   k: SortKey; label: string; rt?: boolean; sort: Sort; onSort: (k: SortKey) => void
 }) {
@@ -43,33 +41,6 @@ function Th({ k, label, rt, sort, onSort }: {
       onClick={() => onSort(k)}
       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSort(k) } }}
     >{label}{on && <span className="ord">{sort.asc ? '▲' : '▼'}</span>}</TableHead>
-  )
-}
-
-/** A line held open for a facility we have not been sent figures for. */
-function EmptyRow({ n, onOpen }: { n: number; onOpen: () => void }) {
-  return (
-    <TableRow
-      className="ghost" tabIndex={0} style={{ cursor: 'pointer' }}
-      aria-label={`facility slot ${n}, figures withheld`}
-      onClick={onOpen}
-      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
-    >
-      {/* Six cells, six em-dashes. The row used to caption itself "figures withheld" and
-          carried four cells against a six-column head, so the withheld blotter both
-          repeated the badge on every line and came up two columns short. The state is
-          said once, in the chrome; a row with nothing in it says so by being empty. */}
-      <TableCell>
-        <span className="inst">
-          <span className="name mute">Facility {n}</span>
-        </span>
-      </TableCell>
-      <TableCell className="num mute">—</TableCell>
-      <TableCell className="num mute">—</TableCell>
-      <TableCell className="rt num mute">—</TableCell>
-      <TableCell className="rt num mute">—</TableCell>
-      <TableCell className="num mute">—</TableCell>
-    </TableRow>
   )
 }
 
@@ -153,7 +124,7 @@ export function Portfolio({ vaults, receivedAt, tick, onOpen }: {
       <div className="row" style={{ marginBottom: 16, alignItems: 'baseline' }}>
         <h2 className="panel-title" style={{ margin: 0 }}>Portfolio</h2>
         <span className="num mute" style={{ fontSize: 'var(--t-xs)' }}>
-          {withheld ? 'Weakest First' : `${vaults.length} Facilities · Weakest First`}
+          {withheld ? '' : `${vaults.length} Facilities · Weakest First`}
         </span>
         {sorted && (
           <Button variant="ghost" size="xs" className="btn-term" onClick={() => setSort(DEFAULT_SORT)}>
@@ -190,19 +161,26 @@ export function Portfolio({ vaults, receivedAt, tick, onOpen }: {
             )}
           </TableHeader>
           <TableBody>
-            {withheld
-              ? SLOTS.map(n => <EmptyRow key={n} n={n} onOpen={() => onOpen('')} />)
-              : rows.map((v, i) => (
-                <Row key={v.vaultId} v={v} i={i} receivedAt={receivedAt} tick={tick} onOpen={onOpen} />
-              ))}
+            {rows.map((v, i) => (
+              <Row key={v.vaultId} v={v} i={i} receivedAt={receivedAt} tick={tick} onOpen={onOpen} />
+            ))}
           </TableBody>
         </Table>
       </div>
 
-      <p className="caption blotter-say">
-        Reported value is what the facility states; held value is what it owns once a
-        recognised loss is taken off.
-      </p>
+      {/* No roster, no rows. The blotter used to hold five lines open, captioned
+          "Facility 1" through "Facility 5" — a number nobody had sent, on a screen whose
+          whole argument is that a reported figure and a held figure are not the same
+          thing. The columns stay, so a reader can see the shape figures arrive into, and
+          the line below says what is true: nothing is on file yet. */}
+      {withheld ? (
+        <p className="caption blotter-say">No facility is on file yet.</p>
+      ) : (
+        <p className="caption blotter-say">
+          Reported value is what the facility states; held value is what it owns once a
+          recognised loss is taken off.
+        </p>
+      )}
 
     </section>
   )
