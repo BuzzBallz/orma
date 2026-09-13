@@ -130,14 +130,24 @@ const watchAccounts = (process.env.WATCH_ACCOUNTS ?? '').split(',').map((s) => s
 // Read from the baked gate facility, which recorded who issued its credential, and
 // overridable for anyone running their own issuer.
 let raterAddress = process.env.RATER_ADDRESS ?? null
-if (!raterAddress && existsSync(join('demo', 'gate-vault.json'))) {
-  try { raterAddress = JSON.parse(readFileSync(join('demo', 'gate-vault.json'), 'utf8')).accounts?.rater ?? null } catch { /* optional */ }
+// The nine-step chain that built the gate, each step with the hash it landed under. The
+// live gate object says a domain exists; only these say what the ledger did when two
+// investors tried to enter it, and the refusal is the whole claim. Scoped to the facility
+// it was baked against, so it can never be served against another vault's id.
+let gateProof = null
+if (existsSync(join('demo', 'gate-vault.json'))) {
+  try {
+    const baked = JSON.parse(readFileSync(join('demo', 'gate-vault.json'), 'utf8'))
+    raterAddress = raterAddress ?? baked.accounts?.rater ?? null
+    gateProof = baked.vaultId ? { vaultId: String(baked.vaultId).toUpperCase(), bakedAt: baked.bakedAt ?? null, steps: baked.steps ?? [] } : null
+  } catch { /* optional */ }
 }
 
 const api = createApi(reader, {
   source: 'devnet',
   watchAccounts,
   raterAddress,
+  gateProof,
   oracleFor: (id) => publishLoop?.oracleFor(id) ?? null,
 })
 

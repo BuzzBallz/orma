@@ -105,6 +105,8 @@ export interface IndexerRace {
   transactionHash?: string; vaultId?: string; loanBrokerId?: string; loanId?: string
   /** Only the pre-event fixture carries this: the probe file it was lifted from. */
   source?: string
+  /** The facility this capture was taken from. The route is not facility-scoped; the record is. */
+  label?: string
   transactionResult: string; finding: string; why: string; verdict?: string
   vaultNode: {
     ledgerIndex: string
@@ -263,4 +265,18 @@ export interface Gate extends Stamped {
   /** Whether this service's own issuer is cited in that domain. Null if unknown. */
   issuerNamed: boolean | null
   raterAddress: string | null
+  /**
+   * The chain that built this gate, each step with the hash it landed under. Present only
+   * on the facility it was baked against: the gate object says a domain exists, only this
+   * says what the ledger did when two investors tried to enter it.
+   */
+  proof: { bakedAt: string | null; steps: GateStep[] } | null
+}
+
+export interface GateStep {
+  step: string
+  code: string
+  ok: boolean
+  hash: string | null
+  note: string | null
 }

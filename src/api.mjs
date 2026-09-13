@@ -215,6 +215,12 @@ export function createApi(reader, opts = {}) {
           // which is the point -- they were never consulted in the first place.
           issuerNamed: opts.raterAddress ? isNamedIn(status, opts.raterAddress) : null,
           raterAddress: opts.raterAddress ?? null,
+          // Only for the facility this chain was actually baked against. A gate object
+          // proves a domain exists; the chain proves what happened when someone tried to
+          // enter it, which is the part that cannot be asserted.
+          proof: opts.gateProof && opts.gateProof.vaultId === key
+            ? { bakedAt: opts.gateProof.bakedAt, steps: opts.gateProof.steps }
+            : null,
         }
         gateCache.set(key, { at: Date.now(), body })
         return send(200, stamp(body))

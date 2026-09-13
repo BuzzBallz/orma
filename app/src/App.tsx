@@ -266,8 +266,9 @@ function Desk() {
       // The capture is not facility-scoped, so the page takes its title from whichever
       // facility the picker is holding. With none chosen it falls back to naming the
       // finding rather than borrowing a name the record never claimed.
-      const open = vaultId ? rows.find(r => r.vaultId === vaultId) : undefined
-      return <Evidence d={race.data} name={open ? facilityName(open) : undefined} />
+      // The capture names its own facility, so nothing here does. Passing the picked
+      // facility's name put one facility's name over another's figures.
+      return <Evidence d={race.data} />
     }
 
     if (path === '/methodology') {
@@ -402,7 +403,7 @@ function Desk() {
         asOf={stamp?.serverTime ?? null}
         receivedAt={primary.receivedAt}
         pollMs={POLL_MS}
-        onSelect={id => navigate(path === '/' ? '/facility' : path, id)}
+        onSelect={id => navigate(path === '/' || path === '/evidence' ? '/facility' : path, id)}
       />
 
       {primary.stale && path !== '/evidence'

@@ -861,6 +861,11 @@ kbd{
 }
 .op-tbl td.num{ font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--fg); }
 .op-tbl td b{ color: var(--fg); font-weight: 500; }
+
+/* The gate chain. Nine rows of result codes and hashes: monospaced, because they are
+   identifiers rather than prose, and the hash column dimmed so the codes carry the row. */
+.gate-chain code{ font-family: var(--mono); font-size: var(--t-sm); }
+.gate-chain .gate-hash{ font-family: var(--mono); color: var(--fg-mute); }
 .op-says{ color: var(--fg-mute); }
 
 .op-box{ border: 1px solid var(--line); border-radius: var(--r-panel); padding: 14px 16px; }
@@ -1026,6 +1031,14 @@ kbd{
   letter-spacing: 0.02em;
 }
 
+/* The same formula with this record's numbers in it. The table is in drops and the headline
+   is per share, and the denominator is not a Vault field at all, so without this line the two
+   figures at the top of the panel cannot be reproduced from anything on the screen. */
+.ev-worked{
+  margin: 4px 0 0; font: 12px/1.5 var(--mono); color: var(--fg-dim);
+  letter-spacing: 0.02em;
+}
+
 .ev-prov{
   display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
   margin-top: 22px;
@@ -1165,7 +1178,7 @@ kbd{
   .ev-tbl td, .ev-tbl th{ border-bottom-color: #ddd !important; }
   .ev-field, .ev-before{ color: #555 !important; }
   .ev-after{ color: #111 !important; }
-  .ev-formula, .ev-prov code, .ev-under{ color: #666 !important; }
+  .ev-formula, .ev-worked, .ev-prov code, .ev-under{ color: #666 !important; }
   .op-break{ break-before: page; padding-top: 0; }
   .op-title{ color: #000; font-size: 22px; }
   .op-top{ border-bottom-color: #000; }

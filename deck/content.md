@@ -49,32 +49,43 @@ During the lock-up the depositor watches the vault get worse, and cannot leave. 
 ### notes
 Nobody can read it from outside. So we read it. // A reader that sees what the vault's own reporting does not. // A score published as a native XRPL object, so anyone can disagree with us on the ledger. // And a grade that gates capital, through a Permissioned Domain.
 
-One thing before the demo. The state is pre-baked: real Devnet transactions, from before this talk. Every number you see is read live. The two deposits at the end are signed live, in front of you.
+One thing before the demo. The state is pre-baked: real Devnet transactions, from before this talk, every one of them with a hash on screen. Every number you see is read live, off the ledger, now.
 
 *"Disagree with us on the ledger" is the strongest line in the deck. It is the whole argument for a native oracle object over an API: an API can only be trusted, an oracle object can be contested by a second publisher without asking us.*
 
 *The live-deposit promise is made at minute one and has to be kept at minute three. The keys are in .demo-keys.json and the gate facility must still be in its Subscription phase. Check both before you walk up, or drop the sentence.*
 
 
-## S4 — Two readers, one transaction
-<!-- time: 0:52 | duration: 35s -->
+## S4 — Meridian, and the loss nobody can see
+<!-- time: 0:52 | duration: 55s | artifact: split -->
 
 ### on screen
-- diffs metadata: **1.000000**
-- re-reads the object: **0.803922**
-- 1,961 bp apart, same transaction
-- `LossUnrealized` 0 → 10,000,000, omitted
+- **Meridian Trade Finance I** · 51 in, 10 lent
+- The borrower defaults. **The manager writes it down, on the ledger.**
+- Every standard indexer still reads **1.000000**
 
 ### notes
-Stay on Verification. The scroll is already set.
+*Slide for twelve seconds, then switch to the browser and stay there until S8. Two switches in the whole talk, not five.*
 
-Left: a reader that diffs transaction metadata. The standard way. // Right: ours. It re-reads the object. // **One point zero zero.** Against **zero point eight zero**. // Nineteen per cent apart, on the same transaction, from the same ledger.
+Meridian Trade Finance I. A trade finance facility: it funds invoices. Fifty-one units in, ten lent against one invoice. // The borrower stops paying, and the manager writes the loan down. On the ledger. Correctly. // **This is the honest manager.** Now watch what his investor's dashboard sees.
 
-**Scroll down one screen** to the before/after table.
+**Switch to the browser. Evidence tab. It all fits on one screen, and Record is open on arrival.**
 
-And here is why. `LossUnrealized` was zero, and zero is the type default, so rippled omits it from the change set. // The other two fields genuinely did not move. // The one that did is the one that is invisible.
+Reported, one point zero zero. // Held, zero point eight zero. // **Nineteen hundred and sixty-one basis points apart**, on the same transaction, from the same record. // Put a hundred million through that facility and the gap is nineteen point six million that nobody's risk system has recorded.
 
-*This is the moment they remember. Do not rush the table.*
+**Point at the Change set column.**
+
+And here is why. Three dashes. The change set is **empty** — `PreviousFields`, bottom left, is two braces. // `LossUnrealized` was zero before, and zero is the type default, so rippled leaves it out of the diff entirely. // Nothing in it says this vault moved.
+
+So the manager who disclosed and the manager who hid it **look identical from outside**. That is what we set out to fix.
+
+*Every cell in that column is an em-dash, because `previousFields` is `{}` and the column renders the change set, not the prior state. Do not say "the other two fields did not move": true of the ledger, not of what is on the wall. Say "the change set is empty".*
+
+*The worked line under the formula is there so the two headline figures can be reproduced from the screen: (51.000000 - 10.000000) / 51.000000 = 0.803922. If someone asks where the denominator comes from, it is the share issuance, not the Vault.*
+
+*The 51 and the 10 are XRP on Devnet. The hundred-million line is an explicit scaling, said as one. Never present a Devnet figure as a real balance sheet.*
+
+*Meridian is graded AA with a 19.6% loss, and that is on screen behind you. It is correct — the score rewards recognising a loss — but `46-QA-CAVEATS.md` §7 is the answer if it is asked.*
 
 ---
 
@@ -88,13 +99,13 @@ And here is why. `LossUnrealized` was zero, and zero is the type default, so rip
 - Calder, same tool: conduct **A**
 
 ### notes
-Facility picker → **Kestrel Bridge Financing II** → scroll to Exhibit 3.
+**Facility tab** first, then the picker → **Kestrel Bridge Financing II** → scroll to Exhibit 3. Picking from the Evidence tab used to leave you on Evidence; it now moves you, but change tab yourself so the movement is the one you rehearsed.
 
 Two bad loans, thirty XRP and ten. This manager declared the big one first. // That consumed **zero point five** of their own first-loss capital. // Small one first would have consumed **zero point seven**. // Same losses, same rates, only the order. // The **zero point two** is investor money, and the party who chose the order is the party it spared.
 
 Facility picker → **Calder Structured Credit III**.
 
-Same tool, same screen, a different manager. // Conduct **A**. They flagged the loss before they took it. // **That** is what a new investor wants to see before they subscribe.
+Same tool, same exhibit, a different manager. // Conduct **A**: no loss written off at all, and the one distressed exposure flagged and left flagged. // **That** is what a new investor wants to see before they subscribe.
 
 *Say "default sequencing and cover sizing" and nothing wider. Do not extend "unilateral control" to impairment re-pricing. `41-SECURITY-DISCLOSURE.md` §9.*
 
@@ -104,7 +115,7 @@ Same tool, same screen, a different manager. // Conduct **A**. They flagged the 
 <!-- time: 2:07 | duration: 30s -->
 
 ### on screen
-- five steps, none of them ours
+- five steps, no relationship needed
 - priced naively: **1.000000**
 - priced on the pointer: **0.803922**
 - **0.196078 XRP** kept off the second lender's book
@@ -112,7 +123,9 @@ Same tool, same screen, a different manager. // Conduct **A**. They flagged the 
 ### notes
 Stay on Calder. Scroll to Exhibit 5.
 
-An investor pledges their units to a second lender. That lender holds a token and nothing else. // They read the token's own metadata, follow the pointer it declares, and price the pledge. Five steps, none of which involve us. // Priced naively: **one point zero zero**. Priced on what the instrument points to: **zero point eight zero**. // **Zero point one nine of overstatement, kept out of the second lender's book.**
+An investor pledges their units to a second lender. That lender holds a token and nothing else. // They read the token's own metadata, follow the pointer it declares, and price the pledge. Five steps, and not one of them needs a relationship with the facility. // Priced naively: **one point zero zero**. Priced on what the instrument points to: **zero point eight zero**. // **Zero point one nine of overstatement, kept out of the second lender's book.**
+
+*The pointer on the wall is our own endpoint on this laptop, and steps four and five say so in green. Volunteer it before it is asked: "in production that URL is whatever the issuer wrote into the token. The point is the lender learns where to look from the token, not from us."*
 
 *`[+]` at 5:00 only: on Kestrel that same exhibit stops at step two: no metadata, nothing readable. That is every vault today.*
 
@@ -127,7 +140,7 @@ An investor pledges their units to a second lender. That lender holds a token an
 - refused by the ledger, not by us
 
 ### notes
-Facility picker → **Thorne Senior Secured I** → Exhibit 6.
+Picker → **Thorne Senior Secured I** → scroll to Exhibit 6, it sits above Key Indicators. The chain is nine rows with a hash on each.
 
 Measuring is advice. This is enforcement. // An independent vault owner named our issuer in their domain. We signed nothing, and we cannot decline. // Two investors, same second: one admitted, the other refused **by the ledger**, not by us.
 

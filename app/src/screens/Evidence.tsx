@@ -1,4 +1,5 @@
 import type { IndexerRace } from '../lib/types'
+import { dropsToXrp } from '../lib/format'
 
 /**
  * Evidence: the one claim this product rests on, shown rather than argued.
@@ -103,6 +104,7 @@ export function Evidence({ d, name }: { d: IndexerRace | null; name?: string }) 
   // a line, whether or not the change set admitted to it.
   const fields = [...new Set([...Object.keys(final), ...Object.keys(prev)])]
   const gap = d.readings.divergenceBps
+  const shares = d.vaultNode.sharesOutstanding
   const raw = JSON.stringify(prev, null, 2)
   const rawFinal = JSON.stringify(final, null, 2)
 
@@ -111,7 +113,11 @@ export function Evidence({ d, name }: { d: IndexerRace | null; name?: string }) 
       <section className="panel ev">
         <header className="ev-head">
           <span className="label">Evidence</span>
-          <h2 className="ev-title">{name ?? 'Recognised loss'}</h2>
+          {/* The capture names its own facility. Taking the title from the picker instead put
+              one facility's name over another facility's figures the moment a judge picked a
+              different row, which reads as fabricated data and is the one thing this screen
+              cannot afford. */}
+          <h2 className="ev-title">{d.label ?? name ?? 'Recognised loss'}</h2>
           <p className="ev-thesis">
             The first recognised loss does not show up on a metadata diff.
           </p>
@@ -141,7 +147,7 @@ export function Evidence({ d, name }: { d: IndexerRace | null; name?: string }) 
           <thead>
             <tr>
               <th>Field</th>
-              <th>Before</th>
+              <th>Change set</th>
               <th>After</th>
             </tr>
           </thead>
@@ -159,6 +165,12 @@ export function Evidence({ d, name }: { d: IndexerRace | null; name?: string }) 
         </table>
 
         <p className="ev-formula">{d.readings.correct.formula}</p>
+        {shares && final.AssetsTotal && (
+          <p className="ev-worked">
+            ({dropsToXrp(final.AssetsTotal)} &minus; {dropsToXrp(final.LossUnrealized ?? '0')})
+            {' / '}{dropsToXrp(shares)} = {d.readings.correct.value}
+          </p>
+        )}
 
         <div className="ev-prov">
           <span className="label">Recorded</span>
@@ -171,7 +183,7 @@ export function Evidence({ d, name }: { d: IndexerRace | null; name?: string }) 
 
         {/* Folded by default. The transcription above is the argument; this is the receipt,
             and a receipt does not need to be open to be a receipt. */}
-        <details className="ev-raw">
+        <details className="ev-raw" open>
           <summary>Record</summary>
           <div className="ev-raw-body">
             <div className="ev-raw-col">

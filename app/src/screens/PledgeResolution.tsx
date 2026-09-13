@@ -94,7 +94,7 @@ export function PledgeResolution({ r }: { r: Resolution | null }) {
 
       {nav && (
         <p className="caption meth" style={{ marginTop: 10 }}>
-          Recompute: <b className="num">({dropsToXrp(nav.provenance.assetsTotal)} − {dropsToXrp(nav.provenance.lossUnrealized)}) ÷ {nav.provenance.unitsOutstanding}</b>,
+          Recompute: <b className="num">({dropsToXrp(nav.provenance.assetsTotal)} − {dropsToXrp(nav.provenance.lossUnrealized)}) ÷ {dropsToXrp(nav.provenance.unitsOutstanding)} = {nav.unitValue.held}</b>,
           ledger <b className="num">{nav.ledgerIndex ?? '—'}</b>.
         </p>
       )}
