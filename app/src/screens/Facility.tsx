@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
 import type { BrokerHistory, Collateral, Gate, Resolution, VaultDetail } from '../lib/types'
-import { Chip } from '../components/Chip'
-import { gradeIndex, gradeTone } from '../lib/grades'
+import { GradeLetter } from '../components/GradeLetter'
+import { GRADE_LADDER, gradeFill, gradeIndex, letterTone } from '../lib/grades'
+import { nextBeat } from '../lib/beats'
 import { bpsToPct, dropsToXrp, duration, fmtIso, ratioToPct, rateToPct } from '../lib/format'
 import { creditText, facilityName, facilityRef, factorRows, outlookOf, splitFactors } from '../lib/credit'
 import { ManagerConduct, PledgedCollateral } from './FacilityExhibits'
@@ -18,9 +19,65 @@ function F({ k, v, note }: { k: string; v: ReactNode; note?: string }) {
   )
 }
 
-function Section({ title, children, tight }: { title: string; children: ReactNode; tight?: boolean }) {
+/**
+ * The internal scale: one track, filled to where this facility sits.
+ *
+ * It was twenty separate rectangles, which drew the mechanism rather than the reading —
+ * a reader had to count boxes to learn anything. A rating is a position on a continuum,
+ * so it is now a continuum: the track runs AAA to D and the fill runs from AAA to here.
+ * The further right it reaches, the worse the facility is, which is the direction a
+ * credit reader already expects a risk bar to move in.
+ *
+ * The fill comes from `gradeFill`, which is the payload's own position on the scale —
+ * 1.0 at AAA and 0.0 at D. The track fills in the opposite direction, so the fraction is
+ * its complement expressed in steps: AAA is 1/20, D is 20/20. Nothing is interpolated.
+ *
+ * With no grade on file the track is empty. Not a faint fill, not a fill at some
+ * plausible middle — empty, and the reading is an em-dash. A bar with something in it is
+ * a claim, and there is nothing here to claim.
+ */
+export function Ladder({ grade }: { grade?: string | null }) {
+  const N = GRADE_LADDER.length
+  const i = grade ? gradeIndex(grade) : -1
+  const known = i >= 0
+  const fill = known ? 1 - gradeFill(GRADE_LADDER[i]) * ((N - 1) / N) : 0
+  const pct = (fill * 100).toFixed(2) + '%'
+
   return (
-    <section className={'op-sec' + (tight ? ' tight' : '')}>
+    <div className="ladder">
+      <div
+        className="lad-track"
+        role="img"
+        aria-label={known
+          ? `${grade}: step ${i + 1} of ${N} on the internal scale, AAA strongest, D weakest`
+          : 'Internal scale, AAA to D. No grade on file.'}
+      >
+        {known && (
+          <span
+            className="lad-fill"
+            style={{ width: pct, ['--tone' as string]: `var(${letterTone(grade!)})` }}
+          />
+        )}
+      </div>
+      <div className="ladder-ends">
+        <span>AAA</span>
+        {/* The position, named. The bar says how far along; only this says what that
+            step is called, and a reader who does not carry AAA..D in their head needs
+            both. Withheld, it is an em-dash and the track above it is empty. */}
+        <b className="ladder-read">
+          {known ? <>{grade} · {i + 1} of {N}</> : <>—</>}
+        </b>
+        <span>D</span>
+      </div>
+    </div>
+  )
+}
+
+function Section({ title, children, tight }: { title: string; children: ReactNode; tight?: boolean }) {
+  // The section names itself so the stylesheet can treat one of them differently without
+  // a second class threaded through every call site. Only "summary" is styled off this.
+  return (
+    <section className={'op-sec' + (tight ? ' tight' : '')} data-sec={title.toLowerCase()}>
       <h3 className="op-h">{title}</h3>
       {children}
     </section>
@@ -53,19 +110,37 @@ export function Facility({ d, history, collateral, resolution, gate }: {
     : null
   const overdue = d.loans.filter(l => l.secondsUntilDue < 0).length
   const redemptionShortfall = d.phaseInfo.projectedShortfall
+  const next = nextBeat(d)
 
   return (
     <article className="opinion">
 
       {/* ─────────────────────────── page 1 ─────────────────────────── */}
       <div className="op-page">
+        {/* Letterhead, print only.
+            On screen the mark sits in the topbar, and the topbar is the first thing the
+            print sheet drops — so a printed opinion left the building with no indication of
+            who had issued it. This is the same mark.svg the chrome uses, not a second
+            drawing: an <img> rather than a background, because "print backgrounds" is off by
+            default in every browser and a letterhead that depends on that setting is not a
+            letterhead. Print turns it black; on paper the cream would be nothing at all. */}
+        <div className="op-letterhead" aria-hidden>
+          <img src="/assets/mark.svg" alt="" width={18} height={18} />
+          <span className="op-lh-name">Orma</span>
+          <span className="op-lh-rule" />
+          {/* The running head names the facility, not the document type: a loose sheet
+              picked up off a table should say which facility it is about. With no figures
+              on file it says so, rather than heading a blank note with a name. */}
+          <span className="op-lh-kind">{d.serverTime ? name : 'Figures withheld'}</span>
+        </div>
+
         <header className="op-top">
           <div className="op-kind">
-            <span className="label">credit opinion</span>
+            <span className="label">Credit Opinion</span>
             <span className="op-date">
               {d.serverTime
-                ? <>figures received {fmtIso(d.serverTime)}</>
-                : <>figures withheld</>}
+                ? <>Figures Received {fmtIso(d.serverTime)}</>
+                : <>Figures Withheld</>}
             </span>
           </div>
           <h1 className="op-title">{name}</h1>
@@ -100,7 +175,7 @@ export function Facility({ d, history, collateral, resolution, gate }: {
             </Section>
 
             <div className="op-two">
-              <Section title="Credit strengths" tight>
+              <Section title="Credit Strengths" tight>
                 {strengths.length ? (
                   <ul className="op-list">
                     {strengths.map(s => (
@@ -120,7 +195,7 @@ export function Facility({ d, history, collateral, resolution, gate }: {
                   </p>
                 )}
               </Section>
-              <Section title="Credit challenges" tight>
+              <Section title="Credit Challenges" tight>
                 <ul className="op-list">
                   {challenges.map(s => (
                     <li key={s.key}>
@@ -131,7 +206,7 @@ export function Facility({ d, history, collateral, resolution, gate }: {
               </Section>
             </div>
 
-            <Section title="Exhibit 1 · Factor scores">
+            <Section title="Exhibit 1 · Factor Scores">
               <table className="op-tbl">
                 <thead>
                   <tr><th>Factor</th><th>What it measures</th><th className="rt">Score</th></tr>
@@ -146,7 +221,7 @@ export function Facility({ d, history, collateral, resolution, gate }: {
                         <td><b>{f.name}</b></td>
                         <td className="op-says">{f.says}</td>
                         <td className="rt">
-                          {worst ? <Chip tone={gradeTone(worst.grade)}>{worst.grade}</Chip> : 'n.a.'}
+                          <GradeLetter grade={worst?.grade} />
                         </td>
                       </tr>
                     )
@@ -156,26 +231,63 @@ export function Facility({ d, history, collateral, resolution, gate }: {
             </Section>
           </div>
 
+          {/* The rail carries the reading; the column beside it carries the argument.
+              Everything here used to be spread down the left-hand side as a loose list, or
+              was two pages away in a prose box — a reader had to scroll, and then open a
+              second tab, to answer "how bad, against what, and when". It is four blocks
+              now, and on a tall window it stays put while the note scrolls under it. */}
           <aside className="op-side">
             <div className="op-box">
               <div className="label">Ratings</div>
               <dl className="op-ratings">
-                <F k="internal score" v={<Chip tone={gradeTone(v.grade)} large>{v.grade}</Chip>} />
-                <F k="outlook" v={outlook} />
-                <F k="status" v={v.phase} />
-                <F k="scale position" v={`${gradeIndex(v.grade) + 1} of 20`} />
-                <F k="scored at" v={d.score.computedAt ? fmtIso(d.score.computedAt) : 'n.a.'} />
+                <F k="Internal Score" v={<GradeLetter grade={v.grade} size="lg" />} />
+                <F k="Outlook" v={outlook} />
+                <F k="Status" v={v.phase} />
+                <F k="Scored At" v={d.score.computedAt ? fmtIso(d.score.computedAt) : 'n.a.'} />
               </dl>
             </div>
 
+            {/* The scale, on its own. Its reading names the step — "AAA · 1 of 20" — which
+                is the scale position that used to sit above it as a second row saying the
+                same thing twice. */}
+            <div className="op-box op-scale">
+              <Ladder grade={v.grade} />
+            </div>
+
             <div className="op-box">
-              <div className="label">At a glance</div>
+              <div className="label">At a Glance</div>
               <dl className="op-ratings">
-                <F k="reported unit value" v={v.navNaive} />
-                <F k="held unit value" v={v.navCorrect} />
-                <F k="reported vs held" v={`${v.navDivergenceBps} bps`} note={`(${gapPct})`} />
-                <F k="exposures" v={`${v.loanCount}`} note={`· ${v.distressedLoanCount} non-performing`} />
-                <F k="remaining term" v={v.secondsToRedemption > 0 ? duration(v.secondsToRedemption) : 'past due'} />
+                <F k="Reported" v={v.navNaive} />
+                <F k="Held" v={v.navCorrect} />
+                <F k="Gap" v={`${v.navDivergenceBps} bps`} note={`(${gapPct})`} />
+                {/* Coverage was a paragraph on page two. The figure a reader wants first is
+                    what is posted against what is required; the paragraph still says the
+                    rest. */}
+                <F
+                  k="Coverage"
+                  v={dropsToXrp(d.broker.coverAvailable)}
+                  note={`of ${dropsToXrp(d.broker.coverRequired)} required`}
+                />
+                <F k="Remaining Term" v={v.secondsToRedemption > 0 ? duration(v.secondsToRedemption) : 'past due'} />
+                <F k="Exposures" v={`${v.loanCount}`} note={`· ${v.distressedLoanCount} non-performing`} />
+              </dl>
+            </div>
+
+            {/* What falls due next, so the calendar tab is a place to go for detail rather
+                than a place to go for the headline. Same builder as that desk uses, so the
+                two can never disagree. */}
+            <div className="op-box">
+              <div className="label">Next Event</div>
+              <dl className="op-ratings">
+                <F k={next ? next.what : 'Nothing on file'} v={next?.when ? fmtIso(next.when) : '—'} />
+                <F
+                  k="Due"
+                  v={next
+                    ? next.inSeconds < 0
+                      ? `${duration(-next.inSeconds)} ago`
+                      : `in ${duration(next.inSeconds)}`
+                    : '—'}
+                />
               </dl>
             </div>
 
@@ -196,7 +308,7 @@ export function Facility({ d, history, collateral, resolution, gate }: {
       {/* ─────────────────────────── page 2 ─────────────────────────── */}
       <div className="op-page op-break">
         <header className="op-top slim">
-          <span className="label">credit opinion · continued</span>
+          <span className="label">Credit Opinion · Continued</span>
           <span className="op-date">{name}</span>
         </header>
 
@@ -213,9 +325,15 @@ export function Facility({ d, history, collateral, resolution, gate }: {
               <p>
                 {d.phaseInfo.canWithdraw
                   ? <>Withdrawals are open.</>
-                  : <>Withdrawals are closed{d.phaseInfo.withdrawBlockedReason ? <>: {creditText(d.phaseInfo.withdrawBlockedReason)}</> : '.'}</>}
-                {' '}The next scheduled boundary is {fmtIso(d.phaseInfo.nextBoundaryAt)},
-                in {duration(Math.abs(d.phaseInfo.secondsToNextBoundary))}.
+                  : <>Withdrawals are closed{d.phaseInfo.withdrawBlockedReason ? <>: {creditText(d.phaseInfo.withdrawBlockedReason)}</> : null}.</>}
+                {/* A boundary that has already gone by is said to have gone by. Taking the
+                    absolute value and always writing "in" turned every overrun into time
+                    still in hand, which is the one direction a credit note must not err in. */}
+                {d.phaseInfo.secondsToNextBoundary < 0
+                  ? <> That boundary was {fmtIso(d.phaseInfo.nextBoundaryAt)},
+                      {' '}{duration(-d.phaseInfo.secondsToNextBoundary)} ago.</>
+                  : <> The next scheduled boundary is {fmtIso(d.phaseInfo.nextBoundaryAt)},
+                      {' '}in {duration(d.phaseInfo.secondsToNextBoundary)}.</>}
               </p>
               <p>
                 Resolution depends on whether performing exposures mature before the
@@ -226,7 +344,7 @@ export function Facility({ d, history, collateral, resolution, gate }: {
 
             {/* Steps ALREADY APPLIED, not prospective triggers. The anchor carries a
                 zero delta and is dropped: "taking AAA to AAA" is not a reason. */}
-            <Section title="Why the score sits below the anchor">
+            <Section title="Why the Score Sits Below the Anchor">
               <ul className="op-list">
                 {d.score.notchTrace.filter(s => s.delta !== 0).slice(-4).map((s, i) => (
                   <li key={i}>{creditText(s.rule)} — {s.delta} notch{Math.abs(s.delta) === 1 ? '' : 'es'}, taking {s.from} to {s.to}.</li>
@@ -241,7 +359,7 @@ export function Facility({ d, history, collateral, resolution, gate }: {
                 with. This is the same five factors, ungrouped, in the order the
                 calculation agent sends them, each with the figure it was scored on —
                 nothing summarised away. */}
-            <Section title="Exhibit 2 · Measured factors">
+            <Section title="Exhibit 2 · Measured Factors">
               <table className="op-tbl factors">
                 <thead>
                   <tr><th>Factor</th><th className="rt">Measured</th><th className="rt">Score</th><th>Basis</th></tr>
@@ -251,7 +369,7 @@ export function Facility({ d, history, collateral, resolution, gate }: {
                     <tr key={dim.key} data-dim={dim.key}>
                       <td><b>{creditText(dim.label)}</b></td>
                       <td className="rt num">{dim.value}{dim.unit === 'pct' ? '%' : dim.unit && dim.unit !== 'none' ? ` ${dim.unit}` : ''}</td>
-                      <td className="rt"><Chip tone={gradeTone(dim.grade)}>{dim.grade}</Chip></td>
+                      <td className="rt"><GradeLetter grade={dim.grade} /></td>
                       <td className="op-says">{creditText(dim.explain)}</td>
                     </tr>
                   ))}
@@ -264,7 +382,7 @@ export function Facility({ d, history, collateral, resolution, gate }: {
             <PledgeResolution r={resolution ?? null} />
             <EntryGate g={gate ?? null} />
 
-            <Section title="Key indicators">
+            <Section title="Key Indicators">
               <table className="op-tbl">
                 <thead>
                   <tr><th>Indicator</th><th className="rt">Value</th><th>Basis</th></tr>
@@ -312,7 +430,7 @@ export function Facility({ d, history, collateral, resolution, gate }: {
             </div>
 
             <div className="op-box">
-              <div className="label">Asset performance</div>
+              <div className="label">Asset Performance</div>
               <p className="op-profile">
                 {v.distressedLoanCount} of {v.loanCount} exposures non-performing.{' '}
                 {overdue > 0
@@ -323,7 +441,7 @@ export function Facility({ d, history, collateral, resolution, gate }: {
             </div>
 
             <div className="op-box">
-              <div className="label">Liquidity and redemptions</div>
+              <div className="label">Liquidity and Redemptions</div>
               <p className="op-profile">
                 {dropsToXrp(v.assetsAvailable)} available of {dropsToXrp(v.assetsTotal)}.
                 Redemption {fmtIso(v.redemptionAt)}

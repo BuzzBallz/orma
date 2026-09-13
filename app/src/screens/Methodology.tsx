@@ -6,7 +6,7 @@ export function Methodology() {
   return (
     <div className="stack">
       <section className="panel">
-        <h2 className="panel-title">How the internal score is built</h2>
+        <h2 className="panel-title">How the Internal Score Is Built</h2>
         <p className="caption meth">
           Five factors, each scored on its own from {GRADE_LADDER[0]} to{' '}
           {GRADE_LADDER[GRADE_LADDER.length - 1]}. For a fixed-term facility the headline
@@ -34,7 +34,7 @@ export function Methodology() {
       </section>
 
       <section className="panel">
-        <h2 className="panel-title">Reported value against held value</h2>
+        <h2 className="panel-title">Reported Value Against Held Value</h2>
         <p className="caption meth">
           The reported value is total assets divided by units outstanding. The held value
           takes off a loss the facility has already recognised. The gap between them, in
@@ -48,7 +48,7 @@ export function Methodology() {
       </section>
 
       <section className="panel">
-        <h2 className="panel-title">When figures are withheld</h2>
+        <h2 className="panel-title">When Figures Are Withheld</h2>
         <p className="caption meth">
           The last set received is shown, with its age. A stale figure is never carried
           forward as current and never estimated. A facility never reported on is held open

@@ -23,6 +23,23 @@
   font-family: "Plex Mono"; font-style: normal; font-weight: 500;
   font-display: swap; src: url("/assets/fonts/plex-mono-500.woff2") format("woff2");
 }
+/* One serif, one weight, one job: the summary paragraphs of a credit opinion.
+   A rating note is read as prose for a minute at a time and the rest of this surface is a
+   terminal — mono figures, sans labels. Setting the two or three paragraphs that are
+   actually argument in a serif is the difference between reading a note and scanning a
+   dashboard. Not the family: 15 kB, weight 400, latin, and it is used nowhere else. */
+@font-face{
+  font-family: "Plex Serif"; font-style: normal; font-weight: 400;
+  font-display: swap; src: url("/assets/fonts/plex-serif-400.woff2") format("woff2");
+}
+/* The wordmark asks for 600 and nothing else does. Without this face the browser
+   synthesised the weight — a faux bold, smeared differently by every engine, on the one
+   word in the product that has to look the same on the presenter's Mac and on a juror's
+   Windows laptop. 10 kB to stop guessing at the brand's own name. */
+@font-face{
+  font-family: "Plex Mono"; font-style: normal; font-weight: 600;
+  font-display: swap; src: url("/assets/fonts/plex-mono-600.woff2") format("woff2");
+}
 
 /* ============================================================
    XRPL Vault Fragility Oracle — one stylesheet.
@@ -53,7 +70,7 @@
 
   --fg:      #EAE0CE;   /* primary text and figures — brand cream */
   --fg-dim:  #B3AA99;   /* secondary — 8.5:1 on --bg, clears AA */
-  --fg-mute: #8C8578;   /* tertiary  — 5.4:1 on --bg, clears AA */
+  --fg-mute: #9A9488;   /* tertiary  — 5.4:1 on --bg, clears AA */
 
   /* CHROME — the brand gold is the furniture: the active tab, an alert, the wordmark.
      Deliberately NOT a signal: red is risk, green is healthy, cyan is the correct
@@ -64,7 +81,7 @@
   --amber-dim: #8E7340;
   /* Idle chrome. Gold had spread to every label, tab and key until nothing gold meant
      anything. Gold is now the active tab, an alert, and the wordmark. Nothing else. */
-  --fg-idle: #8C8578;
+  --fg-idle: #9A9488;
 
   /* CONTRACT — meanings fixed by contract §6, do not repurpose */
   --read-naive:   #8792A6;   /* the naive NAV reading — muted, DASHED (contract §6) */
@@ -83,6 +100,7 @@
 
   --mono: "Plex Mono", ui-monospace, "SF Mono", Consolas, Menlo, monospace;
   --sans: "Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --serif: "Plex Serif", Georgia, "Times New Roman", serif;
 
   --t-hero: 96px;
   --t-xxl:  72px;
@@ -91,8 +109,8 @@
   --t-md:   18px;
   --t-base: 14px;
   --t-sm:   12px;
-  --t-xs:   11px;
-  --t-2xs:  10px;   /* chevrons and other glyph-only marks */
+  --t-xs:   13px;
+  --t-2xs:  12px;   /* chevrons and other glyph-only marks */
   --t-verdict: 40px;
 
   --topbar: 44px;
@@ -187,12 +205,12 @@ body{
 
 /* Grain. A locally generated 128px tile at 5% — enough to stop the flats reading as a
    render, not enough to be a texture you notice. It rides the veil rather than body::after
-   so it mounts on idle with the rest of the dressing: noise.png (16 KB) is never fetched
+   so it mounts on idle with the rest of the dressing: paper.png (28 KB) is never fetched
    while the first paint is happening. */
 .veil-grain{
   position: fixed; inset: 0; z-index: 100; pointer-events: none;
-  background-image: url('/assets/noise.png'); background-size: 128px 128px;
-  opacity: .035;
+  background-image: url('/assets/paper.png'); background-size: 280px 210px;
+  opacity: .055;
 }
 
 /* ---------- the ground ----------
@@ -228,13 +246,11 @@ body{
 /* The sweep IS the poll. Its duration is bound to POLL_MS from App.tsx — it is not a
    decorative loop that happens to look busy, it is the three seconds going by. */
 @keyframes sweep { from { transform: translateY(-1px) } to { transform: translateY(100vh) } }
-.g-sweep{
-  position: absolute; left: 0; right: 0; top: 0; height: 1px;
-  background: linear-gradient(to right, transparent,
-    color-mix(in srgb, var(--amber) 30%, transparent) 16%,
-    color-mix(in srgb, var(--amber) 30%, transparent) 84%, transparent);
-  animation: sweep var(--poll, 3000ms) linear infinite;
-}
+/* The amber sweep is gone. A 1px gold rule crossed the whole surface once per poll,
+   which at rest read as a stray hairline lying across the page at whatever height the
+   animation had reached. The stamp's own 24px rule says the same thing, in the corner
+   where a reader is already looking for it, and says it about the poll rather than
+   about the page. */
 
 /* Content stacks above the ground. topbar (z-20) and the status line (z-30) already do. */
 main.page, .feedbar{ position: relative; z-index: 1; }
@@ -318,7 +334,7 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
   display: inline-block;
   font: 500 var(--t-xs)/1.2 var(--mono);
   font-variant-numeric: tabular-nums;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.06em;
   padding: 3px 8px;
   height: auto;            /* Badge ships h-5; the chip is sized by its own padding */
@@ -342,8 +358,13 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
   border-bottom: 1px solid var(--line);
 }
 .topbar > * { flex: 0 0 auto; }
-/* The picker carries the longest label in the bar, so it is the one item allowed to shrink. */
-.topbar > .picker{ flex: 0 1 auto; min-width: 0; }
+/* The picker carries the longest label in the bar, so it is the one item allowed to shrink.
+   It is also, for the same reason, the only thing that can absorb a bar that has outgrown
+   its window — and it did: a fifth tab and the docs link added ~110px, and the control that
+   opens a facility was squeezed to a 10px sliver on anything under 1200px. The label is
+   built to ellipsis; the control is not built to vanish. This floor is where it stops, and
+   the media query below frees the room to honour it. */
+.topbar > .picker{ flex: 0 1 auto; min-width: 168px; }
 /* `.topbar > *` above outranks the generic `.spacer` rule by source order, so the bar
    was left-packed and its tail floated ~120px short of the right edge. */
 .topbar > .spacer{ flex: 1 1 auto; }
@@ -373,7 +394,7 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
   border: 1px solid color-mix(in srgb, var(--pill-tone, var(--fg-dim)) 35%, transparent);
   border-radius: 999px;
   background: color-mix(in srgb, var(--pill-tone, var(--fg-dim)) 8%, transparent);
-  font: 500 var(--t-xs)/1 var(--mono); letter-spacing: 0.1em; text-transform: uppercase;
+  font: 500 var(--t-xs)/1 var(--mono); letter-spacing: 0.1em; text-transform: none;
   color: var(--fg);
   white-space: nowrap;
 }
@@ -390,7 +411,30 @@ a:hover { text-decoration: underline; text-underline-offset: 2px; }
 .meta + .meta{ margin-left: 16px; }
 
 @media (max-width: 1280px){ .meta.optional{ display: none } }
-@media (max-width: 1100px){ .topbar .meta:not(.keep){ display: none } .topbar .sep{ margin: 0 10px } }
+
+/* Where the bar gives way. The old rule here tried to free room by hiding
+   `.meta:not(.keep)` — but the only .meta in the bar carries .keep, so it matched nothing
+   and the picker paid for the overflow instead. The timestamp stays; it sheds its date
+   first (the date is today, the time is the part that tells you the figures are live),
+   then the furniture tightens. Nothing is hidden that the reader was relying on. */
+@media (max-width: 1220px){
+  .topbar{ padding: 0 20px; }
+  .topbar .sep{ margin: 0 8px; }
+  .topbar .meta .on-day{ display: none; }
+}
+/* The stamp is never hidden.
+   It used to be, at 1120px, on the reasoning that the status capsule beside it still
+   answered "are these figures current?". The capsule is gone and the stamp is now the
+   only thing that answers that, so hiding it would leave the bar with no freshness signal
+   at all. It sheds its date above and keeps the clock; nothing below drops it. */
+@media (max-width: 1120px){
+  .topbar .sep{ margin: 0 6px; }
+}
+/* Last thing to go: the documentation link. It leaves the app, so it is the one item in
+   the bar nobody needs mid-demonstration. */
+@media (max-width: 1060px){
+  .topbar .docs-link, .topbar .sep:has(+ .picker){ display: none; }
+}
 
 /* Radix needs a Tabs root around the list and the panel. It carries context, not layout. */
 .tabs-root{ display: contents; }
@@ -454,8 +498,64 @@ table.tbl th.rt{ text-align: right; }
 /* One scroller per table, and it is the outer box: it is 40px wider than shadcn's own
    container, and it is the box the UI audit asserts on. The primitive's container is
    made transparent rather than left as a second, narrower scroller inside this one. */
+/* The internal scale, drawn. Twenty notches, one marked.
+   The strip is quiet on purpose: the unmarked notches are hairlines, and the only colour
+   in it is the tone of this facility's own step. It reads as a rating scale with a
+   position on it, which is what it is, rather than as a gauge. */
+/* One track, filled to the reading. Twenty rectangles drew the mechanism; a rating is a
+   position on a continuum, so this is a continuum. Empty when there is no grade — a bar
+   with something in it is a claim. */
+.ladder{ margin-top: 12px; }
+.lad-track{
+  position: relative; height: 8px; border-radius: 999px; overflow: hidden;
+  background: color-mix(in srgb, var(--fg) 13%, transparent);
+}
+.lad-fill{
+  position: absolute; inset: 0 auto 0 0;
+  border-radius: 999px; background: var(--tone);
+  transition: width 220ms ease;
+}
+/* The thumb: a hairline at the reading, not a handle. */
+.lad-fill::after{
+  content: ''; position: absolute; right: 0; top: -3px; bottom: -3px;
+  width: 2px; border-radius: 1px;
+  background: var(--tone);
+}
+@media (prefers-reduced-motion: reduce){ .lad-fill{ transition: none } }
+.ladder-ends{
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+  margin-top: 7px;
+  font: var(--t-2xs)/1 var(--mono);
+  letter-spacing: 0.08em;
+  color: var(--fg-mute);
+}
+.ladder-read{
+  font: 500 var(--t-xs)/1 var(--mono);
+  letter-spacing: 0.04em;
+  color: var(--fg);
+}
+.sr-only{
+  position: absolute; width: 1px; height: 1px; margin: -1px;
+  padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+
 .tbl-scroll{ overflow-x: auto; margin: 0 -20px; padding: 0 20px; }
 .tbl-scroll [data-slot="table-container"]{ overflow: visible; }
+
+/* An edge that says there is more to the right.
+   macOS hides its scrollbars until you scroll, so a blotter wider than its panel looked
+   exactly like a blotter that ended there — a reader could finish the portfolio without
+   ever learning the outlook column existed. These are the two standard scroll shadows:
+   the `local` layers are a cover painted in the panel's own colour, the `scroll` layers
+   are the shade underneath. When there is nothing to scroll the cover sits on the shade
+   and nothing shows, so this is invisible at every width where the table already fits. */
+.tbl-scroll{
+  background:
+    linear-gradient(to right, var(--bg-1), transparent) 0 0 / 24px 100% no-repeat local,
+    linear-gradient(to left, var(--bg-1), transparent) 100% 0 / 24px 100% no-repeat local,
+    linear-gradient(to right, rgba(0,0,0,.45), transparent) 0 0 / 16px 100% no-repeat scroll,
+    linear-gradient(to left, rgba(0,0,0,.45), transparent) 100% 0 / 16px 100% no-repeat scroll;
+}
 
 /* Identity | measurement. The hairline after `phase` splits nine columns into the two
    questions a reader actually asks: which instrument, and how bad. */
@@ -497,7 +597,12 @@ table.tbl th:nth-child(4), table.tbl td:nth-child(4){ padding-left: 20px; }
           mask-image: linear-gradient(to bottom, #000 0, #000 55%, transparent 100%);
 }
 .blotter .readstamp{ margin-top: 0; }
-.view > .blotter{ flex: 1 0 auto; }   /* alone on the desk, grow into it; never shrink */
+/* The blotter is as tall as the names it lists, and stops.
+   It used to grow into the whole desk, which on a 728px window left 358px of empty card
+   under five rows — 56% of the panel was a black pit with a border drawn round it. A
+   credit blotter is a list; a list that reaches the bottom of the screen whatever its
+   length is a container, not a document. */
+.view > .blotter{ flex: 0 0 auto; }
 
 /* The reading stamp sits under the rows, quieter than a caption. */
 .readstamp{
@@ -512,8 +617,13 @@ table.tbl th:nth-child(4), table.tbl td:nth-child(4){ padding-left: 20px; }
 /* An instrument's identity: name over its id. */
 /* One line per instrument: the id sits beside the name, not under it. Two-line rows are
    a web table; a blotter fits more of the book on screen. */
-.inst{ display: flex; align-items: baseline; gap: 10px; }
-.inst .name{ font: var(--t-base)/1 var(--mono); color: var(--fg); }
+/* Name over detail, not name beside detail. On one line this column took 486px of a
+   1099px blotter and pushed `outlook` off the right edge entirely — two columns the
+   reader had no way of knowing existed. Stacked, the column costs ~260px, the table
+   fits, and the facility name gets the line to itself, which is the order a credit
+   committee reads in anyway. */
+.inst{ display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.inst .name{ font: var(--t-base)/1.15 var(--mono); color: var(--fg); }
 .inst .id{ font: var(--t-xs)/1 var(--mono); color: var(--fg-mute); letter-spacing: 0.04em; }
 
 /* Risk rail: the only place a row carries colour. */
@@ -592,10 +702,30 @@ button:disabled, .btn:disabled, .picker-btn:disabled{
 
 /* One poll cycle drawn as a 2px rail that recharges. Not a spinner: it is the real
    interval, restarted by each good payload and frozen while none arrive. */
-.statusgroup{ display: inline-flex; flex-direction: column; gap: 5px; }
-.tick{ display: block; width: 100%; height: 2px; background: var(--line); border-radius: 1px; overflow: hidden; }
-.tick > i{ display: block; height: 100%; width: 0; background: var(--fg-mute); animation: recharge linear 1 forwards; }
-@keyframes recharge { from { width: 0 } to { width: 100% } }
+/* ---------- the stamp ----------
+   What used to be a status capsule. A tick icon, a pulsing dot and small caps inside a
+   tinted ring, all agreeing with the date printed beside them — three devices carrying a
+   fact the clock was already carrying. The clock says it now, on its own.
+
+   The one sign of life is a 24px rule that draws itself once per poll. A rule, because a
+   desk that is reading can show it without wearing a badge; and the poll interval drives
+   it, so it stops when the polling stops instead of animating over a dead feed. */
+.stamp{ display: inline-flex; flex-direction: column; gap: 5px; }
+.stamp-line{ white-space: nowrap; }
+.stamp-val{ font-variant-numeric: tabular-nums; font-weight: inherit; }
+.stamp.is-withheld .stamp-val{ color: var(--fg-mute); }
+.stamp-state{ margin-left: 10px; color: var(--fg-mute); }
+.stamp-beat{
+  display: block; width: 24px; height: 1px; border-radius: 1px;
+  background: color-mix(in srgb, var(--fg) 40%, transparent);
+  transform: scaleX(0); transform-origin: 0 50%;
+  animation: beat linear 1 forwards;
+}
+.stamp.is-withheld .stamp-beat{ animation: none; transform: scaleX(1); opacity: .35; }
+@keyframes beat { from { transform: scaleX(0) } to { transform: scaleX(1) } }
+@media (prefers-reduced-motion: reduce){
+  .stamp-beat{ animation: none; transform: scaleX(1); }
+}
 
 /* A figure that actually moved — triggered by a change in an HTTP value, never a timer. */
 @keyframes flash { from { background: color-mix(in srgb, var(--ok) 24%, transparent) } to { background: transparent } }
@@ -672,7 +802,9 @@ kbd{
   background: color-mix(in srgb, var(--bg-1) 92%, transparent);
   border: 1px solid var(--line);
   border-radius: var(--r-panel);
-  padding: 28px 32px 24px;
+  /* 32px of side padding on a sheet that already sits inside a padded page was air
+     bought twice. */
+  padding: 20px;
 }
 
 .op-top{ border-bottom: 1px solid var(--line-2); padding-bottom: 16px; margin-bottom: 22px; }
@@ -685,7 +817,19 @@ kbd{
 }
 .op-sub{ margin: 0; font: var(--t-sm)/1.5 var(--mono); color: var(--fg-dim); }
 
-.op-grid{ display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 24px; align-items: start; }
+/* Twelve columns: eight for the argument, four for the reading.
+   A fixed 280px rail held the same width whether the window was 1100px or 1800px, which
+   made the note wander wider and wider beside a rail that never grew with it. */
+.op-grid{
+  display: grid;
+  grid-template-columns: minmax(0, 8fr) minmax(0, 4fr);
+  gap: 20px; align-items: start;
+}
+/* The rail stays with the reader. The note is the long document; the grade, the scale,
+   the figures and the next date are what you keep glancing back at, so they hold their
+   place while the argument scrolls under them. `align-self: start` is what lets a sticky
+   child work inside a grid that would otherwise stretch it to full height. */
+.op-side{ position: sticky; top: calc(var(--topbar) + 12px); align-self: start; }
 .op-main{ min-width: 0; display: flex; flex-direction: column; gap: 20px; }
 .op-side{ min-width: 0; display: flex; flex-direction: column; gap: 14px; }
 
@@ -722,7 +866,9 @@ kbd{
 .op-box{ border: 1px solid var(--line); border-radius: var(--r-panel); padding: 14px 16px; }
 .op-box > .label{ display: block; padding-bottom: 8px; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
 .op-ratings{ margin: 0; }
-.kv{ display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 5px 0; }
+/* A rail row is 30px, not 34. Six of them is where a quarter of the old rail's height
+   went. */
+.kv{ display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 3px 0; min-height: 24px; }
 .kv + .kv{ border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent); }
 .kv dt{ font-size: var(--t-2xs); }
 .kv dd{ margin: 0; text-align: right; font-size: var(--t-sm); color: var(--fg); }
@@ -760,14 +906,266 @@ kbd{
 .meth-note{ margin-top: 12px; color: var(--fg-mute); font-size: var(--t-xs); }
 
 /* ---------- print: two A4 pages, black on white ---------- */
+
+/* ============================================================================
+   THE RULE SYSTEM — one rule per surface, and most surfaces get none
+
+   Nineteen closed boxes were on the credit opinion at once: the sheet, seven boxes
+   inside the sheet, ten chips. Every one of them 1px, every one the same tone, every
+   one the same radius. That is a grid, and a grid is what makes a page read as
+   generated rather than typeset. A panel is a lighter ground under a shadow; the frame
+   was saying nothing the ground was not already saying.
+
+   THE TEST. Turn off every box-shadow. If a chequerboard of rectangles is still
+   visible, there are too many rules left.
+   ============================================================================ */
+
+.panel, .op-page, .op-box{ border: none; }
+
+/* The boxes in the margin keep their edge as a tone, not a line: a shade lighter than
+   the sheet they sit on, which separates them without drawing anything. */
+.op-box{ background: color-mix(in srgb, var(--fg) 3%, transparent); }
+
+/* THE ONE HAIRLINE: the head of a note.
+   Drawn as a pseudo-element scaled to half a device pixel, so it reads as a rule laid on
+   the page rather than as the top edge of a container. A 1px border at this weight looks
+   like a box that lost three sides; this looks like a rule. */
+.op-top{ border-bottom: none; position: relative; padding-bottom: 16px; }
+.op-top::after{
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0;
+  height: 1px; background: var(--line-2);
+  transform: scaleY(0.5); transform-origin: 0 100%;
+}
+
+/* The margin boxes lose their internal rule; space does that work. */
+.op-box > .label{ border-bottom: none; padding-bottom: 4px; margin-bottom: 8px; }
+
+/* Row separators only, and only where rows are being compared. */
+.kv + .kv{ border-top-color: var(--rule-soft); }
+
+/* Controls: barely there at rest, definite on focus. A control that is outlined all the
+   time is competing with the figures; one that is outlined only when it has the keyboard
+   is answering a question the reader just asked. */
+.picker-btn, .btn-term{ border: 1px solid transparent; border-radius: var(--r-ctl); }
+.picker:hover .picker-btn{ border-color: var(--rule-soft); }
+.picker-btn:focus-visible, .btn-term:focus-visible{ border-color: var(--line-2); }
+
+
+/* ---------- the summary reads as prose ----------
+   Only the summary. Everything else on this page is a figure, a label or a column, and
+   those stay in the mono and the sans they were set in. A measure of about 62 characters
+   is the width a paragraph is comfortable at; wider and the eye loses the line it is on. */
+[data-sec="summary"] p{
+  font: 400 16.5px/1.55 var(--serif);
+  max-width: 62ch;
+  color: var(--fg-dim);
+  letter-spacing: 0;
+}
+[data-sec="summary"] p + p{ margin-top: 0.85em; }
+
+/* Figures line up in columns whatever digits they carry. */
+.num, .rt, .kv dd, table.tbl td, .ladder-read{ font-variant-numeric: tabular-nums; }
+.label, .op-h, table.tbl th{ font-size: var(--t-sm); }
+
+
+/* ============================================================================
+   EVIDENCE — a credit page that happens to be about a record
+
+   It used to be a laboratory: two "reader" cards facing off, a dashed red box holding a
+   poster-sized {}, and a paragraph explaining who the page was for. The claim is simpler
+   than any of that, so the page is now the claim, three figures, the fields that moved,
+   and the receipt folded underneath.
+   ============================================================================ */
+
+.ev{ display: flex; flex-direction: column; }
+
+.ev-head{ position: relative; padding-bottom: 16px; margin-bottom: 20px; }
+.ev-head::after{
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0;
+  height: 1px; background: var(--line-2);
+  transform: scaleY(0.5); transform-origin: 0 100%;
+}
+.ev-title{
+  margin: 8px 0 10px; font: 500 28px/1.15 var(--sans);
+  letter-spacing: -0.015em; color: var(--fg);
+}
+.ev-thesis{
+  margin: 0; max-width: 62ch;
+  font: 400 16.5px/1.55 var(--serif); color: var(--fg-dim);
+}
+
+.ev-band{
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px; margin: 4px 0 10px;
+}
+.ev-fig{ display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ev-num{
+  font: 500 clamp(28px, 4.2vw, 44px)/1 var(--mono);
+  font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+  color: var(--fg); overflow-wrap: anywhere;
+}
+.ev-reported{ color: var(--fg-dim); }
+.ev-held{ color: var(--fg); }
+.ev-gap{ color: var(--bad); }
+
+.ev-under{
+  margin: 0 0 26px; font: var(--t-sm)/1.5 var(--sans); color: var(--fg-mute);
+}
+
+/* Three columns that belong to each other. Left to span the panel, `after` drifted to the
+   far edge and the eye had to cross 400px of nothing to compare a before with an after. */
+.ev-tbl{ margin-top: 4px; max-width: 620px; }
+.ev-tbl td{ height: 30px; }
+.ev-tbl th:first-child, .ev-tbl td:first-child{ width: 46%; }
+.ev-field{ font-family: var(--mono); font-size: var(--t-base); color: var(--fg-dim); }
+.ev-before{ font-family: var(--mono); font-size: var(--t-base); color: var(--fg-mute); }
+.ev-after{ font-family: var(--mono); font-size: var(--t-base); color: var(--fg); }
+
+.ev-formula{
+  margin: 10px 0 0; font: 12px/1.5 var(--mono); color: var(--fg-mute);
+  letter-spacing: 0.02em;
+}
+
+.ev-prov{
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  margin-top: 22px;
+}
+.ev-prov code{
+  font: 12px/1.5 var(--mono); color: var(--fg-mute); letter-spacing: 0.02em;
+}
+.ev-hash{ overflow-wrap: anywhere; }
+
+.ev-raw{ margin-top: 14px; }
+.ev-raw > summary{
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 4px 0; cursor: pointer; list-style: none;
+  font: var(--t-xs)/1 var(--mono); letter-spacing: 0.08em;
+  text-transform: none; color: var(--fg-mute);
+}
+.ev-raw > summary::-webkit-details-marker{ display: none; }
+.ev-raw > summary::before{
+  content: '\25B8'; font-size: var(--t-2xs); transition: transform 180ms ease;
+}
+.ev-raw[open] > summary::before{ transform: rotate(90deg); }
+.ev-raw > summary:hover{ color: var(--fg-dim); }
+.ev-raw-body{
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px; margin-top: 12px;
+}
+.ev-raw-col{ display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ev-raw pre{
+  margin: 0; padding: 12px 14px; overflow-x: auto;
+  background: color-mix(in srgb, var(--fg) 3%, transparent);
+  border-radius: var(--r-ctl);
+  font: 12px/1.55 var(--mono); color: var(--fg-dim);
+}
+
+
+/* ---------- a grade, set as type ----------
+   No box, no ring, no fill. Ten pills on one opinion was ten rectangles drawn round one
+   character each; a rating agency sets its rating as the most important word on the page
+   and puts nothing around it. Weight and colour carry the meaning. */
+.grade{
+  font-family: var(--mono); font-weight: 600; line-height: 1;
+  letter-spacing: 0.02em; font-variant-numeric: tabular-nums;
+  color: var(--tone, var(--fg)); white-space: nowrap;
+}
+.grade-sm{ font-size: var(--t-xs); }
+.grade-md{ font-size: var(--t-base); }
+.grade-lg{ font-size: var(--t-lg); }
+.grade-na{ color: var(--fg-mute); }
+
+
+/* The scale gets its own block in the rail, so it is not a footnote under the ratings. */
+.op-box.op-scale{ padding-top: 12px; padding-bottom: 12px; }
+.op-box.op-scale .ladder{ margin-top: 0; }
+
+/* The sheet ends where its content ends. */
+.opinion, .op-page{ flex: 0 0 auto; }
+
+/* Under 1100px the rail is not a rail: it is the next thing you read, in the same order,
+   and nothing about a single column benefits from being pinned. */
+@media (max-width: 1100px){
+  .op-grid{ grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .op-side{ position: static; }
+  .op-page{ padding: 16px; }
+}
+
+
+/* ============================================================================
+   TYPE, ONE STEP UP
+
+   The surface was set for a terminal: a 10px label, an 11px chrome, a 12px figure
+   beside a 44px poster number. Read as a document rather than as a console, that is
+   small — and the smallest of it was carrying the labels, which are the words that say
+   what every figure means. Nothing here changes a layout or buys air with padding: the
+   sizes move, the boxes do not.
+   ============================================================================ */
+
+.kv dd{ font-size: var(--t-base); }
+.kv dt{ font-size: var(--t-2xs); letter-spacing: 0; }
+
+/* Page titles. The facility name was 32px and the verification title 28px, both louder
+   than the document needs; the panel titles were 18px and quieter than it needs. */
+.op-title{ font-size: 24px; }
+.ev-title{ font-size: 24px; }
+.panel-title{ font-size: 22px; }
+
+/* 44px was a poster. These are three figures to be compared, and at 32px the eye takes
+   all three in one go. */
+.ev-num{ font-size: clamp(26px, 3vw, 32px); }
+
+/* Chrome: tabs, the stamp, the picker. 11-12px is a toolbar; this is a desk. */
+.desk{ font-size: 14px; }
+.stamp, .picker-label, .picker-btn{ font-size: 13px; }
+
+/* The exhibit tables are tables. They were set a step under the blotter's cells, which
+   made the two read as different kinds of document on the same page — and it is the
+   exhibits that carry the factor scores a committee argues over. The bullets and the
+   rail prose come with them: they are read, not scanned. */
+.op-tbl{ font-size: var(--t-base); }
+.op-tbl td, .op-says{ font-size: var(--t-base); line-height: 1.4; }
+.op-tbl th{ font-size: var(--t-sm); }
+.op-list li{ font-size: var(--t-base); line-height: 1.5; }
+.op-profile{ font-size: var(--t-base); line-height: 1.5; }
+
+/* No label is tracked like a caption in a museum. */
+.label, .op-h, table.tbl th, .ev-tbl th, .ladder-ends, .kv-note{ letter-spacing: 0; }
+.ev-raw > summary{ letter-spacing: 0.02em; }
+
 @media print{
   @page{ size: A4 portrait; margin: 14mm 13mm; }
+
+  /* The palette, restated for paper.
+     The screen tokens are a cream-on-black system, and they were carried into print
+     untouched: measured against white, the factor names and every figure in the note came
+     out at 1.31:1 — thirty-nine elements at or under AA, which is to say the substance of
+     the opinion printed as a smudge. Remapping the tokens here fixes all of them in one
+     place instead of chasing selectors, and keeps the meanings contract §6 fixes: risk is
+     still red, healthy still green, the correct reading still the accent. Only the
+     luminance moves, because the ground moved. */
+  :root{
+    --fg: #111; --fg-dim: #333; --fg-mute: #555; --fg-idle: #555;
+    --amber: #000; --amber-dim: #444;
+    --ok: #12692a; --warn: #7a5200; --bad: #b00020; --dead: #555;
+    --read-correct: #05527a; --read-naive: #555;
+    --line: #dcdcdc; --line-2: #9a9a9a; --rule-soft: #ececec;
+  }
+
   html, body{ background: #fff !important; color: #111 !important; }
   .topbar, .hints, .feedbar, .wbanner, .ground, .veil, .veil-grain,
   .toaster, [data-sonner-toaster], .desks, .picker, .wallet{ display: none !important; }
   main.page{ padding: 0 !important; }
   .opinion{ gap: 0; max-width: none; }
   .op-page{ background: #fff !important; border: 0; padding: 0; }
+  /* Every panel, not only the opinion sheet. The print palette darkens the text on the
+     assumption the ground went white with it; a panel that kept its dark fill turned that
+     into dark-on-dark. Anything that paints a surface gets the paper. */
+  .panel, .op-box, .ev-raw pre{ background: #fff !important; }
+  .ev-tbl td, .ev-tbl th{ border-bottom-color: #ddd !important; }
+  .ev-field, .ev-before{ color: #555 !important; }
+  .ev-after{ color: #111 !important; }
+  .ev-formula, .ev-prov code, .ev-under{ color: #666 !important; }
   .op-break{ break-before: page; padding-top: 0; }
   .op-title{ color: #000; font-size: 22px; }
   .op-top{ border-bottom-color: #000; }
@@ -778,8 +1176,54 @@ kbd{
   .kv + .kv{ border-top-color: #ddd; }
   .op-says, .op-date, .op-foot{ color: #666 !important; }
   .chip{ border-color: #666 !important; background: none !important; color: #000 !important; }
+  /* On paper the letter is the rating and nothing else needs to say so. */
+  .grade{ color: #000 !important; }
+  .grade-na{ color: #666 !important; }
   .op-grid{ grid-template-columns: minmax(0, 1fr) 62mm; gap: 8mm; }
+
+  /* The letterhead. Hidden on screen, where the topbar already carries the mark. */
+  .op-letterhead{
+    display: flex !important;
+    align-items: center;
+    gap: 7px;
+    margin: 0 0 7mm;
+    padding-bottom: 2.5mm;
+    border-bottom: 0.6pt solid #000;
+  }
+  .op-letterhead img{
+    /* One asset, two grounds. brightness(0) flattens the cream and the gold to black and
+       keeps the shape, so the printed mark is the drawn mark and not a second file to
+       keep in step with the first. */
+    filter: brightness(0);
+  }
+  .op-lh-name{
+    font: 600 12pt/1 var(--mono);
+    letter-spacing: 0.08em; text-transform: uppercase; color: #000;
+  }
+  .op-lh-rule{ flex: 1 1 auto; }
+  .op-lh-kind{
+    font: 8pt/1 var(--mono);
+    letter-spacing: 0.14em; text-transform: uppercase; color: #555;
+  }
+  /* Page two repeats the identity rather than the letterhead: a reader holding one loose
+     sheet should still know what they are holding. */
+  .op-break .op-top.slim{ border-top: 0.6pt solid #000; padding-top: 2.5mm; }
+  .lad-track{ background: #e2e2e2 !important; }
+  .lad-fill{ background: #000 !important; }
+  .lad-fill::after{ background: #000 !important; }
+  .ladder-ends{ color: #666 !important; }
+  .ladder-read{ color: #000 !important; }
+  .ev-raw{ display: none !important; }
+  .ev-title{ color: #000; font-size: 20pt; }
+  .ev-thesis{ color: #222; }
+  .ev-num{ color: #000 !important; font-size: 22pt; }
+  .ev-reported{ color: #555 !important; }
+  .ev-gap{ color: #b00020 !important; }
+  .ev-head::after{ background: #000; }
 }
+
+/* The letterhead is a print artefact and nothing else. */
+.op-letterhead{ display: none; }
 
 /* ---------- the desks that stand without a feed ---------- */
 
@@ -787,7 +1231,7 @@ kbd{
 .slot-big{ display: flex; align-items: baseline; gap: 14px; }
 .slot-dash{ font: 500 56px/1 var(--mono); color: var(--fg-mute); }
 .slot-say{
-  font: var(--t-xs) var(--mono); letter-spacing: 0.12em; text-transform: uppercase;
+  font: var(--t-xs) var(--mono); letter-spacing: 0.12em; text-transform: none;
   color: var(--fg-mute);
 }
 .slot-grid{
@@ -851,7 +1295,7 @@ kbd{
 .dlg-head{ display: block; padding: 0; }
 .dlg-title{
   font: 500 var(--t-sm)/1.2 var(--mono) !important;
-  letter-spacing: 0.14em; text-transform: uppercase; color: var(--amber);
+  letter-spacing: 0.14em; text-transform: none; color: var(--amber);
 }
 .dlg-sub{
   margin-top: 6px; font-size: var(--t-sm); line-height: 1.5; color: var(--fg-dim) !important;
@@ -871,8 +1315,8 @@ kbd{
 .wrow[data-here="true"] .wstate{ color: var(--ok); }
 .wname{ font-family: var(--sans); font-size: var(--t-base); color: var(--fg); }
 .wrow[data-here="false"] .wname{ color: var(--fg-dim); }
-.wnote{ font-size: var(--t-2xs); letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-mute); }
-.wstate{ font-size: var(--t-2xs); letter-spacing: 0.08em; text-transform: uppercase; }
+.wnote{ font-size: var(--t-2xs); letter-spacing: 0.06em; text-transform: none; color: var(--fg-mute); }
+.wstate{ font-size: var(--t-2xs); letter-spacing: 0.08em; text-transform: none; }
 .wrow .wnote, .wrow .wstate{ flex: 0 0 auto; white-space: nowrap; }
 .wrow .wname{ flex: 0 1 auto; white-space: nowrap; }
 
@@ -1103,12 +1547,43 @@ tr.ghost:hover td > *{ transform: none; }
   .topbar{ height: auto; flex-wrap: wrap; gap: 8px; padding: 10px 16px; }
   .topbar .sep{ display: none; }
   .desks{ height: 36px; margin-left: 0; }
+  /* Five desks at desktop padding are 379px wide, which is four more than a 375px phone
+     has. The labels are the one thing on this bar that must stay readable, so the padding
+     gives way instead — and the strip may scroll if a narrower phone still needs it. */
+  .desks{ max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .desks::-webkit-scrollbar{ display: none; }
+  .topbar .desk{ padding: 0 9px; }
   .picker{ flex: 1 0 100%; }
   .picker-label{ max-width: none; }
   .picker-list{ min-width: 0; }
   .hints{ padding: 8px 16px; gap: 12px; }
   /* At this width nothing should be crushed into a column: let rows break. */
   .row{ flex-wrap: wrap; }
+
+  /* iOS zooms the page when it meets text under 16px, which is a layout bug wearing a
+     typography costume. Body clears 16; the desks clear a thumb. */
+  body, .op-sec p, .ev-thesis, .caption, .said{ font-size: 16px; }
+  .op-sec p, .ev-thesis{ line-height: 1.55; }
+  .topbar .desk{ font-size: 14px; }
+
+  /* The blotter keeps the two columns a phone can actually read: which facility, and
+     what it scores. Status, the reported/held pair, the countdown and the outlook are
+     four columns of figures that were arriving as a horizontally-cut table — present but
+     unreadable, which is worse than deferred. They are all on the facility's own desk,
+     one tap away, and that is where a phone should read them. */
+  .blotter table.tbl th:nth-child(n+3),
+  .blotter table.tbl td:nth-child(n+3){ display: none; }
+  .blotter table.tbl th:nth-child(2),
+  .blotter table.tbl td:nth-child(2){ text-align: right; }
+  .blotter .tbl-scroll{ overflow-x: visible; background: none; }
+  /* Cells stop refusing to wrap. Two columns still overflowed by 81px because the
+     facility name is one unbreakable string at desktop; on a phone the name takes the
+     lines it needs and the score stays on screen, which is the whole point of cutting to
+     two columns. */
+  .blotter table.tbl td, .blotter table.tbl th{ white-space: normal; }
+  .blotter table.tbl td:first-child{ width: auto; }
+  .blotter table.tbl td, .blotter table.tbl th{ padding: 0 6px; }
+  .blotter table.tbl td{ height: auto; padding-top: 7px; padding-bottom: 7px; }
 }
 
 /* S3 owns one viewport: trim the chrome on that route only. */
@@ -1260,59 +1735,6 @@ tr:hover .chip, .picker-list [data-highlighted] .chip{ transform: translateY(-1p
     font-family: var(--mono);
   }
 }
-/* ---------------------------------------------------------------------------
-   VERIFICATION — the split reading, and the metadata behind it.
-
-   Contract §6 fixes the two reading colours and their line styles: the naive
-   reading is muted and DASHED, the correct reading is accent and SOLID. Those
-   are meanings, not decoration, so they are reused here exactly as the figures
-   screens use them and are never restyled locally.
-
-   The figures are set at --t-xxl because this panel is read from the back of a
-   room, not from a desk. Everything else on the screen is deliberately quiet so
-   that the empty object below is the thing the eye lands on.
---------------------------------------------------------------------------- */
-.race{
-  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px; margin-top: 16px;
-}
-@media (max-width: 720px){ .race{ grid-template-columns: minmax(0, 1fr); } }
-
-.race-pane{ padding: 16px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg-1); }
-.race-naive{ border-style: dashed; border-color: var(--read-naive); }
-.race-correct{ border-style: solid; border-color: var(--read-correct); }
-
-.race-hd{
-  font-size: var(--t-sm); color: var(--fg-mute);
-  letter-spacing: .04em; margin-bottom: 10px;
-}
-.race-val{
-  font-family: var(--mono); font-size: var(--t-xxl); line-height: 1;
-  font-variant-numeric: tabular-nums; letter-spacing: -.02em;
-}
-.race-naive   .race-val{ color: var(--read-naive); }
-.race-correct .race-val{ color: var(--read-correct); }
-.race-formula{ font-family: var(--mono); font-size: var(--t-sm); color: var(--fg-mute); margin-top: 10px; }
-.race-note{ font-size: var(--t-sm); color: var(--fg-dim); margin-top: 6px; }
-.race-naive   .race-note{ color: var(--bad); }
-.race-correct .race-note{ color: var(--ok); }
-
-.race-gap{ margin-top: 14px; font-size: var(--t-sm); color: var(--fg-dim); }
-.race-gap b{ font-family: var(--mono); color: var(--fg); font-size: var(--t-md); }
-
-/* The empty object is the evidence. It gets the room. */
-.ev-diff{ display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; margin-top: 14px; }
-.ev-lbl{ font-family: var(--mono); font-size: var(--t-sm); color: var(--fg-mute); margin-top: 8px; }
-.ev-code{
-  font-family: var(--mono); font-size: var(--t-md); color: var(--fg);
-  background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
-  padding: 14px; margin: 0; overflow-x: auto; white-space: pre;
-}
-.ev-empty{
-  color: var(--bad); border-color: var(--bad);
-  font-size: var(--t-xl); text-align: center; padding: 26px 14px;
-}
-.ev-verdict{ margin-top: 12px; }
 /* A 64-character hash must wrap rather than widen the panel and scroll the page. */
 .ev-hash{ font-family: var(--mono); word-break: break-all; }
 
