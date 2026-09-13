@@ -145,12 +145,25 @@ function EventPlaceholder() {
         <span className="slot-dash">—</span>
         <span className="slot-say">no scheduled event on file</span>
       </div>
-      <ol className="beat-list">
-        <li><span className="num mute">·</span> scheduled payment</li>
-        <li><span className="num mute">·</span> period boundary</li>
-        <li><span className="num mute">·</span> redemption date</li>
-        <li><span className="num mute">·</span> review date</li>
-      </ol>
+      {/* The calendar's own shape, held open. This was four bullets with a dot in front
+          of each, which looked like a feature list rather than like the table figures
+          arrive into. Same two columns as the real calendar; the dates are em-dashes
+          because there are no dates. */}
+      <div className="tbl-scroll">
+        <table className="tbl">
+          <thead>
+            <tr><th>Event</th><th className="rt">Date</th></tr>
+          </thead>
+          <tbody>
+            {['Scheduled payment', 'Period boundary', 'Redemption date', 'Review date'].map(k => (
+              <tr key={k}>
+                <td className="mute">{k}</td>
+                <td className="rt num mute">—</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   )
 }
@@ -264,19 +277,12 @@ function Desk() {
     if (path === '/') {
       if (!vaults.data) {
         return (
-          <div className={vaults.fails > 0 ? 'deskgrid down' : ''}>
-            {vaults.fails > 0 && (
-              <Note
-                heading="Figures withheld" tone="var(--bad)"
-                said={<>The five facilities are on file. No figure is shown until one is received.</>}
-                facts={[['Last Received', vaults.ageMs > 0 ? `${Math.round(vaults.ageMs / 1000)}s ago` : 'not yet']]}
-              />
-            )}
-            <Portfolio
-              vaults={[]} receivedAt={0} tick={tick}
-              onOpen={() => navigate('/facility', null)}
-            />
-          </div>
+          // No banner. The chrome reads "As of — Withheld" already, and a red heading
+          // beside a blotter of em-dashes was the same fact a second time in 36px.
+          <Portfolio
+            vaults={[]} receivedAt={0} tick={tick}
+            onOpen={() => navigate('/facility', null)}
+          />
         )
       }
       return (
@@ -339,16 +345,9 @@ function Desk() {
           />
         )
       }
-      return (
-        <div className="deskgrid">
-          <EventPlaceholder />
-          <Note
-            heading="Figures withheld" tone="var(--bad)"
-            said={<>This facility is on file. No figure is shown until one is received.</>}
-            facts={[]}
-          />
-        </div>
-      )
+      // Same reasoning as the facility desk: the chrome says it once, and the calendar
+      // shows the shape the dates will arrive into.
+      return <EventPlaceholder />
     }
 
     if (path === '/facility') {
@@ -386,7 +385,6 @@ function Desk() {
       {dressed && (
         <div className="ground" aria-hidden style={{ ['--poll' as string]: POLL_MS + 'ms' }}>
           <span className="g-vignette" />
-          <span className="g-sweep" />
         </div>
       )}
       {dressed && <>

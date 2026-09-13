@@ -14,23 +14,88 @@ import type { IndexerRace } from '../lib/types'
  * here, and a field the capture does not carry prints an em-dash.
  */
 
+/**
+ * The protocol documentation. It sits on this desk and nowhere else: it is written for
+ * the same reader this screen is, it leaves the application, and a credit analyst reading
+ * a rating note has no use for it in their chrome. Overridable so a preview build can
+ * point at a local copy.
+ */
+const DOCS_URL = import.meta.env.VITE_DOCS_URL
+  ?? 'https://ormaprotocol.mintlify.site/'
+
+function DocsLink() {
+  return (
+    <a className="docs-link" href={DOCS_URL} target="_blank" rel="noreferrer noopener">
+      Protocol documentation
+      <svg viewBox="0 0 12 12" aria-hidden="true">
+        <path d="M4.5 2.5h5v5M9.5 2.5 4 8M8 9.5H2.5V4" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </a>
+  )
+}
+
 /** Only what a value needs to be legible in a column. Never reformats the digits. */
 function cell(v: unknown): string {
   if (v === null || v === undefined || v === '') return '—'
   return String(v)
 }
 
+/**
+ * The same page, with nothing in it.
+ *
+ * A record that has not arrived used to collapse this desk to one sentence in a panel,
+ * which told a reader nothing about what would be there when it did. The claim, the three
+ * figures and the table are the page; withheld, they read em-dash. The figures are the
+ * only three slots on this desk and they are held open whether or not the capture is in.
+ */
+function EvidenceSkeleton({ name }: { name?: string }) {
+  return (
+    <div className="stack">
+      <section className="panel ev">
+        <header className="ev-head">
+          <span className="label">Evidence</span>
+          <h2 className="ev-title">{name ?? 'Recognised loss'}</h2>
+          <p className="ev-thesis">
+            The first recognised loss does not show up on a metadata diff.
+          </p>
+        </header>
+
+        <div className="ev-band">
+          {['Reported', 'Held', 'Gap'].map(k => (
+            <div className="ev-fig" key={k}>
+              <span className="label">{k}</span>
+              <b className="ev-num ev-reported">—</b>
+            </div>
+          ))}
+        </div>
+        <p className="ev-under">No record has been received.</p>
+
+        <table className="tbl ev-tbl">
+          <thead>
+            <tr><th>Field</th><th>Before</th><th>After</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td className="ev-field">—</td>
+              <td className="ev-before">—</td>
+              <td className="rt ev-after">—</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div className="ev-prov">
+          <span className="label">Recorded</span>
+          <code>—</code>
+          <span className="spacer" />
+          <DocsLink />
+        </div>
+      </section>
+    </div>
+  )
+}
+
 export function Evidence({ d, name }: { d: IndexerRace | null; name?: string }) {
-  if (!d) {
-    return (
-      <div className="stack">
-        <section className="panel">
-          <h2 className="panel-title">Evidence</h2>
-          <p className="caption meth">No record has been received.</p>
-        </section>
-      </div>
-    )
-  }
+  if (!d) return <EvidenceSkeleton name={name} />
 
   const prev = d.vaultNode.previousFields ?? {}
   const final = d.vaultNode.finalFields ?? {}
@@ -100,6 +165,8 @@ export function Evidence({ d, name }: { d: IndexerRace | null; name?: string }) 
           <code>{d.transactionResult}</code>
           {d.transactionHash && <code className="ev-hash">{d.transactionHash}</code>}
           {d.capturedAt && <code>{d.capturedAt}</code>}
+          <span className="spacer" />
+          <DocsLink />
         </div>
 
         {/* Folded by default. The transcription above is the argument; this is the receipt,

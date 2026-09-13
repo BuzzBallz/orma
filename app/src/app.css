@@ -246,13 +246,11 @@ body{
 /* The sweep IS the poll. Its duration is bound to POLL_MS from App.tsx — it is not a
    decorative loop that happens to look busy, it is the three seconds going by. */
 @keyframes sweep { from { transform: translateY(-1px) } to { transform: translateY(100vh) } }
-.g-sweep{
-  position: absolute; left: 0; right: 0; top: 0; height: 1px;
-  background: linear-gradient(to right, transparent,
-    color-mix(in srgb, var(--amber) 30%, transparent) 16%,
-    color-mix(in srgb, var(--amber) 30%, transparent) 84%, transparent);
-  animation: sweep var(--poll, 3000ms) linear infinite;
-}
+/* The amber sweep is gone. A 1px gold rule crossed the whole surface once per poll,
+   which at rest read as a stray hairline lying across the page at whatever height the
+   animation had reached. The stamp's own 24px rule says the same thing, in the corner
+   where a reader is already looking for it, and says it about the poll rather than
+   about the page. */
 
 /* Content stacks above the ground. topbar (z-20) and the status line (z-30) already do. */
 main.page, .feedbar{ position: relative; z-index: 1; }
@@ -1519,6 +1517,25 @@ tr.ghost:hover td > *{ transform: none; }
   .hints{ padding: 8px 16px; gap: 12px; }
   /* At this width nothing should be crushed into a column: let rows break. */
   .row{ flex-wrap: wrap; }
+
+  /* The blotter keeps the two columns a phone can actually read: which facility, and
+     what it scores. Status, the reported/held pair, the countdown and the outlook are
+     four columns of figures that were arriving as a horizontally-cut table — present but
+     unreadable, which is worse than deferred. They are all on the facility's own desk,
+     one tap away, and that is where a phone should read them. */
+  .blotter table.tbl th:nth-child(n+3),
+  .blotter table.tbl td:nth-child(n+3){ display: none; }
+  .blotter table.tbl th:nth-child(2),
+  .blotter table.tbl td:nth-child(2){ text-align: right; }
+  .blotter .tbl-scroll{ overflow-x: visible; background: none; }
+  /* Cells stop refusing to wrap. Two columns still overflowed by 81px because the
+     facility name is one unbreakable string at desktop; on a phone the name takes the
+     lines it needs and the score stays on screen, which is the whole point of cutting to
+     two columns. */
+  .blotter table.tbl td, .blotter table.tbl th{ white-space: normal; }
+  .blotter table.tbl td:first-child{ width: auto; }
+  .blotter table.tbl td, .blotter table.tbl th{ padding: 0 6px; }
+  .blotter table.tbl td{ height: auto; padding-top: 7px; padding-bottom: 7px; }
 }
 
 /* S3 owns one viewport: trim the chrome on that route only. */
