@@ -242,6 +242,25 @@ tutorial. `lendingSetup.js` creates an open-ended vault, `submitAndWait` does no
 are currently un-followable. The directory holds the diff, the ready-to-paste PR body, a full run log, the
 before and after scripts, and the upstream sources it was taken from.
 
+### `paper/`
+
+`orma-paper.pdf` is the technical paper, fourteen pages, compiled from `orma-paper.tex`. It states the
+arithmetic the protocol runs on so a reader can check it rather than read JavaScript: the two net asset
+value readings and why the naive one is not merely lazy, the cover liquidation formula and its three
+non-obvious properties, and the ordering result as a theorem with its proof. Every measured figure in it
+was read from live Devnet during the event, and every claim carries a transaction hash.
+
+### `documentation/`
+
+The protocol documentation, ten pages of Mintlify MDX plus its configuration. `build.mjs` renders the same
+source into a static site and `deploy.sh` publishes it, so the pages live at
+https://frytegg.github.io/orma/ without a Mintlify account.
+
+### `deck/`
+
+`content.md` is the ten-slide presentation, timed to four minutes, and `build.mjs` turns it into a
+self-contained deck that opens in a browser and prints to PDF. No slide toolchain to install.
+
 ### `FEEDBACK.md` and `FEEDBACK-APPENDIX.md`
 
 `FEEDBACK.md` is the developer feedback report: what we set out to build, the wall we hit first, what it
