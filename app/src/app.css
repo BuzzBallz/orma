@@ -877,3 +877,36 @@ main:focus{ outline: none; }
   .btn, .picker-btn, .waddr, .menu-btn, .menu-x, .frow, .picker-btn .chev{ transition: none; }
   .btn:active:not(:disabled), .picker-btn:active:not(:disabled), .waddr:active, .menu-btn:active, .menu-x:active, .frow:active{ transform: none; }
 }
+
+/* Surfaces. Menus grow out of the control that opened them; the sign-in dialog settles
+   in place on a desk, and on a phone rises from the edge it leaves by. Radix only waits
+   for an exit that is a CSS animation, hence keyframes here; none of these is opened
+   twice a second. */
+@keyframes fade-in{ from{ opacity: 0; } }
+@keyframes fade-out{ to{ opacity: 0; } }
+@keyframes pop-in{ from{ opacity: 0; transform: scale(.97); } }
+@keyframes pop-out{ to{ opacity: 0; transform: scale(.97); } }
+@keyframes sheet-in{ from{ transform: translateY(100%); } }
+@keyframes sheet-out{ to{ transform: translateY(100%); } }
+.picker-list[data-state="open"]{ animation: pop-in 160ms var(--ease-out); }
+.picker-list[data-state="closed"]{ animation: pop-out 120ms var(--ease-out); }
+.tip[data-state="delayed-open"]{ animation: pop-in 125ms var(--ease-out); }
+.tip[data-state="instant-open"]{ animation: none; }
+.tip[data-state="closed"]{ animation: fade-out 100ms var(--ease-out); }
+[data-slot="dialog-overlay"][data-state="open"]{ animation: fade-in 200ms var(--ease-out); }
+[data-slot="dialog-overlay"][data-state="closed"]{ animation: fade-out 140ms var(--ease-out); }
+.dlg[data-state="open"]{ animation: pop-in 200ms var(--ease-out); }
+.dlg[data-state="closed"]{ animation: fade-out 140ms var(--ease-out); }
+/* The phone menu is how every desk is reached there, so it barely animates. */
+.menu-sheet[data-state="open"]{ animation: fade-in 120ms var(--ease-out); }
+.menu-sheet[data-state="closed"]{ animation: fade-out 100ms var(--ease-out); }
+@media (max-width: 760px){
+  .dlg[data-state="open"]{ animation: sheet-in 300ms var(--ease-drawer); }
+  .dlg[data-state="closed"]{ animation: sheet-out 200ms var(--ease-out); }
+}
+@media (prefers-reduced-motion: reduce){
+  .picker-list[data-state="open"], .tip[data-state="delayed-open"]{ animation: fade-in 120ms var(--ease-out); }
+  .picker-list[data-state="closed"]{ animation: fade-out 100ms var(--ease-out); }
+  .dlg[data-state="open"]{ animation: fade-in 150ms var(--ease-out); }
+  .dlg[data-state="closed"]{ animation: fade-out 120ms var(--ease-out); }
+}
