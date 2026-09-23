@@ -55,6 +55,11 @@ window.uiAudit = async function uiAudit(opts = {}) {
   // evidence. So it is exempt from the vocabulary check and from nothing else: layout,
   // a11y, contrast, motion and overflow all still apply to it.
   const ANALYST_SCREENS = (p) => p !== '/evidence'
+  // The same holds for three exhibits of the credit opinion, and for nothing else on it:
+  // what the units declare (5), the admission chain the ledger enforced (6) and the score
+  // as the object an explorer shows (7). They are the proof, and they stay checkable only
+  // in the protocol's own names. Exhibits 3 and 4 are the analyst's.
+  const PROOF_EXHIBITS = /^Exhibit [567]\b/
 
   // ---------------------------------------------------------------- layout --
   if (run('layout')) {
@@ -86,10 +91,18 @@ window.uiAudit = async function uiAudit(opts = {}) {
         'attempts', 'still asking', 'on watch', 'hackathon', 'methodology note',
       ]
       if (ANALYST_SCREENS(path)) {
+        const proof = [...document.querySelectorAll('details.exh')]
+          .filter(d => PROOF_EXHIBITS.test(d.querySelector('.exh-title')?.textContent ?? ''))
+        proof.forEach(d => { d.hidden = true })          // innerText leaves out what is not drawn
         const seen = document.body.innerText.toLowerCase() + ' ' + location.pathname.toLowerCase()
+        proof.forEach(d => { d.hidden = false })
         const found = BANNED.filter(wd => seen.includes(wd))
         record('consistency', `${label} · no word outside the reader's vocabulary`,
           found.length === 0, found.length ? found.join(', ') : `${BANNED.length} terms checked, none present`)
+        if (proof.length) {
+          record('consistency', `${label} · exhibits in the engineering register, by design`,
+            true, proof.map(d => d.querySelector('.exh-title').textContent.split(' · ')[0]).join(', '))
+        }
       } else {
         // Assert the exemption is narrow: the engineering register may appear HERE and
         // must never leak onto a screen an analyst reads.
