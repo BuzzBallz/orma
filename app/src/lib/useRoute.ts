@@ -1,7 +1,18 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type MouseEvent } from 'react'
 
 export type RoutePath = '/' | '/facility' | '/event' | '/methodology' | '/evidence'
 const ROUTES: RoutePath[] = ['/', '/facility', '/event', '/methodology', '/evidence']
+
+// 'Evidence' last, and named for what it proves rather than for how it works: it is the
+// only desk addressed to an engineer, and it should not be the first thing an analyst
+// reaches for.
+export const DESKS: [RoutePath, string][] = [
+  ['/', 'Portfolio'], ['/facility', 'Facility'], ['/event', 'Event'], ['/methodology', 'Methodology'],
+  ['/evidence', 'Evidence'],
+]
+
+/** Protocol documentation. Overridable so a preview build can point at its own copy. */
+export const DOCS_URL: string = import.meta.env.VITE_DOCS_URL ?? 'https://buzzballz.github.io/orma/'
 
 /** Older links keep working; the address bar is rewritten to the current wording. */
 const MOVED: Record<string, RoutePath> = {
@@ -29,6 +40,21 @@ function read(): { path: RoutePath; vaultId: string | null } {
   return { path: known ? (raw as RoutePath) : '/', vaultId: readId() }
 }
 
+/** The address a desk link points at: the same one `navigate` pushes. */
+export function hrefFor(path: RoutePath, vaultId: string | null): string {
+  return path + (vaultId && path !== '/' ? '?facility=' + vaultId : '')
+}
+
+/**
+ * Links are real links, so a new tab, a copied address and a middle click all work. A
+ * plain left click stays in the page; anything with a modifier is left to the browser.
+ */
+export function follow(e: MouseEvent, go: () => void) {
+  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+  e.preventDefault()
+  go()
+}
+
 export function useRoute() {
   const [route, setRoute] = useState(read)
 
@@ -39,9 +65,7 @@ export function useRoute() {
   }, [])
 
   const navigate = useCallback((path: RoutePath, vaultId?: string | null) => {
-    const id = vaultId === undefined ? readId() : vaultId
-    const url = path + (id && path !== '/' ? '?facility=' + id : '')
-    history.pushState(null, '', url)
+    history.pushState(null, '', hrefFor(path, vaultId === undefined ? readId() : vaultId))
     setRoute(read())
   }, [])
 

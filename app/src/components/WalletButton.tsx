@@ -1,7 +1,5 @@
 import { useState } from 'react'
-import { Check, Copy, LogOut, UserRound } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Check, Copy, LogOut } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -10,56 +8,47 @@ import {
 import { toast } from 'sonner'
 import { useWallet } from '../lib/wallet'
 import { shortAddress } from '../lib/xrpl-address'
-import { SignInDialog } from './WalletDialog'
 
 /**
  * Top right, and deliberately quiet. Nothing on these pages is behind it: signing in
- * records who is reading, and every figure is shown either way.
+ * records who is reading, and every figure is shown either way. The dialog it opens lives
+ * with the masthead, so the phone menu can close itself and still open it.
  */
-export function SignInButton() {
+export function SignInButton({ onOpen }: { onOpen: () => void }) {
   const { state, disconnect, prefetch } = useWallet()
-  const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
 
   if (state.status !== 'connected') {
     return (
-      <>
-        <Button
-          variant="outline" size="xs" className="btn-term btn-press"
-          onMouseEnter={prefetch}
-          onFocus={prefetch}
-          onClick={() => { prefetch(); setOpen(true) }}
-        >
-          <UserRound size={12} strokeWidth={2.25} /> Sign In
-        </Button>
-        <SignInDialog open={open} onOpenChange={setOpen} />
-      </>
+      <button
+        type="button" className="lnk lnk-plain"
+        onMouseEnter={prefetch}
+        onFocus={prefetch}
+        onClick={() => { prefetch(); onOpen() }}
+      >
+        Sign In
+      </button>
     )
   }
 
   const label = shortAddress(state.address)
   return (
     <span className="wallet" data-picker onKeyDown={e => e.stopPropagation()}>
-      <Badge variant="outline" className="pill wpill" style={{ ['--pill-tone' as string]: 'var(--ok)' }}>
-        <span className="dot" />
-        {state.via === 'read-only' ? 'view only' : 'signed in'}
-      </Badge>
+      <span className="wpill">{state.via === 'read-only' ? 'View only' : 'Signed in'}</span>
 
       <DropdownMenu>
         <Tooltip>
           <TooltipTrigger asChild>
-            <DropdownMenuTrigger className="picker-btn waddr">
-              <span className="num">{label}</span>
-            </DropdownMenuTrigger>
+            <DropdownMenuTrigger className="waddr">{label}</DropdownMenuTrigger>
           </TooltipTrigger>
           <TooltipContent className="tip" side="bottom">{state.address}</TooltipContent>
         </Tooltip>
 
-        <DropdownMenuContent align="end" sideOffset={6} data-picker className="picker-list">
-          <DropdownMenuLabel className="label">
-            {state.via === 'read-only' ? 'view only' : 'session'}
+        <DropdownMenuContent align="end" sideOffset={6} data-picker className="picker-list wallet-menu">
+          <DropdownMenuLabel className="picker-head">
+            {state.via === 'read-only' ? 'View only' : 'Session'}
           </DropdownMenuLabel>
-          <DropdownMenuSeparator />
+          <DropdownMenuSeparator className="picker-sep" />
           <DropdownMenuItem
             onSelect={() => {
               navigator.clipboard?.writeText(state.address).then(() => {
@@ -68,11 +57,11 @@ export function SignInButton() {
               }, () => toast.error('Could not reach the clipboard'))
             }}
           >
-            {copied ? <Check size={12} strokeWidth={2.5} /> : <Copy size={12} strokeWidth={2.25} />}
-            copy reference
+            {copied ? <Check size={14} strokeWidth={2} /> : <Copy size={14} strokeWidth={1.75} />}
+            Copy reference
           </DropdownMenuItem>
           <DropdownMenuItem data-danger onSelect={disconnect}>
-            <LogOut size={12} strokeWidth={2.25} /> sign out
+            <LogOut size={14} strokeWidth={1.75} /> Sign out
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
