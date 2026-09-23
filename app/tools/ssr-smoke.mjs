@@ -40,8 +40,11 @@ if (!race) {
   const { Evidence } = await import('../src/screens/Evidence.tsx')
   const html = renderToString(createElement(Evidence, { d: race }))
 
+  // The screen groups thousands ("1 961 bp"), so the digits are looked for with the
+  // spaces taken out: the check follows the page, never the other way round.
+  const flat = html.replace(/\s/g, '')
   for (const m of [race.readings.naive.value, race.readings.correct.value, String(race.readings.divergenceBps)]) {
-    const ok = html.includes(m)
+    const ok = flat.includes(m)
     if (!ok) bad++
     console.log('  ' + (ok ? 'ok  ' : 'MISS') + ' ' + m)
   }
