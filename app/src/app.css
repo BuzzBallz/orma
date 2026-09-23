@@ -851,3 +851,29 @@ main:focus{ outline: none; }
   .op-letterhead{ display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font: 600 14px/1 var(--font-serif); }
   .op-lh-rule{ flex: 1; border-top: 1px solid #000; }
 }
+
+/* ============================================================
+   MOTION — transform and opacity only; reduced motion keeps the fades
+   ============================================================ */
+
+/* Feedback. A press answers the finger; a figure that changed under the reader says so
+   once. All transitions, so a second press or a second change retargets from wherever
+   the first one got to instead of restarting. */
+.btn, .picker-btn, .waddr, .menu-btn, .menu-x{ transition: transform 160ms var(--ease-out); }
+.btn:active:not(:disabled), .picker-btn:active:not(:disabled), .waddr:active, .menu-btn:active, .menu-x:active{ transform: scale(.97); transition-duration: 120ms; }
+.picker-btn .chev{ transition: transform 200ms var(--ease-out); }
+.frow::before{ transition: opacity 120ms ease; }
+@media (max-width: 1099px){
+  .frow{ transition: transform 160ms var(--ease-out); }
+  .frow:active{ transform: scale(.98); transition-duration: 120ms; }
+}
+/* A row whose figures moved: the overlay is set at once, then decays. */
+.frow::after{ transition: opacity 900ms var(--ease-out); }
+.frow.flash::after{ opacity: .16; transition-duration: 0ms; }
+/* A figure is keyed on its value, so a new one mounts and fades in; no counting up. */
+.kf-fig, .op-held .t-fig-display, .feedbar, .wbanner{ transition: opacity 200ms var(--ease-out); }
+@starting-style{ .kf-fig, .op-held .t-fig-display, .feedbar, .wbanner{ opacity: 0; } }
+@media (prefers-reduced-motion: reduce){
+  .btn, .picker-btn, .waddr, .menu-btn, .menu-x, .frow, .picker-btn .chev{ transition: none; }
+  .btn:active:not(:disabled), .picker-btn:active:not(:disabled), .waddr:active, .menu-btn:active, .menu-x:active, .frow:active{ transform: none; }
+}

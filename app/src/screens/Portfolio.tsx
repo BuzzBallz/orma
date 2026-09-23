@@ -56,8 +56,8 @@ function KeyFigures({ v, asOf, onOpen }: {
 
 /** One facility: a table row on a wide screen, a card on a phone. Same link either way. */
 function Row({ v, onOpen }: { v: VaultRow; onOpen: (vaultId: string) => void }) {
-  const gapMoved = useFlash(v.navDivergenceBps, 1200)
-  const navMoved = useFlash(v.navCorrect, 1200)
+  const gapMoved = useFlash(v.navDivergenceBps)
+  const navMoved = useFlash(v.navCorrect)
   const n = v.loanCount
   return (
     <li>
