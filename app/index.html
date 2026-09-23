@@ -7,7 +7,10 @@
          screenshotted the page instead. Full-bleed square on the brand ground —
          Apple rounds the corners itself, so rounding them here would double up. -->
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover lets the safe-area insets in the stylesheet mean something;
+         resizes-content makes an Android keyboard push the sign-in sheet up, as iOS does. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="color-scheme" content="light dark" />
     <title>Orma — credit opinions</title>
     <meta name="description" content="Internal credit scores and opinions on lending facilities, from figures supplied by the calculation agent." />
 

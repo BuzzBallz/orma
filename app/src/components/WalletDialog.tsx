@@ -93,7 +93,7 @@ export function SignInDialog({ open, onOpenChange }: {
           <div className="field">
             <label htmlFor="ro-addr">Account reference</label>
             <input
-              id="ro-addr" spellCheck={false} autoComplete="off" autoCapitalize="off"
+              id="ro-addr" spellCheck={false} autoComplete="off" autoCapitalize="off" autoCorrect="off" enterKeyHint="go"
               aria-invalid={error ? true : undefined} aria-describedby="ro-note"
               value={paste} onChange={e => { setPaste(e.target.value); setError(null) }}
             />
