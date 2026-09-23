@@ -277,20 +277,12 @@ function Desk() {
     }
 
     if (path === '/') {
-      if (!vaults.data) {
-        return (
-          // No banner. The chrome reads "As of — Withheld" already, and a red heading
-          // beside a blotter of em-dashes was the same fact a second time in 36px.
-          <Portfolio
-            vaults={[]} receivedAt={0} tick={tick}
-            onOpen={() => go('/facility', null)}
-          />
-        )
-      }
+      // With nothing received the same page is drawn, reading em-dash; the masthead
+      // already says the figures are withheld.
       return (
         <Portfolio
-          vaults={rows} receivedAt={vaults.receivedAt} tick={tick}
-          onOpen={id => go('/facility', id)}
+          vaults={rows} asOf={vaults.data?.serverTime ?? null}
+          onOpen={id => go('/facility', id)} onNavigate={go}
         />
       )
     }

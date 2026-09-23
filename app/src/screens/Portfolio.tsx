@@ -1,187 +1,145 @@
-import { useState } from 'react'
-import { RotateCcw } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import type { VaultRow } from '../lib/types'
 import { GradeLetter } from '../components/GradeLetter'
-import { Countdown } from '../components/Countdown'
-import { gradeTone, gradeIndex, GRADE_LADDER } from '../lib/grades'
+import { FacilityPicker } from '../components/VaultPicker'
+import { Scale } from '../components/Scale'
+import { GRADE_LADDER, gradeIndex } from '../lib/grades'
 import { useFlash } from '../lib/useFlash'
 import { facilityName, outlookOf } from '../lib/credit'
-import { Button } from '@/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table'
+import { fmtIso } from '../lib/format'
+import { follow, hrefFor, type RoutePath } from '../lib/useRoute'
 
-type SortKey = 'gradeNumeric' | 'label' | 'phase' | 'navDivergenceBps' | 'secondsToRedemption' | 'trend'
-type Sort = { key: SortKey; asc: boolean }
-
-/** Weakest internal score first — the order the credit committee reads in. */
-const DEFAULT_SORT: Sort = { key: 'gradeNumeric', asc: true }
-
-const RAIL: Record<string, string | undefined> = {
-  '--bad': 'row-bad', '--warn': 'row-warn', '--ok': undefined, '--fg-dim': undefined,
+/** No gap, a small one, a material one. Only a gap is ever coloured. */
+function gapTone(bps: number): string {
+  if (bps === 0) return 'mute'
+  if (bps < 100) return 'watch'
+  return 'loss'
 }
 
-function gapTone(bps: number): string | undefined {
-  if (bps === 0) return 'var(--fg-dim)'
-  if (bps < 100) return 'var(--warn)'
-  return 'var(--bad)'
-}
-
-function Th({ k, label, rt, sort, onSort }: {
-  k: SortKey; label: string; rt?: boolean; sort: Sort; onSort: (k: SortKey) => void
+/**
+ * The key figures, for the facility whose reported and held values sit furthest apart:
+ * the gap is the reason this service exists, so the widest one is the first thing shown.
+ * With nothing on file, the same block reads em-dash throughout.
+ */
+function KeyFigures({ v, asOf, onOpen }: {
+  v: VaultRow | null; asOf: string | null; onOpen: (vaultId: string) => void
 }) {
-  const on = sort.key === k
+  const i = v ? gradeIndex(v.grade) : -1
   return (
-    <TableHead
-      className={rt ? 'rt' : undefined}
-      style={{ color: on ? 'var(--amber)' : undefined }}
-      tabIndex={0}
-      aria-sort={on ? (sort.asc ? 'ascending' : 'descending') : 'none'}
-      onClick={() => onSort(k)}
-      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSort(k) } }}
-    >{label}{on && <span className="ord">{sort.asc ? '▲' : '▼'}</span>}</TableHead>
+    <section className="kf" aria-label={v ? `Key figures, ${facilityName(v)}` : 'Key figures'}>
+      {v ? (
+        <a className="kf-head" href={hrefFor('/facility', v.vaultId)} onClick={e => follow(e, () => onOpen(v.vaultId))}>
+          <span className="kf-name">{facilityName(v)}</span>
+          <GradeLetter grade={v.grade} size="sm" />
+        </a>
+      ) : (
+        <div className="kf-head"><span className="kf-name mute">—</span></div>
+      )}
+      <span className="kf-k t-label-s mute">Held unit value</span>
+      {/* Keyed on the figure, so a new value fades in once instead of changing in place. */}
+      <span className="kf-fig t-fig-display" key={v?.navCorrect}>{v?.navCorrect ?? '—'}</span>
+      <dl className="kf-rows">
+        <div><dt>Reported unit value</dt><dd className="dim">{v?.navNaive ?? '—'}</dd></div>
+        <div>
+          <dt>Reported vs held</dt>
+          <dd className={v ? gapTone(v.navDivergenceBps) : 'mute'}>{v ? `${v.navDivergenceBps} bps` : '—'}</dd>
+        </div>
+        <div>
+          <dt>Internal Score</dt>
+          <dd>{v && i >= 0 ? <><GradeLetter grade={v.grade} size="sm" /> · {i + 1} of {GRADE_LADDER.length}</> : '—'}</dd>
+        </div>
+      </dl>
+      <span className="kf-stamp t-fig-s mute">As of {asOf ? fmtIso(asOf) : '—'}</span>
+    </section>
   )
 }
 
-function Row({ v, i, receivedAt, tick, onOpen }: {
-  v: VaultRow; i: number; receivedAt: number; tick: number; onOpen: (id: string) => void
-}) {
-  const gapMoved = useFlash(v.navDivergenceBps)
-  const navMoved = useFlash(v.navCorrect)
+/** One facility: a table row on a wide screen, a card on a phone. Same link either way. */
+function Row({ v, onOpen }: { v: VaultRow; onOpen: (vaultId: string) => void }) {
+  const gapMoved = useFlash(v.navDivergenceBps, 1200)
+  const navMoved = useFlash(v.navCorrect, 1200)
+  const n = v.loanCount
   return (
-    <TableRow
-      className={RAIL[gradeTone(v.grade)]}
-      style={{ cursor: 'pointer', ['--i' as string]: i }}
-      tabIndex={0}
-      aria-label={`open ${facilityName(v)}`}
-      onClick={() => onOpen(v.vaultId)}
-      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(v.vaultId) } }}
-    >
-      <TableCell>
-        <span className="inst">
-          <span className="name">{facilityName(v)}</span>
-          <span className="id">
-            {v.loanCount} exposure{v.loanCount === 1 ? '' : 's'} · {v.distressedLoanCount} non-performing
-          </span>
+    <li>
+      <a
+        className={'frow' + (gapMoved || navMoved ? ' flash' : '')}
+        href={hrefFor('/facility', v.vaultId)}
+        onClick={e => follow(e, () => onOpen(v.vaultId))}
+      >
+        <span className="frow-grade"><GradeLetter grade={v.grade} size="xl" /></span>
+        <span className="frow-id">
+          <span className="frow-name">{facilityName(v)}</span>
+          <span className="frow-meta">{n} exposure{n === 1 ? '' : 's'} · {v.distressedLoanCount} non-performing</span>
         </span>
-      </TableCell>
-      <TableCell>
-        <Tooltip>
-          <TooltipTrigger asChild><span><GradeLetter grade={v.grade} /></span></TooltipTrigger>
-          <TooltipContent className="tip" side="right">
-            <b>{v.grade}</b> — step {gradeIndex(v.grade) + 1} of {GRADE_LADDER.length} on the
-            internal scale. AAA is the strongest, D the weakest. The portfolio is ordered
-            weakest first.
-          </TooltipContent>
-        </Tooltip>
-      </TableCell>
-      <TableCell className="mono" style={{ fontSize: 'var(--t-sm)' }}>{v.phase}</TableCell>
-      <TableCell className={'rt' + (navMoved || gapMoved ? ' flash' : '')}>
-        <span className="pair-naive bare">{v.navNaive}</span>
-        <span className="mute"> vs </span>
-        <span className="pair-correct bare">{v.navCorrect}</span>
-        <span className="num" style={{ color: gapTone(v.navDivergenceBps), marginLeft: 10 }}>
-          {v.navDivergenceBps} bps
+        <span className="frow-rh">
+          <span className="rep">{v.navNaive}</span><span className="vs">vs</span><span className="held">{v.navCorrect}</span>
         </span>
-      </TableCell>
-      <TableCell className="rt">
-        <Countdown seconds={v.secondsToRedemption} receivedAt={receivedAt} tick={tick} mode="boundary" />
-      </TableCell>
-      <TableCell className="mono" style={{ fontSize: 'var(--t-sm)' }}>{outlookOf(v.trend)}</TableCell>
-    </TableRow>
+        <span className="frow-held"><span className="k">Held</span><span className="v">{v.navCorrect}</span></span>
+        <span className={'frow-gap ' + gapTone(v.navDivergenceBps)}><span className="k">Gap</span>{v.navDivergenceBps} bps</span>
+        <span className="frow-status">
+          <span className="frow-rep">Reported <span className="v">{v.navNaive}</span></span>
+          <span className="ph-o"><span>{v.phase}</span><span className="o">Outlook {outlookOf(v.trend)}</span></span>
+        </span>
+      </a>
+    </li>
   )
 }
 
 /**
- * The portfolio blotter. Five facilities, weakest internal score first — a credit
- * committee reads the worst name first, and the gap between reported and held value is
- * the reason this note exists.
+ * The portfolio. What the service is, in one line; the widest gap on file; then every
+ * facility, weakest internal score first — a credit committee reads the worst name first.
  */
-export function Portfolio({ vaults, receivedAt, tick, onOpen }: {
-  vaults: VaultRow[]; receivedAt: number; tick: number
+export function Portfolio({ vaults, asOf, onOpen, onNavigate }: {
+  vaults: VaultRow[]; asOf: string | null
   onOpen: (vaultId: string) => void
+  onNavigate: (path: RoutePath) => void
 }) {
-  const withheld = vaults.length === 0
-  const [sort, setSort] = useState<Sort>(DEFAULT_SORT)
-  const sorted = sort.key !== DEFAULT_SORT.key || sort.asc !== DEFAULT_SORT.asc
-
-  const rows = [...vaults].sort((a, b) => {
-    const k = sort.key
-    const va = k === 'label' ? facilityName(a) : a[k]
-    const vb = k === 'label' ? facilityName(b) : b[k]
-    const cmp = typeof va === 'number' && typeof vb === 'number'
-      ? va - vb : String(va).localeCompare(String(vb))
-    return sort.asc ? cmp : -cmp
-  })
-
-  function toggle(k: SortKey) {
-    setSort(s => (s.key === k ? { key: k, asc: !s.asc } : { key: k, asc: true }))
-  }
+  const featured = vaults.length
+    ? vaults.reduce((a, b) => (b.navDivergenceBps > a.navDivergenceBps ? b : a))
+    : null
+  const n = vaults.length
 
   return (
-    <section className="panel blotter">
-      <div className="row" style={{ marginBottom: 16, alignItems: 'baseline' }}>
-        <h2 className="panel-title" style={{ margin: 0 }}>Portfolio</h2>
-        <span className="num mute" style={{ fontSize: 'var(--t-xs)' }}>
-          {withheld ? '' : `${vaults.length} Facilities · Weakest First`}
-        </span>
-        {sorted && (
-          <Button variant="ghost" size="xs" className="btn-term" onClick={() => setSort(DEFAULT_SORT)}>
-            <RotateCcw size={11} strokeWidth={2.25} /> Weakest First
-          </Button>
-        )}
-        <span className="spacer" />
-      </div>
+    <>
+      <section className="wrap hero">
+        <div className="grid12 hero-grid">
+          <div className="hero-copy">
+            <h1 className="t-display-xl">Credit opinions<br /> on lending facilities.</h1>
+            <p className="t-body-l hero-lede">
+              Reported value is what the facility states; held value is what it owns once a
+              recognised loss is taken off.
+            </p>
+            <div className="hero-ctas">
+              <FacilityPicker vaults={vaults} activeVaultId={null} onSelect={onOpen} variant="cta" />
+              <a className="lnk" href="/methodology" onClick={e => follow(e, () => onNavigate('/methodology'))}>
+                Methodology <ArrowRight size={16} strokeWidth={1.75} aria-hidden />
+              </a>
+            </div>
+          </div>
+          <div className="hero-kf">
+            <KeyFigures v={featured} asOf={asOf} onOpen={onOpen} />
+          </div>
+        </div>
+      </section>
 
-      <div className="tbl-scroll">
-        <Table className="tbl">
-          <TableHeader>
-            {withheld ? (
-              /* The same six columns as a populated blotter. A withheld table that drops
-                 to four reads as a different document, and the reader is left wondering
-                 what the other two said. Same shape, nothing in it. */
-              <TableRow>
-                <TableHead>Facility</TableHead>
-                <TableHead>Internal Score</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="rt">Reported vs Held</TableHead>
-                <TableHead className="rt">Next Event</TableHead>
-                <TableHead>Outlook</TableHead>
-              </TableRow>
-            ) : (
-              <TableRow>
-                <Th k="label" label="Facility" sort={sort} onSort={toggle} />
-                <Th k="gradeNumeric" label="Internal Score" sort={sort} onSort={toggle} />
-                <Th k="phase" label="Status" sort={sort} onSort={toggle} />
-                <Th k="navDivergenceBps" label="Reported vs Held" rt sort={sort} onSort={toggle} />
-                <Th k="secondsToRedemption" label="Next Event" rt sort={sort} onSort={toggle} />
-                <Th k="trend" label="Outlook" sort={sort} onSort={toggle} />
-              </TableRow>
-            )}
-          </TableHeader>
-          <TableBody>
-            {rows.map((v, i) => (
-              <Row key={v.vaultId} v={v} i={i} receivedAt={receivedAt} tick={tick} onOpen={onOpen} />
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <section className="wrap">
+        <Scale grade={featured?.grade} label={false} />
+      </section>
 
-      {/* No roster, no rows. The blotter used to hold five lines open, captioned
-          "Facility 1" through "Facility 5" — a number nobody had sent, on a screen whose
-          whole argument is that a reported figure and a held figure are not the same
-          thing. The columns stay, so a reader can see the shape figures arrive into, and
-          the line below says what is true: nothing is on file yet. */}
-      {withheld ? (
-        <p className="caption blotter-say">No facility is on file yet.</p>
-      ) : (
-        <p className="caption blotter-say">
-          Reported value is what the facility states; held value is what it owns once a
-          recognised loss is taken off.
-        </p>
-      )}
-
-    </section>
+      <section className="wrap book" aria-labelledby="book-title">
+        <div className="book-head">
+          <h2 className="t-display-l" id="book-title">Portfolio</h2>
+          {n > 0 && <span className="t-body-s mute">{n} Facilit{n === 1 ? 'y' : 'ies'} · Weakest First</span>}
+        </div>
+        <div className="book-cols" aria-hidden>
+          <span>Internal Score</span><span>Facility</span>
+          <span className="rt">Reported vs Held</span><span className="rt">Gap</span><span>Status</span>
+        </div>
+        {n > 0
+          ? <ul className="book-list">{vaults.map(v => <Row key={v.vaultId} v={v} onOpen={onOpen} />)}</ul>
+          : <p className="book-empty">No facility is on file yet.</p>}
+        <p className="quote t-quote">A zero gap is not safety. It means the two figures agree.</p>
+      </section>
+    </>
   )
 }

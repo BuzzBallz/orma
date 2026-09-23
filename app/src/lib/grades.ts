@@ -41,12 +41,3 @@ export function letterTone(g: string): ToneToken {
   if (i <= 15) return '--color-watch'   // BB+  .. B-   speculative
   return '--color-loss'                 // CCC  .. D    distressed
 }
-
-/** CSS custom-property name for a grade. */
-export function gradeTone(g: string): '--ok' | '--warn' | '--bad' | '--fg-dim' {
-  const i = gradeIndex(g)
-  if (i < 0) return '--fg-dim'
-  if (i <= 6) return '--ok'      // AAA .. A-
-  if (i <= 12) return '--warn'   // BBB+ .. BB-
-  return '--bad'                 // B+ .. D
-}
