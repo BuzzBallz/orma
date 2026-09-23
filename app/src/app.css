@@ -200,7 +200,9 @@ main:focus{ outline: none; }
   padding-inline: max(var(--gutter), env(safe-area-inset-left, 0px)) max(var(--gutter), env(safe-area-inset-right, 0px));
 }
 .grid12{ display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--space-6); }
-.page{ flex: 1 0 auto; display: flex; flex-direction: column; }
+/* At least a screen tall under the masthead, so the footer starts at the fold: figures that
+   arrive late push nothing the reader can already see (no layout shift). */
+.page{ flex: 1 0 auto; display: flex; flex-direction: column; min-height: calc(100dvh - var(--masthead)); }
 .view{ display: flex; flex-direction: column; }
 /* Whatever a desk ends on keeps its distance from the footer. Zero specificity, so a
    section that sets its own bottom padding keeps it. */
@@ -283,6 +285,7 @@ main:focus{ outline: none; }
 .menu-x{ display: inline-flex; }
 @media (max-width: 1279px){ .mast-in{ gap: var(--space-6); } .mast-right{ gap: var(--space-4); } .mast .stamp{ display: none; } }
 @media (max-width: 1099px){
+  :root{ --masthead: 64px; }
   .desks, .mast-right{ display: none; }
   .menu-btn{ display: inline-flex; }
   .mast{ border-top-width: 3px; }
