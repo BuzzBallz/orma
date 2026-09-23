@@ -66,6 +66,8 @@ export function useRoute() {
 
   const navigate = useCallback((path: RoutePath, vaultId?: string | null) => {
     history.pushState(null, '', hrefFor(path, vaultId === undefined ? readId() : vaultId))
+    // A desk opens at its top. Back and forward keep the browser's own restored position.
+    scrollTo(0, 0)
     setRoute(read())
   }, [])
 
