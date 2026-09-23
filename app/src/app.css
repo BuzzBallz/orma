@@ -661,6 +661,62 @@ main:focus{ outline: none; }
 }
 
 /* ============================================================
+   EVENT — the next event and the calendar
+   ============================================================ */
+.ev-head{ padding-block: var(--space-18) var(--space-10); display: flex; flex-direction: column; gap: var(--space-2); }
+.ev-head-row{ display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-4); flex-wrap: wrap; }
+.ev-feature{ border-top: 3px solid var(--color-rule); padding-top: 28px; align-items: end; }
+.ev-feature-what{ grid-column: span 7; display: flex; flex-direction: column; gap: var(--space-2); }
+.ev-feature-when{ grid-column: span 5; display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-2); text-align: right; }
+.ev-cal{ padding-top: var(--space-18); }
+.ev-cal h2{ margin-bottom: var(--space-5); }
+.cal{ width: 100%; border-collapse: collapse; }
+.cal th{ padding: 0 var(--space-6) 10px 0; text-align: left; font: 500 13px/1.4 var(--font-sans); color: var(--color-text-3); white-space: nowrap; }
+.cal td{ padding: 14px var(--space-6) 14px 0; border-top: 1px solid var(--color-line); vertical-align: baseline; }
+.cal tr > :last-child{ padding-right: 0; }
+.cal .rt{ text-align: right; }
+.cal .what{ font: 500 15px/1.4 var(--font-sans); }
+.cal .who{ font: 400 14px/1.5 var(--font-sans); color: var(--color-text-2); }
+.cal .fig{ font: 400 16px/1.5 var(--font-mono); color: var(--color-text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ev-what{ padding-block: var(--space-18) var(--space-24); }
+.ev-what h2{ margin-bottom: 14px; }
+.ev-what p{ max-width: 760px; }
+@media (max-width: 1099px){
+  .ev-feature-what, .ev-feature-when{ grid-column: span 12; }
+  .ev-feature-when{ align-items: flex-start; text-align: left; margin-top: var(--space-4); }
+}
+/* Narrow, each calendar row is a small card: event and amount, counterparty, then when. */
+@media (max-width: 900px){
+  .cal thead{ position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .cal, .cal tbody{ display: block; }
+  .cal tbody{ border-bottom: 1px solid var(--color-line); }
+  .cal tr{ display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "what amount" "who who" "due date"; column-gap: var(--space-3); row-gap: 6px; padding: var(--space-4) 0; border-top: 1px solid var(--color-line); }
+  .cal td{ display: block; padding: 0; border: 0; }
+  .cal td:nth-child(1){ grid-area: what; }
+  .cal td:nth-child(2){ grid-area: who; }
+  .cal td:nth-child(3){ grid-area: amount; }
+  .cal td:nth-child(4){ grid-area: due; text-align: left; }
+  .cal td:nth-child(5){ grid-area: date; }
+  .cal td:nth-child(4) .fig, .cal td:nth-child(5) .fig{ font-size: 13px; color: var(--color-text-3); }
+}
+@media (max-width: 760px){
+  .ev-head-row{ display: contents; }
+  .ev-head h1{ order: 1; }
+  .ev-head > p{ order: 2; }
+  .ev-head-row > span{ order: 3; }
+  .ev-head .op-pick{ order: 4; }
+  .ev-head{ padding-block: 28px; }
+  .ev-head h1{ font-size: 40px; line-height: 1.15; }
+  .ev-head p.t-heading-m{ font-size: 20px; }
+  .ev-feature{ padding-top: var(--space-5); }
+  .ev-feature-what .t-display-m{ font-size: 32px; line-height: 1.2; }
+  .ev-feature-when .t-fig-l{ font-size: 26px; }
+  .ev-cal{ padding-top: var(--space-10); }
+  .ev-what{ padding-block: var(--space-10) var(--space-12); }
+  .ev-what p{ font-size: 16px; }
+}
+
+/* ============================================================
    PRINT — the opinion on paper
    ============================================================ */
 @media print{

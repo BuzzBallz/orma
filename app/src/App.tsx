@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, type ReactNode } from 'react'
 import './app.css'
 import { API_MIXED_ORIGIN, SUSPECT_AFTER_FAILS, SUSPECT_BACKOFF_MS } from './lib/api'
 import { usePoll } from './lib/usePoll'
-import { useTick } from './lib/useTick'
 import { facilityName } from './lib/credit'
 import { follow, useRoute, type RoutePath } from './lib/useRoute'
 import type { BrokerHistory, Collateral, Gate, Health, IndexerRace, OracleContest, Resolution, VaultDetail as Detail, VaultsResponse } from './lib/types'
@@ -12,7 +11,7 @@ import { StaleBar } from './components/StaleBar'
 import { FacilityPicker } from './components/VaultPicker'
 import { Portfolio } from './screens/Portfolio'
 import { Facility, FacilityPlaceholder } from './screens/Facility'
-import { Event } from './screens/Event'
+import { Event, EventPlaceholder } from './screens/Event'
 import { Methodology } from './screens/Methodology'
 import { Evidence } from './screens/Evidence'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -51,40 +50,7 @@ function Note({ heading, watch, said, facts, onBack }: {
   )
 }
 
-/** /event with nothing selected. */
-function EventPlaceholder() {
-  return (
-    <section className="panel ghost-desk rail slotdesk">
-      <h2 className="panel-title">Next Event</h2>
-      <div className="slot-big">
-        <span className="slot-dash">—</span>
-        <span className="slot-say">no scheduled event on file</span>
-      </div>
-      {/* The calendar's own shape, held open. This was four bullets with a dot in front
-          of each, which looked like a feature list rather than like the table figures
-          arrive into. Same two columns as the real calendar; the dates are em-dashes
-          because there are no dates. */}
-      <div className="tbl-scroll">
-        <table className="tbl">
-          <thead>
-            <tr><th>Event</th><th className="rt">Date</th></tr>
-          </thead>
-          <tbody>
-            {['Scheduled payment', 'Period boundary', 'Redemption date', 'Review date'].map(k => (
-              <tr key={k}>
-                <td className="mute">{k}</td>
-                <td className="rt num mute">—</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  )
-}
-
 function Desk() {
-  const tick = useTick()
   const { path, vaultId, navigate } = useRoute()
 
   // A desk rises into place when a reader clicks to it, but not on the first paint and
@@ -194,46 +160,45 @@ function Desk() {
       )
     }
 
+    const Placeholder = path === '/facility' ? FacilityPlaceholder : EventPlaceholder
+
     if (!vaultId) {
-      const note = (
-        <Note
-          heading="No facility selected"
-          said={path === '/facility'
-            ? <>A credit opinion covers one facility. Choose one from the portfolio.</>
-            : <>The calendar covers one facility. Choose one from the portfolio.</>}
-          facts={rows.length ? [['Facilities on File', String(rows.length)]] : []}
-          onBack={back}
-        />
+      return (
+        <Placeholder picker={picker}>
+          <Note
+            heading="No facility selected"
+            said={path === '/facility'
+              ? <>A credit opinion covers one facility. Choose one from the portfolio.</>
+              : <>The calendar covers one facility. Choose one from the portfolio.</>}
+            facts={rows.length ? [['Facilities on File', String(rows.length)]] : []}
+            onBack={back}
+          />
+        </Placeholder>
       )
-      return path === '/facility'
-        ? <FacilityPlaceholder picker={picker}>{note}</FacilityPlaceholder>
-        : <div className="deskgrid"><EventPlaceholder />{note}</div>
     }
 
     if (notFound && !detail.data) {
-      const note = (
-        <Note
-          heading="Not on file" watch
-          said={<>No facility on file under that reference.</>}
-          facts={[['Reference', vaultId.slice(0, 12).toUpperCase()]]}
-          onBack={back}
-        />
+      return (
+        <Placeholder picker={picker}>
+          <Note
+            heading="Not on file" watch
+            said={<>No facility on file under that reference.</>}
+            facts={[['Reference', vaultId.slice(0, 12).toUpperCase()]]}
+            onBack={back}
+          />
+        </Placeholder>
       )
-      return path === '/facility'
-        ? <FacilityPlaceholder picker={picker}>{note}</FacilityPlaceholder>
-        : <div className="deskgrid"><EventPlaceholder />{note}</div>
     }
 
     if (!detail.data) {
       if (detail.fails === 0) return null
       // The blotter already knows this facility's name even while its detail is
       // unreachable, so the page can be headed properly instead of by an em-dash.
-      if (path !== '/facility') return <EventPlaceholder />
       const known = rows.find(r => r.vaultId === vaultId)
       return (
-        <FacilityPlaceholder name={known ? facilityName(known) : undefined} picker={picker}>
+        <Placeholder name={known ? facilityName(known) : undefined} picker={picker}>
           <p className="t-body-m dim">This facility is on file. No figure is shown until one is received.</p>
-        </FacilityPlaceholder>
+        </Placeholder>
       )
     }
 
@@ -255,7 +220,7 @@ function Desk() {
         ? gate.data : null
       return <Facility d={d} history={h} collateral={c} resolution={rz} gate={gt} contest={contest.data} picker={picker} />
     }
-    return <Event d={detail.data} tick={tick} />
+    return <Event d={detail.data} picker={picker} />
   }
 
   const missing = wallet.missing && WALLETS.find(w => w.kind === wallet.missing)?.name
