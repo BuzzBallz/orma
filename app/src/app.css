@@ -717,6 +717,33 @@ main:focus{ outline: none; }
 }
 
 /* ============================================================
+   METHODOLOGY
+   ============================================================ */
+.meth{ padding-block: var(--space-18) var(--space-24); align-items: start; }
+.meth-main{ grid-column: span 8; display: flex; flex-direction: column; gap: var(--space-6); }
+.meth-main p{ max-width: 720px; }
+.meth-main h2{ margin-top: var(--space-10); }
+.meth-zero{ border-top: 1px solid var(--color-rule); padding-top: var(--space-6); display: flex; flex-direction: column; gap: 10px; }
+.meth-side{ grid-column: 10 / span 3; position: sticky; top: calc(var(--masthead) + var(--space-6)); }
+.ladder-v{ list-style: none; margin: 0; padding: 0; border-top: 3px solid var(--color-rule); }
+.ladder-v li{ display: flex; justify-content: space-between; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--color-line); font: 400 13px/1.5 var(--font-mono); color: var(--color-text-3); }
+.ladder-v li b{ font-weight: 500; color: var(--tone, var(--color-text)); }
+.meth-scale{ display: none; }
+@media (max-width: 1099px){ .meth-main{ grid-column: span 12; } .meth-side{ display: none; } .meth-scale{ display: block; margin-top: var(--space-4); } }
+@media (max-width: 760px){
+  .meth{ padding-block: 28px var(--space-12); }
+  .meth-main{ gap: 18px; }
+  .meth-main h1{ font-size: 40px; line-height: 1.15; }
+  .meth-main p.t-body-l{ font-size: 16px; line-height: 1.55; }
+  .meth-main h2{ font-size: 26px; margin-top: var(--space-6); }
+  .meth-zero .t-quote{ font-size: 22px; }
+  .fac-list thead{ display: none; }
+  .fac-list table, .fac-list tbody{ display: block; }
+  .fac-list tr{ display: flex; flex-direction: column; gap: 2px; padding: var(--space-3) 0; border-top: 1px solid var(--color-line); }
+  .fac-list td{ border: 0; padding: 0; }
+}
+
+/* ============================================================
    PRINT — the opinion on paper
    ============================================================ */
 @media print{
