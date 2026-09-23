@@ -4,34 +4,12 @@ Every file here is committed to the repo and served from the same origin. Nothin
 hotlinked: the venue wifi is a risk and a remote asset that fails on stage is a visible
 failure.
 
-## noise.png  *(retired)*
-
-- No longer referenced. `paper.png` replaced it as the single surface texture; kept in the
-  tree only so a git history that mentions it still resolves.
-
-- 128x128 tileable greyscale noise, generated locally by a throwaway Python script
-  (zlib + struct, no dependencies, `random.seed(66)` so the file is reproducible).
-  Not downloaded, not traced, no licence to carry. 16 KB.
-- Used at 5% opacity as a fixed overlay over the whole desk (`body::after`), together
-  with the 4% scanline veil. Both are `pointer-events: none`.
-
-## paper.png
-
-- 280x210 tileable paper fibre, 28 kB, the full-surface overlay at 5.5% opacity
-  (`.veil-grain`), `pointer-events: none`. It replaced the generated noise tile: one
-  texture on the surface, not two grains stacked.
-- Source: the `exclusive-paper` pattern from transparenttextures.com, free for commercial
-  use, downloaded once and committed. Nothing is hotlinked.
-- **Recoloured deliberately.** The pattern ships black-on-transparent, drawn for light
-  backgrounds — over a #0E1015 panel at 5% it is invisible, which was measured before
-  choosing. Only the alpha channel carries the fibre, so the RGB is set to the brand cream
-  and the alpha kept. Same pattern, legible on a dark ground.
-- Halved to 280x210 and the alpha quantised to 32 levels: 145 kB as downloaded, 28 kB as
-  committed, with no visible loss in a texture used at 5%.
-
 ## mark.svg
 
-- The brand sigil in the topbar. Drawn for this project.
+- The brand sigil. Drawn for this project. The masthead and the footer draw the same
+  paths inline (`src/components/Lockup.tsx`), so the O and the upper current take the
+  page's text colour in both themes; this file stays the reference and the source of the
+  og card.
 - **Deliberately not the XRPL logo.** Using the real trademark is not a call the
   frontend gets to make, and an imitation of it would be worse. This is two readings of
   one quantity — dashed and low, solid and true — which is the product in three strokes.
@@ -61,7 +39,6 @@ fail on venue wifi.
 | `plex-sans-var.woff2` | IBM Plex Sans, variable 400–600, latin subset | 40 kB |
 | `plex-mono-400.woff2` | IBM Plex Mono 400, latin subset | 10 kB |
 | `plex-mono-500.woff2` | IBM Plex Mono 500, latin subset | 10 kB |
-| `plex-mono-600.woff2` | IBM Plex Mono 600, latin subset — the wordmark only | 10 kB |
 | `plex-serif-400.woff2` | IBM Plex Serif 400, latin subset — titles, the held figure, the summary | 15 kB |
 | `plex-serif-600.woff2` | IBM Plex Serif 600, latin subset — the wordmark, grades, facility names | 16 kB |
 | `plex-serif-400-italic.woff2` | IBM Plex Serif 400 italic, latin subset — the one quoted line | 16 kB |
@@ -72,11 +49,7 @@ fail on venue wifi.
 - Licence: **SIL Open Font License 1.1** — https://github.com/IBM/plex/blob/master/LICENSE.txt
   Redistribution inside a project is exactly what the OFL is for.
 - Source of these binaries: the latin subsets Google Fonts serves for IBM Plex
-  (fonts.gstatic.com), downloaded once and committed. 70 kB for all four.
-- `plex-mono-600.woff2` exists for one word. `.brand` sets the wordmark in Plex Mono 600
-  and no other rule asks for that weight; without the face the browser synthesised it,
-  and a synthesised bold is drawn differently by each engine. The brand name is the one
-  thing that must not change shape between the presenter's machine and a juror's.
+  (fonts.gstatic.com), downloaded once and committed. About 107 kB for all six.
 - Since the redesign (direction D2, "Registre") the serif carries the reading: titles,
   facility names, grades and the held figure, with Plex Sans for the interface and Plex
   Mono for tabular figures. Three serif files, latin only — not the family. Georgia is the
