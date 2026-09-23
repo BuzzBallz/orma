@@ -32,7 +32,12 @@
     <meta name="twitter:title" content="Orma — credit opinions" />
     <meta name="twitter:description" content="Internal credit scores and opinions on lending facilities." />
     <meta name="twitter:image" content="__SITE_ORIGIN__/assets/og-card.png" />
-    <meta name="theme-color" content="#0A0B0E" />
+    <!-- The browser chrome follows the page, which follows the reader's system setting. -->
+    <meta name="theme-color" content="#F4F4F2" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0B0C0F" media="(prefers-color-scheme: dark)" />
+    <!-- The two faces the first screen is set in, fetched before the stylesheet asks. -->
+    <link rel="preload" href="/assets/fonts/plex-serif-400.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/assets/fonts/plex-sans-var.woff2" as="font" type="font/woff2" crossorigin />
   </head>
   <body>
     <div id="root"></div>

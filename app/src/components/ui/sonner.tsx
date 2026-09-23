@@ -2,13 +2,13 @@ import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
 
 /**
- * shadcn ships this wired to next-themes. We are on Vite and we ship exactly one theme,
- * so the dependency is dropped and the theme is stated outright.
+ * shadcn ships this wired to next-themes. We are on Vite and the page follows the
+ * reader's system setting, so the toaster does too, without the dependency.
  */
 const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
-      theme="dark"
+      theme="system"
       className="toaster group"
       icons={{
         success: <CircleCheckIcon className="size-4" />,

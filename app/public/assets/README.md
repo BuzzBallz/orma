@@ -62,7 +62,9 @@ fail on venue wifi.
 | `plex-mono-400.woff2` | IBM Plex Mono 400, latin subset | 10 kB |
 | `plex-mono-500.woff2` | IBM Plex Mono 500, latin subset | 10 kB |
 | `plex-mono-600.woff2` | IBM Plex Mono 600, latin subset — the wordmark only | 10 kB |
-| `plex-serif-400.woff2` | IBM Plex Serif 400, latin subset — the summary only | 15 kB |
+| `plex-serif-400.woff2` | IBM Plex Serif 400, latin subset — titles, the held figure, the summary | 15 kB |
+| `plex-serif-600.woff2` | IBM Plex Serif 600, latin subset — the wordmark, grades, facility names | 16 kB |
+| `plex-serif-400-italic.woff2` | IBM Plex Serif 400 italic, latin subset — the one quoted line | 16 kB |
 
 - Family: **IBM Plex** — drawn for technical and enterprise interfaces, with real tabular
   figures in the mono. Picked over Inter precisely because Inter is the default that makes
@@ -75,9 +77,10 @@ fail on venue wifi.
   and no other rule asks for that weight; without the face the browser synthesised it,
   and a synthesised bold is drawn differently by each engine. The brand name is the one
   thing that must not change shape between the presenter's machine and a juror's.
-- `plex-serif-400.woff2` is used by exactly one rule: the summary paragraphs of a credit
-  opinion. A rating note is read as prose for a minute at a time while the rest of this
-  surface is a terminal, and a serif is what separates reading from scanning. Georgia is
-  the fallback. One weight, latin only — not the family.
+- Since the redesign (direction D2, "Registre") the serif carries the reading: titles,
+  facility names, grades and the held figure, with Plex Sans for the interface and Plex
+  Mono for tabular figures. Three serif files, latin only — not the family. Georgia is the
+  fallback. The two added faces come from the same place as the others (fonts.gstatic.com
+  latin subsets), downloaded once and committed.
 - `font-display: swap` with the system stack as the fallback, so the screen paints on the
   first frame either way.

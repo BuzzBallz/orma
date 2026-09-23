@@ -12,34 +12,34 @@ export function gradeFill(g: string): number {
   return i < 0 ? 0 : 1 - i / (GRADE_LADDER.length - 1)   // denominator is 19
 }
 
-/**
- * The tone a grade is SET in, as opposed to the tone a row is railed in.
- *
- * `gradeTone` below paints the risk rail on a blotter row, where three bands are the
- * point. A grade printed as a letter wants the one distinction a credit reader actually
- * makes first: investment grade or not, and whether it has gone distressed. So AAA..BBB-
- * reads in the text colour, BB+..B- as watch, and CCC..D as risk.
- */
+/** A colour token from the stylesheet, by name. */
+export type ToneToken = '--color-text' | '--color-watch' | '--color-loss' | '--color-text-3'
+
 /**
  * Conduct is graded A to E, which is NOT the AAA..D credit ladder. Routing it through
  * letterTone put "E", the worst conduct grade there is, in the muted colour this product
  * uses for "no grade on file", and "A" in the colour of an investment grade rating two
  * notches below the facility's own. Five steps, its own map.
  */
-export function conductTone(g: string): '--fg' | '--warn' | '--bad' | '--fg-mute' {
+export function conductTone(g: string): ToneToken {
   const i = 'ABCDE'.indexOf(String(g).trim().toUpperCase())
-  if (i < 0) return '--fg-mute'
-  if (i === 0) return '--fg'
-  if (i <= 2) return '--warn'
-  return '--bad'
+  if (i < 0) return '--color-text-3'
+  if (i === 0) return '--color-text'
+  if (i <= 2) return '--color-watch'
+  return '--color-loss'
 }
 
-export function letterTone(g: string): '--fg' | '--warn' | '--bad' | '--fg-mute' {
+/**
+ * The tone a grade is set in: the one distinction a credit reader actually makes first,
+ * investment grade or not, and whether it has gone distressed. So AAA..BBB- reads in the
+ * text colour, BB+..B- as watch, and CCC..D as loss.
+ */
+export function letterTone(g: string): ToneToken {
   const i = gradeIndex(g)
-  if (i < 0) return '--fg-mute'
-  if (i <= 9) return '--fg'      // AAA .. BBB-  investment grade
-  if (i <= 15) return '--warn'   // BB+  .. B-   speculative
-  return '--bad'                 // CCC  .. D    distressed
+  if (i < 0) return '--color-text-3'
+  if (i <= 9) return '--color-text'     // AAA .. BBB-  investment grade
+  if (i <= 15) return '--color-watch'   // BB+  .. B-   speculative
+  return '--color-loss'                 // CCC  .. D    distressed
 }
 
 /** CSS custom-property name for a grade. */
