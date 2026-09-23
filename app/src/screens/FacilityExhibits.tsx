@@ -2,6 +2,7 @@ import type { BrokerHistory, Collateral } from '../lib/types'
 import { GradeLetter } from '../components/GradeLetter'
 import { Exhibit } from '../components/Exhibit'
 import { dropsToXrp, fmtIso, short } from '../lib/format'
+import { creditText } from '../lib/credit'
 
 /**
  * Exhibits 3 and 4 of the credit opinion.
@@ -56,7 +57,7 @@ export function ManagerConduct({ h }: { h: BrokerHistory | null }) {
           <div className="tbl-wrap">
             <table className="op-tbl">
               <thead>
-                <tr><th>First-loss cover consumed</th><th className="rt">XRP</th><th>Basis</th></tr>
+                <tr><th>First-loss cover consumed</th><th className="rt">Amount</th><th>Basis</th></tr>
               </thead>
               <tbody>
                 <tr>
@@ -88,7 +89,7 @@ export function ManagerConduct({ h }: { h: BrokerHistory | null }) {
           </p>
         </>
       ) : (
-        <p className="caption">Sequence not assessable: {o.reason}.</p>
+        <p className="caption">Sequence not assessable: {creditText(o.reason ?? '')}.</p>
       )}
 
       {rep.findings.length > 0 && (
@@ -97,7 +98,7 @@ export function ManagerConduct({ h }: { h: BrokerHistory | null }) {
             <thead><tr><th>Observation</th></tr></thead>
             <tbody>
               {rep.findings.map(f => (
-                <tr key={f.code}><td className="op-says">{f.detail}</td></tr>
+                <tr key={f.code}><td className="op-says">{creditText(f.detail)}</td></tr>
               ))}
             </tbody>
           </table>
@@ -107,8 +108,8 @@ export function ManagerConduct({ h }: { h: BrokerHistory | null }) {
       {rec.applicable && (
         <p className="caption">
           On current distressed exposures, declaring smallest first would apply{' '}
-          <b className="num">{dropsToXrp(rec.atStakeForDepositors!)}</b> XRP more of the
-          manager's own capital to investor losses than declaring largest first.
+          <b className="num">{dropsToXrp(rec.atStakeForDepositors!)}</b> more of the manager's
+          own capital to investor losses than declaring largest first.
         </p>
       )}
 
@@ -149,7 +150,7 @@ export function ManagerConduct({ h }: { h: BrokerHistory | null }) {
         </table>
       </div>
 
-      <p className="caption">{rep.caveat}</p>
+      <p className="caption">{creditText(rep.caveat)}</p>
     </Exhibit>
   )
 }
@@ -172,7 +173,7 @@ export function PledgedCollateral({ c }: { c: Collateral | null }) {
       <div className="tbl-wrap">
         <table className="op-tbl">
           <thead>
-            <tr><th>Measure</th><th className="rt">XRP</th><th>Basis</th></tr>
+            <tr><th>Measure</th><th className="rt">Amount</th><th>Basis</th></tr>
           </thead>
           <tbody>
             <tr>
