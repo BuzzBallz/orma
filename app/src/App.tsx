@@ -154,7 +154,7 @@ function Desk() {
       // already says the figures are withheld.
       return (
         <Portfolio
-          vaults={rows} asOf={vaults.data?.serverTime ?? null}
+          vaults={rows} received={vaults.data !== null} asOf={vaults.data?.serverTime ?? null}
           onOpen={id => go('/facility', id)} onNavigate={go}
         />
       )
