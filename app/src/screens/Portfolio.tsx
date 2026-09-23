@@ -36,8 +36,7 @@ function KeyFigures({ v, asOf, onOpen }: {
         <div className="kf-head"><span className="kf-name mute">—</span></div>
       )}
       <span className="kf-k t-label-s mute">Held unit value</span>
-      {/* Keyed on the figure, so a new value fades in once instead of changing in place. */}
-      <span className="kf-fig t-fig-display" key={v?.navCorrect}>{v?.navCorrect ?? '—'}</span>
+      <span className="kf-fig t-fig-display">{v?.navCorrect ?? '—'}</span>
       <dl className="kf-rows">
         <div><dt>Reported unit value</dt><dd className="dim">{v?.navNaive ?? '—'}</dd></div>
         <div>

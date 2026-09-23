@@ -60,6 +60,14 @@ function Desk() {
     quiet.current = false
     navigate(p, id)
   }, [navigate])
+  // Back and forward are the browser's own navigation, often a key or an edge swipe that
+  // already animates: the desk they land on stays still. Capture phase, so this runs before
+  // the router's own listener, whose state update React renders before the next listener.
+  useEffect(() => {
+    const still = () => { quiet.current = true }
+    addEventListener('popstate', still, true)
+    return () => removeEventListener('popstate', still, true)
+  }, [])
 
   const slow = API_MIXED_ORIGIN
     ? { slowAfter: SUSPECT_AFTER_FAILS, slowCapMs: SUSPECT_BACKOFF_MS }

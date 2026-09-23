@@ -141,7 +141,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, pi
         <div className="op-band-in grid12">
           <div className="op-held">
             <span className="t-label-s mute">Held</span>
-            <span className="t-fig-display" key={v.navCorrect}>{v.navCorrect}</span>
+            <span className="t-fig-display">{v.navCorrect}</span>
             {lead && <p className={'t-body-s ' + (SEVERITY[lead.severity] ?? 'dim')}>{creditText(lead.title)}</p>}
           </div>
           <dl className="op-glance">

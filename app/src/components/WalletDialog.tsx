@@ -25,7 +25,6 @@ export function SignInDialog({ open, onOpenChange }: {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="dlg" showCloseButton>
-        <span className="grab" aria-hidden />
         <DialogHeader className="dlg-head">
           <DialogTitle className="dlg-title">Sign in</DialogTitle>
           <DialogDescription className="dlg-sub">
