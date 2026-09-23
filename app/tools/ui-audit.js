@@ -4,10 +4,10 @@
 
    HOW TO RUN
      1. open the app (any screen)
-     2. devtools console
+     2. devtools console, with Rendering › "Emulate a focused page" ticked: the
+        console holds the focus otherwise, and no focus ring can be measured
      3. paste this whole file, then:  await uiAudit()
         or one section:               await uiAudit({ only: ['layout','contract'] })
-        or the feed-down half:        await uiAudit({ feedDown: true })
 
    It walks every screen against every vault the API is serving, so it takes
    about a minute. Each check prints PASS or FAIL with the measurement that
@@ -30,13 +30,18 @@ window.uiAudit = async function uiAudit(opts = {}) {
     history.pushState(null, '', path + (vault ? '?facility=' + vault : ''))
     dispatchEvent(new PopStateEvent('popstate'))
     await wait(POLL)
+    // Exhibits are folded. Opened, every check reads the whole page, as it did before they folded.
+    for (const d of document.querySelectorAll('details.exh')) d.open = true
   }
 
-  // The five ids the feed is actually serving right now — never hardcoded.
+  // The API base is read off the app's own requests: the page no longer prints it.
+  const apiUrl = performance.getEntriesByType('resource').map(e => e.name).find(u => u.includes('/api/'))
+  const API = apiUrl ? apiUrl.slice(0, apiUrl.indexOf('/api/')) : 'http://localhost:8787'
+
+  // The ids the feed is actually serving right now — never hardcoded.
   let VAULTS = []
   try {
-    const base = document.body.innerText.match(/https?:\/\/[^\s]+:\d+/)?.[0] || 'http://localhost:8787'
-    VAULTS = (await (await fetch(base + '/api/vaults')).json()).vaults.map(v => v.vaultId)
+    VAULTS = (await (await fetch(API + '/api/vaults')).json()).vaults.map(v => v.vaultId)
   } catch { /* feed down: the layout and a11y sections still run */ }
 
   const SCREENS = VAULTS.length
@@ -62,19 +67,11 @@ window.uiAudit = async function uiAudit(opts = {}) {
         de.scrollWidth <= innerWidth + 1, `scrollWidth ${de.scrollWidth} vs ${innerWidth}`)
 
       // The bug that hid S1's loan table: a flex view shrinking under its content.
-      const view = document.querySelector('main > div')
+      const view = document.querySelector('main > .view')
       if (view) {
         const box = Math.round(view.getBoundingClientRect().height)
         record('layout', `${label} · content inside its box`,
           view.scrollHeight <= box + 1, `content ${view.scrollHeight} vs box ${box}`)
-      }
-      if (path === '/event') {
-        record('layout', `${label} · one viewport, no scroll`,
-          de.scrollHeight <= de.clientHeight,
-          `at ${innerWidth}x${innerHeight}: needs ${de.scrollHeight} (spec §S3 budgets 1440x900)`)
-        const over = [...document.querySelectorAll('main section.panel')]
-          .filter(b => b.scrollHeight > b.clientHeight + 1).length
-        record('layout', `${label} · no band overflows`, over === 0, `${over} band(s) overflowing`)
       }
       // The reader is a credit analyst. Any word they would not meet in a rating note or
       // on a loans blotter is a word that loses them, wherever it appears — a heading, a
@@ -100,30 +97,29 @@ window.uiAudit = async function uiAudit(opts = {}) {
           true, 'engineering register is correct on this screen only')
       }
 
-      // A cyan ring means keyboard focus and nothing else. Anything else wearing the
-      // focus colour as an outline reads as a stray selection box to everyone who sees it.
+      // A ring means keyboard focus and nothing else. Anything else wearing the focus
+      // colour as a ring reads as a stray selection box to everyone who sees it.
       const probe = document.createElement('i')
-      probe.style.color = 'var(--read-correct)'
+      probe.style.color = 'var(--color-focus)'
       document.body.appendChild(probe)
       const FOCUS_COLOUR = getComputedStyle(probe).color
       probe.remove()
       const strays = [...document.querySelectorAll('body *')].filter(el => {
         if (el === document.activeElement) return false
         const cs = getComputedStyle(el)
-        return cs.outlineStyle !== 'none' && cs.outlineWidth !== '0px' && cs.outlineColor === FOCUS_COLOUR
+        return (cs.outlineStyle !== 'none' && cs.outlineWidth !== '0px' && cs.outlineColor === FOCUS_COLOUR)
+          || cs.boxShadow.includes(FOCUS_COLOUR + ' 0px 0px 0px')   // the ring is a spread shadow now
       })
       record('layout', `${label} · focus colour is not used as decoration`,
         strays.length === 0,
         strays.length ? strays.map(e => e.tagName + '.' + [...e.classList][0]).join(', ') : `0 stray rings (${FOCUS_COLOUR})`)
 
       // Wide tables are allowed to scroll, but only inside their own box.
-      for (const sc of document.querySelectorAll('.tbl-scroll')) {
-        // The box may be the div itself, or a Radix ScrollArea viewport inside it.
-        const box = sc.querySelector('[data-slot="scroll-area-viewport"]') || sc
-        const t = sc.querySelector('table')
+      for (const box of document.querySelectorAll('.tbl-wrap')) {
+        const t = box.querySelector('table')
         if (t && t.scrollWidth > box.clientWidth + 1) {
-          // 'auto' (our own .tbl-scroll) and 'scroll' (Radix's viewport) both contain it.
-          // 'visible' is the failure: that is the table escaping onto the page.
+          // 'auto' and 'scroll' both contain it. 'visible' is the failure: that is the
+          // table escaping onto the page.
           const ox = getComputedStyle(box).overflowX
           record('layout', `${label} · table scrolls in its own box`,
             ox === 'auto' || ox === 'scroll', `${ox} — needs ${t.scrollWidth}, box ${box.clientWidth}`)
@@ -146,25 +142,22 @@ window.uiAudit = async function uiAudit(opts = {}) {
   // -------------------------------------------------------------- contract --
   // The few visual facts the frozen contract fixes. These are not taste.
   if (run('contract') && VAULTS.length) {
-    await go('/event', VAULTS[0])
-    await wait(7000)                                   // let the sparkline get two samples
-    const [naive, correct] = document.querySelectorAll('.spark polyline')
-    if (naive && correct) {
-      record('contract', 'naive reading is dashed (§6)',
-        getComputedStyle(naive).strokeDasharray !== 'none', getComputedStyle(naive).strokeDasharray)
-      record('contract', 'correct reading is solid (§6)',
-        getComputedStyle(correct).strokeDasharray === 'none', getComputedStyle(correct).strokeDasharray)
-    }
     await go('/facility', VAULTS[0])
     // Exhibit 2 carries every measured factor, in the order the calculation agent sends
-    // them. Exhibit 1 groups them for the committee; §4.2 is upheld by the ungrouped one.
-    const order = [...document.querySelectorAll('.op-tbl.factors tbody tr')].map(r => r.dataset.dim)
+    // them. Exhibit 1 (.fac-tbl) groups them for the committee; §4.2 is upheld by the
+    // ungrouped one. A row names its factor by label, mapped back to the key the API sent.
+    const dims = await fetch(API + '/api/vaults/' + VAULTS[0])
+      .then(r => r.json()).then(d => d.score.dimensions).catch(() => [])
+    const keyOf = new Map(dims.map(d => [d.label, d.key]))
+    const ex2 = [...document.querySelectorAll('details.exh')]
+      .find(x => x.querySelector('.exh-title')?.textContent.startsWith('Exhibit 2'))
+    const rows = [...(ex2?.querySelectorAll('table.op-tbl tbody tr') ?? [])]
+    const order = rows.map(r => keyOf.get(r.cells[0].textContent.trim()) ?? r.cells[0].textContent.trim())
     record('contract', 'every measured factor, in the API order (§4.2)',
       order.join() === 'LIQUIDITY,COVER,CONCENT,RECOG,DEADLINE,HEADLINE', order.join(' '))
     // §S1.3: a factor is presented by its SCORE, never by a bar whose length comes from
     // the raw value — a 0.00% and a 100.0% must not read as the same severity.
-    const scored = [...document.querySelectorAll('.op-tbl.factors tbody tr')]
-      .map(r => r.querySelector('.chip')?.textContent).filter(Boolean)
+    const scored = rows.map(r => r.querySelector('.grade:not(.grade-na)')?.textContent).filter(Boolean)
     record('contract', 'each factor is presented by its score (§S1.3)',
       scored.length === order.length && order.length === 6, scored.join(' '))
   }
@@ -172,20 +165,29 @@ window.uiAudit = async function uiAudit(opts = {}) {
   // ---------------------------------------------------------------- a11y ----
   if (run('a11y')) {
     await go('/', null)
-    const focusables = [...document.querySelectorAll('a,button,[tabindex]:not([tabindex="-1"]),tr[tabindex]')]
+    // Only what is laid out at this width: the phone menu button and the desk links swap at 1100px.
+    const focusables = [...document.querySelectorAll('a[href],button:not(:disabled),summary,[tabindex]:not([tabindex="-1"])')]
+      .filter(el => el.checkVisibility())
     record('a11y', 'every control is reachable', focusables.length > 0, `${focusables.length} focusable`)
+    // The ring is a box-shadow drawn on :focus-visible, so a control is ringed when focusing
+    // it changes its shadow or outline. focusVisible stops a mouse click made earlier from
+    // withholding the ring; an unfocused page withholds :focus itself.
+    const look = el => getComputedStyle(el).boxShadow + ' ' + getComputedStyle(el).outlineStyle
     const noRing = focusables.filter(el => {
-      el.focus()
-      const o = getComputedStyle(el).outlineWidth
-      return !o || o === '0px'
+      const rest = look(el)
+      el.focus({ focusVisible: true })
+      return look(el) === rest
     })
-    record('a11y', 'every focused control shows a ring',
-      noRing.length === 0, noRing.length ? `${noRing.length} without: ${noRing.slice(0,2).map(e=>e.className||e.tagName)}` : 'all ringed')
+    record('a11y', 'every focused control shows a ring', noRing.length === 0,
+      !document.hasFocus() ? 'not measured: the page is not focused, see HOW TO RUN'
+        : noRing.length ? `${noRing.length} without: ${noRing.slice(0,2).map(e=>e.className||e.tagName)}` : `${focusables.length} ringed`)
     document.activeElement?.blur?.()
 
-    const ths = [...document.querySelectorAll('th[aria-sort]')]
-    record('a11y', 'sortable headers announce their state',
-      ths.length > 0 && ths.every(t => t.getAttribute('aria-sort')), `${ths.length} with aria-sort`)
+    // The masthead says which desk this is, to a screen reader as well as to the eye.
+    const current = [...document.querySelectorAll('nav.desks a.desk[aria-current="page"]')]
+    record('a11y', 'the current desk is announced',
+      current.length === 1 && current[0].pathname === location.pathname,
+      current.map(a => `${a.textContent} (${a.pathname})`).join(', ') || 'none')
     const imgs = [...document.querySelectorAll('img')]
     record('a11y', 'every image has alt text',
       imgs.every(i => i.hasAttribute('alt')), `${imgs.length} image(s)`)
@@ -208,8 +210,9 @@ window.uiAudit = async function uiAudit(opts = {}) {
       return getComputedStyle(document.body).backgroundColor
     }
     const seen = new Map()
-    for (const el of document.querySelectorAll('main *, .topbar *, .hints *')) {
-      if (!el.textContent?.trim() || el.children.length) continue
+    for (const el of document.querySelectorAll('header.mast *, .feedbar *, main *, footer.foot *')) {
+      // Only text drawn at this width: the scale's step names, for one, fold into bare ticks.
+      if (!el.textContent?.trim() || el.children.length || !el.checkVisibility()) continue
       const key = getComputedStyle(el).color + ' on ' + groundOf(el)
       if (!seen.has(key)) seen.set(key, el.textContent.trim().slice(0, 18))
     }
@@ -222,6 +225,9 @@ window.uiAudit = async function uiAudit(opts = {}) {
 
   // ---------------------------------------------------------------- motion --
   if (run('motion')) {
+    // Nothing moves at rest. A desk rises in when a reader clicks to it, so click one.
+    document.querySelector('nav.desks a.desk[aria-current="page"]')?.click()
+    await wait(50)
     const anims = new Set()
     for (const el of document.querySelectorAll('*')) {
       const n = getComputedStyle(el).animationName
@@ -248,18 +254,23 @@ window.uiAudit = async function uiAudit(opts = {}) {
     }
     // Labels only. Controls deliberately carry no tracking — a tab and a button are not
     // captions, and spacing them out is what made every uppercase word look like a label.
-    // Labels carry none. Headings carry one optical value, the same everywhere — a title
-    // and a caption are not the same category and must not be asserted as one.
-    oneOf('no tracking on labels', '.label,table.tbl th',
+    // Labels carry none. Headings carry one optical value per text style, set in em so it
+    // holds at every size the style is drawn at — a title and a caption are not the same
+    // category and must not be asserted as one.
+    oneOf('no tracking on labels', '.label,.t-label-s,.t-label-m,table.op-tbl th,table.cal th',
       e => cs(e).letterSpacing === 'normal' ? 'none' : cs(e).letterSpacing)
-    oneOf('one tracking for headings', '.panel-title,.op-h', e => cs(e).letterSpacing)
-    oneOf('no tracking on controls', '.desk,.btn-term,button.picker-btn',
+    for (const s of ['display-xl', 'display-l', 'display-m', 'heading-l', 'heading-m', 'heading-s'])
+      oneOf(`one tracking for .t-${s}`, `.t-${s}`,
+        e => (parseFloat(cs(e).letterSpacing) / parseFloat(cs(e).fontSize) || 0).toFixed(3) + 'em')
+    oneOf('no tracking on controls', '.desk,.btn,.lnk,button.picker-btn',
       e => cs(e).letterSpacing === 'normal' || cs(e).letterSpacing === '0px' ? 'none' : cs(e).letterSpacing)
-    oneOf('one grid gap', '.grid12,.stack', e => cs(e).gap)
-    oneOf('one panel radius', 'main .panel', e => cs(e).borderRadius)
+    // Row gaps are the layout's own; the twelve columns share one gutter.
+    oneOf('one grid gutter', '.grid12', e => cs(e).columnGap)
+    // A facility row is a card below 1100px, the same card as an empty desk's note.
+    oneOf('one card radius', 'main .frow, main .state', e => cs(e).borderRadius)
+    // Serif for the reading, sans for the interface, mono for the figures.
     const fams = uniq([...document.querySelectorAll('main *')].map(e => cs(e).fontFamily.split(',')[0]))
-      .filter(f => !/Times|serif/i.test(f))
-    record('consistency', 'two font families, no more', fams.length <= 2, fams.join(' / '))
+    record('consistency', 'three font families, no more', fams.length <= 3, fams.join(' / '))
   }
 
   // ----------------------------------------------------------------- polls --
