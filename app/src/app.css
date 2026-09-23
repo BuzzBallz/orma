@@ -785,6 +785,64 @@ main:focus{ outline: none; }
 }
 
 /* ============================================================
+   SIGN IN — the dialog, and a sheet from the bottom edge on a phone
+   ============================================================ */
+.dlg{
+  width: min(520px, calc(100% - 32px)) !important; max-width: none !important; padding: var(--space-8) !important;
+  gap: var(--space-5) !important; background: var(--color-bg-raised) !important; color: var(--color-text) !important;
+  border-radius: var(--radius-md) !important; max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain;
+  box-shadow: 0 24px 64px -12px rgb(var(--shadow-rgb) / .18), 0 2px 6px rgb(var(--shadow-rgb) / .06) !important;
+}
+[data-slot="dialog-overlay"]{ background: rgb(var(--shadow-rgb) / .48) !important; backdrop-filter: none !important; }
+.dlg [data-slot="dialog-close"]{
+  top: var(--space-6) !important; right: var(--space-6) !important; width: var(--size-control) !important; height: var(--size-control) !important;
+  border-radius: var(--radius-sm);
+}
+.dlg [data-slot="dialog-close"] svg{ width: 20px; height: 20px; }
+.dlg-head{ gap: var(--space-3) !important; padding-right: var(--space-10); }
+.dlg-title{ font: 400 26px/1.25 var(--font-serif) !important; }
+.dlg-sub{ font: 400 14px/1.5 var(--font-sans) !important; color: var(--color-text-2) !important; }
+.wrows{ display: flex; flex-direction: column; border-bottom: 1px solid var(--color-line); }
+.wrow{ display: flex; align-items: center; gap: var(--space-4); min-height: 68px; padding: var(--space-3) 0; border-top: 1px solid var(--color-line); }
+.wrow-id{ display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
+.wname{ font: 500 15px/1.4 var(--font-sans); }
+.wnote{ font: 400 14px/1.5 var(--font-sans); color: var(--color-text-3); }
+.wstate{ font: 400 14px/1.5 var(--font-sans); color: var(--color-text-3); white-space: nowrap; }
+.wrow[data-here="true"] .wstate{ color: var(--color-ok); }
+.wqr{ display: flex; flex-direction: column; align-items: center; gap: var(--space-2); }
+.wqr img{ border-radius: var(--radius-sm); background: #fff; padding: var(--space-2); }
+.wpaste{ display: flex; flex-direction: column; gap: var(--space-4); border-top: 1px solid var(--color-rule); padding-top: var(--space-5); }
+.field{ display: flex; flex-direction: column; gap: var(--space-2); }
+.field label{ font: 500 13px/1.4 var(--font-sans); }
+.field input{
+  width: 100%; min-height: 48px; padding: 0 14px; background: var(--color-bg);
+  border: 1px solid var(--color-line); border-radius: var(--radius-sm);
+  font: 400 16px/1.5 var(--font-mono); color: var(--color-text); outline: none;
+}
+.field input:focus{ border-color: var(--color-rule); }
+.field input[aria-invalid="true"]{ border-color: var(--color-border-error); }
+.field-help{ font: 400 14px/1.5 var(--font-sans); color: var(--color-text-3); }
+.field-error{ font: 400 14px/1.5 var(--font-sans); color: var(--color-loss); }
+.field-error b{ font-weight: 600; }
+.wpaste-actions{ display: flex; justify-content: flex-end; }
+.grab{ display: none; }
+@media (max-width: 760px){
+  .dlg{
+    top: auto !important; bottom: 0 !important; left: 0 !important; translate: none !important;
+    width: 100% !important; max-height: 92dvh;
+    padding: var(--space-3) var(--space-5) calc(28px + env(safe-area-inset-bottom)) !important;
+    gap: 14px !important;
+    border-radius: var(--radius-md) var(--radius-md) 0 0 !important;
+    box-shadow: 0 -8px 32px rgb(var(--shadow-rgb) / .14) !important;
+  }
+  .dlg [data-slot="dialog-close"]{ top: var(--space-5) !important; right: var(--space-3) !important; }
+  .grab{ display: block; justify-self: center; width: 36px; height: 4px; border-radius: 2px; background: var(--color-line); }
+  .wpaste{ padding-top: var(--space-4); gap: var(--space-3); }
+  .wpaste-actions .btn{ width: 100%; }
+}
+.cn-toast{ font-family: var(--font-sans) !important; border-radius: var(--radius-md) !important; }
+
+/* ============================================================
    PRINT — the opinion on paper
    ============================================================ */
 @media print{
