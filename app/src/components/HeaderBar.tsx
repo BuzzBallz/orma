@@ -32,12 +32,14 @@ function Stamp({ asOf, withheld }: { asOf: string | null; withheld: boolean }) {
  * portfolio the list itself is the picker, and on the other two there is nothing to pick.
  * Narrow, all of it folds into one menu.
  */
-export function HeaderBar({ vaults, activeVaultId, path, asOf, withheld, onNavigate, onSelect }: {
+export function HeaderBar({ vaults, activeVaultId, path, asOf, withheld, slide, onNavigate, onSelect }: {
   vaults: VaultRow[]
   activeVaultId: string | null
   path: RoutePath
   asOf: string | null
   withheld: boolean
+  /** Whether a desk change should slide the underline: a click, not a shortcut. */
+  slide: boolean
   onNavigate: (path: RoutePath) => void
   onSelect: (vaultId: string) => void
 }) {
@@ -52,7 +54,7 @@ export function HeaderBar({ vaults, activeVaultId, path, asOf, withheld, onNavig
     const a = nav.current?.querySelector<HTMLElement>('[aria-current="page"]')
     if (a) setInd(prev => ({ x: a.offsetLeft, w: a.offsetWidth, slide: slide && prev !== null }))
   }, [])
-  useLayoutEffect(() => { measure(true) }, [path, measure])
+  useLayoutEffect(() => { measure(slide) }, [path, slide, measure])
   useEffect(() => {
     const snap = () => measure(false)
     addEventListener('resize', snap)

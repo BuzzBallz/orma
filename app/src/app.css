@@ -910,3 +910,20 @@ main:focus{ outline: none; }
   .dlg[data-state="open"]{ animation: fade-in 150ms var(--ease-out); }
   .dlg[data-state="closed"]{ animation: fade-out 120ms var(--ease-out); }
 }
+
+/* Navigation. The underline follows a click to its desk; a desk rises in when a reader
+   clicked to it. Neither moves on the first paint or after a keyboard shortcut, which is
+   used too often to be animated. An exhibit's contents settle in as it opens. */
+@keyframes rise{ from{ opacity: 0; transform: translateY(6px); } }
+@keyframes settle{ from{ opacity: 0; transform: translateY(-4px); } }
+.desk-ind[data-slide]{ transition: transform 200ms var(--ease-in-out); }
+.enter > *{ animation: rise 220ms var(--ease-out) both; }
+.enter > :nth-child(2){ animation-delay: 40ms; }
+.enter > :nth-child(n+3){ animation-delay: 80ms; }
+.exh-chev{ transition: transform 200ms var(--ease-out); }
+.exh[open] > .exh-body{ animation: settle 180ms var(--ease-out); }
+@media (prefers-reduced-motion: reduce){
+  .desk-ind[data-slide], .exh-chev{ transition: none; }
+  .enter > *{ animation-name: fade-in; }
+  .exh[open] > .exh-body{ animation-name: fade-in; }
+}

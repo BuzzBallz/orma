@@ -236,6 +236,7 @@ function Desk() {
         path={path}
         asOf={stamp?.serverTime ?? null}
         withheld={!health.data || health.stale}
+        slide={!quiet.current}
         onNavigate={go}
         onSelect={select}
       />
