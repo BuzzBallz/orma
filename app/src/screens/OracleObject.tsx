@@ -1,5 +1,6 @@
 import type { Oracle, OracleContest } from '../lib/types'
 import { short, fmtIso } from '../lib/format'
+import { Exhibit } from '../components/Exhibit'
 
 /**
  * EXHIBIT 7 — the score as a ledger object.
@@ -21,25 +22,24 @@ import { short, fmtIso } from '../lib/format'
 export function OracleObject({ o, contest }: { o: Oracle | null; contest?: OracleContest | null }) {
   if (!o?.published) {
     return (
-      <section className="op-sec">
-        <h3 className="op-h">Exhibit 7 · The score as a ledger object</h3>
-        <p className="caption meth">
+      <Exhibit title="Exhibit 7 · The score as a ledger object">
+        <p className="caption">
           Not published for this facility. The figures above are this service's reading and
           nothing on the ledger contradicts or confirms them.
         </p>
-      </section>
+      </Exhibit>
     )
   }
 
   return (
-    <section className="op-sec">
-      <h3 className="op-h">Exhibit 7 · The score as a ledger object</h3>
-      <p className="caption meth">
+    <Exhibit title="Exhibit 7 · The score as a ledger object">
+      <p className="caption">
         Not a row in our database. An XLS-47 PriceOracle, keyed to the vault id, carrying six
         dimensions in one document. Read back from the object below, not from what we sent.
       </p>
 
-      <table className="op-tbl" style={{ marginTop: 12 }}>
+      <div className="tbl-wrap">
+      <table className="op-tbl">
         <thead>
           <tr><th>Dimension</th><th className="rt">On the ledger</th><th>As stored</th></tr>
         </thead>
@@ -53,12 +53,13 @@ export function OracleObject({ o, contest }: { o: Oracle | null; contest?: Oracl
           ))}
         </tbody>
       </table>
+      </div>
 
-      <p className="caption meth" style={{ marginTop: 10 }}>
+      <p className="caption">
         Base asset <b className="orc-raw">{o.baseAssetHex}</b>, document <b>{o.oracleDocumentId}</b>,
         published by <b>{short(o.publisher, 10)}</b>
         {o.lastUpdateAt ? <> at <b>{fmtIso(o.lastUpdateAt)}</b></> : null}
-        {o.stale ? <> — <span className="res-no">stale</span></> : null}.{' '}
+        {o.stale ? <>, <span className="res-no">stale</span></> : null}.{' '}
         {/* The transaction, not the object index: devnet.xrpl.org has no route for a bare
             ledger index and renders a client-side 404 on one. The index is still printed,
             because it is the thing being talked about, and the request under it fetches the
@@ -67,7 +68,7 @@ export function OracleObject({ o, contest }: { o: Oracle | null; contest?: Oracl
           {o.lastPublishTx ? <>last written by {short(o.lastPublishTx, 8)}</> : <>the publishing account</>}
         </a>
       </p>
-      <p className="caption meth orc-fetch">
+      <p className="caption orc-fetch">
         Object <span className="orc-raw">{o.objectIndex}</span>. Fetch it from any node:{' '}
         <span className="orc-raw">
           ledger_entry {'{'} oracle: {'{'} account: "{o.publisher}", oracle_document_id: {o.oracleDocumentId} {'}'} {'}'}
@@ -77,7 +78,8 @@ export function OracleObject({ o, contest }: { o: Oracle | null; contest?: Oracl
       {/* The whole case for a ledger object over an API, made on the ledger. */}
       {contest?.aggregate && (
         <>
-          <table className="op-tbl orc-contest" style={{ marginTop: 16 }}>
+          <div className="tbl-wrap">
+          <table className="op-tbl orc-contest">
             <thead>
               <tr><th>Who published a reading</th><th className="rt">NAV</th><th>How they arrived at it</th></tr>
             </thead>
@@ -99,13 +101,14 @@ export function OracleObject({ o, contest }: { o: Oracle | null; contest?: Oracl
               </tr>
             </tbody>
           </table>
-          <p className="caption meth" style={{ marginTop: 10 }}>
+          </div>
+          <p className="caption">
             Neither publisher computed that median and neither can alter the other's document.
             A second reader who thinks we are wrong does not need our permission to say so,
             and the disagreement is then a number on the ledger rather than an argument.
           </p>
         </>
       )}
-    </section>
+    </Exhibit>
   )
 }

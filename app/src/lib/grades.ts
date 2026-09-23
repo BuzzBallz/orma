@@ -6,12 +6,6 @@ export const GRADE_LADDER = [
 
 export function gradeIndex(g: string): number { return GRADE_LADDER.indexOf(g as never) }
 
-/** Bar fill, 0..1. AAA = 1.0, D = 0.0. Unknown grade = 0. */
-export function gradeFill(g: string): number {
-  const i = gradeIndex(g)
-  return i < 0 ? 0 : 1 - i / (GRADE_LADDER.length - 1)   // denominator is 19
-}
-
 /** A colour token from the stylesheet, by name. */
 export type ToneToken = '--color-text' | '--color-watch' | '--color-loss' | '--color-text-3'
 

@@ -1,6 +1,6 @@
-import type { ReactNode } from 'react'
 import type { BrokerHistory, Collateral } from '../lib/types'
 import { GradeLetter } from '../components/GradeLetter'
+import { Exhibit } from '../components/Exhibit'
 import { dropsToXrp, fmtIso, short } from '../lib/format'
 
 /**
@@ -25,15 +25,6 @@ const ACTION: Record<string, string> = {
   manage: 'managed',
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="op-sec">
-      <h3 className="op-h">{title}</h3>
-      {children}
-    </section>
-  )
-}
-
 /**
  * EXHIBIT 3 — manager conduct.
  *
@@ -49,112 +40,117 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 export function ManagerConduct({ h }: { h: BrokerHistory | null }) {
   if (!h) return null
   const { ordering: o, reputation: rep, recommendation: rec } = h
+  const assessment = <><GradeLetter grade={rep.grade} scale="conduct" size="sm" /> {rep.score} / 100</>
 
   return (
-    <Section title="Exhibit 3 · Manager conduct">
-      <div className="kv" style={{ marginBottom: 12 }}>
+    <Exhibit title="Exhibit 3 · Manager conduct" meta={assessment}>
+      <div className="kv">
         {/* Named as its own scale. Unlabelled, an "A" here reads two notches below the
-            facility's own AA on the rail a few centimetres above it. */}
-        <dt className="label">Conduct Assessment <span className="cond-scale">A–E</span></dt>
-        <dd className="num">
-          <GradeLetter grade={rep.grade} scale="conduct" /> {rep.score} / 100
-        </dd>
+            facility's own AA on the scale a few centimetres above it. */}
+        <span className="label">Conduct Assessment <span className="cond-scale">A–E</span></span>
+        <span className="num">{assessment}</span>
       </div>
 
       {o.applicable ? (
         <>
-          <table className="op-tbl">
-            <thead>
-              <tr><th>First-loss cover consumed</th><th className="rt">XRP</th><th>Basis</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><b>As declared</b></td>
-                <td className="rt num">{dropsToXrp(o.actualCoverPaid!)}</td>
-                <td className="op-says">the sequence the manager actually chose</td>
-              </tr>
-              <tr>
-                <td>Best available to investors</td>
-                <td className="rt num">{dropsToXrp(o.bestPossible!)}</td>
-                <td className="op-says">smallest exposure declared first</td>
-              </tr>
-              <tr>
-                <td>Worst available to investors</td>
-                <td className="rt num">{dropsToXrp(o.worstPossible!)}</td>
-                <td className="op-says">largest exposure declared first</td>
-              </tr>
-              <tr>
-                <td><b>Cost of the sequence chosen</b></td>
-                <td className="rt num">{dropsToXrp(o.costToDepositors!)}</td>
-                <td className="op-says">borne by investors, not by the manager</td>
-              </tr>
-            </tbody>
-          </table>
-          <p className="caption meth" style={{ marginTop: 10 }}>
+          <div className="tbl-wrap">
+            <table className="op-tbl">
+              <thead>
+                <tr><th>First-loss cover consumed</th><th className="rt">XRP</th><th>Basis</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><b>As declared</b></td>
+                  <td className="rt num">{dropsToXrp(o.actualCoverPaid!)}</td>
+                  <td className="op-says">the sequence the manager actually chose</td>
+                </tr>
+                <tr>
+                  <td>Best available to investors</td>
+                  <td className="rt num">{dropsToXrp(o.bestPossible!)}</td>
+                  <td className="op-says">smallest exposure declared first</td>
+                </tr>
+                <tr>
+                  <td>Worst available to investors</td>
+                  <td className="rt num">{dropsToXrp(o.worstPossible!)}</td>
+                  <td className="op-says">largest exposure declared first</td>
+                </tr>
+                <tr>
+                  <td><b>Cost of the sequence chosen</b></td>
+                  <td className="rt num">{dropsToXrp(o.costToDepositors!)}</td>
+                  <td className="op-says">borne by investors, not by the manager</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="caption">
             Sequence score <b className="num">{o.fairness}</b>, where 0 is worst for investors
             and 1 best. Same losses either way; only the order differs.
           </p>
         </>
       ) : (
-        <p className="caption meth">Sequence not assessable: {o.reason}.</p>
+        <p className="caption">Sequence not assessable: {o.reason}.</p>
       )}
 
       {rep.findings.length > 0 && (
-        <table className="op-tbl" style={{ marginTop: 12 }}>
-          <thead><tr><th>Observation</th></tr></thead>
-          <tbody>
-            {rep.findings.map(f => (
-              <tr key={f.code}><td className="op-says">{f.detail}</td></tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="tbl-wrap">
+          <table className="op-tbl">
+            <thead><tr><th>Observation</th></tr></thead>
+            <tbody>
+              {rep.findings.map(f => (
+                <tr key={f.code}><td className="op-says">{f.detail}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {rec.applicable && (
-        <p className="caption meth" style={{ marginTop: 10 }}>
+        <p className="caption">
           On current distressed exposures, declaring smallest first would apply{' '}
           <b className="num">{dropsToXrp(rec.atStakeForDepositors!)}</b> XRP more of the
           manager's own capital to investor losses than declaring largest first.
         </p>
       )}
 
-      <table className="op-tbl" style={{ marginTop: 12 }}>
-        <thead>
-          <tr>
-            <th>Action</th><th className="rt">Exposure</th>
-            <th className="rt">Book before</th><th className="rt">Cover moved</th><th>When</th>
-          </tr>
-        </thead>
-        <tbody>
-          {h.events.length === 0 && (
-            <tr><td colSpan={5} className="op-says">No manager action on file.</td></tr>
-          )}
-          {h.events.map((e, i) => (
-            <tr key={(e.hash ?? '') + i}>
-              <td><b>{ACTION[e.kind] ?? e.kind.replace(/_/g, ' ')}</b></td>
-              {/* A cover movement has no exposure and consumes nothing: its figure is
-                  the capital it moved, and it belongs in the cover column with a sign.
-                  Rendering three zeros made "added first-loss capital" read as a
-                  non-event on the exhibit about first-loss capital. */}
-              <td className="rt num">{e.exposure === '0' ? '—' : dropsToXrp(e.exposure)}</td>
-              {/* An em-dash, never 0.00. Flagging an exposure leaves the manager's own
-                  book untouched, so the record does not state it at that moment. */}
-              <td className="rt num">{e.debtBefore === null ? '—' : dropsToXrp(e.debtBefore)}</td>
-              <td className="rt num">
-                {e.kind === 'cover_deposit' || e.kind === 'cover_withdraw'
-                  ? (e.amount && e.amount !== '0'
-                      ? (e.kind === 'cover_deposit' ? '+' : '−') + dropsToXrp(e.amount)
-                      : '—')
-                  : dropsToXrp(e.coverConsumed)}
-              </td>
-              <td className="op-says">{fmtIso(e.at)}</td>
+      <div className="tbl-wrap">
+        <table className="op-tbl">
+          <thead>
+            <tr>
+              <th>Action</th><th className="rt">Exposure</th>
+              <th className="rt">Book before</th><th className="rt">Cover moved</th><th>When</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {h.events.length === 0 && (
+              <tr><td colSpan={5} className="op-says">No manager action on file.</td></tr>
+            )}
+            {h.events.map((e, i) => (
+              <tr key={(e.hash ?? '') + i}>
+                <td><b>{ACTION[e.kind] ?? e.kind.replace(/_/g, ' ')}</b></td>
+                {/* A cover movement has no exposure and consumes nothing: its figure is
+                    the capital it moved, and it belongs in the cover column with a sign.
+                    Rendering three zeros made "added first-loss capital" read as a
+                    non-event on the exhibit about first-loss capital. */}
+                <td className="rt num">{e.exposure === '0' ? '—' : dropsToXrp(e.exposure)}</td>
+                {/* An em-dash, never 0.00. Flagging an exposure leaves the manager's own
+                    book untouched, so the record does not state it at that moment. */}
+                <td className="rt num">{e.debtBefore === null ? '—' : dropsToXrp(e.debtBefore)}</td>
+                <td className="rt num">
+                  {e.kind === 'cover_deposit' || e.kind === 'cover_withdraw'
+                    ? (e.amount && e.amount !== '0'
+                        ? (e.kind === 'cover_deposit' ? '+' : '−') + dropsToXrp(e.amount)
+                        : '—')
+                    : dropsToXrp(e.coverConsumed)}
+                </td>
+                <td className="op-says num">{fmtIso(e.at)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-      <p className="caption meth" style={{ marginTop: 10 }}>{rep.caveat}</p>
-    </Section>
+      <p className="caption">{rep.caveat}</p>
+    </Exhibit>
   )
 }
 
@@ -172,54 +168,58 @@ export function PledgedCollateral({ c }: { c: Collateral | null }) {
   if (!c || c.pledgeCount === 0) return null
 
   return (
-    <Section title="Exhibit 4 · Units pledged as collateral">
-      <table className="op-tbl">
-        <thead>
-          <tr><th>Measure</th><th className="rt">XRP</th><th>Basis</th></tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Value on reported figures</td>
-            <td className="rt num">{dropsToXrp(c.totalValueNaive)}</td>
-            <td className="op-says">units × reported unit value</td>
-          </tr>
-          <tr>
-            <td>Value on held figures</td>
-            <td className="rt num">{dropsToXrp(c.totalValueCorrect)}</td>
-            <td className="op-says">units × held unit value</td>
-          </tr>
-          <tr>
-            <td><b>Overstatement carried into the pledge</b></td>
-            <td className="rt num">{dropsToXrp(c.totalOverstatement)}</td>
-            <td className="op-says">{c.totalOverstatementPct}% of the reported value</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <table className="op-tbl" style={{ marginTop: 12 }}>
-        <thead>
-          <tr>
-            <th>Pledge</th><th className="rt">Units</th>
-            <th className="rt">Reported</th><th className="rt">Held</th><th className="rt">Lendable</th>
-          </tr>
-        </thead>
-        <tbody>
-          {c.pledges.map(p => (
-            <tr key={p.escrowId}>
-              <td className="op-says">{short(p.escrowId, 6)}</td>
-              <td className="rt num">{p.shares}</td>
-              <td className="rt num">{dropsToXrp(p.valueNaive)}</td>
-              <td className="rt num">{dropsToXrp(p.valueCorrect)}</td>
-              <td className="rt num">{dropsToXrp(p.maxLendable)}</td>
+    <Exhibit title="Exhibit 4 · Units pledged as collateral">
+      <div className="tbl-wrap">
+        <table className="op-tbl">
+          <thead>
+            <tr><th>Measure</th><th className="rt">XRP</th><th>Basis</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Value on reported figures</td>
+              <td className="rt num">{dropsToXrp(c.totalValueNaive)}</td>
+              <td className="op-says">units × reported unit value</td>
             </tr>
-          ))}
-        </tbody>
-      </table>
+            <tr>
+              <td>Value on held figures</td>
+              <td className="rt num">{dropsToXrp(c.totalValueCorrect)}</td>
+              <td className="op-says">units × held unit value</td>
+            </tr>
+            <tr>
+              <td><b>Overstatement carried into the pledge</b></td>
+              <td className="rt num">{dropsToXrp(c.totalOverstatement)}</td>
+              <td className="op-says">{c.totalOverstatementPct}% of the reported value</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
-      <p className="caption meth" style={{ marginTop: 10 }}>
+      <div className="tbl-wrap">
+        <table className="op-tbl">
+          <thead>
+            <tr>
+              <th>Pledge</th><th className="rt">Units</th>
+              <th className="rt">Reported</th><th className="rt">Held</th><th className="rt">Lendable</th>
+            </tr>
+          </thead>
+          <tbody>
+            {c.pledges.map(p => (
+              <tr key={p.escrowId}>
+                <td className="op-says">{short(p.escrowId, 6)}</td>
+                <td className="rt num">{p.shares}</td>
+                <td className="rt num">{dropsToXrp(p.valueNaive)}</td>
+                <td className="rt num">{dropsToXrp(p.valueCorrect)}</td>
+                <td className="rt num">{dropsToXrp(p.maxLendable)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="caption">
         The discount applies to the held value. A discount absorbs volatility, not an
         overstatement.
       </p>
-    </Section>
+    </Exhibit>
   )
 }

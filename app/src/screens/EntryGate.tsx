@@ -1,5 +1,6 @@
 import type { Gate } from '../lib/types'
 import { short } from '../lib/format'
+import { Exhibit } from '../components/Exhibit'
 
 /**
  * EXHIBIT 6 — who may enter.
@@ -18,11 +19,9 @@ export function EntryGate({ g }: { g: Gate | null }) {
   if (!g) return null
 
   return (
-    <section className="op-sec">
-      <h3 className="op-h">Exhibit 6 · Who may enter</h3>
-
+    <Exhibit title="Exhibit 6 · Who may enter" meta={g.gated ? 'Restricted.' : 'Open to any subscriber.'}>
       {!g.gated ? (
-        <p className="caption meth">
+        <p className="caption">
           Open to any subscriber.
           {/* The note earns a sentence only when it says something the line above does
               not: a facility marked restricted that enforces nothing, for instance. */}
@@ -32,10 +31,11 @@ export function EntryGate({ g }: { g: Gate | null }) {
         </p>
       ) : (
         <>
-          <p className="caption meth">
+          <p className="caption">
             Restricted. Without one of these credentials, a subscription is refused outright.
           </p>
-          <table className="op-tbl" style={{ marginTop: 12 }}>
+          <div className="tbl-wrap">
+          <table className="op-tbl">
             <thead><tr><th>Credential required</th><th>Accepted from</th></tr></thead>
             <tbody>
               {g.acceptedCredentials.map((a, i) => (
@@ -43,13 +43,14 @@ export function EntryGate({ g }: { g: Gate | null }) {
                   <td><b>{a.type ?? short(a.typeHex, 8)}</b></td>
                   <td className="op-says">
                     {short(a.issuer, 10)}
-                    {g.issuerNamed && a.issuer === g.raterAddress ? ' — this service' : null}
+                    {g.issuerNamed && a.issuer === g.raterAddress ? ', this service' : null}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <p className="caption meth" style={{ marginTop: 10 }}>
+          </div>
+          <p className="caption">
             The facility named these issuers itself. None of them was asked, and none can
             decline being cited.
             {/* Two addresses side by side ARE the argument: the domain belongs to the
@@ -65,7 +66,8 @@ export function EntryGate({ g }: { g: Gate | null }) {
               turns people away and shows nothing that did. */}
           {g.proof && g.proof.steps.length > 0 && (
             <>
-              <table className="op-tbl gate-chain" style={{ marginTop: 16 }}>
+              <div className="tbl-wrap">
+              <table className="op-tbl gate-chain">
                 <thead><tr><th>What was submitted</th><th>Result</th><th>Recorded under</th></tr></thead>
                 <tbody>
                   {g.proof.steps.map((s, i) => (
@@ -73,14 +75,15 @@ export function EntryGate({ g }: { g: Gate | null }) {
                       <td><b>{s.step}</b></td>
                       <td>
                         <code className={s.ok ? 'res-ok' : 'res-no'}>{s.code}</code>
-                        {s.note ? <span className="op-says"> — {s.note}</span> : null}
+                        {s.note ? <span className="op-says"> · {s.note}</span> : null}
                       </td>
                       <td className="op-says gate-hash">{s.hash ? short(s.hash, 10) : '—'}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              <p className="caption meth" style={{ marginTop: 10 }}>
+              </div>
+              <p className="caption">
                 Every row landed on Devnet. The two refusals were returned by the ledger, not
                 by this service.
               </p>
@@ -88,6 +91,6 @@ export function EntryGate({ g }: { g: Gate | null }) {
           )}
         </>
       )}
-    </section>
+    </Exhibit>
   )
 }
