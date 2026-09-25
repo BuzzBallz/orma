@@ -46,7 +46,7 @@ const GLANCE_KEYS = ['Reported', 'Gap', 'Internal Score', 'Outlook', 'Status', '
  * empty, not at a different page.
  */
 export function FacilityPlaceholder({ name, picker, children }: {
-  name?: string; picker?: ReactNode; children: ReactNode
+  name?: string; picker?: ReactNode; children?: ReactNode
 }) {
   return (
     <>
@@ -59,7 +59,7 @@ export function FacilityPlaceholder({ name, picker, children }: {
         <p className="t-body-m dim">Lending facility · — · internal score — · outlook —</p>
         {picker && <div className="op-pick">{picker}</div>}
       </header>
-      <section className="wrap state-slot">{children}</section>
+      {children && <section className="wrap state-slot">{children}</section>}
       <section className="wrap op-band op-placeholder" aria-label="Key figures">
         <div className="op-band-in grid12">
           <div className="op-held">
@@ -99,6 +99,8 @@ export function Facility({ d, history, collateral, resolution, gate, contest, pi
   const headline = d.score.dimensions.find(x => x.key === 'HEADLINE')
 
   const gapPct = bpsToPct(v.navDivergenceBps)
+  // With no gap the two figures agree: there is no recognised loss to describe.
+  const hasGap = v.navDivergenceBps > 0
   const largest = d.loans.length
     ? d.loans.reduce((a, b) => (Number(a.shareOfDebtTotal) > Number(b.shareOfDebtTotal) ? a : b))
     : null
@@ -176,13 +178,21 @@ export function Facility({ d, history, collateral, resolution, gate, contest, pi
               non-performing. It is in its {v.phase.toLowerCase()} period, with redemption
               scheduled for {fmtIso(v.redemptionAt)}.
             </p>
-            <p>
-              The facility reports a unit value of {v.navNaive} against a held value of{' '}
-              {v.navCorrect}. The {v.navDivergenceBps} bps gap ({gapPct}) between the two is
-              the recognised loss of {dropsToXrp(v.lossUnrealized)} carried on the book but
-              not taken off the reported figure. An investor reading the reported figure
-              alone is reading a number the facility cannot currently realise.
-            </p>
+            {hasGap ? (
+              <p>
+                The facility reports a unit value of {v.navNaive} against a held value of{' '}
+                {v.navCorrect}. The {v.navDivergenceBps} bps gap ({gapPct}) between the two is
+                the recognised loss of {dropsToXrp(v.lossUnrealized)} carried on the book but
+                not taken off the reported figure. An investor reading the reported figure
+                alone is reading a number the facility cannot currently realise.
+              </p>
+            ) : (
+              <p>
+                The facility reports a unit value of {v.navNaive} and holds the same value,{' '}
+                {v.navCorrect}. The two figures agree, which is not the same as safety: a loss
+                nobody has recognised is absent from both.
+              </p>
+            )}
             <p>
               The internal score of {v.grade} anchors on whether claims can be met at
               redemption and is notched down from there. No weights are applied. The
@@ -228,11 +238,13 @@ export function Facility({ d, history, collateral, resolution, gate, contest, pi
               {/* A boundary that has already gone by is said to have gone by. Taking the
                   absolute value and always writing "in" turned every overrun into time
                   still in hand, which is the one direction a credit note must not err in. */}
-              {d.phaseInfo.secondsToNextBoundary < 0
-                ? <> That boundary was {fmtIso(d.phaseInfo.nextBoundaryAt)},
-                    {' '}{duration(-d.phaseInfo.secondsToNextBoundary)} ago.</>
-                : <> The next scheduled boundary is {fmtIso(d.phaseInfo.nextBoundaryAt)},
-                    {' '}in {duration(d.phaseInfo.secondsToNextBoundary)}.</>}
+              {!d.phaseInfo.nextBoundaryAt
+                ? <> No further boundary is scheduled.</>
+                : d.phaseInfo.secondsToNextBoundary < 0
+                  ? <> That boundary was {fmtIso(d.phaseInfo.nextBoundaryAt)},
+                      {' '}{duration(-d.phaseInfo.secondsToNextBoundary)} ago.</>
+                  : <> The next scheduled boundary is {fmtIso(d.phaseInfo.nextBoundaryAt)},
+                      {' '}in {duration(d.phaseInfo.secondsToNextBoundary)}.</>}
             </p>
             <p className="dim">
               Resolution depends on whether performing exposures mature before the
@@ -242,7 +254,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, pi
           </section>
 
           <section className="op-sec op-why">
-            <h3 className="t-heading-s">Why the Score Sits Below the Anchor</h3>
+            <h3 className="t-heading-s">Why the Score Sits {moves.length > 0 ? 'Below' : 'at'} the Anchor</h3>
             {moves.length > 0
               ? (
                 <div>
@@ -314,7 +326,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, pi
               {overdue > 0
                 ? `${overdue} past due and carried at par until recognised.`
                 : 'None past due.'}{' '}
-              The reported figure overstates held value by {gapPct}.
+              {hasGap ? `The reported figure overstates held value by ${gapPct}.` : 'Reported and held values agree.'}
             </p>
           </div>
           <div className="op-box">

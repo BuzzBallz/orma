@@ -828,7 +828,7 @@ main:focus{ outline: none; }
 .field label{ font: 500 13px/1.4 var(--font-sans); }
 .field input{
   width: 100%; min-height: 48px; padding: 0 14px; background: var(--color-bg);
-  border: 1px solid var(--color-line); border-radius: var(--radius-sm);
+  border: 1px solid var(--color-text-3); border-radius: var(--radius-sm);
   font: 400 16px/1.5 var(--font-mono); color: var(--color-text); outline: none;
 }
 .field input:focus{ border-color: var(--color-rule); }

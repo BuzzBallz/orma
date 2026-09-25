@@ -96,7 +96,7 @@ export function Event({ d, picker }: { d: VaultDetail; picker?: ReactNode }) {
               <span className="t-fig-s mute">{next.who}</span>
             </div>
             <div className="ev-feature-when">
-              <span className="t-fig-l">
+              <span className={'t-fig-l' + (next.inSeconds < 0 ? ' loss' : '')}>
                 {next.inSeconds < 0 ? `${duration(-next.inSeconds)} past due` : `in ${duration(next.inSeconds)}`}
               </span>
               {next.when && <span className="t-fig-s mute">{fmtIso(next.when)}</span>}

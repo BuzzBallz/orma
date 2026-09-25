@@ -52,16 +52,20 @@ export function beatRows(d: VaultDetail): Beat[] {
   const v = d.vault
   const scheduled: Beat[] = [
     {
-      when: d.phaseInfo.nextBoundaryAt, inSeconds: d.phaseInfo.secondsToNextBoundary,
-      what: `${v.phase} period ends`, who: facilityName(v), amount: null, tone: '--fg-dim',
-    },
-    {
       when: v.redemptionAt, inSeconds: v.secondsToRedemption,
       what: 'Redemption date', who: facilityName(v),
       amount: d.phaseInfo.claimsAtRedemption,
       tone: Number(d.phaseInfo.projectedShortfall) > 0 ? '--bad' : '--fg-dim',
     },
   ]
+  // The last period has no boundary after it. A row with no date is not a calendar entry,
+  // and sorted by its zero seconds it would head the list as the next event.
+  if (d.phaseInfo.nextBoundaryAt) {
+    scheduled.push({
+      when: d.phaseInfo.nextBoundaryAt, inSeconds: d.phaseInfo.secondsToNextBoundary,
+      what: `${v.phase} period ends`, who: facilityName(v), amount: null, tone: '--fg-dim',
+    })
+  }
   return [...scheduled, ...loanBeats(d.loans)].sort((a, b) => a.inSeconds - b.inSeconds)
 }
 

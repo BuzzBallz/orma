@@ -132,6 +132,11 @@ function Desk() {
   // fixed historical artifact and "stale" means a live figure stopped arriving.
   const stamp = path === '/' ? vaults.data : path === '/evidence' ? race.data : detail.data
   const notFound = detail.code === 'VAULT_NOT_FOUND'
+  // usePoll keeps the last good payload across a path change, so `detail.data` can still be
+  // the previous facility's while this one is in flight. A desk draws a payload only when
+  // it names the facility in the address bar, never one facility's figures under another's.
+  const own = detail.data && vaultId && detail.data.vault.vaultId.toUpperCase() === vaultId.toUpperCase()
+    ? detail.data : null
 
   const wasWithheld = useRef(false)
   useEffect(() => {
@@ -185,7 +190,7 @@ function Desk() {
       )
     }
 
-    if (notFound && !detail.data) {
+    if (notFound && !own) {
       return (
         <Placeholder picker={picker}>
           <Note
@@ -198,14 +203,14 @@ function Desk() {
       )
     }
 
-    if (!detail.data) {
-      if (detail.fails === 0) return null
-      // The blotter already knows this facility's name even while its detail is
-      // unreachable, so the page can be headed properly instead of by an em-dash.
+    if (!own) {
+      // The blotter already knows this facility's name even while its detail is in
+      // flight or unreachable, so the page can be headed properly instead of by an
+      // em-dash. Still waiting draws the desk's shape alone; only a failure says why.
       const known = rows.find(r => r.vaultId === vaultId)
       return (
         <Placeholder name={known ? facilityName(known) : undefined} picker={picker}>
-          <p className="t-body-m dim">This facility is on file. No figure is shown until one is received.</p>
+          {detail.fails > 0 && <p className="t-body-m dim">This facility is on file. No figure is shown until one is received.</p>}
         </Placeholder>
       )
     }
@@ -216,7 +221,7 @@ function Desk() {
       // attribute one facility's manager -- and their conduct grade -- to the next
       // facility opened, for as long as the new request is in flight. So each exhibit is
       // shown only when the payload identifies ITSELF as belonging to this facility.
-      const d = detail.data
+      const d = own
       const h = history.data && d.broker && history.data.loanBrokerId === d.broker.loanBrokerId
         ? history.data : null
       const c = collateral.data && d.vault.shareMptId && collateral.data.shareMptId === d.vault.shareMptId
@@ -228,7 +233,7 @@ function Desk() {
         ? gate.data : null
       return <Facility d={d} history={h} collateral={c} resolution={rz} gate={gt} contest={contest.data} picker={picker} />
     }
-    return <Event d={detail.data} picker={picker} />
+    return <Event d={own} picker={picker} />
   }
 
   const missing = wallet.missing && WALLETS.find(w => w.kind === wallet.missing)?.name
@@ -243,7 +248,7 @@ function Desk() {
         activeVaultId={vaultId}
         path={path}
         asOf={stamp?.serverTime ?? null}
-        withheld={!health.data || health.stale}
+        withheld={health.fails > 0 || health.stale}
         slide={!quiet.current}
         onNavigate={go}
         onSelect={select}

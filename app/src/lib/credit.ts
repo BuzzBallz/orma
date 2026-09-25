@@ -32,6 +32,7 @@ const TERMS: [RegExp, string][] = [
   // Amounts arrive denominated; the note states the reporting currency once, in the
   // methodology, rather than repeating a ticker against every figure.
   [/\s*\bXRP\b/g, ''],
+  [/\bFirstComeFirstServe\b/g, 'first come, first served'],
   [/\bon-chain\b/gi, 'reported'],
   [/\bledger\b/gi, 'register'],
 ]

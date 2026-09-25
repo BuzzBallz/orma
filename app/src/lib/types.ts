@@ -66,7 +66,7 @@ export interface Loan {
 export interface PhaseInfo {
   phase: Phase; canDeposit: boolean; canWithdraw: boolean
   withdrawBlockedReason: string | null
-  nextBoundaryAt: string; secondsToNextBoundary: number
+  nextBoundaryAt: string | null; secondsToNextBoundary: number   // NULL in the last period
   claimsAtRedemption: string; liquidityAtRedemption: string
   projectedShortfall: string; shortfallPct: string
 }
