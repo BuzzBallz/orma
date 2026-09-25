@@ -17,8 +17,8 @@ import { Evidence } from './screens/Evidence'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Toaster } from '@/components/ui/sonner'
 import { toast } from 'sonner'
-import { WALLETS, WalletProvider, useWallet } from './lib/wallet'
-import { ArrowLeft, KeyRound } from 'lucide-react'
+import { WalletProvider } from './lib/wallet'
+import { ArrowLeft } from 'lucide-react'
 
 const POLL_MS = 3000
 
@@ -72,7 +72,6 @@ function Desk() {
   const slow = API_MIXED_ORIGIN
     ? { slowAfter: SUSPECT_AFTER_FAILS, slowCapMs: SUSPECT_BACKOFF_MS }
     : undefined
-  const wallet = useWallet()
   const health = usePoll<Health>('/api/health', 5000, slow)
   const vaults = usePoll<VaultsResponse>('/api/vaults', path === '/' ? POLL_MS : 15000, slow)
   const detail = usePoll<Detail>(vaultId ? `/api/vaults/${vaultId}` : null, POLL_MS, slow)
@@ -236,8 +235,6 @@ function Desk() {
     return <Event d={own} picker={picker} />
   }
 
-  const missing = wallet.missing && WALLETS.find(w => w.kind === wallet.missing)?.name
-
   return (
     <TooltipProvider delayDuration={250} skipDelayDuration={400}>
       <a className="skip" href="#main">Skip to content</a>
@@ -254,17 +251,7 @@ function Desk() {
         onSelect={select}
       />
 
-      {primary.stale && path !== '/evidence'
-        ? <StaleBar ageMs={primary.ageMs} />
-        : missing && (
-          <button type="button" className="wbanner" onClick={wallet.dismissMissing}>
-            <span className="wrap bar-in">
-              <KeyRound size={16} strokeWidth={1.75} aria-hidden />
-              <span className="k">{missing} is not available in this browser</span>
-              <span className="v">Every figure is shown either way.</span>
-            </span>
-          </button>
-        )}
+      {primary.stale && path !== '/evidence' && <StaleBar ageMs={primary.ageMs} />}
 
       <main id="main" className="page" tabIndex={-1}>
         <div key={path} className={'view' + (quiet.current ? '' : ' enter')}>{body()}</div>

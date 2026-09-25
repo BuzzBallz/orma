@@ -1,8 +1,5 @@
 @import "tailwindcss";
-@import "tw-animate-css";
 @import "shadcn/tailwind.css";
-
-@custom-variant dark (&:is(.dark *));
 
 /* ============================================================
    THEME — direction D2 "Registre"
@@ -148,8 +145,11 @@ body{
   text-rendering: optimizeLegibility;
   -webkit-tap-highlight-color: transparent;
 }
-#root{ min-height: 100dvh; display: flex; flex-direction: column; }
+/* svh, not dvh: the page is at least the smallest viewport, so the footer does not move as a
+   phone's address bar folds away while scrolling. */
+#root{ min-height: 100svh; display: flex; flex-direction: column; }
 h1, h2, h3, h4, p, dl, dd, figure, blockquote, pre{ margin: 0; }
+p{ text-wrap: pretty; }
 a{ color: inherit; }
 button{ font: inherit; color: inherit; }
 img, svg{ display: block; }
@@ -202,7 +202,7 @@ main:focus{ outline: none; }
 .grid12{ display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--space-6); }
 /* At least a screen tall under the masthead, so the footer starts at the fold: figures that
    arrive late push nothing the reader can already see (no layout shift). */
-.page{ flex: 1 0 auto; display: flex; flex-direction: column; min-height: calc(100dvh - var(--masthead)); }
+.page{ flex: 1 0 auto; display: flex; flex-direction: column; min-height: calc(100svh - var(--masthead)); }
 .view{ display: flex; flex-direction: column; }
 /* Whatever a desk ends on keeps its distance from the footer. Zero specificity, so a
    section that sets its own bottom padding keeps it. */
@@ -316,7 +316,10 @@ main:focus{ outline: none; }
 }
 .picker-cta .chev{ color: currentColor; }
 .picker-cta:disabled{ background: var(--color-bg-disabled); border-color: var(--color-bg-disabled); color: var(--color-text-disabled); }
-@media (hover: hover) and (pointer: fine){ .picker-cta:hover:not(:disabled){ background: var(--color-bg-inverse-hover); border-color: var(--color-bg-inverse-hover); } }
+@media (hover: hover) and (pointer: fine){
+  .picker-cta:hover:not(:disabled){ background: var(--color-bg-inverse-hover); border-color: var(--color-bg-inverse-hover); }
+  .picker-btn:hover:not(:disabled):not(.picker-cta){ border-color: var(--color-rule); }
+}
 .picker-block{ width: 100%; max-width: none; min-height: 48px; }
 .op-pick .picker{ display: flex; }
 .picker-list{
@@ -371,8 +374,7 @@ main:focus{ outline: none; }
 .menu-stamp{ padding: var(--space-2) var(--gutter) calc(var(--space-8) + env(safe-area-inset-bottom)); }
 
 /* ---------- status bars ---------- */
-.feedbar, .wbanner{ display: block; width: 100%; background: var(--color-bg-sunken); border: 0; border-bottom: 1px solid var(--color-line); }
-.wbanner{ text-align: left; cursor: pointer; padding: 0; }
+.feedbar{ display: block; width: 100%; background: var(--color-bg-sunken); border: 0; border-bottom: 1px solid var(--color-line); }
 .bar-in{ display: flex; align-items: center; flex-wrap: wrap; column-gap: var(--space-3); min-height: var(--size-control); padding-block: 10px; }
 .bar-in .k{ font: 500 14px/1.4 var(--font-sans); color: var(--color-text); }
 .bar-in .v{ font: 400 14px/1.5 var(--font-sans); color: var(--color-text-2); }
@@ -493,6 +495,8 @@ main:focus{ outline: none; }
     background: var(--color-bg-raised); border: 1px solid var(--color-line); border-radius: var(--radius-md);
   }
   .frow::before, .frow::after{ border-radius: var(--radius-md); }
+  /* The focus ring would round the card to the base 2px; it keeps the card's own corners. */
+  .frow:focus-visible{ border-radius: var(--radius-md); }
   .frow-grade{ grid-area: g; }
   .frow-grade .grade-xl{ font-size: 30px; }
   .frow-id{ grid-area: id; padding-right: 0; }
@@ -563,9 +567,9 @@ main:focus{ outline: none; }
 .op-item{ display: flex; flex-direction: column; gap: var(--space-1); padding: 14px 0; border-top: 1px solid var(--color-line); }
 .op-item b{ font: 500 15px/1.4 var(--font-sans); }
 .op-item span{ font: 400 14px/1.5 var(--font-sans); color: var(--color-text-2); }
-.op-notch{ display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: var(--space-6); padding: 14px 0; border-top: 1px solid var(--color-line); }
+.op-notch{ display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-6); padding: 14px 0; border-top: 1px solid var(--color-line); }
 .op-notch span:first-child{ font: 400 14px/1.5 var(--font-sans); color: var(--color-text-2); }
-.op-notch span:last-child{ font: 400 13px/1.5 var(--font-mono); text-align: right; }
+.op-notch span:last-child{ font: 400 13px/1.5 var(--font-mono); text-align: right; white-space: nowrap; }
 .op-box{ display: flex; flex-direction: column; gap: 6px; padding-top: var(--space-4); border-top: 1px solid var(--color-line); }
 .op-box.lead{ border-top: 3px solid var(--color-rule); }
 .op-box.rule{ border-top-color: var(--color-rule); gap: 10px; }
@@ -586,6 +590,10 @@ main:focus{ outline: none; }
 .exh-meta{ display: inline-flex; align-items: center; gap: var(--space-4); flex: 0 0 auto; font: 400 14px/1.5 var(--font-sans); color: var(--color-text-3); }
 .exh-meta-text{ display: inline-flex; align-items: baseline; gap: 6px; }
 .exh-chev{ color: var(--color-text-2); }
+@media (hover: hover) and (pointer: fine){
+  .exh > summary:hover .exh-chev{ color: var(--color-text); }
+  .exh > summary:hover .exh-title{ text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 5px; }
+}
 .exh[open] .exh-chev{ transform: rotate(180deg); }
 .exh-body{ padding-bottom: 28px; display: flex; flex-direction: column; gap: var(--space-4); }
 
@@ -771,7 +779,9 @@ main:focus{ outline: none; }
 .evd-formula{ display: flex; flex-direction: column; gap: 6px; padding: var(--space-5); background: var(--color-bg-sunken); border-radius: var(--radius-sm); }
 .evd-formula code{ font: 400 15px/1.5 var(--font-mono); overflow-wrap: anywhere; }
 .evd-prov{ grid-column: span 5; display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--color-rule); padding-top: var(--space-4); }
-.evd-prov code{ font: 400 13px/1.5 var(--font-mono); color: var(--color-text-2); overflow-wrap: anywhere; }
+/* A 64-character hash has no space to break at: break anywhere, and split it evenly instead of
+   leaving its last two characters alone on a second line. */
+.evd-prov code{ font: 400 13px/1.5 var(--font-mono); color: var(--color-text-2); overflow-wrap: anywhere; word-break: break-all; text-wrap: balance; }
 .evd-prov code.ok{ font-size: 16px; font-weight: 500; color: var(--color-ok); }
 .evd-prov code.mute{ color: var(--color-text-3); }
 .evd-raw{ padding-block: var(--space-12) var(--space-24); }
@@ -856,7 +866,7 @@ main:focus{ outline: none; }
    PRINT — the opinion on paper
    ============================================================ */
 @media print{
-  .mast, .foot, .feedbar, .wbanner, .skip, .op-pick, .menu-btn{ display: none !important; }
+  .mast, .foot, .feedbar, .skip, .op-pick, .menu-btn{ display: none !important; }
   body{ background: #fff; color: #000; }
   .op-letterhead{ display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font: 600 14px/1 var(--font-serif); }
   .op-lh-rule{ flex: 1; border-top: 1px solid #000; }
@@ -870,11 +880,13 @@ main:focus{ outline: none; }
    once. All transitions, so a second press or a second change retargets from wherever
    the first one got to instead of restarting. */
 .btn, .picker-btn, .waddr, .menu-btn, .menu-x, .dlg [data-slot="dialog-close"]{ transition: transform 160ms var(--ease-out); }
+/* Hover on a filled or outlined control: the colour follows in 120ms, as the design canvas has it. */
+.btn, .picker-btn{ transition: transform 160ms var(--ease-out), background-color 120ms ease-out, border-color 120ms ease-out; }
 .btn:active:not(:disabled), .picker-btn:active:not(:disabled), .waddr:active, .menu-btn:active, .menu-x:active, .dlg [data-slot="dialog-close"]:active{ transform: scale(.97); translate: none; transition-duration: 120ms; }
 /* Text controls dim at the touch and come back on release, as text buttons do on iOS: the
    tap highlight is off, so this is the only sign a tap landed. */
-.lnk, .desk, .menu-list a, .foot-nav a, .kf-head, .exh > summary{ transition: opacity 160ms var(--ease-out); }
-.lnk:active, .desk:active, .menu-list a:active, .foot-nav a:active, .kf-head:active, .exh > summary:active{ opacity: .6; transition-duration: 0ms; }
+.lnk, .desk, .menu-list a, .foot-nav a, .kf-head, .exh > summary, .lockup{ transition: opacity 160ms var(--ease-out); }
+.lnk:active, .desk:active, .menu-list a:active, .foot-nav a:active, .kf-head:active, .exh > summary:active, .lockup:active{ opacity: .6; transition-duration: 0ms; }
 .picker-btn .chev{ transition: transform 200ms var(--ease-out); }
 .frow::before{ transition: opacity 120ms ease; }
 @media (max-width: 1099px){
@@ -884,10 +896,15 @@ main:focus{ outline: none; }
 /* A row whose figures moved: the overlay is set at once, then decays. */
 .frow::after{ transition: opacity 900ms var(--ease-out); }
 .frow.flash::after{ opacity: .16; transition-duration: 0ms; }
-/* The stale bar and the wallet notice fade in when they appear; figures never animate. */
-.feedbar, .wbanner{ transition: opacity 200ms var(--ease-out); }
-@starting-style{ .feedbar, .wbanner{ opacity: 0; } }
+/* The stale bar fades in when it appears; figures never animate. */
+.feedbar{ transition: opacity 200ms var(--ease-out); }
+@starting-style{ .feedbar{ opacity: 0; } }
+/* The signed-in pill and address arrive where the Sign In link was: a short fade and settle
+   instead of a swap. Masthead only; the phone menu opens too often to replay it each time. */
+.mast-right .wallet{ transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out); }
+@starting-style{ .mast-right .wallet{ opacity: 0; transform: translateY(4px); } }
 @media (prefers-reduced-motion: reduce){
+  .mast-right .wallet{ transition-property: opacity; }
   .btn, .picker-btn, .waddr, .menu-btn, .menu-x, .dlg [data-slot="dialog-close"], .frow, .picker-btn .chev{ transition: none; }
   .btn:active:not(:disabled), .picker-btn:active:not(:disabled), .waddr:active, .menu-btn:active, .menu-x:active, .dlg [data-slot="dialog-close"]:active, .frow:active{ transform: none; }
 }
@@ -936,7 +953,7 @@ main:focus{ outline: none; }
 .enter > *{ animation: rise 220ms var(--ease-out) both; }
 .enter > :nth-child(2){ animation-delay: 40ms; }
 .enter > :nth-child(n+3){ animation-delay: 80ms; }
-.exh-chev{ transition: transform 200ms var(--ease-out); }
+.exh-chev{ transition: transform 200ms var(--ease-out), color 120ms ease-out; }
 .exh[open] > .exh-body{ animation: settle 180ms var(--ease-out); }
 @media (prefers-reduced-motion: reduce){
   .desk-ind[data-slide], .exh-chev{ transition: none; }

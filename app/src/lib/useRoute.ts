@@ -19,10 +19,19 @@ const MOVED: Record<string, RoutePath> = {
   '/vault': '/facility', '/moment': '/event', '/oracle': '/methodology',
 }
 
-/** The address bar is read too. `facility=` is the current spelling; `vault=` still works. */
+/**
+ * The address bar is read too. `facility=` is the current spelling; `vault=` still works,
+ * and is rewritten to it so a copied address carries the current wording.
+ */
 function readId(): string | null {
   const q = new URLSearchParams(location.search)
-  return q.get('facility') ?? q.get('vault')
+  const legacy = q.get('vault')
+  if (legacy !== null && !q.has('facility')) {
+    q.set('facility', legacy)
+    q.delete('vault')
+    history.replaceState(null, '', location.pathname + '?' + q)
+  }
+  return q.get('facility')
 }
 
 function read(): { path: RoutePath; vaultId: string | null } {

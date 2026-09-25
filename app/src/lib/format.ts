@@ -60,12 +60,6 @@ export function ratioToPct(r: string): string { return padDp(shift(r, 2), 2) + '
 /** [CONTRACT §6] 1e-5 rate -> percent, 3dp. 10000 -> "10.000%" ; 1000 -> "1.000%" */
 export function rateToPct(rate: number): string { return padDp(shift(String(rate), -3), 3) + '%' }
 
-/** [CONTRACT §6] negative -> "overdue 7m 00s" ; positive -> "in 2m 13s" */
-export function formatCountdown(seconds: number): string {
-  const late = seconds < 0
-  return (late ? 'overdue ' : 'in ') + duration(Math.abs(Math.trunc(seconds)))
-}
-
 /** bare duration, no prefix. 86100 -> "23h 55m 00s" ; 742 -> "12m 22s" */
 export function duration(absSeconds: number): string {
   const s = Math.abs(Math.trunc(absSeconds))

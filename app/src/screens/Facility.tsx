@@ -7,7 +7,7 @@ import { Mark } from '../components/Lockup'
 import { gradeIndex } from '../lib/grades'
 import { nextBeat } from '../lib/beats'
 import { bpsToPct, dropsToXrp, duration, fmtIso, ratioToPct, rateToPct } from '../lib/format'
-import { creditText, facilityName, facilityRef, factorRows, outlookOf, splitFactors } from '../lib/credit'
+import { creditText, facilityName, facilityRef, factorRows, outlookOf, sentence, splitFactors } from '../lib/credit'
 import { ManagerConduct, PledgedCollateral } from './FacilityExhibits'
 import { PledgeResolution } from './PledgeResolution'
 import { EntryGate } from './EntryGate'
@@ -33,7 +33,7 @@ function FactorItem({ d }: { d: Dimension }) {
   return (
     <div className="op-item">
       <b>{creditText(d.label)}</b>
-      <span>Scored {d.grade}. {creditText(d.explain)}</span>
+      <span>Scored {d.grade}. {sentence(creditText(d.explain))}</span>
     </div>
   )
 }
@@ -387,7 +387,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, pi
                       <td><b>{creditText(dim.label)}</b></td>
                       <td className="rt num">{dim.value}{dim.unit === 'pct' ? '%' : dim.unit && dim.unit !== 'none' ? ` ${dim.unit}` : ''}</td>
                       <td className="rt"><GradeLetter grade={dim.grade} size="sm" /></td>
-                      <td className="op-says">{creditText(dim.explain)}</td>
+                      <td className="op-says">{sentence(creditText(dim.explain))}</td>
                     </tr>
                   ))}
                 </tbody>

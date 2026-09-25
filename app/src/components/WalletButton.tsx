@@ -57,7 +57,7 @@ export function SignInButton({ onOpen }: { onOpen: () => void }) {
               }, () => toast.error('Could not reach the clipboard'))
             }}
           >
-            {copied ? <Check size={14} strokeWidth={2} /> : <Copy size={14} strokeWidth={1.75} />}
+            {copied ? <Check size={14} strokeWidth={1.75} /> : <Copy size={14} strokeWidth={1.75} />}
             Copy reference
           </DropdownMenuItem>
           <DropdownMenuItem data-danger onSelect={disconnect}>

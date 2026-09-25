@@ -42,6 +42,11 @@ export function creditText(s: string): string {
   return TERMS.reduce((acc, [re, to]) => acc.replace(re, to), s)
 }
 
+/** For a backend string that opens a sentence: creditText can leave it in lower case. */
+export function sentence(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
 /** Outlook, derived from the trend the backend actually sends. Never decorative. */
 export function outlookOf(trend: Trend | undefined): 'Stable' | 'Negative' | 'Positive' | 'n.a.' {
   if (trend === 'deteriorating') return 'Negative'
