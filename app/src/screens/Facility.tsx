@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
-import type { BrokerHistory, Collateral, Dimension, Gate, OracleContest, Resolution, VaultDetail } from '../lib/types'
+import type { BrokerHistory, Collateral, Dimension, Gate, NavHistory, OracleContest, Resolution, VaultDetail } from '../lib/types'
 import { GradeLetter } from '../components/GradeLetter'
 import { Scale } from '../components/Scale'
+import { NavChart } from '../components/NavChart'
 import { Exhibit } from '../components/Exhibit'
 import { Mark } from '../components/Lockup'
 import { gradeIndex } from '../lib/grades'
@@ -83,13 +84,14 @@ export function FacilityPlaceholder({ name, picker, children }: {
  * then the exhibits. Every figure in it is a figure the calculation agent sent. Where a
  * figure was not sent, the line reads n.a. and nothing is inferred to fill it.
  */
-export function Facility({ d, history, collateral, resolution, gate, contest, picker }: {
+export function Facility({ d, history, collateral, resolution, gate, contest, navHistory, picker }: {
   d: VaultDetail
   history?: BrokerHistory | null
   collateral?: Collateral | null
   resolution?: Resolution | null
   gate?: Gate | null
   contest?: OracleContest | null
+  navHistory?: NavHistory | null
   picker?: ReactNode
 }) {
   const v = d.vault
@@ -176,6 +178,17 @@ export function Facility({ d, history, collateral, resolution, gate, contest, pi
       </section>
 
       <section className="wrap op-scale"><Scale grade={v.grade} /></section>
+
+      {navHistory && navHistory.points.length > 1 && (
+        <section className="wrap op-nav" aria-label="NAV history">
+          <h2 className="t-heading-m">NAV History</h2>
+          <p className="t-body-s dim">
+            Reported and held value per unit at every transaction that modified the facility.
+            {navHistory.truncated && ' The oldest transactions are not shown.'}
+          </p>
+          <NavChart points={navHistory.points} />
+        </section>
+      )}
 
       <section className="wrap grid12 op-body">
         <div className="op-main">

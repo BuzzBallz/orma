@@ -66,17 +66,21 @@ if (!id) {
   const detail = await grab('/api/vaults/' + id)
   const history = await grab('/api/vaults/' + id + '/broker-history')
   const collateral = await grab('/api/vaults/' + id + '/collateral')
+  const navHistory = await grab('/api/vaults/' + id + '/nav-history')
 
   const { Facility } = await import('../src/screens/Facility.tsx')
-  const page = renderToString(createElement(Facility, { d: detail, history, collateral }))
+  const page = renderToString(createElement(Facility, { d: detail, history, collateral, navHistory }))
 
   const hasConduct = page.includes('Exhibit 3')
   const hasPledges = page.includes('Exhibit 4')
+  const hasChart = page.includes('NAV History')
   console.log(NL + '  facility ' + id.slice(0, 10) + ' renders, ' + page.length + ' bytes')
   console.log('  ' + (hasConduct ? 'ok  ' : '--  ') + ' Exhibit 3 manager conduct '
     + (hasConduct ? 'present' : 'omitted, no manager on file'))
   console.log('  ' + (hasPledges ? 'ok  ' : '--  ') + ' Exhibit 4 pledged units   '
     + (hasPledges ? 'present' : 'omitted, nothing pledged'))
+  console.log('  ' + (hasChart ? 'ok  ' : '--  ') + ' NAV history chart         '
+    + (hasChart ? 'present' : 'omitted, this server has no history for it'))
 
   // The whole reason the API reports null rather than 0: an unstated book must never
   // print as a figure. If an event says the book is unknown, an em-dash reaches the page.

@@ -54,6 +54,9 @@ function padDp(s: string, dp: number): string {
 /** [CONTRACT §6] drops -> XRP. "51000000" -> "51.000000" ; "1" -> "0.000001" */
 export function dropsToXrp(drops: string): string { return padDp(shift(drops, -6), 6) }
 
+/** A plotted position as an axis label, rounded half-up to `dp` places. */
+export function axisLabel(v: number, dp = 2): string { return padDp(String(v), dp) }
+
 /** [CONTRACT §6] ratio string -> percent, 2dp. "0.8039" -> "80.39%" */
 export function ratioToPct(r: string): string { return padDp(shift(r, 2), 2) + '%' }
 

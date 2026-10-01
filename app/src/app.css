@@ -555,6 +555,27 @@ main:focus{ outline: none; }
 .op-held, .op-glance > div{ position: relative; isolation: isolate; }
 .op-held::after, .op-glance > div::after{ content: ""; position: absolute; inset: 0; z-index: -1; opacity: 0; pointer-events: none; background: var(--color-brand-gold); }
 .op-scale{ padding-top: var(--space-10); }
+/* NAV history: reported against held at every transaction, the turning points in the brand gold. */
+.op-nav{ padding-top: var(--space-16); display: flex; flex-direction: column; gap: var(--space-2); }
+.navc{ margin-top: var(--space-5); display: flex; flex-direction: column; gap: var(--space-5); }
+.navc svg{ display: block; max-width: 100%; overflow: visible; }
+.navc-grid{ stroke: var(--color-line); stroke-width: 1; }
+.navc-tick{ font: 400 12px var(--font-mono); fill: var(--color-text-3); }
+.navc-xl{ font: 500 12px var(--font-sans); fill: var(--color-text-2); }
+.navc-held{ fill: none; stroke: var(--color-text); stroke-width: 2; }
+.navc-rep{ fill: none; stroke: var(--color-text-3); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.navc-gap{ fill: var(--color-loss); opacity: .1; }
+.navc-end{ font: 500 13px var(--font-mono); fill: var(--color-text); }
+.navc-end.rep{ fill: var(--color-text-3); }
+.navc-pt .hit{ fill: transparent; }
+.navc-pt .dot{ fill: var(--color-bg); stroke: var(--color-text); stroke-width: 1.5; }
+.navc-pt.key .dot{ fill: var(--color-brand-gold); }
+.navc-tip{ display: block; }
+.navc-legend{ list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-6); color: var(--color-text-2); }
+.navc-legend li{ display: inline-flex; align-items: center; gap: var(--space-2); }
+.navc-dot{ display: inline-block; width: 11px; height: 11px; margin-right: var(--space-2); border-radius: 50%; background: var(--color-brand-gold); border: 1.5px solid var(--color-text); vertical-align: -1px; }
+.navc-legend .navc-dot{ margin-right: 0; vertical-align: baseline; }
+.navc .op-tbl td:nth-child(2){ white-space: nowrap; }
 .op-body{ padding-top: var(--space-16); align-items: start; }
 .op-main{ grid-column: span 8; min-width: 0; display: flex; flex-direction: column; }
 .op-side{ grid-column: span 4; min-width: 0; display: flex; flex-direction: column; gap: var(--space-8); }

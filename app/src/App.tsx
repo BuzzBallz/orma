@@ -4,7 +4,7 @@ import { API_MIXED_ORIGIN, SUSPECT_AFTER_FAILS, SUSPECT_BACKOFF_MS } from './lib
 import { usePoll } from './lib/usePoll'
 import { facilityName } from './lib/credit'
 import { follow, useRoute, type RoutePath } from './lib/useRoute'
-import type { BrokerHistory, Collateral, Gate, Health, IndexerRace, OracleContest, Resolution, VaultDetail as Detail, VaultsResponse } from './lib/types'
+import type { BrokerHistory, Collateral, Gate, Health, IndexerRace, NavHistory, OracleContest, Resolution, VaultDetail as Detail, VaultsResponse } from './lib/types'
 import { HeaderBar } from './components/HeaderBar'
 import { Footer } from './components/Footer'
 import { StaleBar } from './components/StaleBar'
@@ -116,6 +116,9 @@ function Desk() {
   const resolution = usePoll<Resolution>(
     shareId ? `/api/mpt/${shareId}/resolve?units=1000000` : null, 60000)
   const collateral = usePoll<Collateral>(collPath, 20000)
+  // The NAV at each transaction that modified the vault. Ledger history, so slow; an older
+  // server without the route answers 404 and the desk simply omits the chart.
+  const navHist = usePoll<NavHistory>(path === '/facility' && vaultId ? `/api/vaults/${vaultId}/nav-history` : null, 30000)
   // An admission rule changes when its owner edits it, not every four seconds.
   const gate = usePoll<Gate>(path === '/facility' && vaultId ? `/api/vaults/${vaultId}/gate` : null, 30000)
 
@@ -233,7 +236,9 @@ function Desk() {
         ? resolution.data : null
       const gt = gate.data && gate.data.vaultId?.toUpperCase() === d.vault.vaultId.toUpperCase()
         ? gate.data : null
-      return <Facility d={d} history={h} collateral={c} resolution={rz} gate={gt} contest={contest.data} picker={picker} />
+      const nh = navHist.data && navHist.data.vaultId?.toUpperCase() === d.vault.vaultId.toUpperCase()
+        ? navHist.data : null
+      return <Facility d={d} history={h} collateral={c} resolution={rz} gate={gt} contest={contest.data} navHistory={nh} picker={picker} />
     }
     return <Event d={own} picker={picker} />
   }
