@@ -10,6 +10,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { presentVault, presentRow, setLabel } from './present.mjs'
 import { findShareEscrows, presentCollateral } from './collateral.mjs'
 import { fetchBrokerHistory, analyseOrdering, reputation, recommendOrder } from './history.mjs'
+import { fetchNavHistory } from './navhistory.mjs'
 import { presentNav, resolveFromIssuance, valuePledge } from './nav.mjs'
 import { gateStatus, isNamedIn } from './credentials.mjs'
 import { deriveScoreInputs, buildScore } from './score.mjs'
@@ -170,6 +171,23 @@ export function createApi(reader, opts = {}) {
         }
         historyCache.set(broker.loanBrokerId, { at: Date.now(), body })
         return send(200, stamp(body))
+      }
+
+      // The vault's NAV at every transaction that modified it: reported and held, each
+      // read from the metadata of that transaction. The chart on the credit opinion.
+      const tm = url.pathname.match(/^\/api\/vaults\/([A-Fa-f0-9]{64})\/nav-history$/)
+      if (tm && req.method === 'GET') {
+        const snap = reader.get(tm[1].toUpperCase()) ?? reader.get(tm[1])
+        if (!snap) return fail(404, 'VAULT_NOT_FOUND', 'No vault with that id', false)
+        // The promise is cached, so requests that arrive during a miss share one ledger read.
+        const key = 'nav:' + snap.vaultId
+        let hit = historyCache.get(key)
+        if (!hit || Date.now() - hit.at >= 15000) {
+          hit = { at: Date.now(), body: fetchNavHistory(reader.xrpl, snap.vault).then((h) => ({ vaultId: snap.vaultId, ...h })) }
+          historyCache.set(key, hit)
+          hit.body.catch(() => historyCache.delete(key))
+        }
+        return send(200, stamp(await hit.body))
       }
 
       // ---------------------------------------------------------------------

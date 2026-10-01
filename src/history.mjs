@@ -43,7 +43,7 @@ import { logger } from './log.mjs'
 const log = logger('history')
 const RIPPLE_EPOCH = 946684800
 
-const FLAG = { IMPAIR: 0x20000, UNIMPAIR: 0x40000, DEFAULT: 0x10000 }
+export const FLAG = { IMPAIR: 0x20000, UNIMPAIR: 0x40000, DEFAULT: 0x10000 }
 
 /** Pull LoanManage and cover-movement events for one broker out of account history. */
 /**
