@@ -1,7 +1,8 @@
 import type { BrokerHistory, Collateral } from '../lib/types'
 import { GradeLetter } from '../components/GradeLetter'
 import { Exhibit } from '../components/Exhibit'
-import { dropsToXrp, fmtIso, short } from '../lib/format'
+import { fmtIso, short } from '../lib/format'
+import { Amount } from '../components/Amount'
 import { creditText } from '../lib/credit'
 
 /**
@@ -62,22 +63,22 @@ export function ManagerConduct({ h }: { h: BrokerHistory | null }) {
               <tbody>
                 <tr>
                   <td><b>As declared</b></td>
-                  <td className="rt num">{dropsToXrp(o.actualCoverPaid!)}</td>
+                  <td className="rt num"><Amount drops={o.actualCoverPaid!} /></td>
                   <td className="op-says">the sequence the manager actually chose</td>
                 </tr>
                 <tr>
                   <td>Best available to investors</td>
-                  <td className="rt num">{dropsToXrp(o.bestPossible!)}</td>
+                  <td className="rt num"><Amount drops={o.bestPossible!} /></td>
                   <td className="op-says">smallest exposure declared first</td>
                 </tr>
                 <tr>
                   <td>Worst available to investors</td>
-                  <td className="rt num">{dropsToXrp(o.worstPossible!)}</td>
+                  <td className="rt num"><Amount drops={o.worstPossible!} /></td>
                   <td className="op-says">largest exposure declared first</td>
                 </tr>
                 <tr>
                   <td><b>Cost of the sequence chosen</b></td>
-                  <td className="rt num">{dropsToXrp(o.costToDepositors!)}</td>
+                  <td className="rt num"><Amount drops={o.costToDepositors!} /></td>
                   <td className="op-says">borne by investors, not by the manager</td>
                 </tr>
               </tbody>
@@ -108,7 +109,7 @@ export function ManagerConduct({ h }: { h: BrokerHistory | null }) {
       {rec.applicable && (
         <p className="caption">
           On current distressed exposures, declaring smallest first would apply{' '}
-          <b className="num">{dropsToXrp(rec.atStakeForDepositors!)}</b> more of the manager's
+          <b className="num"><Amount drops={rec.atStakeForDepositors!} /></b> more of the manager's
           own capital to investor losses than declaring largest first.
         </p>
       )}
@@ -132,16 +133,16 @@ export function ManagerConduct({ h }: { h: BrokerHistory | null }) {
                     the capital it moved, and it belongs in the cover column with a sign.
                     Rendering three zeros made "added first-loss capital" read as a
                     non-event on the exhibit about first-loss capital. */}
-                <td className="rt num">{e.exposure === '0' ? '—' : dropsToXrp(e.exposure)}</td>
+                <td className="rt num">{e.exposure === '0' ? '—' : <Amount drops={e.exposure} />}</td>
                 {/* An em-dash, never 0.00. Flagging an exposure leaves the manager's own
                     book untouched, so the record does not state it at that moment. */}
-                <td className="rt num">{e.debtBefore === null ? '—' : dropsToXrp(e.debtBefore)}</td>
+                <td className="rt num">{e.debtBefore === null ? '—' : <Amount drops={e.debtBefore} />}</td>
                 <td className="rt num">
                   {e.kind === 'cover_deposit' || e.kind === 'cover_withdraw'
                     ? (e.amount && e.amount !== '0'
-                        ? (e.kind === 'cover_deposit' ? '+' : '−') + dropsToXrp(e.amount)
+                        ? <>{e.kind === 'cover_deposit' ? '+' : '−'}<Amount drops={e.amount} /></>
                         : '—')
-                    : dropsToXrp(e.coverConsumed)}
+                    : <Amount drops={e.coverConsumed} />}
                 </td>
                 <td className="op-says num">{fmtIso(e.at)}</td>
               </tr>
@@ -178,17 +179,17 @@ export function PledgedCollateral({ c }: { c: Collateral | null }) {
           <tbody>
             <tr>
               <td>Value on reported figures</td>
-              <td className="rt num">{dropsToXrp(c.totalValueNaive)}</td>
+              <td className="rt num"><Amount drops={c.totalValueNaive} /></td>
               <td className="op-says">units × reported unit value</td>
             </tr>
             <tr>
               <td>Value on held figures</td>
-              <td className="rt num">{dropsToXrp(c.totalValueCorrect)}</td>
+              <td className="rt num"><Amount drops={c.totalValueCorrect} /></td>
               <td className="op-says">units × held unit value</td>
             </tr>
             <tr>
               <td><b>Overstatement carried into the pledge</b></td>
-              <td className="rt num">{dropsToXrp(c.totalOverstatement)}</td>
+              <td className="rt num"><Amount drops={c.totalOverstatement} /></td>
               <td className="op-says">{c.totalOverstatementPct}% of the reported value</td>
             </tr>
           </tbody>
@@ -208,9 +209,9 @@ export function PledgedCollateral({ c }: { c: Collateral | null }) {
               <tr key={p.escrowId}>
                 <td className="op-says">{short(p.escrowId, 6)}</td>
                 <td className="rt num">{p.shares}</td>
-                <td className="rt num">{dropsToXrp(p.valueNaive)}</td>
-                <td className="rt num">{dropsToXrp(p.valueCorrect)}</td>
-                <td className="rt num">{dropsToXrp(p.maxLendable)}</td>
+                <td className="rt num"><Amount drops={p.valueNaive} /></td>
+                <td className="rt num"><Amount drops={p.valueCorrect} /></td>
+                <td className="rt num"><Amount drops={p.maxLendable} /></td>
               </tr>
             ))}
           </tbody>

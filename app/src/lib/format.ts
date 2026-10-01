@@ -54,6 +54,22 @@ function padDp(s: string, dp: number): string {
 /** [CONTRACT §6] drops -> XRP. "51000000" -> "51.000000" ; "1" -> "0.000001" */
 export function dropsToXrp(drops: string): string { return padDp(shift(drops, -6), 6) }
 
+/**
+ * An amount with a run of zeros as a significand and an exponent: "41.000000" -> 4.1 x 10^1.
+ * Exact: only zeros are dropped. Null when there is nothing to save.
+ */
+export function compact(full: string): { mantissa: string; exp: number } | null {
+  const { neg, int, frac } = split(full)
+  if (!/0{3,}/.test(frac)) return null
+  const all = int + frac
+  const first = all.search(/[1-9]/)
+  if (first < 0) return { mantissa: '0', exp: 0 }
+  const sig = all.slice(first).replace(/0+$/, '')
+  const mantissa = (neg ? '-' : '') + sig[0] + (sig.length > 1 ? '.' + sig.slice(1) : '')
+  const exp = int.length - 1 - first
+  return exp === 0 && mantissa === full ? null : { mantissa, exp }
+}
+
 /** A plotted position as an axis label, rounded half-up to `dp` places. */
 export function axisLabel(v: number, dp = 2): string { return padDp(String(v), dp) }
 

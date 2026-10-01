@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
 import type { VaultDetail } from '../lib/types'
 import { beatRows, type Beat } from '../lib/beats'
-import { duration, dropsToXrp, fmtIso, ratioToPct } from '../lib/format'
+import { duration, fmtIso, ratioToPct } from '../lib/format'
+import { Amount } from '../components/Amount'
 import { creditText, facilityName } from '../lib/credit'
 
 /** A calendar tone, in the colours this product has. */
@@ -116,7 +117,7 @@ export function Event({ d, picker }: { d: VaultDetail; picker?: ReactNode }) {
             <tr key={i}>
               <td><span className={'what ' + (TONE[r.tone] ?? '')}>{r.what}</span></td>
               <td className="who">{r.who}</td>
-              <td className="rt"><span className="fig">{r.amount ? dropsToXrp(r.amount) : '—'}</span></td>
+              <td className="rt"><span className="fig">{r.amount ? <Amount drops={r.amount} /> : '—'}</span></td>
               <td className="rt"><span className="fig">{r.inSeconds < 0 ? `${duration(-r.inSeconds)} ago` : duration(r.inSeconds)}</span></td>
               <td className="rt"><span className="fig">{r.when ? fmtIso(r.when) : '—'}</span></td>
             </tr>
@@ -127,10 +128,10 @@ export function Event({ d, picker }: { d: VaultDetail; picker?: ReactNode }) {
       <section className="wrap ev-what">
         <h2 className="t-heading-m">What happens at redemption</h2>
         <p className="t-body-l">
-          Claims of {dropsToXrp(d.phaseInfo.claimsAtRedemption)} are projected against
-          liquidity of {dropsToXrp(d.phaseInfo.liquidityAtRedemption)}.
+          Claims of <Amount drops={d.phaseInfo.claimsAtRedemption} /> are projected against
+          liquidity of <Amount drops={d.phaseInfo.liquidityAtRedemption} />.
           {shortfall
-            ? <> <span className="loss">That is a shortfall of {dropsToXrp(d.phaseInfo.projectedShortfall)}, or{' '}
+            ? <> <span className="loss">That is a shortfall of <Amount drops={d.phaseInfo.projectedShortfall} />, or{' '}
                 {ratioToPct(d.phaseInfo.shortfallPct)} of claims.</span> Redemption is served in the
                 order requests arrive, so the shortfall falls on whoever asks last.</>
             : <> <span className="ok strong">Claims are covered.</span></>}

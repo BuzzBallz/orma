@@ -2,13 +2,14 @@ import type { ReactNode } from 'react'
 import type { BrokerHistory, Collateral, Dimension, Gate, NavHistory, OracleContest, Resolution, VaultDetail } from '../lib/types'
 import { GradeLetter } from '../components/GradeLetter'
 import { Scale } from '../components/Scale'
+import { Amount } from '../components/Amount'
 import { NavChart } from '../components/NavChart'
 import { Exhibit } from '../components/Exhibit'
 import { Mark } from '../components/Lockup'
 import { gradeIndex } from '../lib/grades'
 import { nextBeat } from '../lib/beats'
 import { useFlash } from '../lib/useFlash'
-import { bpsToPct, dropsToXrp, duration, fmtIso, ratioToPct, rateToPct } from '../lib/format'
+import { bpsToPct, duration, fmtIso, ratioToPct, rateToPct } from '../lib/format'
 import { creditText, facilityName, facilityRef, factorRows, outlookOf, sentence, splitFactors } from '../lib/credit'
 import { ManagerConduct, PledgedCollateral } from './FacilityExhibits'
 import { PledgeResolution } from './PledgeResolution'
@@ -166,7 +167,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
             <Glance k="Scored At" v={d.score.computedAt ? fmtIso(d.score.computedAt) : 'n.a.'} className="g-scored" />
             <Glance
               k="Coverage" phrase moved={coverMoved}
-              v={`${dropsToXrp(d.broker.coverAvailable)} of ${dropsToXrp(d.broker.coverRequired)} required`}
+              v={<><Amount drops={d.broker.coverAvailable} /> of <Amount drops={d.broker.coverRequired} /> required</>}
             />
             <Glance
               k="Remaining Term" phrase={v.secondsToRedemption <= 0}
@@ -204,7 +205,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
               <p>
                 The facility reports a unit value of {v.navNaive} against a held value of{' '}
                 {v.navCorrect}. The {v.navDivergenceBps} bps gap ({gapPct}) between the two is
-                the recognised loss of {dropsToXrp(v.lossUnrealized)} carried on the book but
+                the recognised loss of <Amount drops={v.lossUnrealized} /> carried on the book but
                 not taken off the reported figure. An investor reading the reported figure
                 alone is reading a number the facility cannot currently realise.
               </p>
@@ -325,7 +326,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
             <h3 className="t-label-m">Profile</h3>
             <p>
               {name} lends to a single broker against posted first-loss coverage. Drawn
-              debt is {dropsToXrp(d.broker.debtTotal)} of {dropsToXrp(d.broker.debtMaximum)}{' '}
+              debt is <Amount drops={d.broker.debtTotal} /> of <Amount drops={d.broker.debtMaximum} />{' '}
               committed. Investors subscribe units and redeem them at the scheduled date;
               the facility is {v.isPrivate ? 'restricted to admitted subscribers' : 'open to any subscriber'} and its
               withdrawal policy is {creditText(v.withdrawalPolicy)}. Internal reference{' '}
@@ -335,9 +336,9 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
           <div className="op-box">
             <h3 className="t-label-m">Coverage</h3>
             <p>
-              {dropsToXrp(d.broker.coverAvailable)} posted against{' '}
-              {dropsToXrp(d.broker.coverRequired)} required. Of that,{' '}
-              {dropsToXrp(d.broker.maxLiquidatableNow)} can be liquidated today;{' '}
+              <Amount drops={d.broker.coverAvailable} /> posted against{' '}
+              <Amount drops={d.broker.coverRequired} /> required. Of that,{' '}
+              <Amount drops={d.broker.maxLiquidatableNow} /> can be liquidated today;{' '}
               {ratioToPct(d.broker.strandedCoverFraction)} is stranded.
             </p>
           </div>
@@ -354,11 +355,11 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
           <div className="op-box">
             <h3 className="t-label-m">Liquidity and Redemptions</h3>
             <p>
-              {dropsToXrp(v.assetsAvailable)} available of {dropsToXrp(v.assetsTotal)}.
+              <Amount drops={v.assetsAvailable} /> available of <Amount drops={v.assetsTotal} />.
               Redemption {fmtIso(v.redemptionAt)}
               {v.secondsToRedemption > 0 ? `, in ${duration(v.secondsToRedemption)}` : ''}.
               {Number(redemptionShortfall) > 0
-                ? ` Claims exceed projected liquidity by ${dropsToXrp(redemptionShortfall)}.`
+                ? <> Claims exceed projected liquidity by <Amount drops={redemptionShortfall} />.</>
                 : ' Claims are covered by projected liquidity.'}
             </p>
           </div>
@@ -433,16 +434,16 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
                   <tr><td>Reported unit value</td><td className="rt num">{v.navNaive}</td><td className="op-says">as stated by the facility</td></tr>
                   <tr><td>Held unit value</td><td className="rt num">{v.navCorrect}</td><td className="op-says">after recognised loss</td></tr>
                   <tr><td>Reported vs held</td><td className="rt num">{v.navDivergenceBps} bps</td><td className="op-says">{gapPct} of reported</td></tr>
-                  <tr><td>Total assets</td><td className="rt num">{dropsToXrp(v.assetsTotal)}</td><td className="op-says">gross</td></tr>
-                  <tr><td>Available assets</td><td className="rt num">{dropsToXrp(v.assetsAvailable)}</td><td className="op-says">unencumbered</td></tr>
-                  <tr><td>Recognised loss</td><td className="rt num">{dropsToXrp(v.lossUnrealized)}</td><td className="op-says">written down, not yet reported</td></tr>
-                  <tr><td>Drawn debt</td><td className="rt num">{dropsToXrp(d.broker.debtTotal)}</td><td className="op-says">of {dropsToXrp(d.broker.debtMaximum)} committed</td></tr>
-                  <tr><td>Coverage available</td><td className="rt num">{dropsToXrp(d.broker.coverAvailable)}</td><td className="op-says">of {dropsToXrp(d.broker.coverRequired)} required</td></tr>
-                  <tr><td>Coverage shortfall</td><td className="rt num">{dropsToXrp(d.broker.coverShortfall)}</td><td className="op-says">at the {rateToPct(d.broker.coverRateMinimum)} minimum rate</td></tr>
+                  <tr><td>Total assets</td><td className="rt num"><Amount drops={v.assetsTotal} /></td><td className="op-says">gross</td></tr>
+                  <tr><td>Available assets</td><td className="rt num"><Amount drops={v.assetsAvailable} /></td><td className="op-says">unencumbered</td></tr>
+                  <tr><td>Recognised loss</td><td className="rt num"><Amount drops={v.lossUnrealized} /></td><td className="op-says">written down, not yet reported</td></tr>
+                  <tr><td>Drawn debt</td><td className="rt num"><Amount drops={d.broker.debtTotal} /></td><td className="op-says">of <Amount drops={d.broker.debtMaximum} /> committed</td></tr>
+                  <tr><td>Coverage available</td><td className="rt num"><Amount drops={d.broker.coverAvailable} /></td><td className="op-says">of <Amount drops={d.broker.coverRequired} /> required</td></tr>
+                  <tr><td>Coverage shortfall</td><td className="rt num"><Amount drops={d.broker.coverShortfall} /></td><td className="op-says">at the {rateToPct(d.broker.coverRateMinimum)} minimum rate</td></tr>
                   <tr><td>Largest exposure</td><td className="rt num">{largest ? ratioToPct(largest.shareOfDebtTotal) : 'n.a.'}</td><td className="op-says">share of drawn debt</td></tr>
                   <tr><td>Exposures</td><td className="rt num">{v.loanCount}</td><td className="op-says">{v.distressedLoanCount} non-performing, {overdue} past due</td></tr>
-                  <tr><td>Claims at redemption</td><td className="rt num">{dropsToXrp(d.phaseInfo.claimsAtRedemption)}</td><td className="op-says">against {dropsToXrp(d.phaseInfo.liquidityAtRedemption)} liquidity</td></tr>
-                  <tr><td>Projected shortfall</td><td className="rt num">{dropsToXrp(redemptionShortfall)}</td><td className="op-says">{ratioToPct(d.phaseInfo.shortfallPct)} of claims</td></tr>
+                  <tr><td>Claims at redemption</td><td className="rt num"><Amount drops={d.phaseInfo.claimsAtRedemption} /></td><td className="op-says">against <Amount drops={d.phaseInfo.liquidityAtRedemption} /> liquidity</td></tr>
+                  <tr><td>Projected shortfall</td><td className="rt num"><Amount drops={redemptionShortfall} /></td><td className="op-says">{ratioToPct(d.phaseInfo.shortfallPct)} of claims</td></tr>
                 </tbody>
               </table>
             </div>
