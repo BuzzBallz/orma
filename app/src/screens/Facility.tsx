@@ -6,6 +6,7 @@ import { Exhibit } from '../components/Exhibit'
 import { Mark } from '../components/Lockup'
 import { gradeIndex } from '../lib/grades'
 import { nextBeat } from '../lib/beats'
+import { useFlash } from '../lib/useFlash'
 import { bpsToPct, dropsToXrp, duration, fmtIso, ratioToPct, rateToPct } from '../lib/format'
 import { creditText, facilityName, facilityRef, factorRows, outlookOf, sentence, splitFactors } from '../lib/credit'
 import { ManagerConduct, PledgedCollateral } from './FacilityExhibits'
@@ -14,11 +15,11 @@ import { EntryGate } from './EntryGate'
 import { OracleObject } from './OracleObject'
 
 /** One figure at a glance. Figures are set in mono; phrases in sans, so they wrap on words. */
-function Glance({ k, v, phrase, tone, className }: {
-  k: string; v: ReactNode; phrase?: boolean; tone?: string; className?: string
+function Glance({ k, v, phrase, tone, className, moved }: {
+  k: string; v: ReactNode; phrase?: boolean; tone?: string; className?: string; moved?: boolean
 }) {
   return (
-    <div className={className}>
+    <div className={[className, moved && 'flash'].filter(Boolean).join(' ') || undefined}>
       <dt>{k}</dt>
       <dd className={[phrase && 'phrase', tone].filter(Boolean).join(' ') || undefined}>{v ?? 'n.a.'}</dd>
     </div>
@@ -97,6 +98,14 @@ export function Facility({ d, history, collateral, resolution, gate, contest, pi
   const { strengths, challenges, atTopOfScale } = splitFactors(d.score, gradeIndex)
   const factors = factorRows(d.score)
   const headline = d.score.dimensions.find(x => x.key === 'HEADLINE')
+  // A ledger figure that changed under the reader says so once, as a portfolio row does.
+  // Not the term or the scoring time: they move on every poll and would never rest.
+  const heldMoved = useFlash(v.navCorrect)
+  const reportedMoved = useFlash(v.navNaive)
+  const gapMoved = useFlash(v.navDivergenceBps)
+  const gradeMoved = useFlash(v.grade)
+  const coverMoved = useFlash(d.broker.coverAvailable)
+  const exposuresMoved = useFlash(`${v.loanCount}/${v.distressedLoanCount}`)
 
   const gapPct = bpsToPct(v.navDivergenceBps)
   // With no gap the two figures agree: there is no recognised loss to describe.
@@ -141,27 +150,27 @@ export function Facility({ d, history, collateral, resolution, gate, contest, pi
 
       <section className="wrap op-band" aria-label="Key figures">
         <div className="op-band-in grid12">
-          <div className="op-held">
+          <div className={'op-held' + (heldMoved ? ' flash' : '')}>
             <span className="t-label-s mute">Held</span>
             <span className="t-fig-display">{v.navCorrect}</span>
             {lead && <p className={'t-body-s ' + (SEVERITY[lead.severity] ?? 'dim')}>{creditText(lead.title)}</p>}
           </div>
           <dl className="op-glance">
-            <Glance k="Reported" v={v.navNaive} />
-            <Glance k="Gap" v={`${v.navDivergenceBps} bps (${gapPct})`} tone={v.navDivergenceBps > 0 ? 'loss' : undefined} />
-            <Glance k="Internal Score" v={<GradeLetter grade={v.grade} size="sm" />} />
+            <Glance k="Reported" v={v.navNaive} moved={reportedMoved} />
+            <Glance k="Gap" v={`${v.navDivergenceBps} bps (${gapPct})`} tone={v.navDivergenceBps > 0 ? 'loss' : undefined} moved={gapMoved} />
+            <Glance k="Internal Score" v={<GradeLetter grade={v.grade} size="sm" />} moved={gradeMoved} />
             <Glance k="Outlook" v={outlook} phrase />
             <Glance k="Status" v={v.phase} phrase className="g-status" />
             <Glance k="Scored At" v={d.score.computedAt ? fmtIso(d.score.computedAt) : 'n.a.'} className="g-scored" />
             <Glance
-              k="Coverage" phrase
+              k="Coverage" phrase moved={coverMoved}
               v={`${dropsToXrp(d.broker.coverAvailable)} of ${dropsToXrp(d.broker.coverRequired)} required`}
             />
             <Glance
               k="Remaining Term" phrase={v.secondsToRedemption <= 0}
               v={v.secondsToRedemption > 0 ? duration(v.secondsToRedemption) : 'past due'}
             />
-            <Glance k="Exposures" v={`${v.loanCount} · ${v.distressedLoanCount} non-performing`} phrase />
+            <Glance k="Exposures" v={`${v.loanCount} · ${v.distressedLoanCount} non-performing`} phrase moved={exposuresMoved} />
           </dl>
         </div>
       </section>

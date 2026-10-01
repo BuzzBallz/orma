@@ -543,7 +543,7 @@ main:focus{ outline: none; }
 .op-head h1{ margin-top: var(--space-1); }
 .op-pick{ display: none; padding-top: var(--space-2); }
 .op-band-in{ border-top: 3px solid var(--color-rule); padding-top: 28px; }
-.op-held{ grid-column: span 5; display: flex; flex-direction: column; gap: var(--space-2); }
+.op-held{ grid-column: span 5; align-self: start; display: flex; flex-direction: column; gap: var(--space-2); }
 .op-held p{ margin-top: 6px; max-width: 420px; }
 .op-glance{ grid-column: span 7; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: var(--space-6); align-content: start; }
 .op-glance > div{ display: flex; flex-direction: column; gap: var(--space-1); padding: 14px 0; border-top: 1px solid var(--color-line); min-width: 0; }
@@ -551,6 +551,9 @@ main:focus{ outline: none; }
 .op-glance dd{ font: 500 16px/1.5 var(--font-mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .op-glance dd.phrase{ font: 500 15px/1.4 var(--font-sans); overflow-wrap: normal; }
 .op-placeholder .t-fig-display, .op-placeholder dd{ color: var(--color-text-3); }
+/* The change flash, as on a portfolio row: one overlay, so the figure itself never repaints. */
+.op-held, .op-glance > div{ position: relative; isolation: isolate; }
+.op-held::after, .op-glance > div::after{ content: ""; position: absolute; inset: 0; z-index: -1; opacity: 0; pointer-events: none; background: var(--color-brand-gold); }
 .op-scale{ padding-top: var(--space-10); }
 .op-body{ padding-top: var(--space-16); align-items: start; }
 .op-main{ grid-column: span 8; min-width: 0; display: flex; flex-direction: column; }
@@ -894,8 +897,8 @@ main:focus{ outline: none; }
   .frow:active{ transform: scale(.98); transition-duration: 120ms; }
 }
 /* A row whose figures moved: the overlay is set at once, then decays. */
-.frow::after{ transition: opacity 900ms var(--ease-out); }
-.frow.flash::after{ opacity: .16; transition-duration: 0ms; }
+.frow::after, .op-held::after, .op-glance > div::after{ transition: opacity 900ms var(--ease-out); }
+.frow.flash::after, .op-held.flash::after, .op-glance > div.flash::after{ opacity: .16; transition-duration: 0ms; }
 /* The stale bar fades in when it appears; figures never animate. */
 .feedbar{ transition: opacity 200ms var(--ease-out); }
 @starting-style{ .feedbar{ opacity: 0; } }
