@@ -891,7 +891,7 @@ main:focus{ outline: none; }
 .lnk, .desk, .menu-list a, .foot-nav a, .kf-head, .exh > summary, .lockup{ transition: opacity 160ms var(--ease-out); }
 .lnk:active, .desk:active, .menu-list a:active, .foot-nav a:active, .kf-head:active, .exh > summary:active, .lockup:active{ opacity: .6; transition-duration: 0ms; }
 .picker-btn .chev{ transition: transform 200ms var(--ease-out); }
-.frow::before{ transition: opacity 120ms ease; }
+.frow::before{ transition: opacity 120ms ease-out; }
 @media (max-width: 1099px){
   .frow{ transition: transform 160ms var(--ease-out); }
   .frow:active{ transform: scale(.98); transition-duration: 120ms; }
@@ -908,7 +908,8 @@ main:focus{ outline: none; }
 @starting-style{ .mast-right .wallet{ opacity: 0; transform: translateY(4px); } }
 @media (prefers-reduced-motion: reduce){
   .mast-right .wallet{ transition-property: opacity; }
-  .btn, .picker-btn, .waddr, .menu-btn, .menu-x, .dlg [data-slot="dialog-close"], .frow, .picker-btn .chev{ transition: none; }
+  .btn, .picker-btn{ transition: background-color 120ms ease-out, border-color 120ms ease-out; }
+  .waddr, .menu-btn, .menu-x, .dlg [data-slot="dialog-close"], .frow, .picker-btn .chev{ transition: none; }
   .btn:active:not(:disabled), .picker-btn:active:not(:disabled), .waddr:active, .menu-btn:active, .menu-x:active, .dlg [data-slot="dialog-close"]:active, .frow:active{ transform: none; }
 }
 
