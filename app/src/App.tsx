@@ -241,7 +241,11 @@ function Desk() {
   return (
     <TooltipProvider delayDuration={250} skipDelayDuration={400}>
       <a className="skip" href="#main">Skip to content</a>
-      <Toaster position="bottom-right" closeButton={false} duration={4000} />
+      <Toaster
+        position="bottom-right" closeButton={false} duration={4000}
+        offset={{ bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))', right: 'calc(24px + env(safe-area-inset-right, 0px))' }}
+        mobileOffset={{ bottom: 'calc(16px + env(safe-area-inset-bottom, 0px))' }}
+      />
 
       <HeaderBar
         vaults={rows}

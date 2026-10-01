@@ -130,9 +130,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const onConnect = useCallback((address: string, via: WalletKind) => {
     setQr(null)
     setState({ status: 'connected', address, via })
-    toast.success('Signed in', {
-      description: `${shortAddress(address)} · ${WALLETS.find(w => w.kind === via)?.name ?? via}`,
-    })
   }, [])
 
   const onDisconnect = useCallback(() => {
@@ -171,8 +168,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const mgr = await getManager(onConnect, onDisconnect)
       // onQRCode is the adapter's own callback: the QR is whatever Xaman minted for this
       // sign-in, never an image we compose ourselves.
-      await mgr.connect(kind, kind === 'xaman' ? { onQRCode: url => setQr(url) } : undefined)
-      // the `connect` event does the rest — one path for a fresh connect and a restore
+      const account = await mgr.connect(kind, kind === 'xaman' ? { onQRCode: url => setQr(url) } : undefined)
+      // The `connect` event sets the state, for a fresh connect and a restore alike. Only a
+      // sign-in the reader asked for is announced: a session brought back on load is silent.
+      toast.success('Signed in', {
+        description: `${shortAddress(account.address)} · ${WALLETS.find(w => w.kind === kind)?.name ?? kind}`,
+      })
     } catch (e) {
       setQr(null)
       setState({ status: 'disconnected' })

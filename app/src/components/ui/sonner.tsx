@@ -1,5 +1,5 @@
 import { Toaster as Sonner, type ToasterProps } from "sonner"
-import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
+import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon } from "lucide-react"
 
 /**
  * shadcn ships this wired to next-themes. We are on Vite and the page follows the
@@ -15,7 +15,6 @@ const Toaster = ({ ...props }: ToasterProps) => {
         info: <InfoIcon className="size-4" strokeWidth={1.75} />,
         warning: <TriangleAlertIcon className="size-4" strokeWidth={1.75} />,
         error: <OctagonXIcon className="size-4" strokeWidth={1.75} />,
-        loading: <Loader2Icon className="size-4 animate-spin" strokeWidth={1.75} />,
       }}
       style={
         {
