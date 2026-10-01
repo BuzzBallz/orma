@@ -136,6 +136,9 @@ function Desk() {
   // it names the facility in the address bar, never one facility's figures under another's.
   const own = detail.data && vaultId && detail.data.vault.vaultId.toUpperCase() === vaultId.toUpperCase()
     ? detail.data : null
+  // A facility still in flight: after a click its frame is held invisible for a moment
+  // (app.css, .enter[data-wait]), so a quick answer enters once instead of replacing it mid-rise.
+  const waiting = (path === '/facility' || path === '/event') && !!vaultId && !own
 
   const wasWithheld = useRef(false)
   useEffect(() => {
@@ -254,7 +257,7 @@ function Desk() {
       {primary.stale && path !== '/evidence' && <StaleBar ageMs={primary.ageMs} />}
 
       <main id="main" className="page" tabIndex={-1}>
-        <div key={path} className={'view' + (quiet.current ? '' : ' enter')}>{body()}</div>
+        <div key={path} className={'view' + (quiet.current ? '' : ' enter')} data-wait={waiting || undefined}>{body()}</div>
       </main>
 
       <Footer vaultId={vaultId} onNavigate={go} />

@@ -953,6 +953,10 @@ main:focus{ outline: none; }
 .enter > *{ animation: rise 220ms var(--ease-out) both; }
 .enter > :nth-child(2){ animation-delay: 40ms; }
 .enter > :nth-child(n+3){ animation-delay: 80ms; }
+/* After a click, a facility still in flight stays invisible for 300ms: a warm answer
+   (60-200ms) then enters once instead of replacing a frame that is still rising. A slow
+   one fades the desk's frame in, without movement. */
+.enter[data-wait] > *{ animation: fade-in 200ms var(--ease-out) 300ms both; }
 .exh-chev{ transition: transform 200ms var(--ease-out), color 120ms ease-out; }
 .exh[open] > .exh-body{ animation: settle 180ms var(--ease-out); }
 @media (prefers-reduced-motion: reduce){
