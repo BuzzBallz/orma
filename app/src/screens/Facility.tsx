@@ -156,7 +156,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
           <div className={'op-held' + (heldMoved ? ' flash' : '')}>
             <span className="t-label-s mute">Held</span>
             <span className="t-fig-display">{v.navCorrect}</span>
-            {lead && <p className={'t-body-s ' + (SEVERITY[lead.severity] ?? 'dim')}>{creditText(lead.title)}</p>}
+            {lead && <p className={'t-body-l ' + (SEVERITY[lead.severity] ?? 'dim')}>{creditText(lead.title)}</p>}
           </div>
           <dl className="op-glance">
             <Glance k="Reported" v={v.navNaive} moved={reportedMoved} />
