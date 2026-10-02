@@ -395,8 +395,9 @@ main:focus{ outline: none; }
 .foot-brand{ grid-column: 1 / span 6; grid-row: 1; }
 .foot-lines{ grid-column: 1 / span 6; grid-row: 2; display: flex; flex-direction: column; gap: var(--space-1); font: 400 14px/1.5 var(--font-sans); color: var(--color-text-3); }
 .foot-nav{ grid-column: 7 / span 6; grid-row: 1 / span 2; display: flex; flex-wrap: wrap; justify-content: flex-end; align-content: flex-start; margin-right: -10px; }
-.foot-nav a{ display: inline-flex; align-items: center; min-height: var(--size-control); padding: 0 10px; font: 400 15px/1.4 var(--font-sans); color: var(--color-text-2); text-decoration: none; }
-@media (hover: hover) and (pointer: fine){ .foot-nav a:hover{ color: var(--color-text); text-decoration: underline; text-underline-offset: 5px; } }
+.foot-nav a, .foot-nav button{ display: inline-flex; align-items: center; min-height: var(--size-control); padding: 0 10px; font: 400 15px/1.4 var(--font-sans); color: var(--color-text-2); text-decoration: none; }
+.foot-nav button{ background: none; border: 0; cursor: pointer; }
+@media (hover: hover) and (pointer: fine){ .foot-nav a:hover, .foot-nav button:hover{ color: var(--color-text); text-decoration: underline; text-underline-offset: 5px; } }
 @media (max-width: 1099px){
   .foot-brand, .foot-lines, .foot-nav{ grid-column: 1 / -1; grid-row: auto; }
   .foot-nav{ order: 2; justify-content: flex-start; margin-inline: -10px; }
@@ -863,13 +864,18 @@ main:focus{ outline: none; }
 .wpaste{ display: flex; flex-direction: column; gap: var(--space-4); border-top: 1px solid var(--color-rule); padding-top: var(--space-5); }
 .field{ display: flex; flex-direction: column; gap: var(--space-2); }
 .field label{ font: 500 13px/1.4 var(--font-sans); }
-.field input{
+.field input, .field textarea{
   width: 100%; min-height: 48px; padding: 0 14px; background: var(--color-bg);
   border: 1px solid var(--color-text-3); border-radius: var(--radius-sm);
   font: 400 16px/1.5 var(--font-mono); color: var(--color-text); outline: none;
 }
-.field input:focus{ border-color: var(--color-rule); }
+.field input:focus, .field textarea:focus{ border-color: var(--color-rule); }
 .field input[aria-invalid="true"]{ border-color: var(--color-border-error); }
+/* Contact: prose, so the sans face; the trap field is out of sight and out of reach. */
+.contact{ display: flex; flex-direction: column; gap: var(--space-4); }
+.contact .field input, .contact .field textarea{ font-family: var(--font-sans); }
+.field textarea{ padding: 12px 14px; min-height: 120px; resize: vertical; }
+.hp{ position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
 .field-help{ font: 400 14px/1.5 var(--font-sans); color: var(--color-text-3); }
 .field-error{ font: 400 14px/1.5 var(--font-sans); color: var(--color-loss); }
 .field-error b{ font-weight: 600; }
@@ -912,8 +918,8 @@ main:focus{ outline: none; }
 .btn:active:not(:disabled), .picker-btn:active:not(:disabled), .waddr:active, .menu-btn:active, .menu-x:active, .dlg [data-slot="dialog-close"]:active{ transform: scale(.97); translate: none; transition-duration: 120ms; }
 /* Text controls dim at the touch and come back on release, as text buttons do on iOS: the
    tap highlight is off, so this is the only sign a tap landed. */
-.lnk, .desk, .menu-list a, .foot-nav a, .kf-head, .exh > summary, .lockup{ transition: opacity 160ms var(--ease-out); }
-.lnk:active, .desk:active, .menu-list a:active, .foot-nav a:active, .kf-head:active, .exh > summary:active, .lockup:active{ opacity: .6; transition-duration: 0ms; }
+.lnk, .desk, .menu-list a, .foot-nav a, .foot-nav button, .kf-head, .exh > summary, .lockup{ transition: opacity 160ms var(--ease-out); }
+.lnk:active, .desk:active, .menu-list a:active, .foot-nav a:active, .foot-nav button:active, .kf-head:active, .exh > summary:active, .lockup:active{ opacity: .6; transition-duration: 0ms; }
 .picker-btn .chev{ transition: transform 200ms var(--ease-out); }
 .frow::before{ transition: opacity 120ms ease-out; }
 @media (max-width: 1099px){
