@@ -418,8 +418,8 @@ Plain ESM `.mjs` with JSDoc typedefs, no build step.
 
 ### `app/`, the frontend
 
-React 19, Vite, Tailwind, TypeScript. Screens: Portfolio, Facility, Evidence, PledgeResolution, EntryGate,
-Methodology, Event. It polls the backend and renders the same numbers the API serves, with the notch trace
+React 19, Vite, Tailwind, TypeScript. Screens: Portfolio, Facility, FacilityExhibits, Evidence, OracleObject,
+PledgeResolution, EntryGate, Methodology, Event. It polls the backend and renders the same numbers the API serves, with the notch trace
 that produced each grade.
 
 ### `demo/`
@@ -464,13 +464,14 @@ self-contained deck that opens in a browser and prints to PDF. No slide toolchai
 ### `FEEDBACK.pdf` and `feedback/`
 
 `FEEDBACK.pdf` is the developer feedback report: **three pages**, written from the build, signed. It is
-short on purpose, because it is read by someone who did not ask for it. It is kept as submitted on
-13 September 2026. Its body states the presence rule, but its closing paragraph still words the
-`PreviousFields` fix by value, it calls the prior report on `rippled#6487` our strongest evidence, which the
-register no longer does, and the filings it calls ready were since filed or overtaken
-([`contrib/filings/`](contrib/filings/README.md); [xrpl-dev-portal#3926](https://github.com/XRPLF/xrpl-dev-portal/issues/3926)).
+short on purpose, because it is read by someone who did not ask for it. It was corrected on 13 October
+2026, with a dated line under the signature: the `PreviousFields` rule is worded by presence, not value
+([xrpl-dev-portal#3926](https://github.com/XRPLF/xrpl-dev-portal/issues/3926)), the prior report on
+`rippled#6487` is no longer called our strongest evidence, and the filings it called ready are listed as
+filed ([`contrib/filings/`](contrib/filings/README.md)). The report as submitted is attached to the
+[`hackathon-submission`](https://github.com/BuzzBallz/orma/releases/tag/hackathon-submission) release.
 
-Its evidence is `feedback/appendix.pdf`, the full 40-finding register — 33 pages, every claim carrying a
+Its evidence is `feedback/appendix.pdf`, the full 40-finding register — 34 pages, every claim carrying a
 transaction hash, repro steps and tracker status.
 
 `feedback/` holds what both are made of. `feedback.html` is the report, `register.md` is the register, and
@@ -528,7 +529,7 @@ after:
   [xrpl-dev-portal#3926](https://github.com/XRPLF/xrpl-dev-portal/issues/3926) as a documentation task.
 - **15 September 2026.** The closed-ended vault draft,
   [XRPL-Standards#587](https://github.com/XRPLF/XRPL-Standards/pull/587), merged with our three notes addressed.
-- **From 23 September 2026.** A UI redesign on the unmerged branch `feat/redesign` (Andrea). It is what
+- **From 23 September 2026.** A UI redesign (Andrea), merged into `main` on 13 October 2026. It is what
   https://ormaprotocol.vercel.app serves.
 - **1 October 2026.** A NAV-history route, `GET /api/vaults/:vaultId/nav-history`, a vault's NAV at every
   transaction that modified it, on `main` (Andrea). The deployed API does not serve it yet.
@@ -543,6 +544,10 @@ after:
   an account our setup script created), the pre-commit hook (local during the event, not in this
   repository), the quickstart's first step (`tools/verify-toolchain.mjs` is not in the repository), and the
   deck's speaker notes in four places.
+- **13 October 2026.** `FINDINGS.md` statuses refreshed, and the register's index with them. The API
+  answers `HEAD` and says `503 WARMING_UP` before its first snapshot. `FEEDBACK.pdf` corrected in four
+  places, with a dated line under the signature (Andrea). An MIT licence. The repository as submitted is
+  the [`hackathon-submission`](https://github.com/BuzzBallz/orma/releases/tag/hackathon-submission) release.
 
 ---
 
