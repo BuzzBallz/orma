@@ -539,7 +539,7 @@ after:
 - **From 23 September 2026.** A UI redesign (Andrea), merged into `main` on 13 October 2026. It is what
   https://ormaprotocol.vercel.app serves.
 - **1 October 2026.** A NAV-history route, `GET /api/vaults/:vaultId/nav-history`, a vault's NAV at every
-  transaction that modified it, on `main` (Andrea). The deployed API does not serve it yet.
+  transaction that modified it, on `main` (Andrea). The deployed API serves it since 13 October 2026.
 - **13 October 2026.** Corrections to this README and the docs: the `PreviousFields` mechanism restated
   (presence, not value), the Kestrel oracle query fixed (document 4, deployed publisher), the oracle document
   ids described as assigned in publish order, the upstream statuses updated, and the raw transactions behind
@@ -561,7 +561,7 @@ after:
   archive, and each response states the window it covers. When that window does not reach back to the
   broker's creation, the conduct grade is withheld rather than computed: a pruned record would have graded
   Kestrel's broker A 100 instead of E 25 (raised by Andrea). On a cold start, a facility not read yet answers
-  `503 WARMING_UP` rather than `404`. The deployed API does not serve these yet.
+  `503 WARMING_UP` rather than `404`. The deployed API serves all of this since that day.
 
 ---
 
