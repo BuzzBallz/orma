@@ -91,7 +91,7 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
 <p>Internally every amount is a <code>Decimal</code> at precision 40, and every serialisation goes through <code>str()</code> in <code>src/num.mjs</code>, which emits <code>toFixed()</code> and therefore never scientific notation. A real captured value that breaks a float: <code>"periodicPayment": "3333346.017258355048"</code>.</p>
 <p>For chart pixel positions, <code>Number(x)</code> after dividing to a human scale is acceptable. For anything displayed as a figure, it is not.</p>
 <h3 id="2-absent-means-zero-and-the-api-normalises-it-away">2. Absent means zero, and the API normalises it away</h3>
-<p>rippled omits any field whose value equals the type default. A vault carrying no unrealised loss has <b>no <code>LossUnrealized</code> key at all</b>, not <code>"0"</code>. That single behaviour is the root of the finding this whole project is built on, and it is handled in exactly one place: <code>num()</code> in <code>src/num.mjs</code>, which maps <code>undefined</code>, <code>null</code> and <code>""</code> to zero.</p>
+<p>rippled does not store an optional field (declared <code>SoeDefault</code>) while it holds its type default, so absent means zero. A vault carrying no unrealised loss has <b>no <code>LossUnrealized</code> key at all</b>, not <code>"0"</code>. That single behaviour is the root of the finding this whole project is built on, and it is handled in exactly one place: <code>num()</code> in <code>src/num.mjs</code>, which maps <code>undefined</code>, <code>null</code> and <code>""</code> to zero.</p>
 <p>Consumers may rely on presence. Every numeric field in every response below is always emitted, defaulting to <code>"0"</code>.</p>
 <div class="callout note"><span class="ck">Note</span><div><p>Two deliberate exceptions, both of which use <code>null</code> to mean "not known" rather than "zero".</p><p>On <code>broker-history</code>, <code>debtBefore</code>, <code>debtAfter</code>, <code>coverBefore</code> and <code>coverAfter</code> are <code>null</code>, not</p><p><code>"0"</code>, when <code>brokerStateKnown</code> is <code>false</code>. An impairment does not touch the <code>LoanBroker</code> object at</p><p>all, so that transaction genuinely does not report the book. Emitting <code>"0"</code> would read as an empty</p><p>book, which is a different and much worse claim.</p><p>On the <code>pledge</code> block of <code>/api/mpt/:mptId/nav</code> and <code>/api/mpt/:mptId/resolve</code>, <code>valueHeld</code>,</p><p><code>valueReported</code> and <code>overstatement</code> are <code>null</code> when the resolved document carries no <code>unitValue</code>,</p><p>alongside an <code>unpriced</code> explanation. Same reasoning: an unvaluable pledge is not a pledge worth</p><p>zero.</p></div></div>
 <h3 id="3-every-200-carries-a-ledger-stamp">3. Every 200 carries a ledger stamp</h3>
@@ -109,7 +109,8 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
     "retryable": false
   }
 }</code></pre>
-<div class="tw"><table><thead><tr><th>code</th><th>status</th><th>retryable</th><th>raised when</th></tr></thead><tbody><tr><td><code>VAULT_NOT_FOUND</code></td><td>404</td><td>false</td><td>the id is well formed but no snapshot exists for it</td></tr><tr><td><code>NO_SHARE_MPT</code></td><td>404</td><td>false</td><td>the vault has no share issuance, so there is nothing to value</td></tr><tr><td><code>NO_BROKER</code></td><td>404</td><td>false</td><td>the vault has no <code>LoanBroker</code>, so there is no conduct to reconstruct</td></tr><tr><td><code>SHARE_NOT_TRACKED</code></td><td>404</td><td>false</td><td>no facility on this service issues that MPT</td></tr><tr><td><code>NOT_FOUND</code></td><td>404</td><td>false</td><td>no route matched, or the demo capture file is missing</td></tr><tr><td><code>FORBIDDEN</code></td><td>403</td><td>false</td><td>an operator <code>POST</code> from something other than loopback</td></tr><tr><td><code>INTERNAL</code></td><td>500</td><td>true</td><td>anything unhandled</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>code</th><th>status</th><th>retryable</th><th>raised when</th></tr></thead><tbody><tr><td><code>WARMING_UP</code></td><td>503</td><td>true</td><td>the reader has not read its first snapshot yet, so an id it does not know is unknown rather than absent. Vault and MPT routes answer this until the first read lands, a few seconds after a start</td></tr><tr><td><code>VAULT_NOT_FOUND</code></td><td>404</td><td>false</td><td>the id is well formed but no snapshot exists for it, once the reader has read its first snapshot</td></tr><tr><td><code>NO_SHARE_MPT</code></td><td>404</td><td>false</td><td>the vault has no share issuance, so there is nothing to value</td></tr><tr><td><code>NO_BROKER</code></td><td>404</td><td>false</td><td>the vault has no <code>LoanBroker</code>, so there is no conduct to reconstruct</td></tr><tr><td><code>SHARE_NOT_TRACKED</code></td><td>404</td><td>false</td><td>no facility on this service issues that MPT</td></tr><tr><td><code>NOT_FOUND</code></td><td>404</td><td>false</td><td>no route matched, or the demo capture file is missing</td></tr><tr><td><code>FORBIDDEN</code></td><td>403</td><td>false</td><td>an operator <code>POST</code> from something other than loopback</td></tr><tr><td><code>INTERNAL</code></td><td>500</td><td>true</td><td>anything unhandled</td></tr></tbody></table></div>
+<p>Every route that answers <code>GET</code> also answers <code>HEAD</code>, with the same status and headers and no body, so a link checker sees the status a reader would.</p>
 <p>A vault id must match <code>[A-Fa-f0-9]{64}</code> and an MPT issuance id <code>[A-Fa-f0-9]{48}</code>. Lowercase hex is accepted and upper-cased before lookup. A path that matches no pattern returns <code>{"error":{"code":"NOT_FOUND","message":"No route GET /api/nope","retryable":false}}</code>.</p>
 <h3 id="6-cors-and-which-two-routes-are-deliberately-public">6. CORS, and which two routes are deliberately public</h3>
 <p>Every response carries <code>Access-Control-Allow-Origin: *</code>, <code>Access-Control-Allow-Headers: *</code> and <code>Access-Control-Allow-Methods: GET,POST,OPTIONS</code>, set unconditionally at the top of the request handler so the local demo frontend works from any origin. <code>OPTIONS</code> returns <code>204</code>.</p>
@@ -119,7 +120,7 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
 <div class="callout warning"><span class="ck">Warning</span><div><p>The metadata that carries the NAV URL is written into the <code>MPTokenIssuance</code> at creation and can</p><p>never be rewritten. The contract at the end of those two routes is therefore effectively permanent:</p><p>fields may be added, nothing may ever be renamed, retyped or removed.</p></div></div>
 <hr>
 <h2 id="route-index">Route index</h2>
-<div class="tw"><table><thead><tr><th>method and path</th><th>answers</th></tr></thead><tbody><tr><td><code>GET /api/health</code></td><td>is the reader connected, and how old is the data</td></tr><tr><td><code>GET /api/vaults</code></td><td>which facilities are tracked, worst first</td></tr><tr><td><code>GET /api/vaults/:vaultId</code></td><td>everything about one facility</td></tr><tr><td><code>GET /api/vaults/:vaultId/nav</code></td><td>what is one unit actually worth</td></tr><tr><td><code>GET /api/vaults/:vaultId/gate</code></td><td>is this facility gated, and by whom</td></tr><tr><td><code>GET /api/vaults/:vaultId/collateral</code></td><td>what are the pledged shares worth to a lender</td></tr><tr><td><code>GET /api/vaults/:vaultId/broker-history</code></td><td>what did this manager actually do</td></tr><tr><td><code>GET /api/mpt/:mptId/nav</code></td><td>the same valuation, keyed by the token</td></tr><tr><td><code>GET /api/mpt/:mptId/resolve</code></td><td>can a stranger get from the token to a valuation</td></tr><tr><td><code>GET /api/indexer-race</code></td><td>proof the first impairment is invisible to metadata diffing</td></tr><tr><td><code>GET /api/demo/state</code></td><td>which facilities are baked and live</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>method and path</th><th>answers</th></tr></thead><tbody><tr><td><code>GET /api/health</code></td><td>is the reader connected, and how old is the data</td></tr><tr><td><code>GET /api/vaults</code></td><td>which facilities are tracked, worst first</td></tr><tr><td><code>GET /api/vaults/:vaultId</code></td><td>everything about one facility</td></tr><tr><td><code>GET /api/vaults/:vaultId/nav</code></td><td>what is one unit actually worth</td></tr><tr><td><code>GET /api/vaults/:vaultId/nav-history</code></td><td>what was one unit worth after each transaction that changed the vault</td></tr><tr><td><code>GET /api/vaults/:vaultId/gate</code></td><td>is this facility gated, and by whom</td></tr><tr><td><code>GET /api/vaults/:vaultId/collateral</code></td><td>what are the pledged shares worth to a lender</td></tr><tr><td><code>GET /api/vaults/:vaultId/broker-history</code></td><td>what did this manager actually do</td></tr><tr><td><code>GET /api/mpt/:mptId/nav</code></td><td>the same valuation, keyed by the token</td></tr><tr><td><code>GET /api/mpt/:mptId/resolve</code></td><td>can a stranger get from the token to a valuation</td></tr><tr><td><code>GET /api/indexer-race</code></td><td>proof the first impairment is invisible to metadata diffing</td></tr><tr><td><code>GET /api/demo/state</code></td><td>which facilities are baked and live</td></tr></tbody></table></div>
 <hr>
 <h2 id="get-api-health">GET /api/health</h2>
 <p>Is the reader up, which ledger is it on, and is it currently degraded. No parameters.</p>
@@ -325,6 +326,8 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
 <p>Things in there that are easy to misread:</p>
 <ul><li><code>oracle.dimensionsOnChain[].raw</code> is <b>hexadecimal</b>, because <code>AssetPrice</code> on an XLS-47 <code>PriceData</code></li></ul>
 <p>  is a <code>UInt64</code> serialised as hex. <code>c4452</code> is 803922, which at <code>scale: 6</code> decodes to <code>0.803922</code>.   Writing <code>"100"</code> into that field means 256, not one hundred. Full detail in   <a href="mathematics.html#8-publication-as-an-oracle-object">/mathematics</a>.</p>
+<ul><li><code>oracle.publisher</code> and <code>oracle.oracleDocumentId</code> name the account and document the answering</li></ul>
+<p>  reader publishes to. This capture is from the event, when that was <code>rpVg1…</code>, whose objects stopped   updating on 13 September; the deployed reader publishes from <code>rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H</code>.   Document id 3 is Calder on both accounts. The full mapping is in   <a href="quickstart.html#reading-the-objects-already-on-devnet">the quickstart</a>.</p>
 <ul><li><code>coverRateMinimum</code> and <code>coverRateLiquidation</code> are in units of $10^{-5}$. A stated <code>10000</code> is</li></ul>
 <p>  $0.10$. <b>Both</b> are divided by $10^{5}$, which is why <code>maxLiquidatableNow</code> is   $\lceil 10{,}000{,}000 \times 0.10 \times 0.10 \rceil = 100{,}000$ drops against a   <code>coverAvailable</code> of <code>"5000000"</code>. <code>strandedCoverFraction: "0.9800"</code> is the 98% of posted cover that   cannot be reached at the current book size.</p>
 <ul><li><code>canWithdraw: false</code> with <code>withdrawBlockedReason: "tecTOO_SOON"</code> is <b>not an error</b>.</li></ul>
@@ -388,6 +391,52 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
 <p>$$\text{NAV}_{\text{naive}} = \frac{A}{S} \qquad \text{NAV}_{\text{held}} = \frac{A - L}{S}$$</p>
 <p>Handing over only the honest number asks the consumer to take our word for it. Handing over both, with the gap named in basis points, lets them see what the obvious computation would have told them. <code>provenance</code> names the three ledger fields so they can recompute it without trusting us: $(51{,}000{,}000 - 10{,}000{,}000) / 51{,}000{,}000 = 0.803922$.</p>
 <p><code>assessment</code> is labelled <code>advisory: true</code> and can be <code>null</code>. The valuation is a measurement, the grade is an opinion, and the grade failing to compute must never take the valuation down with it.</p>
+<hr>
+<h2 id="get-api-vaults-vaultid-nav-history">GET /api/vaults/:vaultId/nav-history</h2>
+<p>What one unit of this facility was worth after each transaction that changed it: one point per successful transaction that modified the <code>Vault</code> while it had shares outstanding, oldest first.</p>
+<div class="tw"><table><thead><tr><th>parameter</th><th>in</th><th>required</th><th>notes</th></tr></thead><tbody><tr><td><code>vaultId</code></td><td>path</td><td>yes</td><td>64 hex characters</td></tr></tbody></table></div>
+<p>Each point is read from that transaction's own metadata, not reconstructed: <code>AssetsTotal</code> and <code>LossUnrealized</code> from the <code>Vault</code> node's <code>FinalFields</code>, and the shares from the <code>MPTokenIssuance</code> node when the transaction moved them (between a deposit and a withdrawal the count carries forward). The transactions come from <code>account_tx</code> on the vault's pseudo-account, which lists the impairments; an <code>account_tx</code> on the broker's owner does not. The response is cached for 15 seconds, and <code>truncated</code> is <code>true</code> when the vault has 1,000 transactions or more, in which case the oldest are missing.</p>
+<pre class="code" data-lang="bash"><code>curl -s http://localhost:8787/api/vaults/864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835/nav-history</code></pre>
+<pre class="code" data-lang="json"><code>{
+  "serverTime": "2026-10-13T12:41:50Z",
+  "ledgerIndex": 6089562,
+  "vaultId": "864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835",
+  "points": [
+    {
+      "at": "2026-09-12T21:05:11Z",
+      "hash": "3ACF03E8E5E68CD30814694CC7CD5C4BBE67E2EA396EF61EA8C756063892AA8C",
+      "kind": "deposit",
+      "navNaive": "1.000000",
+      "navCorrect": "1.000000",
+      "assetsTotal": "51000000",
+      "lossUnrealized": "0",
+      "sharesOutstanding": "51000000"
+    },
+    {
+      "at": "2026-09-12T21:05:32Z",
+      "hash": "1523BD1B1548A01B46AAA88871EA965EE973BFA7016D7B8ACC950E463567AA4A",
+      "kind": "loan",
+      "navNaive": "1.000000",
+      "navCorrect": "1.000000",
+      "assetsTotal": "51000000",
+      "lossUnrealized": "0",
+      "sharesOutstanding": "51000000"
+    },
+    {
+      "at": "2026-09-12T21:07:52Z",
+      "hash": "075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3",
+      "kind": "impair",
+      "navNaive": "1.000000",
+      "navCorrect": "0.803922",
+      "assetsTotal": "51000000",
+      "lossUnrealized": "10000000",
+      "sharesOutstanding": "51000000"
+    }
+  ],
+  "truncated": false
+}</code></pre>
+<p>The third point is the first impairment. Its <code>Vault</code> node has an empty <code>PreviousFields</code>, so a metadata diff sees nothing, but its <code>FinalFields</code> carry <code>LossUnrealized</code> and the two NAVs part: 1.000000 reported, 0.803922 held. <code>kind</code> names the transaction: <code>create</code>, <code>deposit</code>, <code>withdraw</code>, <code>clawback</code>, <code>update</code>, <code>loan</code>, <code>payment</code>, <code>loan_closed</code>, and for a <code>LoanManage</code> the flag it set, <code>impair</code>, <code>unimpair</code> or <code>default</code>.</p>
+<div class="callout warning"><span class="ck">Warning</span><div><p>The series is only as long as the history the server still holds. Devnet prunes old ledgers (on</p><p>13 October 2026 one public server's oldest had closed on 10 September), so for the facilities created at</p><p>the event the earliest points will drop out and the series will then be empty. The three transactions</p><p>above are archived in <code>evidence/devnet-tx/</code> and verify offline with <code>npm run check:evidence</code>.</p></div></div>
 <hr>
 <h2 id="get-api-vaults-vaultid-gate">GET /api/vaults/:vaultId/gate</h2>
 <p>Is this facility gated, and by whom. This is enforcement, not advice: an LP without an accepted credential from a named issuer cannot deposit at all, and the ledger is what refuses them.</p>
@@ -528,7 +577,7 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
         "detail": "2 exposures were written off with no prior warning, so the loss was never signalled before it was taken."
       }
     ],
-    "caveat": "Reconstructed from the public record only, which is retained for roughly 29 days. Conduct before that window is not visible here."
+    "caveat": "Reconstructed from the public record only. Devnet prunes old ledgers, so conduct before the oldest retained ledger is not visible here."
   },
   "recommendation": {
     "applicable": false,
@@ -628,7 +677,7 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
   "transactionHash": "075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3",
   "transactionResult": "tesSUCCESS",
   "finding": "The first impairment of a previously-healthy vault is invisible to metadata diffing.",
-  "why": "LossUnrealized was 0 (the type default) so rippled omits it from PreviousFields. Under cash-basis accounting impairment changes nothing else on the Vault, so PreviousFields is entirely {} while FinalFields carries a non-zero LossUnrealized.",
+  "why": "A healthy vault does not carry LossUnrealized (an optional (SoeDefault) field at its default is not stored on the object), so there is no previous value for PreviousFields to record. Under cash-basis accounting impairment changes nothing else on the Vault, so PreviousFields is entirely {} while FinalFields carries a non-zero LossUnrealized.",
   "vaultId": "864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835",
   "loanBrokerId": "41BD2EA81CD03ED9EAC612BFFC6179AC742120FC4A5E0DD1D3E4DCE7DB5B2F38",
   "loanId": "60C170A9F1096E7200196E2DBC5849A5D8991C2F630123E77FF359B68F2B4188",
@@ -657,7 +706,7 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
   },
   "verdict": "PreviousFields is empty. An indexer diffing metadata sees no change on this vault."
 }</code></pre>
-<p><code>previousFields: {}</code> on the <code>Vault</code> node is the entire finding. <code>LossUnrealized</code> moved from zero, and rippled omits from <code>PreviousFields</code> any field whose previous value was the type default. Under cash-basis accounting (<code>LEVersion = 1</code>) impairment moves nothing else on the <code>Vault</code>, so the diff is empty while <code>FinalFields</code> carries a recognised loss of 10 XRP. The only signal anywhere in the metadata is the <code>Loan</code> node's flags going from <code>0</code> to <code>131072</code>, on a different object.</p>
+<p><code>previousFields: {}</code> on the <code>Vault</code> node is the entire finding. A healthy vault carries no <code>LossUnrealized</code> field, and <code>PreviousFields</code> only records fields the object already had. Under cash-basis accounting (<code>LEVersion = 1</code>) impairment moves nothing else on the <code>Vault</code>, so the diff is empty while <code>FinalFields</code> carries a recognised loss of 10 XRP. The only signal anywhere in the metadata is the <code>Loan</code> node's flags going from <code>0</code> to <code>131072</code>, on a different object.</p>
 <p>This is why the reader in <code>src/poll.mjs</code> re-reads full state every 4 seconds and never diffs <code>PreviousFields</code>. Test flags by bit, not by equality: a loan can carry more than one flag, and <code>Flags === 131072</code> stops matching the day it does.</p>
 <hr>
 <h2 id="get-api-demo-state">GET /api/demo/state</h2>

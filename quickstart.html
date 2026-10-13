@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Quickstart — Orma</title>
-<meta name="description" content="Clone, prove the toolchain, start the reader against four live Devnet facilities, run the frontend, then bake your own.">
+<meta name="description" content="Clone, install and check, start the reader against four live Devnet facilities, run the frontend, then bake your own.">
 <style>
 :root{--bg:#0A0B0E;--panel:#0E1015;--raised:#15171D;--fg:#EAE0CE;--dim:#B3AA99;--mute:#8C8578;
 --gold:#C9A45F;--line:#1F222A;--line2:#2C313B;--ok:#35D64A;--bad:#FF4A4A;
@@ -71,13 +71,13 @@ nav{position:static;height:auto;border-right:0;border-bottom:1px solid var(--lin
   </nav>
   <main>
     <h1>Quickstart</h1>
-    <p class="lede">Clone, prove the toolchain, start the reader against four live Devnet facilities, run the frontend, then bake your own.</p>
+    <p class="lede">Clone, install and check, start the reader against four live Devnet facilities, run the frontend, then bake your own.</p>
     <p>Orma is two processes. A Node reader that polls XLS-65 vaults on XRPL Devnet, scores them and serves a frozen JSON contract on port 8787, and a Vite frontend that consumes it. Neither needs a database. The reader holds its state in memory and re-reads the ledger every four seconds.</p>
 <p>This page gets both running against four facilities that already exist on Devnet, then shows you how to build your own.</p>
 <h2 id="what-you-need">What you need</h2>
 <div class="tw"><table><thead><tr><th></th><th>Version</th><th>Note</th></tr></thead><tbody><tr><td>Node</td><td>24.13.0</td><td><code>package.json</code> declares <code>engines.node &gt;= 20</code>. Everything documented here was run on 24.13.0.</td></tr><tr><td>npm</td><td>bundled</td><td>The repository root uses npm and <code>package-lock.json</code>.</td></tr><tr><td>pnpm</td><td>any recent</td><td>Only for <code>app/</code>, which has its own <code>pnpm-lock.yaml</code>.</td></tr><tr><td>Network</td><td>outbound wss</td><td><code>wss://s.devnet.rippletest.net:51233</code>, network id 2.</td></tr></tbody></table></div>
 <p>Two runtime dependencies, both pinned exactly: <code>xrpl</code> at <code>5.2.0</code> and <code>decimal.js</code> at <code>10.6.0</code>.</p>
-<div class="callout warning"><span class="ck">Warning</span><div><p>Do not run <code>npm install</code> or <code>pnpm install</code> in the repository root. <code>node_modules/</code> ships installed</p><p>and verified, and re-resolving it is the one reliable way to lose a working toolchain. The</p><p>frontend is the exception: <code>app/</code> is a separate tree and <code>pnpm install</code> there is expected.</p></div></div>
+<div class="callout warning"><span class="ck">Warning</span><div><p>Install the repository root with <code>npm ci</code>, not <code>npm install</code>. <code>npm ci</code> installs the committed</p><p><code>package-lock.json</code> exactly, and re-resolving it can move <code>ripple-binary-codec</code>, the package that</p><p>serialises closed-ended vaults. The frontend is separate: <code>app/</code> is its own tree and</p><p><code>pnpm install</code> there is expected.</p></div></div>
 <h2 id="why-the-xrpl-pin-is-exact">Why the xrpl pin is exact</h2>
 <p><code>xrpl@5.2.0</code> was published on 2026-09-11 at 22:20 UTC, roughly five hours before the hackathon opened. It matters more than a version number usually does.</p>
 <p>Every lending vault on XRPL must be closed-ended. <code>LoanBrokerSet</code> returns <code>tecNO_PERMISSION</code> against an open-ended vault, so a <code>VaultCreate</code> carrying <code>VaultKind: 1</code>, <code>SubscriptionDate</code> and <code>RedemptionDate</code> is the protocol's own first transaction. Before 5.2.0, the published npm <code>xrpl</code> could not serialize those three fields: <code>validate()</code> rejected them, so the transaction was unreachable through the model layer entirely. For six days, <code>npm install xrpl</code> returned a library that could not build the first transaction of the feature it shipped support for.</p>
@@ -92,16 +92,18 @@ nav{position:static;height:auto;border-right:0;border-bottom:1px solid var(--lin
 <ul><li><b><code>OracleSet</code> is signed raw.</b> <code>validate()</code> caps <code>Scale</code> at 0 to 10 while rippled accepts 0 to</li></ul>
 <p>  20, and demands <code>Scale</code> whenever <code>AssetPrice</code> is present while rippled forbids an explicit   <code>Scale: 0</code>. Together those make some legal oracles unreachable through the model layer. See   <a href="mathematics.html">the oracle publication</a>, section 8, for what ends up on the ledger.</p>
 <div class="callout note"><span class="ck">Note</span><div><p><code>xrpl-py</code> is still on 5.1.0 and did not get either fix. Keep Python out of the signing path.</p></div></div>
-<h2 id="step-1-prove-the-toolchain">Step 1: prove the toolchain</h2>
-<p>Run this first, every session, before trusting anything else. It drives the entire lending chain against live Devnet with no workarounds: <code>VaultCreate</code> to <code>VaultDeposit</code> to <code>LoanBrokerSet</code> to <code>LoanBrokerCoverDeposit</code> to <code>LoanSet</code> with a native counterparty signature.</p>
-<pre class="code" data-lang="bash"><code>npm run verify          # = node tools/verify-toolchain.mjs</code></pre>
-<pre class="code"><code>[39.2s] vault+deposit+broker+cover all tesSUCCESS, zero workarounds
-For LoanSet transaction the auto calculated Fee accounts for total number of signers the counterparty has to avoid transaction failure.
-[47.1s] LoanSet tesSUCCESS  loan=86C4316664B46577…
+<h2 id="step-1-install-and-check">Step 1: install and check</h2>
+<pre class="code" data-lang="bash"><code>npm ci
+npm run check:ordering</code></pre>
+<p><code>check:ordering</code> needs no network. It recomputes, with the reader's own <code>coverForOrder</code> in <code>src/history.mjs</code>, the first-loss cover consumed by two defaults of 30 and 10 XRP declared in either order, and compares the result with the figures measured on-chain:</p>
+<pre class="code"><code>  BIG-FIRST    computed  500000  measured on-chain  500000  MATCH
+  SMALL-FIRST  computed  700000  measured on-chain  700000  MATCH
+  swing 40.00%  (measured 40.00%)  MATCH
+  closed form big-first   500000
+  closed form small-first 700000
 
-CONFIRMED: xrpl@5.2.0 signs the counterparty signature natively. Both recon workarounds are OBSOLETE.</code></pre>
-<p>That is one real run. The middle line is <code>autofill</code>'s own warning about the second signature, and it is the warning described below: it is printed, and then the fee is not doubled. The loan id is different every time, because the script builds a fresh vault each run. The elapsed markers move with Devnet close times: 44.8 seconds is the figure recorded in the backend spec, the run above took 47.1 seconds, and both were all <code>tesSUCCESS</code>. It funds two throwaway faucet wallets and leaves a vault behind, which is fine: Devnet.</p>
-<p>If this fails, stop. Nothing downstream will work and the failure is almost certainly the toolchain rather than your code.</p>
+  PASS: the module reproduces the on-chain measurements exactly</code></pre>
+<p>It exits non-zero on any mismatch. If it fails, stop: the install is not the one the figures on these pages were produced with.</p>
 <h2 id="step-2-start-the-reader">Step 2: start the reader</h2>
 <pre class="code" data-lang="bash"><code>node src/index.mjs</code></pre>
 <p>There are no arguments in the common case. On startup the entrypoint reads every <code>demo/*.json</code>, keeps any file carrying a 64-hex <code>vaultId</code>, and serves it under the <code>label</code> in the same file. Those four files are tracked in git, so a clean clone already knows what to watch.</p>
@@ -126,7 +128,13 @@ VAULTS=&lt;64-hex id&gt;,&lt;64-hex id&gt; node src/index.mjs</code></pre>
 <p>With a seed set, the reader attaches a publish loop that writes six <code>PriceData</code> entries per vault into a native XLS-47 Oracle object: <code>NAV</code>, <code>HDL</code>, <code>LIQ</code>, <code>COV</code>, <code>CNC</code> and <code>DDL</code>. It publishes on material change (the held NAV moved, or the grade moved) plus a 60 second heartbeat, so a stale oracle is distinguishable from a dead publisher. <code>PUBLISH_HEARTBEAT_MS</code> changes that interval.</p>
 <pre class="code"><code>[22:20:17] INFO  [main] publishing enabled {"publisher":"rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B","funded":false}</code></pre>
 <p><code>PUBLISH=faucet</code> instead of a seed funds a throwaway publisher, and the reader warns that it has done so. It works, but every restart publishes under a new account, so the previous oracle objects are stranded where they are and the series does not continue. A seed is what keeps the same objects across restarts.</p>
-<div class="callout warning"><span class="ck">Warning</span><div><p>Devnet faucet seeds are worthless and they are still private keys. <code>.env</code> and <code>/.demo-keys.json</code></p><p>are gitignored, and <code>tools/pre-commit</code> greps the added lines of every staged file for an XRPL</p><p>family seed (<code>s…</code> or <code>sEd…</code>) and rejects the commit if it finds one. Do not weaken the hook, move</p><p>the seed.</p></div></div>
+<div class="callout warning"><span class="ck">Warning</span><div><p>Devnet faucet seeds are worthless and they are still private keys. <code>.env</code> and <code>/.demo-keys.json</code></p><p>are gitignored. We ran a local pre-commit hook that greps staged lines for an XRPL family seed</p><p>(<code>s…</code> or <code>sEd…</code>); it is not part of this repository, so a clone has no such check. Add your own</p><p>before you commit anywhere near a seed.</p></div></div>
+<h3 id="reading-the-objects-already-on-devnet">Reading the objects already on Devnet</h3>
+<p>The scores of the four baked facilities sit on two publisher accounts. <code>rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B</code>, the one in the log line above, published during the event; its objects were last updated between 14:20 and 14:21 UTC on 13 September 2026. <code>rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H</code> is the deployed reader behind <code>orma-api.onrender.com</code>, which publishes while the service runs. The free tier can sleep when idle, so read <code>LastUpdateTime</code> before using a value. The reader numbers documents in the order it first publishes them (<code>docIdFor</code> in <code>src/oracle.mjs</code>), so the ids are not fixed. On 13 October 2026 both accounts used the same ones:</p>
+<div class="tw"><table><thead><tr><th><code>oracle_document_id</code></th><th>Facility</th><th>Vault id</th></tr></thead><tbody><tr><td>1</td><td>Thorne Senior Secured I</td><td><code>4A5A8E37…5B00190DF5</code></td></tr><tr><td>2</td><td>Meridian Trade Finance I</td><td><code>864C5A2D…E37E8C835</code></td></tr><tr><td>3</td><td>Calder Structured Credit III</td><td><code>5763707D…2A96CB0E5</code></td></tr><tr><td>4</td><td>Kestrel Bridge Financing II</td><td><code>24EAA01A…1E5810089</code></td></tr></tbody></table></div>
+<p>Kestrel, from the deployed publisher:</p>
+<pre class="code" data-lang="json"><code>{ "command": "ledger_entry", "oracle": { "account": "rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H", "oracle_document_id": 4 }, "ledger_index": "validated" }</code></pre>
+<p>Every <code>BaseAsset</code> in the answer is the first 20 bytes of the vault id, <code>24EAA01AD4CE70D8ABB4ACB4255DC4C216B8AF3B</code> for Kestrel, which is how to check that the object is the vault you meant. The same request with the <code>rpVg1…</code> account returns Kestrel as it stood at the end of the event. <code>GET /api/vaults/:vaultId</code> reports the publisher, document id and object index a reader is using, under <code>oracle</code>.</p>
 <h2 id="step-4-the-frontend">Step 4: the frontend</h2>
 <pre class="code" data-lang="bash"><code>cd app
 pnpm install
@@ -153,7 +161,7 @@ pnpm dev</code></pre>
 AA	89	1.000000	0.803922	1961bp	Meridian Trade Finance I
 AA	89	1.000000	0.803922	1961bp	Calder Structured Credit III
 AAA	100	1.000000	1.000000	0bp	Thorne Senior Secured I</code></pre>
-<p>Two things to read off that table. Meridian and Calder both report a unit value of <code>1.000000</code> and hold <code>0.803922</code>: 1961 basis points of divergence that an indexer diffing transaction metadata never sees, because <code>LossUnrealized</code> moved from zero and rippled omits type-default previous values from <code>PreviousFields</code>. Kestrel shows zero divergence and still grades <b>B</b>, because its losses were not impaired, they were defaulted, and a realised write-off leaves no provision behind to diverge from. The score's memory term is what catches it. Full method at <a href="mathematics.html">/mathematics</a>, sections 4 to 6.</p>
+<p>Two things to read off that table. Meridian and Calder both report a unit value of <code>1.000000</code> and hold <code>0.803922</code>: 1961 basis points of divergence that an indexer diffing transaction metadata never sees, because a healthy vault carries no <code>LossUnrealized</code> and <code>PreviousFields</code> only records fields the object already had. Kestrel shows zero divergence and still grades <b>B</b>, because its losses were not impaired, they were defaulted, and a realised write-off leaves no provision behind to diverge from. The score's memory term is what catches it. Full method at <a href="mathematics.html">/mathematics</a>, sections 4 to 6.</p>
 <p><b>Value a pledge from the share token alone.</b> This is the loop a second broker runs when offered vault units as collateral, and it needs nothing from us but a URL the token itself carries.</p>
 <pre class="code" data-lang="bash"><code>curl -s "http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav?units=1000000" \
   | jq '{unitValue, pledge}'</code></pre>

@@ -232,7 +232,7 @@ const RED = SUB + WINDOW   // WINDOW defaults to 3600 seconds</code></pre>
   entryClosedAfterRevocation: !bounced.ok &amp;&amp; bounced.code === 'tecNO_AUTH',
   exitStayedOpen: exit.ok,
 }</code></pre>
-<p>The four Devnet seeds are written separately to <code>.demo-keys.json</code>, which is gitignored, so the gate can be replayed live rather than only recounted. Faucet keys on a test network are worthless and they are still private keys, so they stay out of the committed artefact. A pre-commit hook checks staged content for seeds by checksum and refuses the commit if one appears.</p>
+<p>The four Devnet seeds are written separately to <code>.demo-keys.json</code>, which is gitignored, so the gate can be replayed live rather than only recounted. Faucet keys on a test network are worthless and they are still private keys, so they stay out of the committed artefact. The pre-commit hook that checked staged content for seeds during the event was local and is not part of this repository.</p>
 <h2 id="what-this-does-not-do">What this does not do</h2>
 <ul><li>It does not run on Mainnet. XLS-65 and XLS-66 are not available there, so the vault this gate protects</li></ul>
 <p>  cannot exist on Mainnet yet. XLS-70 credentials and XLS-80 permissioned domains are live on Mainnet, so   the enforcement half has a production path ahead of the measurement half.</p>

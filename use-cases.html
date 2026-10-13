@@ -111,7 +111,7 @@ curl -s localhost:8787/api/vaults \
 # the manager's record, reconstructed from account_tx
 curl -s localhost:8787/api/vaults/24EAA01AD4CE70D8ABB4ACB4255DC4C216B8AF3B9E7315DB8052BFC1E5810089/broker-history \
   | jq '{ordering, reputation}'</code></pre>
-<div class="callout note"><span class="ck">Note</span><div><p>Conduct is reconstructed from <code>account_tx</code>, which Devnet retains for roughly 29 days. The</p><p>API returns that caveat in the response body rather than burying it in a footnote. Conduct</p><p>before the retention window is not visible and is not claimed to be.</p></div></div>
+<div class="callout note"><span class="ck">Note</span><div><p>Conduct is reconstructed from <code>account_tx</code>, and Devnet prunes old ledgers: on 13 October 2026</p><p>the oldest one the public endpoint served was about a month old. The</p><p>API returns that caveat in the response body rather than burying it in a footnote. Conduct</p><p>before the retention window is not visible and is not claimed to be.</p></div></div>
 <hr>
 <h2 id="2-a-second-broker-asked-to-lend-against-pledged-units">2. A second broker asked to lend against pledged units</h2>
 <p>An LP holds units of Calder's share token and wants to borrow against them from a different broker. The units are escrowed on-ledger: XLS-85 <code>TokenEscrow</code> accepts MPT amounts, and vault shares are MPTs, so <code>EscrowCreate</code> with <code>Amount: { mpt_issuance_id, value }</code> returns <code>tesSUCCESS</code>. The pledge is then a public object. What it is worth is the open question.</p>
@@ -203,7 +203,9 @@ curl -s "localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B
 <h2 id="limits">Limits</h2>
 <ul><li>Devnet only, because XLS-65 and XLS-66 are not on Mainnet. XLS-70 credentials and</li></ul>
 <p>  XLS-80 permissioned domains are, so the enforcement half of case 4 has a production   path ahead of the measurement half.</p>
-<ul><li>Conduct history is bounded by <code>account_tx</code> retention, roughly 29 days.</li><li>The credential bar is a fixed threshold, <code>ORMA-IG</code> at BBB- or better. Nothing</li></ul>
+<ul><li>Conduct history is bounded by how far back the queried server keeps ledgers, which on Devnet</li></ul>
+<p>  is not a fixed number of days (about a month on 13 October 2026).</p>
+<ul><li>The credential bar is a fixed threshold, <code>ORMA-IG</code> at BBB- or better. Nothing</li></ul>
 <p>  automatically reissues or revokes when a grade moves.</p>
 <ul><li>The pointer written into Calder's metadata is a <code>localhost</code> URL and cannot be changed.</li><li>Grades are advisory. <code>assessment.advisory</code> is <code>true</code> on every valuation response. The</li></ul>
 <p>  only thing that binds is the domain in case 4.</p>

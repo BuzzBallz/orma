@@ -216,9 +216,9 @@ const assets = Number(vault.AssetsTotal)
 import Decimal from 'decimal.js'
 Decimal.set({ precision: 40 })
 const assets = new Decimal(vault.AssetsTotal ?? 0)</code></pre>
-<p>Also: rippled omits any field whose value equals the type default. A vault with no unrealised loss has <b>no <code>LossUnrealized</code> key at all</b>, not <code>"0"</code>. Coalesce absent to zero in one helper so a call site cannot forget.</p>
+<p>Also: rippled does not store an optional field (declared <code>SoeDefault</code>) while it holds its type default, so absent means zero. A vault with no unrealised loss has <b>no <code>LossUnrealized</code> key at all</b>, not <code>"0"</code>. Coalesce absent to zero in one helper so a call site cannot forget.</p>
 <h3 id="2-never-diff-previousfields">2. Never diff <code>PreviousFields</code></h3>
-<p><code>PreviousFields</code> omits any field whose previous value was the type default. On the first impairment of a healthy vault, <code>LossUnrealized</code> moves up from 0, so it is omitted, and under cash-basis accounting (<code>LEVersion = 1</code>) impairment changes nothing else on the Vault object. The Vault node's <code>PreviousFields</code> is emitted <b>empty</b>. An indexer that diffs metadata sees no change at all.</p>
+<p><code>PreviousFields</code> records a previous value only for a field the object already had. On the first impairment of a healthy vault, <code>LossUnrealized</code> did not exist before, so it is omitted, and under cash-basis accounting (<code>LEVersion = 1</code>) impairment changes nothing else on the Vault object. The Vault node's <code>PreviousFields</code> is emitted <b>empty</b>. An indexer that diffs metadata sees no change at all.</p>
 <p>Transaction <code>075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3</code> on Devnet is that case. Always re-read the object. Orma polls full state every 4000 ms for this reason.</p>
 <h3 id="3-domainid-is-on-the-share-issuance-not-the-vault">3. <code>DomainID</code> is on the share issuance, not the vault</h3>
 <p>Reading the <code>Vault</code> ledger entry to find out whether a vault is gated returns nothing, which reads exactly like "open to everyone". The field lives on the share <code>MPTokenIssuance</code>.</p>
@@ -277,9 +277,10 @@ const decodePrice = (hex) =&gt; BigInt(`0x${hex}`)</code></pre>
 1. Monetary values are decimal strings up to 19 significant digits. Use decimal.js at
    precision 40. Never Number(), never parseFloat, never BigInt() on a value that may be
    in scientific notation.
-2. An absent ledger field means zero, not missing. rippled omits type defaults.
-3. Never diff PreviousFields. It omits any field whose previous value was the default, so
-   the first impairment of a healthy vault emits PreviousFields: {}. Re-read the object.
+2. An absent optional ledger field means zero, not missing. rippled does not store an
+   optional (SoeDefault) field while it holds its type default.
+3. Never diff PreviousFields. It only records fields the object already had, so the
+   first impairment of a healthy vault emits PreviousFields: {}. Re-read the object.
 4. DomainID lives on the share MPTokenIssuance, not on the Vault. tfVaultPrivate
    (0x00010000) is required alongside it or nothing is gated.
 5. LoanManage carries LoanID only, no LoanBrokerID, and an impairment does not touch the
@@ -294,7 +295,7 @@ const decodePrice = (hex) =&gt; BigInt(`0x${hex}`)</code></pre>
 10. MPTokenMetadata is write-once: settable on VaultCreate, rejected on VaultSet,
     tecNO_PERMISSION on MPTokenIssuanceSet. Max 1024 bytes. Put a pointer there, not a
     number.</code></pre>
-<div class="callout tip"><span class="ck">Tip</span><div><p>If an assistant writes ledger-reading code that has not been run against a live node, treat the</p><p>output as unverified. Two research agents contradicted each other during this project's recon</p><p>and only live execution settled it. <code>npm run verify</code> proves the full lending chain on Devnet in</p><p>about 45 seconds.</p></div></div>
+<div class="callout tip"><span class="ck">Tip</span><div><p>If an assistant writes ledger-reading code that has not been run against a live node, treat the</p><p>output as unverified. Two research agents contradicted each other during this project's recon</p><p>and only live execution settled it. <code>npm run check:history</code> builds a broker with two loans on</p><p>live Devnet, defaults both, and checks that the reader reconstructs the order and its cost, in about</p><p>three and a half minutes.</p></div></div>
     <div class="foot">
       Orma — built at the XRPL Lending Protocol Hackathon, Paris, 12-13 September 2026,
       by Alexandre Lemiere and Andrea Gonzalez. Devnet only.
