@@ -176,7 +176,11 @@ const sorted = order
   : files
 
 const pages = sorted.map((f) => {
-  const { meta, body } = frontmatter(readFileSync(join(PAGES_DIR, f), 'utf8'))
+  // A Windows checkout with core.autocrlf hands every page over with CRLF endings. The
+  // parser splits on \n and anchors on '---\n', so without this the frontmatter renders as
+  // a paragraph and no heading is recognised. Normalise once, here, before anything parses.
+  const src = readFileSync(join(PAGES_DIR, f), 'utf8').replace(/\r\n?/g, '\n')
+  const { meta, body } = frontmatter(src)
   return { slug: slug(f), title: meta.title || slug(f), description: meta.description || '', html: render(body) }
 })
 
