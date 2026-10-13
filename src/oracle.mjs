@@ -95,7 +95,7 @@ export function buildPriceData(detail) {
 /**
  * Publisher. One instance per publishing account.
  *
- * OracleDocumentIDs come from an explicit table, never from a hash of the VaultID:
+ * OracleDocumentIDs come from an in-memory counter in first-publish order (docIdFor), never from a hash of the VaultID:
  * the id is a UInt32 scoped to (account, id) and a collision would silently overwrite
  * another vault's scores.
  */

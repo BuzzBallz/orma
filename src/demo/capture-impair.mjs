@@ -8,8 +8,11 @@
  * submit. Both problems have the same fix: capture it again now, from a vault built
  * during the event, and write it somewhere tracked.
  *
- * THE FINDING. rippled omits from `PreviousFields` any field whose previous value was
- * the type default. `LossUnrealized` on a healthy vault is 0. Under cash-basis
+ * THE FINDING. `PreviousFields` records a previous value only for a field that was
+ * present on the object before the transaction. A healthy vault does not carry
+ * `LossUnrealized` at all: an optional (SoeDefault) field at its default is not stored on the object, so the
+ * first impairment has no previous value to record. The rule is presence, not value:
+ * the same transaction records the Loan's previous `Flags` of 0. Under cash-basis
  * accounting (`LEVersion=1`) impairment moves nothing else on the Vault object. So the
  * first impairment of a healthy vault emits `PreviousFields: {}` — an indexer that
  * diffs metadata sees an empty change set and reports nothing, while the fund has just
@@ -116,7 +119,7 @@ const loanId = created(r.result.meta, 'Loan').LedgerIndex
 // --- the state that makes the finding visible --------------------------------
 // Read the vault BEFORE impairment, so the capture proves it was healthy: a reader who
 // only sees the after-state cannot tell that PreviousFields was empty because nothing
-// changed, or because the previous value was the default.
+// changed, or because the field was absent before the transaction.
 // Read through the shipped reader, not raw ledger_entry: there is no SharesTotal on a
 // Vault (ledger_entries.macro: "no SharesTotal ever, use MPTIssuance.sfOutstandingAmount"),
 // and vault_info is where the share count actually comes from.
@@ -159,7 +162,7 @@ const out = {
   transactionHash: impair.result.hash,
   transactionResult: code(impair),
   finding: 'The first impairment of a previously-healthy vault is invisible to metadata diffing.',
-  why: 'LossUnrealized was 0 (the type default) so rippled omits it from PreviousFields. Under cash-basis accounting impairment changes nothing else on the Vault, so PreviousFields is entirely {} while FinalFields carries a non-zero LossUnrealized.',
+  why: 'A healthy vault does not carry LossUnrealized (an optional (SoeDefault) field at its default is not stored on the object), so there is no previous value for PreviousFields to record. Under cash-basis accounting impairment changes nothing else on the Vault, so PreviousFields is entirely {} while FinalFields carries a non-zero LossUnrealized.',
   vaultId,
   loanBrokerId: brokerId,
   loanId,

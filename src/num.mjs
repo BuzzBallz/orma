@@ -3,7 +3,7 @@
  *
  * Two rules that the whole backend depends on:
  *
- *  1. rippled omits any field whose value equals the type default. A vault with no
+ *  1. rippled does not store an optional (SoeDefault) field while it holds its type default. A vault with no
  *     unrealised loss has NO `LossUnrealized` key at all, not `"0"`. Every read of a
  *     ledger amount goes through `num()` so that coalescing happens in exactly one
  *     place and cannot be forgotten at a call site.

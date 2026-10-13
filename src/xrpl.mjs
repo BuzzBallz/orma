@@ -3,13 +3,16 @@
  *
  * Deliberately a POLLER, not a streaming indexer. Reasons, both learned the hard way:
  *
- *  - Transaction metadata OMITS any field whose previous value was the type default,
- *    so the first impairment of a healthy vault emits `PreviousFields: {}` on the Vault
- *    node while `LossUnrealized` becomes non-zero. Any indexer that diffs metadata
+ *  - `PreviousFields` records a previous value only for a field that was present on the
+ *    object before the transaction. A healthy vault does not carry `LossUnrealized` at
+ *    all (an optional (SoeDefault) field at its default is not stored), so the first impairment emits
+ *    `PreviousFields: {}` on the Vault node while `LossUnrealized` becomes non-zero.
+ *    The rule is presence, not value: the same transaction records the Loan's previous
+ *    `Flags` of 0. Any indexer that diffs metadata
  *    misses the single most important credit event in the protocol. Re-reading the
  *    object cannot miss it.
- *  - Devnet history is pruned to roughly 29 days, so a backfill by walking
- *    PreviousTxnID hits txnNotFound on anything older.
+ *  - Devnet prunes old ledgers (on 13 October 2026 one server's oldest was 5193077; it varies),
+ *    so a backfill by walking PreviousTxnID hits txnNotFound on anything older.
  *
  * Everything here re-reads current state. Nothing here diffs metadata.
  */
@@ -136,8 +139,9 @@ export class Xrpl {
 
   /**
    * Transaction history for an account, newest first.
-   * Devnet retains roughly 29 days, which is ample for brokers created during an event
-   * but would not be for a real track record. Paginates on `marker`.
+   * Devnet keeps only a window of recent ledgers (about a month on 13 October 2026, varying by server),
+   * which covers brokers created during an event but would not hold a real track record.
+   * Paginates on `marker`.
    */
   async accountTx(account, { limit = 200, maxPages = 5 } = {}) {
     const out = []

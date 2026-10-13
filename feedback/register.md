@@ -311,7 +311,9 @@ And PR #582 explicitly defers it. Line 124 of its `XLS-0066-lending-protocol/REA
 
 PR #587 contains the string `LoanBrokerSet` **zero times**. It mentions `LoanBroker` twice, both about
 owner-count blocking `LoanBrokerDelete`. **The two in-flight specification PRs point at each other, and
-neither of them specifies the rule.** Discussion #590 does not either.
+neither of them specifies the rule.** Discussion #590 does not either. *(True at the event. Corrected
+2026-10-13: #587 was merged on 2026-09-15 with the restriction, after our comment; since #636 it is §3.3
+of `66.1.2-closed-ended-loan-gates.md`.)*
 
 So the ask is narrower than we first wrote it, and it is cheap: the behaviour is agreed, implemented and
 already documented downstream. Please land it in the standard, because XLS-66 §3.3.3.2 is where an
@@ -434,9 +436,16 @@ Unchanged on rippled **3.4.0-rc5**: a fresh impairment submitted on 2026-09-12,
 
 ### Why
 
-`PreviousFields` records the prior value of fields that were **present** on the object and changed. A
-field sitting at its type default is not serialised onto the object at all, so it has no prior value to
-record. `LossUnrealized`'s type default is 0, so on a healthy vault the field is simply not there.
+*Corrected 2026-10-13: the mechanism is presence, not value. The submitted text said in places (the
+suggested fix below, U5 and §12) that rippled omits a field whose previous value was the type default; those
+passages are restated. The claim that the same absence hides the first `DebtTotal`, `CoverAvailable` and
+`AssetsTotal` is kept, restated by presence and now cited with its transactions. Removed: our reading of the
+prior reporter's reasoning, and a heading that called the prior art our strongest evidence. See `XRPLF/xrpl-dev-portal#3926`.*
+
+`PreviousFields` records the prior value of fields that were **present** on the object and changed. An
+optional field such as `LossUnrealized` (declared `SoeDefault`) is not serialised onto the object while it holds its type default,
+so it has no prior value to record. `LossUnrealized`'s type default is 0, so on a healthy vault the field is
+simply not there.
 (The rule is presence, not value: the same transaction records the Loan's previous `Flags` of `0`,
 because `Flags` *was* on the object.) And under cash-basis
 accounting (D1.b) impairment changes *nothing else* on the Vault node — `AssetsTotal` and `AssetsAvailable`
@@ -460,7 +469,7 @@ This is the part that makes it dangerous. Three cases, same field, three differe
 
 | Event | Previous value | `PreviousFields` | Visible to a diff? |
 |---|---|---|---|
-| **First impairment of a healthy vault** | 0 (type default, field absent) | `{}` | **No** |
+| **First impairment of a healthy vault** | none (field absent, read as 0) | `{}` | **No** |
 | `tfLoanUnimpair` | 10000000 | `{"LossUnrealized":"10000000"}` | Yes |
 | Second impairment while one is outstanding | 2000000 | `{"LossUnrealized":"2000000"}` → final 5000000 | Yes |
 
@@ -471,8 +480,11 @@ So an indexer author who tests the reversal, or who tests a second impairment, s
 concludes the system works. The only case that breaks is the transition from healthy to distressed — the
 one that matters.
 
-It is also not specific to `LossUnrealized`. The same rule hides the first non-zero `DebtTotal`, the first
-`CoverAvailable`, the first `AssetsTotal`. `LossUnrealized` is just where it hurts most.
+It is also not specific to `LossUnrealized`. The same absence hides the first `AssetsTotal` of a vault
+(first `VaultDeposit`, `202F9600CC1D85266FFB27B70F26CE09AB0FE0423D4A8E77FA12F7F8D515F6C1`), the first `CoverAvailable` of a broker (first
+`LoanBrokerCoverDeposit`, `13ECAC8451FB861723953DFE8BA9EC8B642A14FA5255943E7C7B1349EB1DD562`) and its first `DebtTotal` (first `LoanSet`,
+`525FC003CF1D4C99B82E876DE945000A681230D4312C03DE1120EA9F905118AB`): in each, the node's `PreviousFields` has no entry for the field the
+transaction creates. `LossUnrealized` is just where it hurts most.
 
 There is a second, related trap on the other side of the lifecycle: on `tfLoanDefault` rippled **deletes**
 `PrincipalOutstanding`, `TotalValueOutstanding`, `PaymentRemaining` and `NextPaymentDueDate` from the `Loan`
@@ -481,10 +493,10 @@ once before we guarded it.
 
 ### Suggested fix, cheapest first
 
-1. **Document it.** One paragraph on the transaction-metadata page: *"`PreviousFields` omits any field whose
-   not present on the object beforehand. A `ModifiedNode` may therefore appear with an empty
-   `PreviousFields` while `FinalFields` carries a new non-zero value. Do not infer 'unchanged' from an empty
-   `PreviousFields`."* Cross-link it from the `Vault` ledger-entry page and from `LoanManage`. This costs
+1. **Document it.** One paragraph on the transaction-metadata page: *"`PreviousFields` records a previous
+   value only for a field that was present on the object before the transaction. A field the transaction
+   creates has no entry, so a `ModifiedNode` may appear with an empty `PreviousFields` while `FinalFields`
+   carries a new non-zero value. Do not infer 'unchanged' from an empty `PreviousFields`."* Cross-link it from the `Vault` ledger-entry page and from `LoanManage`. This costs
    nothing and would have saved us a day.
 2. **Emit the default.** When a field is created on an existing node, record its default value in
    `PreviousFields`. This is the correct fix and it makes metadata self-describing, but it changes the
@@ -499,7 +511,7 @@ absent to `"0"`, and parse with `decimal.js` at precision 40. Our demo is a two-
 transaction: the naive indexer reports 1.0000, the correct one reports 0.8039, and both are reading the same
 ledger.
 
-### Prior art — and it is the strongest evidence we have
+### Prior art
 
 Our first draft of this finding said "prior art: none found". That was wrong, and the way it was wrong
 matters, so here is the whole of it.
@@ -513,10 +525,9 @@ comment: "Not a bug."** No maintainer replied. Nothing was documented as a resul
 unchanged six months later on 3.4.0-rc5.
 
 We think that closure *is* the finding. The operator of an XRPL explorer — precisely the metadata-diffing
-indexer author this trap is built for — hit it on Devnet, could not distinguish a silent correctness bug
-from intended behaviour, and filed it away as his own misunderstanding. He was half right: rippled is
-behaving as designed. What is missing is the one paragraph that would have told him so, and told him that
-"touched but unchanged" is not a safe inference. Nobody triaged it, so nobody wrote that paragraph.
+indexer author this trap is built for — hit it on Devnet and closed it as not a bug. rippled is behaving as
+designed. What is missing is the one paragraph that says so, and says that "touched but unchanged" is not a
+safe inference. Nobody triaged it, so nobody wrote that paragraph.
 
 We are re-opening the same ground with what #6487 did not have: the NAV arithmetic (1,961 bps), the
 asymmetry table above that shows why the bug survives casual testing, and a request that the behaviour be
@@ -1076,14 +1087,15 @@ different boundary and is filed separately.)
 ### U5 — absent means zero, everywhere, with no normalising option
 **P1 · rippled read APIs · ALREADY REPORTED (`XRPLF/xrpl-dev-portal#3612`), with a new ask**
 
-rippled omits any field whose value equals the type default, from ledger objects and from metadata alike.
-A healthy vault has **no `LossUnrealized` key at all** — not `"0"`. So does a vault with no `Scale`, a
-broker with no `CoverAvailable`, a loan whose `ManagementFeeOutstanding` rounds to sub-drop.
+Many fields are not stored on a ledger object while they hold their type default, so they are absent from
+objects and from metadata alike. A healthy vault has **no `LossUnrealized` key at all** — not
+`"0"`. So does a vault with no `Scale`, a broker with no `CoverAvailable`, a loan whose
+`ManagementFeeOutstanding` rounds to sub-drop.
 
 Every read in a lending application therefore needs `v.AssetsAvailable ?? '0'` on every numeric field, and
 the failure mode when you forget is `undefined` arithmetic producing `NaN`, not an exception. Combined with
-X1 — the same rule applied to `PreviousFields` — this is the single most common source of crashes we hit,
-and it is mentioned on no page today.
+X1, where the same absence leaves `PreviousFields` empty, this is the single most common source of crashes
+we hit, and it is mentioned on no page today.
 
 **It has, however, been an open ticket since 2026-04-15, filed by Ripple's own documentation lead.**
 `XRPLF/xrpl-dev-portal#3612` "Several fields (esp. lending-related entries) are actually optional", by
@@ -1370,7 +1382,9 @@ To monitor vaults you must already know their IDs. Every route to discovering th
 - `loan_info` and `loan_broker_info` also return `unknownCmd`.
 - `ledger_data` with a `type` filter is clamped to 256 entries **with the filter applied after the page is
   cut**, so a filtered query can legitimately return zero rows on a ledger that contains matches.
-- Devnet history is pruned to roughly 29 days, so back-filling from transaction history is not general.
+- Devnet prunes old ledgers, so back-filling from transaction history is not general. (Corrected
+  2026-10-13: the submitted text said roughly 29 days. The window is not a fixed number of days; on
+  2026-10-13, a month after the event, one public Devnet server reported its oldest ledger as 5193077 (closed 10 September); the floor moves and differs between servers.)
 - There is no `subscribe` stream for the lending ledger entry types.
 
 The only correct reader we could build is a poller over a hard-coded list of `VaultID`s, which is what we
@@ -2010,10 +2024,10 @@ upstream before we could report it (§13).
 2. **Fix the lending tutorial's `VaultCreate` and its result-code check** (D2). Four lines of transaction
    fields and one `if`. It is the difference between a developer's first hour ending in a working loan and
    ending in an unexplained `TypeError`. We have the PR ready and run green against rc5.
-3. **Document that `PreviousFields` omits default-valued fields** (X1). One paragraph. Without it, every
-   indexer built on this protocol will silently miss the first impairment of every healthy vault, which is
-   the only credit event that matters — and we now know of one explorer operator who hit exactly that in
-   March 2026 and concluded the fault was his own.
+3. **Document that `PreviousFields` records nothing for a field that was absent before the transaction**
+   (X1). One paragraph. Without it, every indexer built on this protocol will silently miss the first
+   impairment of every healthy vault, which is the only credit event that matters — and one explorer
+   operator reported exactly that in March 2026 (`rippled#6487`).
 
 Everything else in this report is smaller than these three.
 

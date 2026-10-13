@@ -128,8 +128,8 @@ export async function fetchBrokerHistory(xrpl, ownerAccount, brokerId) {
       // FINDING X1, ON OUR OWN CODE, FOR THE SECOND TIME.
       //
       // The amount used to be read as the change in CoverAvailable. On the FIRST cover
-      // deposit that difference is always zero, because CoverAvailable was 0 beforehand,
-      // 0 is the type default, and rippled therefore omits it from PreviousFields. The
+      // deposit that difference is always zero: CoverAvailable is not stored on the broker
+      // until the first deposit creates it, so PreviousFields has no previous value for it. The
       // fallback on line 82 -- correct for an impairment, which touches nothing -- then
       // sets the before equal to the after and the movement disappears. So the row that
       // says "added first-loss capital" reported adding none, on the exhibit whose entire
@@ -302,7 +302,7 @@ export function reputation(events, ordering, broker) {
       eventsRetained: events.length,
     },
     findings,
-    // Devnet prunes to roughly 29 days, so this is a window rather than a lifetime.
-    caveat: 'Reconstructed from the public record only, which is retained for roughly 29 days. Conduct before that window is not visible here.',
+    // Devnet prunes old ledgers, so this is a window rather than a lifetime.
+    caveat: 'Reconstructed from the public record only. Devnet prunes old ledgers, so conduct before the oldest retained ledger is not visible here.',
   }
 }

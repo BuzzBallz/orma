@@ -95,7 +95,7 @@
 
 \title{Orma: measuring discretion in on-ledger private credit}
 \author{Alexandre Lemiere \and Andrea Gonzalez}
-\date{13 September 2026}
+\date{13 September 2026, corrected 13 October 2026}
 
 \begin{document}
 \maketitle
@@ -313,18 +313,19 @@ object of $V$'s node in that transaction's metadata is empty.
 \end{proposition}
 
 \begin{proof}
-The metadata for a modified node lists in \texttt{PreviousFields} exactly those fields whose
-value before the transaction differs from their value after it, and omits any field whose
-previous value was the default for that field's type. For the amount-valued fields of a
-Vault that default is $0$.
+The metadata for a modified node lists in \texttt{PreviousFields} the previous value of
+each field that was present on the object before the transaction and changed. An optional (\texttt{SoeDefault}) field at
+its type's default, $0$ for the amount-valued fields of a Vault, is not stored on the
+object, so a field the transaction creates has no previous value to record.\footnote{Corrected
+13 October 2026: the rule is presence, not value (\texttt{xrpl-dev-portal\#3926}).}
 
 Take each field in turn. \texttt{AssetsTotal} is unchanged: under cash-basis accounting
 origination recorded the principal in \texttt{DebtTotal}, and recognising a loss on an
 outstanding loan writes no asset movement. \texttt{AssetsAvailable} is unchanged: nothing is
 lent, repaid, deposited or withdrawn. The share issuance is untouched, so $S$ is unchanged,
 and every remaining field of the Vault is static configuration. The single field whose value
-differs is \texttt{LossUnrealized}, moving from $0$ to $L'$; but its previous value is $0$,
-the type default, so by the omission rule it is not emitted. No other field differs, hence
+differs is \texttt{LossUnrealized}, moving from $0$ to $L'$; but at $0$ it was not stored
+on the object, so it has no previous value and is not emitted. No other field differs, hence
 \texttt{PreviousFields} is empty.
 \end{proof}
 
@@ -901,9 +902,11 @@ production facility to measure and no claim is made about one. The arithmetic is
 of the protocol rules rather than of Devnet and should carry over unchanged if the
 amendments activate. The hashes will not: Devnet is periodically reset.
 
-\paragraph{A $29$ day history window.} The conduct score and the sequence score $\phi$ are
-reconstructed from public transaction history, which the Devnet cluster retains for roughly
-$29$ days. Behaviour before that window is invisible, so every conduct figure is a lower
+\paragraph{A bounded history window.} The conduct score and the sequence score $\phi$ are
+reconstructed from public transaction history, which the Devnet cluster prunes: on 13 October
+2026 one server reported its oldest ledger as $5{,}193{,}077$; the floor varies by server.\footnote{Corrected 13 October 2026: an
+earlier version gave the window as roughly $29$ days. It is not a fixed number of days.}
+Behaviour before that window is invisible, so every conduct figure is a lower
 bound on observable misconduct over a bounded window, not a statement about a manager's
 whole record.
 

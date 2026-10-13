@@ -7,7 +7,7 @@
   "transactionHash": "075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3",
   "transactionResult": "tesSUCCESS",
   "finding": "The first impairment of a previously-healthy vault is invisible to metadata diffing.",
-  "why": "LossUnrealized was 0 (the type default) so rippled omits it from PreviousFields. Under cash-basis accounting impairment changes nothing else on the Vault, so PreviousFields is entirely {} while FinalFields carries a non-zero LossUnrealized.",
+  "why": "A healthy vault does not carry LossUnrealized (an optional (SoeDefault) field at its default is not stored on the object), so there is no previous value for PreviousFields to record. Under cash-basis accounting impairment changes nothing else on the Vault, so PreviousFields is entirely {} while FinalFields carries a non-zero LossUnrealized.",
   "vaultId": "864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835",
   "loanBrokerId": "41BD2EA81CD03ED9EAC612BFFC6179AC742120FC4A5E0DD1D3E4DCE7DB5B2F38",
   "loanId": "60C170A9F1096E7200196E2DBC5849A5D8991C2F630123E77FF359B68F2B4188",
