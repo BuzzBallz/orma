@@ -33,6 +33,8 @@ export class Reader {
     /** full passes over every vault. The first reads them one by one, seconds apart, so until it
      * ends a vault without a snapshot may simply not have been reached yet. */
     this.passes = 0
+    /** vaults the ledger says do not exist: an answer, not a read that failed */
+    this.missing = new Set()
     this._timer = null
     this._running = false
     /** optional hook, set by the publish loop. Must never block or throw into tick(). */
@@ -138,6 +140,7 @@ export class Reader {
         }
         const prev = this.snapshots.get(id)
         this.snapshots.set(id, snap)
+        this.missing.delete(id)
         if (this.onSnapshot) { try { this.onSnapshot(snap) } catch { /* never let a consumer break a read */ } }
         this.lastGoodAt = Date.now()
         this.degraded = false
@@ -155,6 +158,8 @@ export class Reader {
           })
         }
       } catch (e) {
+        const code = e?.data?.error
+        if (code === 'entryNotFound' || code === 'objectNotFound') this.missing.add(id)
         this.degraded = true
         log.warn('vault read failed, keeping last good snapshot', {
           vault: id.slice(0, 12),

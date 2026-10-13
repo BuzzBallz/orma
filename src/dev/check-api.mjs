@@ -39,6 +39,15 @@ eq('a tracked vault whose first read failed', (await call('GET', `/api/vaults/${
 reader.vaultIds = []
 eq('an id the reader does not track, once a pass is done', (await call('GET', `/api/vaults/${ID}/nav-history`)).code, 'VAULT_NOT_FOUND')
 
+// A share id is unknown while a tracked vault is unread, and a vault the ledger says does not exist
+// is absent, not forever warming up.
+const MPT = 'CD'.repeat(24)
+reader.vaultIds = [ID]
+eq('a share id while a tracked vault is unread', (await call('GET', `/api/mpt/${MPT}/nav`)).code, 'WARMING_UP')
+reader.missing = new Set([ID])
+eq('a tracked vault the ledger says does not exist', (await call('GET', `/api/vaults/${ID}/nav`)).code, 'VAULT_NOT_FOUND')
+eq('and a share id once every tracked vault is read or missing', (await call('GET', `/api/mpt/${MPT}/nav`)).code, 'SHARE_NOT_TRACKED')
+
 await api.close()
 console.log(bad ? `\n  ${bad} FAILED` : '\n  all ok')
 process.exitCode = bad ? 1 : 0  // not process.exit(): on Windows it aborts while the closed sockets are still closing

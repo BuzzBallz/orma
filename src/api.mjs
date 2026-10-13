@@ -89,14 +89,14 @@ export function createApi(reader, opts = {}) {
     }
     const fail = (code, errCode, message, retryable = false) =>
       send(code, { error: { code: errCode, message, retryable } })
-    // Not read yet is not absent: say retry, not "no such vault". Before the first snapshot nothing
-    // is known; before the reader's first full pass ends, an id may be a vault it has not reached;
-    // and a vault it tracks but has not read (a first read that failed) is still on its way. Only an
-    // id it does not track is absent.
+    // Not read yet is not absent: say retry, not "no such vault". Until the reader's first full
+    // pass ends, an id may be a vault it has not reached (a reader that counts no passes: until its
+    // first snapshot). After it, a vault it tracks but could not read is still on its way, unless the
+    // ledger answered that it does not exist. A share id is unknown while any tracked vault is.
+    const pending = (v) => Boolean(reader.vaultIds?.includes(v) && !reader.snapshots.has(v) && !reader.missing?.has(v))
     const absent = (errCode, message, vaultId = null) => {
-      const id = vaultId?.toUpperCase()
-      const unread = reader.snapshots.size === 0 || reader.passes === 0
-        || Boolean(id && reader.vaultIds?.includes(id) && !reader.snapshots.has(id))
+      const firstPass = reader.passes === undefined ? reader.snapshots.size === 0 : reader.passes === 0
+      const unread = firstPass || (vaultId ? pending(vaultId.toUpperCase()) : Boolean(reader.vaultIds?.some(pending)))
       return unread
         ? fail(503, 'WARMING_UP', 'Warming up: the reader has not read this vault yet', true)
         : fail(404, errCode, message, false)
