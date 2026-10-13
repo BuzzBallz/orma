@@ -17,6 +17,7 @@ export function Footer({ vaultId, onNavigate }: {
         <div className="foot-lines">
           <p>Nothing on these pages is behind a sign-in.</p>
           <p>A stale figure is never carried forward as current and never estimated.</p>
+          <p>Every reading is also published as a <span data-vocab-exempt>native XLS-47 Oracle object</span>.</p>
           <p data-vocab-exempt>
             Built by <a className="lnk" href="https://github.com/frytegg" target="_blank" rel="noreferrer noopener">Alexandre Lemiere</a>{' '}
             and <a className="lnk" href="https://github.com/andreagnzz" target="_blank" rel="noreferrer noopener">Andrea Gonzalez</a>

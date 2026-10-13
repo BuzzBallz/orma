@@ -56,6 +56,13 @@ export function Methodology() {
           forward as current and never estimated. A facility never reported on is held open
           with an em-dash in every column.
         </p>
+
+        <h2 className="t-heading-l">Where the figures are published</h2>
+        <p className="t-body-l">
+          Every reading is also published as a <span data-vocab-exempt>native XLS-47 Oracle object</span>.
+          The calculation agent named on these pages is that publisher, so a reading can be
+          checked against the register without this site.
+        </p>
         <div className="meth-scale"><Scale label={false} /></div>
       </div>
 
