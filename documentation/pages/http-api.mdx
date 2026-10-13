@@ -114,8 +114,8 @@ distressed loans and reports par.
 
 | code | status | retryable | raised when |
 |---|---|---|---|
-| `WARMING_UP` | 503 | true | the reader has not read its first snapshot yet, so an id it does not know is unknown rather than absent. Vault and MPT routes answer this until the first read lands, a few seconds after a start |
-| `VAULT_NOT_FOUND` | 404 | false | the id is well formed but no snapshot exists for it, once the reader has read its first snapshot |
+| `WARMING_UP` | 503 | true | the reader has not read that vault yet, so it is unknown rather than absent. Vault and MPT routes answer this until the reader's first pass over the facilities ends (it reads them one by one, a few seconds after a start), and vault routes afterwards for a facility it tracks whose first read has not succeeded |
+| `VAULT_NOT_FOUND` | 404 | false | the id is well formed, the reader has finished a pass, and it does not track that vault |
 | `NO_SHARE_MPT` | 404 | false | the vault has no share issuance, so there is nothing to value |
 | `NO_BROKER` | 404 | false | the vault has no `LoanBroker`, so there is no conduct to reconstruct |
 | `SHARE_NOT_TRACKED` | 404 | false | no facility on this service issues that MPT |

@@ -30,6 +30,9 @@ export class Reader {
     this.closeTime = null
     this.degraded = false
     this.lastGoodAt = null
+    /** full passes over every vault. The first reads them one by one, seconds apart, so until it
+     * ends a vault without a snapshot may simply not have been reached yet. */
+    this.passes = 0
     this._timer = null
     this._running = false
     /** optional hook, set by the publish loop. Must never block or throw into tick(). */
@@ -159,6 +162,7 @@ export class Reader {
         })
       }
     }
+    this.passes++
   }
 
   async start() {

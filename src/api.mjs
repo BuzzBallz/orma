@@ -89,10 +89,18 @@ export function createApi(reader, opts = {}) {
     }
     const fail = (code, errCode, message, retryable = false) =>
       send(code, { error: { code: errCode, message, retryable } })
-    // Until the first snapshot lands an id is unknown, not absent: say retry, not "no such vault".
-    const absent = (errCode, message) => reader.snapshots.size === 0
-      ? fail(503, 'WARMING_UP', 'Warming up: the reader has not read its first snapshot yet', true)
-      : fail(404, errCode, message, false)
+    // Not read yet is not absent: say retry, not "no such vault". Before the first snapshot nothing
+    // is known; before the reader's first full pass ends, an id may be a vault it has not reached;
+    // and a vault it tracks but has not read (a first read that failed) is still on its way. Only an
+    // id it does not track is absent.
+    const absent = (errCode, message, vaultId = null) => {
+      const id = vaultId?.toUpperCase()
+      const unread = reader.snapshots.size === 0 || reader.passes === 0
+        || Boolean(id && reader.vaultIds?.includes(id) && !reader.snapshots.has(id))
+      return unread
+        ? fail(503, 'WARMING_UP', 'Warming up: the reader has not read this vault yet', true)
+        : fail(404, errCode, message, false)
+    }
 
     try {
       if (key === 'GET /api/health') return send(200, health())
@@ -109,7 +117,7 @@ export function createApi(reader, opts = {}) {
       const m = url.pathname.match(/^\/api\/vaults\/([A-Fa-f0-9]{64})$/)
       if (m && method === 'GET') {
         const snap = reader.get(m[1].toUpperCase()) ?? reader.get(m[1])
-        if (!snap) return absent('VAULT_NOT_FOUND', 'No vault with that id')
+        if (!snap) return absent('VAULT_NOT_FOUND', 'No vault with that id', m[1])
         const detail = presentVault(snap, {
           prevNavCorrect: prevNav.get(snap.vaultId),
           oracle: opts.oracleFor?.(snap.vaultId) ?? null,
@@ -123,7 +131,7 @@ export function createApi(reader, opts = {}) {
       const cm = url.pathname.match(/^\/api\/vaults\/([A-Fa-f0-9]{64})\/collateral$/)
       if (cm && method === 'GET') {
         const snap = reader.get(cm[1].toUpperCase()) ?? reader.get(cm[1])
-        if (!snap) return absent('VAULT_NOT_FOUND', 'No vault with that id')
+        if (!snap) return absent('VAULT_NOT_FOUND', 'No vault with that id', cm[1])
         const shareMptId = snap.vault.shareMptId
         if (!shareMptId) return fail(404, 'NO_SHARE_MPT', 'vault has no share issuance', false)
         // No reverse index exists from an MPT issuance to the escrows holding it, so a
@@ -144,7 +152,7 @@ export function createApi(reader, opts = {}) {
       const hm = url.pathname.match(/^\/api\/vaults\/([A-Fa-f0-9]{64})\/broker-history$/)
       if (hm && method === 'GET') {
         const snap = reader.get(hm[1].toUpperCase()) ?? reader.get(hm[1])
-        if (!snap) return absent('VAULT_NOT_FOUND', 'No vault with that id')
+        if (!snap) return absent('VAULT_NOT_FOUND', 'No vault with that id', hm[1])
         const broker = snap.brokers[0]
         if (!broker) return fail(404, 'NO_BROKER', 'vault has no loan broker', false)
         const cached = historyCache.get(broker.loanBrokerId)
@@ -187,7 +195,7 @@ export function createApi(reader, opts = {}) {
       const tm = url.pathname.match(/^\/api\/vaults\/([A-Fa-f0-9]{64})\/nav-history$/)
       if (tm && method === 'GET') {
         const snap = reader.get(tm[1].toUpperCase()) ?? reader.get(tm[1])
-        if (!snap) return absent('VAULT_NOT_FOUND', 'No vault with that id')
+        if (!snap) return absent('VAULT_NOT_FOUND', 'No vault with that id', tm[1])
         // The promise is cached, so requests that arrive during a miss share one ledger read.
         const key = 'nav:' + snap.vaultId
         let hit = historyCache.get(key)
@@ -212,7 +220,7 @@ export function createApi(reader, opts = {}) {
       const nm = url.pathname.match(/^\/api\/vaults\/([A-Fa-f0-9]{64})\/nav$/)
       if (nm && method === 'GET') {
         const snap = reader.get(nm[1].toUpperCase()) ?? reader.get(nm[1])
-        if (!snap) return absent('VAULT_NOT_FOUND', 'No vault with that id')
+        if (!snap) return absent('VAULT_NOT_FOUND', 'No vault with that id', nm[1])
         let score = null
         try {
           score = buildScore(deriveScoreInputs({ ...snap.vault, broker: snap.brokers[0] ?? {}, loans: snap.loans, phase: snap.vault.phase }).scoreArgs)
@@ -234,7 +242,7 @@ export function createApi(reader, opts = {}) {
       const gm = url.pathname.match(/^\/api\/vaults\/([A-Fa-f0-9]{64})\/gate$/)
       if (gm && method === 'GET') {
         const snap = reader.get(gm[1].toUpperCase()) ?? reader.get(gm[1])
-        if (!snap) return absent('VAULT_NOT_FOUND', 'No vault with that id')
+        if (!snap) return absent('VAULT_NOT_FOUND', 'No vault with that id', gm[1])
         const key = snap.vault.vaultId
         const cached = gateCache.get(key)
         if (cached && Date.now() - cached.at < 30000) return send(200, stamp(cached.body))

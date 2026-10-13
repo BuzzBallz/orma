@@ -340,7 +340,7 @@ Each `check:*` script proves one claim:
 npm run check:ordering   # the cover-ordering arithmetic, offline, against the figures measured on Devnet
 npm run check:history    # broker history reconstruction, live; funds fresh Devnet accounts from the faucet
 npm run check:oracle     # XLS-47 publication round trip, live; funds a fresh publisher from the faucet
-npm run check:api        # HEAD answers like GET, and "warming up" before the first snapshot, offline
+npm run check:api        # HEAD answers like GET, and "warming up" until a vault is first read, offline
 ```
 
 The HTTP API is documented in `documentation/pages/http-api.mdx`:

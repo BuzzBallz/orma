@@ -1,5 +1,5 @@
-// Offline check of two api.mjs behaviours: HEAD answers like GET, and an id asked before the
-// first snapshot is "warming up" (503), not "no such vault" (404). No network, no ledger.
+// Offline check of two api.mjs behaviours: HEAD answers like GET, and a vault not read yet is
+// "warming up" (503), not "no such vault" (404). No network, no ledger.
 //   node src/dev/check-api.mjs
 import { createApi } from '../api.mjs'
 
@@ -29,6 +29,15 @@ eq('HEAD health', await call('HEAD', '/api/health'), { status: 200, code: null, 
 reader.snapshots.set('x', {})
 eq('GET unknown id once a snapshot exists', (await call('GET', `/api/vaults/${ID}/nav`)).code, 'VAULT_NOT_FOUND')
 eq('HEAD unknown id once a snapshot exists', (await call('HEAD', `/api/vaults/${ID}/nav`)).status, 404)
+
+// The first pass reads the vaults one by one: a snapshot of one does not mean the others were reached.
+reader.passes = 0
+eq('a vault the first pass has not reached yet', (await call('GET', `/api/vaults/${ID}/nav`)).code, 'WARMING_UP')
+reader.passes = 1
+reader.vaultIds = [ID]
+eq('a tracked vault whose first read failed', (await call('GET', `/api/vaults/${ID}/broker-history`)).code, 'WARMING_UP')
+reader.vaultIds = []
+eq('an id the reader does not track, once a pass is done', (await call('GET', `/api/vaults/${ID}/nav-history`)).code, 'VAULT_NOT_FOUND')
 
 await api.close()
 console.log(bad ? `\n  ${bad} FAILED` : '\n  all ok')
