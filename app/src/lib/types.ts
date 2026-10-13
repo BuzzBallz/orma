@@ -173,7 +173,8 @@ export interface Ordering {
 export interface ReputationFinding { code: string; detail: string }
 
 export interface Reputation {
-  grade: string; score: number
+  /** null, with `withheld`, when the record does not reach back to the broker's creation. */
+  grade: string | null; score: number | null; withheld?: boolean
   observations: {
     defaults: number; impairments: number; defaultsWithoutPriorImpairment: number
     coverWithdrawals: number; eventsRetained: number

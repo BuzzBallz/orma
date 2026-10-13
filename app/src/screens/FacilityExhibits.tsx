@@ -42,7 +42,9 @@ const ACTION: Record<string, string> = {
 export function ManagerConduct({ h }: { h: BrokerHistory | null }) {
   if (!h) return null
   const { ordering: o, reputation: rep, recommendation: rec } = h
-  const assessment = <><GradeLetter grade={rep.grade} scale="conduct" size="sm" /> {rep.score} / 100</>
+  const assessment = rep.withheld
+    ? <>Not assessed</>
+    : <><GradeLetter grade={rep.grade} scale="conduct" size="sm" /> {rep.score} / 100</>
 
   return (
     <Exhibit title="Exhibit 3 · Manager conduct" meta={assessment}>
