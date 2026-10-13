@@ -98,6 +98,13 @@ function checkOne(dir, id, fail) {
   // Transaction: JSON less the envelope must be tx_blob, byte for byte and key for key.
   const txJson = { ...tx }
   for (const k of ENVELOPE) delete txJson[k]
+  // On a Payment, API v1 adds DeliverMax as a copy of Amount; it is not a field of the signed
+  // transaction. It must equal Amount, and is then set aside like the envelope.
+  if ('DeliverMax' in txJson) {
+    if (txJson.TransactionType !== 'Payment') fail(id, `DeliverMax on a ${txJson.TransactionType}`)
+    else if (deepDiff(txJson.Amount, txJson.DeliverMax, 'tx.DeliverMax', 'Amount')) fail(id, 'DeliverMax differs from Amount')
+    delete txJson.DeliverMax
+  }
   try {
     if (encode(txJson) !== bin.tx_blob) fail(id, 'JSON transaction does not re-encode to tx_blob')
   } catch (e) { fail(id, `JSON transaction does not encode: ${e.message}`) }
@@ -147,7 +154,27 @@ export function check(dir, readme) {
   if (binIds.length === 0) fail('evidence        ', `no captures found in ${dir}`)
   for (const h of linked) if (!binIds.includes(h)) fail(h, 'linked from README.md but not captured')
 
-  return { failures, captures: binIds.length, linked: linked.length }
+  // Coverage: the history routes fall back on exactly what _manifest.json declares per account, so
+  // every hash it declares must be captured here, inside the ledger range it declares.
+  const declared = new Set()
+  let manifest = null
+  try { manifest = JSON.parse(readFileSync(join(dir, '_manifest.json'), 'utf8')) } catch (e) { fail('_manifest.json  ', `unreadable: ${e.message}`) }
+  const vaults = Object.entries(manifest?.coverage?.vaults ?? {})
+  if (manifest && vaults.length === 0) fail('_manifest.json  ', 'no coverage section, so the history routes have no archive to fall back on')
+  for (const [vaultId, v] of vaults) {
+    for (const role of ['pseudoAccount', 'owner']) {
+      const c = v[role]
+      if (!c || !Array.isArray(c.transactions)) { fail(vaultId, `coverage has no ${role} listing`); continue }
+      for (const h of c.transactions) {
+        declared.add(h)
+        if (!binIds.includes(h)) { fail(h, `declared for the ${role} of vault ${vaultId.slice(0, 8)} but not captured`); continue }
+        const at = JSON.parse(readFileSync(join(dir, `${h}.json`), 'utf8')).ledger_index
+        if (!(at >= c.ledgerMin && at <= c.ledgerMax)) fail(h, `ledger ${at} is outside the declared range ${c.ledgerMin}-${c.ledgerMax}`)
+      }
+    }
+  }
+
+  return { failures, captures: binIds.length, linked: linked.length, declared: declared.size }
 }
 
 // Planted defects on a temporary copy. Each case states whether the checker must fail it.
@@ -161,6 +188,15 @@ function selfTest() {
       if (t.PriceDataSeries) return f.slice(0, 64)
     }
     throw new Error('no OracleSet capture to tamper with')
+  })()
+  // A transaction only the coverage declares: a Payment the README does not link.
+  const PAYMENT = (() => {
+    const linked = readFileSync(README, 'utf8').toUpperCase()
+    for (const f of readdirSync(SRC).filter((x) => x.endsWith('.bin.json'))) {
+      const t = JSON.parse(readFileSync(join(SRC, f.replace('.bin.json', '.json')), 'utf8'))
+      if (t.TransactionType === 'Payment' && typeof t.Amount === 'string' && !linked.includes(t.hash)) return t.hash
+    }
+    throw new Error('no unlinked XRP Payment capture to tamper with')
   })()
   const rw = (dir, file, fn) => {
     const p = join(dir, file)
@@ -198,6 +234,12 @@ function selfTest() {
     { name: 'capture linked from README removed', expectFail: true, plant(d) {
       rmSync(join(d, `${IMPAIR}.json`)); rmSync(join(d, `${IMPAIR}.bin.json`))
     } },
+    { name: 'Payment DeliverMax changed in the JSON (an API copy of Amount, not in tx_blob)', expectFail: true, plant(d) {
+      rw(d, `${PAYMENT}.json`, (t) => { t.DeliverMax = String(BigInt(t.Amount) + 1n) })
+    } },
+    { name: 'capture declared in the manifest coverage but not linked from README removed', expectFail: true, plant(d) {
+      rmSync(join(d, `${PAYMENT}.json`)); rmSync(join(d, `${PAYMENT}.bin.json`))
+    } },
     // Known limit, kept as a control so the README's wording has a receipt: the metadata is not
     // hash-bound offline, so a forgery written consistently into both copies passes.
     { name: 'KNOWN LIMIT: same Vault forgery in both meta_blob and JSON', expectFail: false, plant(d) {
@@ -229,12 +271,12 @@ if (isMain) {
   else {
     const dir = resolve(process.argv[2] ?? `${ROOT}/evidence/devnet-tx`)
     const readme = resolve(process.argv[3] ?? `${ROOT}/README.md`)
-    const { failures, captures, linked } = check(dir, readme)
+    const { failures, captures, linked, declared } = check(dir, readme)
     if (failures.length) {
       for (const f of failures) console.error(`  FAIL ${f}`)
       console.error(`\n  FAIL: ${failures.length} problem(s) across ${captures} captures`)
       process.exit(1)
     }
-    console.log(`  PASS: ${captures} captures; each tx_blob hashes to its id; JSON transaction and meta re-encode to tx_blob and meta_blob and match them key for key; all ${linked} README transaction links captured. meta_blob is the server's copy, not hash-bound.`)
+    console.log(`  PASS: ${captures} captures; each tx_blob hashes to its id; JSON transaction and meta re-encode to tx_blob and meta_blob and match them key for key; all ${linked} README transaction links captured; all ${declared} transactions the coverage declares captured in range. meta_blob is the server's copy, not hash-bound.`)
   }
 }
