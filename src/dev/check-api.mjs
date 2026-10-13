@@ -32,4 +32,4 @@ eq('HEAD unknown id once a snapshot exists', (await call('HEAD', `/api/vaults/${
 
 await api.close()
 console.log(bad ? `\n  ${bad} FAILED` : '\n  all ok')
-process.exit(bad ? 1 : 0)
+process.exitCode = bad ? 1 : 0  // not process.exit(): on Windows it aborts while the closed sockets are still closing
