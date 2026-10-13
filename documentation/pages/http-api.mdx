@@ -114,13 +114,17 @@ distressed loans and reports par.
 
 | code | status | retryable | raised when |
 |---|---|---|---|
-| `VAULT_NOT_FOUND` | 404 | false | the id is well formed but no snapshot exists for it |
+| `WARMING_UP` | 503 | true | the reader has not read its first snapshot yet, so an id it does not know is unknown rather than absent. Vault and MPT routes answer this until the first read lands, a few seconds after a start |
+| `VAULT_NOT_FOUND` | 404 | false | the id is well formed but no snapshot exists for it, once the reader has read its first snapshot |
 | `NO_SHARE_MPT` | 404 | false | the vault has no share issuance, so there is nothing to value |
 | `NO_BROKER` | 404 | false | the vault has no `LoanBroker`, so there is no conduct to reconstruct |
 | `SHARE_NOT_TRACKED` | 404 | false | no facility on this service issues that MPT |
 | `NOT_FOUND` | 404 | false | no route matched, or the demo capture file is missing |
 | `FORBIDDEN` | 403 | false | an operator `POST` from something other than loopback |
 | `INTERNAL` | 500 | true | anything unhandled |
+
+Every route that answers `GET` also answers `HEAD`, with the same status and headers and no body, so a
+link checker sees the status a reader would.
 
 A vault id must match `[A-Fa-f0-9]{64}` and an MPT issuance id `[A-Fa-f0-9]{48}`. Lowercase hex is
 accepted and upper-cased before lookup. A path that matches no pattern returns
