@@ -65,10 +65,11 @@ export function createApi(reader, opts = {}) {
 
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, `http://localhost:${port}`)
-    const key = `${req.method} ${url.pathname}`
+    const method = req.method === 'HEAD' ? 'GET' : req.method
+    const key = `${method} ${url.pathname}`
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Headers', '*')
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+    res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,POST,OPTIONS')
     res.setHeader('Cache-Control', 'no-store')
     if (req.method === 'OPTIONS') return res.writeHead(204).end()
 
@@ -88,6 +89,10 @@ export function createApi(reader, opts = {}) {
     }
     const fail = (code, errCode, message, retryable = false) =>
       send(code, { error: { code: errCode, message, retryable } })
+    // Until the first snapshot lands an id is unknown, not absent: say retry, not "no such vault".
+    const absent = (errCode, message) => reader.snapshots.size === 0
+      ? fail(503, 'WARMING_UP', 'Warming up: the reader has not read its first snapshot yet', true)
+      : fail(404, errCode, message, false)
 
     try {
       if (key === 'GET /api/health') return send(200, health())
@@ -102,9 +107,9 @@ export function createApi(reader, opts = {}) {
       }
 
       const m = url.pathname.match(/^\/api\/vaults\/([A-Fa-f0-9]{64})$/)
-      if (m && req.method === 'GET') {
+      if (m && method === 'GET') {
         const snap = reader.get(m[1].toUpperCase()) ?? reader.get(m[1])
-        if (!snap) return fail(404, 'VAULT_NOT_FOUND', 'No vault with that id', false)
+        if (!snap) return absent('VAULT_NOT_FOUND', 'No vault with that id')
         const detail = presentVault(snap, {
           prevNavCorrect: prevNav.get(snap.vaultId),
           oracle: opts.oracleFor?.(snap.vaultId) ?? null,
@@ -116,9 +121,9 @@ export function createApi(reader, opts = {}) {
       // Collateral: escrowed vault shares, valued both ways. This is the endpoint a
       // second broker would call before lending against a pledge.
       const cm = url.pathname.match(/^\/api\/vaults\/([A-Fa-f0-9]{64})\/collateral$/)
-      if (cm && req.method === 'GET') {
+      if (cm && method === 'GET') {
         const snap = reader.get(cm[1].toUpperCase()) ?? reader.get(cm[1])
-        if (!snap) return fail(404, 'VAULT_NOT_FOUND', 'No vault with that id', false)
+        if (!snap) return absent('VAULT_NOT_FOUND', 'No vault with that id')
         const shareMptId = snap.vault.shareMptId
         if (!shareMptId) return fail(404, 'NO_SHARE_MPT', 'vault has no share issuance', false)
         // No reverse index exists from an MPT issuance to the escrows holding it, so a
@@ -137,9 +142,9 @@ export function createApi(reader, opts = {}) {
       // paid depositors, and what they should do next. The two audiences Shota named:
       // depositors see the cost of the ordering, the broker gets a fairness tool.
       const hm = url.pathname.match(/^\/api\/vaults\/([A-Fa-f0-9]{64})\/broker-history$/)
-      if (hm && req.method === 'GET') {
+      if (hm && method === 'GET') {
         const snap = reader.get(hm[1].toUpperCase()) ?? reader.get(hm[1])
-        if (!snap) return fail(404, 'VAULT_NOT_FOUND', 'No vault with that id', false)
+        if (!snap) return absent('VAULT_NOT_FOUND', 'No vault with that id')
         const broker = snap.brokers[0]
         if (!broker) return fail(404, 'NO_BROKER', 'vault has no loan broker', false)
         const cached = historyCache.get(broker.loanBrokerId)
@@ -176,9 +181,9 @@ export function createApi(reader, opts = {}) {
       // The vault's NAV at every transaction that modified it: reported and held, each
       // read from the metadata of that transaction. The chart on the credit opinion.
       const tm = url.pathname.match(/^\/api\/vaults\/([A-Fa-f0-9]{64})\/nav-history$/)
-      if (tm && req.method === 'GET') {
+      if (tm && method === 'GET') {
         const snap = reader.get(tm[1].toUpperCase()) ?? reader.get(tm[1])
-        if (!snap) return fail(404, 'VAULT_NOT_FOUND', 'No vault with that id', false)
+        if (!snap) return absent('VAULT_NOT_FOUND', 'No vault with that id')
         // The promise is cached, so requests that arrive during a miss share one ledger read.
         const key = 'nav:' + snap.vaultId
         let hit = historyCache.get(key)
@@ -201,9 +206,9 @@ export function createApi(reader, opts = {}) {
       // can use it. Read-only, public ledger state, nothing to protect.
       // ---------------------------------------------------------------------
       const nm = url.pathname.match(/^\/api\/vaults\/([A-Fa-f0-9]{64})\/nav$/)
-      if (nm && req.method === 'GET') {
+      if (nm && method === 'GET') {
         const snap = reader.get(nm[1].toUpperCase()) ?? reader.get(nm[1])
-        if (!snap) return fail(404, 'VAULT_NOT_FOUND', 'No vault with that id', false)
+        if (!snap) return absent('VAULT_NOT_FOUND', 'No vault with that id')
         let score = null
         try {
           score = buildScore(deriveScoreInputs({ ...snap.vault, broker: snap.brokers[0] ?? {}, loans: snap.loans, phase: snap.vault.phase }).scoreArgs)
@@ -223,9 +228,9 @@ export function createApi(reader, opts = {}) {
       // everyone". Cached: a domain changes when someone edits it, not every four
       // seconds, and this costs two extra ledger reads.
       const gm = url.pathname.match(/^\/api\/vaults\/([A-Fa-f0-9]{64})\/gate$/)
-      if (gm && req.method === 'GET') {
+      if (gm && method === 'GET') {
         const snap = reader.get(gm[1].toUpperCase()) ?? reader.get(gm[1])
-        if (!snap) return fail(404, 'VAULT_NOT_FOUND', 'No vault with that id', false)
+        if (!snap) return absent('VAULT_NOT_FOUND', 'No vault with that id')
         const key = snap.vault.vaultId
         const cached = gateCache.get(key)
         if (cached && Date.now() - cached.at < 30000) return send(200, stamp(cached.body))
@@ -256,9 +261,9 @@ export function createApi(reader, opts = {}) {
       // `units` values a specific pledge, so a lender does not have to reimplement
       // decimal arithmetic to use this.
       const vm = url.pathname.match(/^\/api\/mpt\/([A-Fa-f0-9]{48})\/nav$/)
-      if (vm && req.method === 'GET') {
+      if (vm && method === 'GET') {
         const snap = reader.getByShareMpt(vm[1])
-        if (!snap) return fail(404, 'SHARE_NOT_TRACKED', 'No facility on this service issues that share token', false)
+        if (!snap) return absent('SHARE_NOT_TRACKED', 'No facility on this service issues that share token')
         let score = null
         try {
           score = buildScore(deriveScoreInputs({ ...snap.vault, broker: snap.brokers[0] ?? {}, loans: snap.loans, phase: snap.vault.phase }).scoreArgs)
@@ -281,7 +286,7 @@ export function createApi(reader, opts = {}) {
       // Every step is reported including failure, because "this collateral is opaque" is
       // a useful answer to give a lender and a far better one than an exception.
       const rm = url.pathname.match(/^\/api\/mpt\/([A-Fa-f0-9]{48})\/resolve$/)
-      if (rm && req.method === 'GET') {
+      if (rm && method === 'GET') {
         const resolve = url.searchParams.get('resolve') !== 'false'
         const out = await resolveFromIssuance(reader.xrpl, rm[1].toUpperCase(), { resolve })
         const units = url.searchParams.get('units')
