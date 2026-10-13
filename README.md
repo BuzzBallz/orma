@@ -9,7 +9,7 @@ token's own metadata, and lets an independent third party gate deposits on it th
 
 **1st place of 14 projects**, De Vinci Blockchain XRPL Lending Protocol Hackathon, Paris, 12-13 September 2026 ([ESILV](https://www.esilv.fr/xrpl-hackathon-devinci-blockchain-remporte-deux-places-sur-le-podium/)).\
 **Upstream:** three notes on the closed-ended vault draft ([XRPL-Standards#587](https://github.com/XRPLF/XRPL-Standards/pull/587#issuecomment-5655843515)), addressed by its author ([reply](https://github.com/XRPLF/XRPL-Standards/pull/587#issuecomment-5665157387)) and merged on 15 September; the `PreviousFields` issue, moved by a RippleX maintainer to the documentation tracker, where it is open ([xrpl-dev-portal#3926](https://github.com/XRPLF/xrpl-dev-portal/issues/3926)).\
-**Live:** [app](https://ormaprotocol.vercel.app) · [API, Meridian `/nav`](https://orma-api.onrender.com/api/vaults/864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835/nav) (free tier: after an idle spell the first request is slow, and until the facilities load it answers `503 WARMING_UP`; retry) · [docs](https://ormaprotocol.mintlify.site/) · [paper](paper/orma-paper.pdf)\
+**Live:** [app](https://ormaprotocol.vercel.app) · [API, Meridian `/nav`](https://orma-api.onrender.com/api/vaults/864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835/nav) (free tier: after an idle spell the first request is slow, and until the facilities load it answers `503 WARMING_UP`; retry) · [docs](https://buzzballz.github.io/orma/) · [paper](paper/orma-paper.pdf)\
 Built by Alexandre Lemiere ([@frytegg](https://github.com/frytegg)) and Andrea Gonzalez ([@andreagnzz](https://github.com/andreagnzz)).
 
 **The asymmetry.** The party who decides *when* a vault recognises a loss is the same party who decides *in
@@ -452,9 +452,10 @@ corrections of that day.
 
 ### `documentation/`
 
-The protocol documentation, ten pages of Mintlify MDX plus its configuration. It is published at
-https://ormaprotocol.mintlify.site/. `build.mjs` renders the same source into a static site and
-`deploy.sh` publishes that to GitHub Pages, so the pages survive the loss of the Mintlify account.
+The protocol documentation, ten pages of Mintlify MDX plus its configuration. `build.mjs` renders the
+same source into a static site and `deploy.sh` publishes it to GitHub Pages, at
+https://buzzballz.github.io/orma/, so the pages do not depend on the Mintlify account
+(https://ormaprotocol.mintlify.site/).
 
 ### `deck/`
 
