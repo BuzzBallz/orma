@@ -388,7 +388,7 @@ sets the Vite build and the single-page rewrite.
 |---|---|
 | `VITE_API_BASE` | The backend's public URL. It must be `https://`: an https page cannot call http. |
 | `VITE_XRPL_NETWORK` | `devnet` |
-| `VITE_DOCS_URL` | Optional. Defaults to https://ormaprotocol.mintlify.site/. |
+| `VITE_DOCS_URL` | Optional. Defaults to https://buzzballz.github.io/orma/. |
 
 `VITE_` variables are inlined into the bundle at build time, so changing one needs a redeploy, and no
 secret may ever be one.
