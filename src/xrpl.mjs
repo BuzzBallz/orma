@@ -138,23 +138,35 @@ export class Xrpl {
   }
 
   /**
-   * Transaction history for an account, newest first.
+   * Transaction history for an account, newest first, with the window it covers.
    * Devnet keeps only a window of recent ledgers (about a month on 13 October 2026, varying by server),
    * which covers brokers created during an event but would not hold a real track record.
-   * Paginates on `marker`.
+   * Paginates on `marker`. `ledgerMin`-`ledgerMax` is the range the server says it searched, null
+   * when it does not say; `truncated` means the page limit stopped the read with older ones left.
    */
-  async accountTx(account, { limit = 200, maxPages = 5 } = {}) {
-    const out = []
+  async accountTxWindow(account, { limit = 200, maxPages = 5 } = {}) {
+    const transactions = []
     let marker
+    let ledgerMin = null, ledgerMax = null
     for (let page = 0; page < maxPages; page++) {
       const req = { command: 'account_tx', account, limit, ledger_index_min: -1, ledger_index_max: -1 }
       if (marker) req.marker = marker
       const r = await this.req(req)
-      out.push(...(r.result.transactions ?? []))
+      transactions.push(...(r.result.transactions ?? []))
+      // Every page states its range, and a reconnect can land on a server with another floor:
+      // keep the narrowest, so the window claimed holds for every page.
+      const lo = r.result.ledger_index_min, hi = r.result.ledger_index_max
+      if (Number.isInteger(lo)) ledgerMin = Math.max(ledgerMin ?? lo, lo)
+      if (Number.isInteger(hi)) ledgerMax = Math.min(ledgerMax ?? hi, hi)
       marker = r.result.marker
       if (!marker) break
     }
-    return out
+    return { transactions, ledgerMin, ledgerMax, truncated: Boolean(marker) }
+  }
+
+  /** The transactions alone, for callers that need no window. */
+  async accountTx(account, opts) {
+    return (await this.accountTxWindow(account, opts)).transactions
   }
 
   /** Objects owned by an account, optionally filtered. Used to discover a vault's brokers. */
@@ -211,6 +223,8 @@ export function normaliseVault(v, closeTime) {
     redemptionAt: rippleToIso(v.RedemptionDate),
     subscriptionRipple: v.SubscriptionDate ?? null,
     redemptionRipple: v.RedemptionDate ?? null,
+    // The ledger of the last transaction that changed it: where its history has to reach.
+    lastChangeLedger: v.PreviousTxnLgrSeq ?? null,
     asset: v.Asset?.currency === 'XRP' || v.Asset?.currency === undefined && !v.Asset?.mpt_issuance_id
       ? { kind: 'XRP', currency: 'XRP', issuer: null, mptIssuanceId: null }
       : v.Asset?.mpt_issuance_id
@@ -233,6 +247,7 @@ export function normaliseBroker(b) {
     coverRateLiquidation: Number(b.CoverRateLiquidation ?? 0),
     managementFeeRate: Number(b.ManagementFeeRate ?? 0),
     loanSequence: Number(b.LoanSequence ?? 0),
+    lastChangeLedger: b.PreviousTxnLgrSeq ?? null,
   }
 }
 

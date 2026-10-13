@@ -30,6 +30,7 @@ import { createApi } from './api.mjs'
 import { setLabel } from './present.mjs'
 import { OraclePublisher } from './oracle.mjs'
 import { PublishLoop } from './publish-loop.mjs'
+import { archive } from './archive.mjs'
 import { logger } from './log.mjs'
 
 const log = logger('main')
@@ -154,6 +155,10 @@ const api = createApi(reader, {
   gateProof,
   oracleFor: (id) => publishLoop?.oracleFor(id) ?? null,
 })
+
+// The history routes merge in the transactions Devnet has pruned, from evidence/devnet-tx. Load
+// them now, so an archive missing from the image is an error at startup, not a silent gap later.
+archive()
 
 // Serve immediately; the first tick fills the snapshots a moment later. health.ok
 // stays false until then, which is honest rather than pretending to be ready.

@@ -18,7 +18,9 @@
     "check:history": "node src/dev/check-history.mjs",
     "check:evidence": "node src/dev/check-evidence.mjs",
     "check:evidence:self-test": "node src/dev/check-evidence.mjs --self-test",
-    "check:api": "node src/dev/check-api.mjs"
+    "check:api": "node src/dev/check-api.mjs",
+    "check:navhistory": "node src/dev/check-navhistory.mjs",
+    "check:archive": "node src/dev/check-archive.mjs"
   },
   "dependencies": {
     "decimal.js": "10.6.0",

@@ -8,9 +8,14 @@
  * NAVs use the formulas of poll.mjs. account_tx on the vault's pseudo-account lists every
  * transaction that touched the Vault node, impairments included, which an account_tx on
  * the broker's owner alone does not.
+ *
+ * Devnet prunes that history, so it is read through archive.mjs: merged with the copy in
+ * evidence/devnet-tx, each point saying which of the two it came from, and the response
+ * saying whether the series reaches from the vault's creation to its last change.
  */
 import { num, rippleToIso } from './num.mjs'
 import { FLAG } from './history.mjs'
+import { readHistory, creates } from './archive.mjs'
 
 const KIND = {
   VaultCreate: 'create', VaultDeposit: 'deposit', VaultWithdraw: 'withdraw', VaultClawback: 'clawback',
@@ -59,15 +64,23 @@ export function navPoints(vault, txs) {
       assetsTotal: assets.toFixed(0),
       lossUnrealized: loss.toFixed(0),
       sharesOutstanding: shares.toFixed(0),
+      // "archive" when Devnet no longer returned this transaction and the captured copy stood in.
+      source: entry.source ?? 'live',
     })
   }
   return points
 }
 
-// accountTx reads 5 pages of 200; a vault with more transactions than that loses its oldest.
-const WINDOW = 1000
-
-export async function fetchNavHistory(xrpl, vault) {
-  const txs = await xrpl.accountTx(vault.pseudoAccount)
-  return { points: navPoints(vault, txs), truncated: txs.length >= WINDOW }
+/**
+ * The series, and the window it covers. `truncated` keeps its meaning: the live read stopped at
+ * its page limit (5 pages of 200) with older transactions left. `window.complete` says whether,
+ * with the archive, nothing is missing between the vault's creation and its last change.
+ */
+export async function fetchNavHistory(xrpl, vault, opts = {}) {
+  const { txs, truncated, window } = await readHistory(xrpl, vault.pseudoAccount, {
+    ...opts,
+    origin: creates('Vault', vault.vaultId),
+    lastChange: vault.lastChangeLedger ?? null,
+  })
+  return { points: navPoints(vault, txs), truncated, window }
 }

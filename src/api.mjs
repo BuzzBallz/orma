@@ -9,7 +9,7 @@ import { createServer } from 'node:http'
 import { readFileSync, existsSync } from 'node:fs'
 import { presentVault, presentRow, setLabel } from './present.mjs'
 import { findShareEscrows, presentCollateral } from './collateral.mjs'
-import { fetchBrokerHistory, analyseOrdering, reputation, recommendOrder } from './history.mjs'
+import { readBrokerHistory, analyseOrdering, reputation, recommendOrder } from './history.mjs'
 import { fetchNavHistory } from './navhistory.mjs'
 import { presentNav, resolveFromIssuance, valuePledge } from './nav.mjs'
 import { gateStatus, isNamedIn } from './credentials.mjs'
@@ -149,8 +149,10 @@ export function createApi(reader, opts = {}) {
         if (!broker) return fail(404, 'NO_BROKER', 'vault has no loan broker', false)
         const cached = historyCache.get(broker.loanBrokerId)
         if (cached && Date.now() - cached.at < 15000) return send(200, stamp(cached.body))
-        const events = await fetchBrokerHistory(reader.xrpl, broker.owner, broker.loanBrokerId)
-        const ordering = analyseOrdering(events, broker)
+        // Merged with the archive Devnet has pruned, and graded only if the record reaches back to
+        // the broker's creation: a pruned record would otherwise read as a clean one.
+        const { events, window } = await readBrokerHistory(reader.xrpl, broker, snap.vault)
+        const ordering = analyseOrdering(events, broker, window)
         const body = {
           loanBrokerId: broker.loanBrokerId,
           owner: broker.owner,
@@ -169,10 +171,12 @@ export function createApi(reader, opts = {}) {
             // "added first-loss capital" renders three zeros, on the exhibit whose whole
             // subject is first-loss capital.
             amount: e.amount ? e.amount.toFixed(0) : null,
+            source: e.source,
           })),
           ordering,
-          reputation: reputation(events, ordering, broker),
+          reputation: reputation(events, ordering, broker, window),
           recommendation: recommendOrder(snap.loans, broker),
+          window,
         }
         historyCache.set(broker.loanBrokerId, { at: Date.now(), body })
         return send(200, stamp(body))

@@ -39,6 +39,7 @@
  */
 import { num, Decimal } from './num.mjs'
 import { logger } from './log.mjs'
+import { readHistory, creates } from './archive.mjs'
 
 const log = logger('history')
 const RIPPLE_EPOCH = 946684800
@@ -57,8 +58,11 @@ function txAmountDrops(amount) {
   return null
 }
 
-export async function fetchBrokerHistory(xrpl, ownerAccount, brokerId) {
-  const txs = await xrpl.accountTx(ownerAccount)
+/**
+ * A broker's events, oldest first, from account_tx entries (newest first) on the account that
+ * owns it. Every LoanManage and cover movement is signed by that owner, so its history holds them all.
+ */
+export function brokerEvents(txs, brokerId) {
   const events = []
 
   for (const entry of txs) {
@@ -105,6 +109,7 @@ export async function fetchBrokerHistory(xrpl, ownerAccount, brokerId) {
         hash: entry.hash ?? tx.hash,
         loanId: tx.LoanID ?? null,
         ledgerIndex: entry.ledger_index ?? null,
+        source: entry.source ?? 'live',
         brokerStateKnown: known,
         debtBefore, debtAfter,
         coverBefore, coverAfter,
@@ -146,6 +151,7 @@ export async function fetchBrokerHistory(xrpl, ownerAccount, brokerId) {
         hash: entry.hash ?? tx.hash,
         loanId: null,
         ledgerIndex: entry.ledger_index ?? null,
+        source: entry.source ?? 'live',
         brokerStateKnown: known,
         debtBefore, debtAfter,
         // Reconstruct the balance the change set could not state, rather than reporting
@@ -164,6 +170,30 @@ export async function fetchBrokerHistory(xrpl, ownerAccount, brokerId) {
   // account_tx is newest first; a track record reads forwards.
   return events.reverse()
 }
+
+/** The live record only, for a broker just built (the bake and check scripts). */
+export async function fetchBrokerHistory(xrpl, ownerAccount, brokerId) {
+  return brokerEvents(await xrpl.accountTx(ownerAccount), brokerId)
+}
+
+/**
+ * The record the API serves: the live history merged with the archive (archive.mjs), and the
+ * window it covers. It must reach from the broker's creation to the later of its own last change
+ * (defaults, cover movements) and its vault's (impairments touch the Vault and the Loan, never the
+ * LoanBroker). Either one unknown, it must reach the current ledger.
+ */
+export async function readBrokerHistory(xrpl, broker, vault, opts = {}) {
+  const ends = [broker.lastChangeLedger, vault?.lastChangeLedger]
+  const { txs, truncated, window } = await readHistory(xrpl, broker.owner, {
+    ...opts,
+    origin: creates('LoanBroker', broker.loanBrokerId),
+    lastChange: ends.every(Number.isInteger) ? Math.max(...ends) : null,
+  })
+  return { events: brokerEvents(txs, broker.loanBrokerId), truncated, window }
+}
+
+/** Why a record that does not reach back to the broker's creation is not graded. */
+const INCOMPLETE = 'the retained record does not reach back to the broker’s creation'
 
 /**
  * Total cover consumed for a given ordering of principals.
@@ -188,8 +218,10 @@ export function coverForOrder(principals, startingDebt, cmin, cliq, coverAvailab
  * Compare what the broker did against the best and worst orders available to them.
  * `fairness` is 0 when they picked the LP-worst order and 1 when they picked the best.
  */
-export function analyseOrdering(events, broker) {
+export function analyseOrdering(events, broker, window = null) {
   const defaults = events.filter((e) => e.kind === 'default' && e.principal.gt(0))
+  // The sequence is only the sequence if no default is missing from it.
+  if (window && !window.complete) return { applicable: false, reason: INCOMPLETE, defaultCount: defaults.length }
   if (defaults.length < 2) {
     return {
       applicable: false,
@@ -258,10 +290,34 @@ export function recommendOrder(loans, broker) {
  * Reputation. Ordinal and rule-based like the vault score: a broker is graded on what
  * they did, not on a weighted opinion of it.
  */
-export function reputation(events, ordering, broker) {
+export function reputation(events, ordering, broker, window = null) {
   const defaults = events.filter((e) => e.kind === 'default')
   const impairs = events.filter((e) => e.kind === 'impair')
   const withdrawals = events.filter((e) => e.kind === 'cover_withdraw')
+  const caveat = 'Reconstructed from the public record only: the ledgers Devnet retains, and the transactions it has pruned as captured on 2026-10-13 in evidence/devnet-tx. The grade is withheld when that record does not reach back to the broker’s creation.'
+
+  const observations = (undeclared) => ({
+    defaults: defaults.length,
+    impairments: impairs.length,
+    defaultsWithoutPriorImpairment: undeclared,
+    coverWithdrawals: withdrawals.length,
+    eventsRetained: events.length,
+  })
+
+  // Pruning removes the oldest transactions first, and for a broker those are its defaults: a
+  // record with them gone reads "no defaults declared" and scores 100. A record that does not
+  // reach back to the broker's creation cannot tell a clean broker from a pruned one, so it is
+  // not graded at all.
+  if (window && !window.complete) {
+    return {
+      grade: null,
+      score: null,
+      withheld: true,
+      observations: observations(null),
+      findings: [{ code: 'HISTORY_INCOMPLETE', detail: 'Not assessed: the record available does not reach back to the broker’s first action, so an absence of losses here could be an absence of record.' }],
+      caveat,
+    }
+  }
 
   // Declaring a default with no prior impairment skips the warning entirely: the loss
   // goes straight from invisible to realised, with no window for anyone to react.
@@ -294,15 +350,9 @@ export function reputation(events, ordering, broker) {
   return {
     grade,
     score,
-    observations: {
-      defaults: defaults.length,
-      impairments: impairs.length,
-      defaultsWithoutPriorImpairment: undeclaredDefaults,
-      coverWithdrawals: withdrawals.length,
-      eventsRetained: events.length,
-    },
+    withheld: false,
+    observations: observations(undeclaredDefaults),
     findings,
-    // Devnet prunes old ledgers, so this is a window rather than a lifetime.
-    caveat: 'Reconstructed from the public record only. Devnet prunes old ledgers, so conduct before the oldest retained ledger is not visible here.',
+    caveat,
   }
 }

@@ -3,6 +3,7 @@
 //   node src/dev/check-navhistory.mjs
 import { navPoints, fetchNavHistory } from '../navhistory.mjs'
 import { rippleToIso } from '../num.mjs'
+import { Xrpl } from '../xrpl.mjs'
 
 const VAULT = 'AB'.repeat(32), POOL = 'rVaultPseudoAccount'
 const vaultNode = (assets, loss) => ({ ModifiedNode: { LedgerEntryType: 'Vault', LedgerIndex: VAULT, FinalFields: { ...(assets && { AssetsTotal: assets }), ...(loss && { LossUnrealized: loss }) } } })
@@ -53,11 +54,25 @@ const deposit = tx('VaultDeposit', [shares('1000000'), vaultNode('1000000')])
 const [first] = navPoints({ vaultId: VAULT, pseudoAccount: POOL }, [deposit])
 eq('time comes from the ledger close', first.at, rippleToIso(deposit.tx_json.date))
 
-const full = Array.from({ length: 1000 }, () => tx('LoanBrokerSet', []))
-eq('a full window says it may have lost its oldest transactions',
-  (await fetchNavHistory({ accountTx: async () => full }, { vaultId: VAULT, pseudoAccount: POOL })).truncated, true)
-eq('a short one does not',
-  (await fetchNavHistory({ accountTx: async () => full.slice(0, 5) }, { vaultId: VAULT, pseudoAccount: POOL })).truncated, false)
+// The page limit is read from the server's marker, not guessed from a count, and the range kept
+// is the narrowest any page stated (a reconnect can land on a server with a higher floor).
+const paged = (pages) => {
+  const x = new Xrpl('wss://unused.invalid')
+  let n = 0
+  x.req = async () => { n++; return { result: { transactions: [tx('LoanBrokerSet', [])], ledger_index_min: 100 + n, ledger_index_max: 900 - n, ...(n < pages && { marker: { n } }) } } }
+  return x.accountTxWindow(POOL, { maxPages: 5 })
+}
+const stopped = await paged(7)
+eq('a read the page limit stopped says so', [stopped.transactions.length, stopped.truncated], [5, true])
+eq('it keeps the narrowest range a page stated', [stopped.ledgerMin, stopped.ledgerMax], [105, 895])
+const whole = await paged(5)
+eq('a read that ran out of pages first does not', [whole.transactions.length, whole.truncated], [5, false])
+
+const window = (truncated) => ({ accountTxWindow: async () => ({ transactions: [deposit], ledgerMin: 1, ledgerMax: 9, truncated }) })
+eq('the route passes the page limit through',
+  (await fetchNavHistory(window(true), { vaultId: VAULT, pseudoAccount: POOL }, { archive: null })).truncated, true)
+eq('and says when it was not hit',
+  (await fetchNavHistory(window(false), { vaultId: VAULT, pseudoAccount: POOL }, { archive: null })).truncated, false)
 
 console.log(bad ? `\n  ${bad} FAILED` : '\n  all ok')
 process.exit(bad ? 1 : 0)

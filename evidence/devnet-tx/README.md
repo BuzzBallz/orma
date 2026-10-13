@@ -29,6 +29,16 @@ node src/dev/capture-history.mjs
 
 which is live and read-only, and only works while those ledgers are above the server's floor.
 
+`src/archive.mjs` serves only what `coverage` declares. On every successful read, a history route merges the
+live transactions with the archived ones for the same account, by hash, the live copy winning; an archived
+transaction the live read no longer returns is marked `"source": "archive"`. Each response states the window
+it covers and whether that window reaches from the object's creation to its last change. Pruning is partial
+and silent, so the merge runs on every read, not only when the live read comes back empty.
+
+The archived transactions are captured, not verified: what `check:evidence` binds to its hash is the
+transaction, not the metadata the NAV points are read from (see below). The archive loads each transaction
+only if it hashes to its id, and serves the metadata as the server returned it on 2026-10-13.
+
 What can be checked offline, and what cannot. The transaction id is the hash of the signed blob, so a
 `tx_blob` that hashes back to its id is the signed transaction with that id. The metadata (`meta_blob`,
 which carries the result and the `PreviousFields` the findings rest on) and the `validated` flag are as the
