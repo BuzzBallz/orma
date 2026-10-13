@@ -7,9 +7,6 @@
     "node": ">=20"
   },
   "scripts": {
-    "fixtures:build": "node tools/build-fixtures.mjs",
-    "fixtures": "node tools/fixture-server.mjs",
-    "verify": "node tools/verify-toolchain.mjs",
     "check:reader": "node src/dev/check-reader.mjs",
     "check:score": "node src/dev/check-score.mjs",
     "start": "node src/index.mjs",

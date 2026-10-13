@@ -59,7 +59,8 @@ build/
 #  Devnet wallet seeds
 # =============================================================================
 #  Disposable and faucet-regenerable, but they are private keys and never
-#  belong in git. The pre-commit hook blocks them as a second line of defence.
+#  belong in git. During the event a local pre-commit hook, not in this repository,
+#  was the second line of defence.
 # =============================================================================
 **/wallets*.json
 **/accounts*.json
