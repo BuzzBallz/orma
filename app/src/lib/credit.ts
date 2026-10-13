@@ -35,6 +35,11 @@ const TERMS: [RegExp, string][] = [
   [/\bFirstComeFirstServe\b/g, 'first come, first served'],
   [/\bon-chain\b/gi, 'reported'],
   [/\bledger\b/gi, 'register'],
+  // The manager-conduct caveat names the network, its pruned ledgers and the folder the
+  // archive is kept in. The analyst reads the register and the date, not the folder.
+  [/\s+in evidence\/devnet-tx\b/g, ''],
+  [/\bDevnet\b/g, 'the test network'],
+  [/\bledgers\b/gi, 'registers'],
 ]
 
 /** Apply to every backend-owned string before it reaches the screen. */
