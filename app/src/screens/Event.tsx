@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import type { VaultDetail } from '../lib/types'
-import { beatRows, type Beat } from '../lib/beats'
+import { beatRows, nextBeat, type Beat } from '../lib/beats'
 import { duration, fmtIso, ratioToPct } from '../lib/format'
 import { Amount } from '../components/Amount'
 import { creditText, facilityName } from '../lib/credit'
@@ -74,7 +74,7 @@ export function EventPlaceholder({ name, picker, children }: {
 export function Event({ d, picker }: { d: VaultDetail; picker?: ReactNode }) {
   const v = d.vault
   const rows: Beat[] = beatRows(d)
-  const next = rows[0]
+  const next = nextBeat(d)
   const shortfall = Number(d.phaseInfo.projectedShortfall) > 0
 
   return (
@@ -97,8 +97,8 @@ export function Event({ d, picker }: { d: VaultDetail; picker?: ReactNode }) {
               <span className="t-fig-s mute">{next.who}</span>
             </div>
             <div className="ev-feature-when">
-              <span className={'t-fig-l' + (next.inSeconds < 0 ? ' loss' : '')}>
-                {next.inSeconds < 0 ? `${duration(-next.inSeconds)} past due` : `in ${duration(next.inSeconds)}`}
+              <span className={'t-fig-l' + (next.inSeconds < 0 && !next.matured ? ' loss' : '')}>
+                {next.inSeconds < 0 ? `${duration(-next.inSeconds)} ago` : `in ${duration(next.inSeconds)}`}
               </span>
               {next.when && <span className="t-fig-s mute">{fmtIso(next.when)}</span>}
             </div>

@@ -171,7 +171,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
             />
             <Glance
               k="Remaining Term" phrase={v.secondsToRedemption <= 0}
-              v={v.secondsToRedemption > 0 ? duration(v.secondsToRedemption) : 'past due'}
+              v={v.secondsToRedemption > 0 ? duration(v.secondsToRedemption) : `matured ${fmtIso(v.redemptionAt).slice(0, 10)}`}
             />
             <Glance k="Exposures" v={`${v.loanCount} · ${v.distressedLoanCount} non-performing`} phrase moved={exposuresMoved} />
           </dl>
@@ -305,7 +305,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
             {next?.when && <span className="t-fig-s mute">{fmtIso(next.when)}</span>}
             <div className="op-due">
               <span className="t-label-s mute">Due</span>
-              <span className={'t-fig-m' + (next && next.inSeconds < 0 ? ' loss' : '')}>
+              <span className={'t-fig-m' + (next && next.inSeconds < 0 && !next.matured ? ' loss' : '')}>
                 {next
                   ? next.inSeconds < 0 ? `${duration(-next.inSeconds)} ago` : `in ${duration(next.inSeconds)}`
                   : '—'}
