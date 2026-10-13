@@ -93,12 +93,20 @@ window.uiAudit = async function uiAudit(opts = {}) {
       if (ANALYST_SCREENS(path)) {
         const proof = [...document.querySelectorAll('details.exh')]
           .filter(d => PROOF_EXHIBITS.test(d.querySelector('.exh-title')?.textContent ?? ''))
+        // Statements the owner asked to make in the protocol's own words, each marked in the
+        // markup with data-vocab-exempt: a credit line, a unit after a figure. Set aside for
+        // this read like the proof exhibits, so the same word anywhere else is still caught.
+        const stated = [...document.querySelectorAll('[data-vocab-exempt]')]
+        const shown = stated.map(el => el.style.display)
         proof.forEach(d => { d.hidden = true })          // innerText leaves out what is not drawn
+        stated.forEach(el => { el.style.display = 'none' })
         const seen = document.body.innerText.toLowerCase() + ' ' + location.pathname.toLowerCase()
         proof.forEach(d => { d.hidden = false })
+        stated.forEach((el, i) => { el.style.display = shown[i] })
         const found = BANNED.filter(wd => seen.includes(wd))
         record('consistency', `${label} · no word outside the reader's vocabulary`,
-          found.length === 0, found.length ? found.join(', ') : `${BANNED.length} terms checked, none present`)
+          found.length === 0, found.length ? found.join(', ')
+            : `${BANNED.length} terms checked, none present` + (stated.length ? `; ${stated.length} marked statement${stated.length === 1 ? '' : 's'} set aside` : ''))
         if (proof.length) {
           record('consistency', `${label} · exhibits in the engineering register, by design`,
             true, proof.map(d => d.querySelector('.exh-title').textContent.split(' · ')[0]).join(', '))

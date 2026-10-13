@@ -17,6 +17,12 @@ export function Footer({ vaultId, onNavigate }: {
         <div className="foot-lines">
           <p>Nothing on these pages is behind a sign-in.</p>
           <p>A stale figure is never carried forward as current and never estimated.</p>
+          <p data-vocab-exempt>
+            Built by <a className="lnk" href="https://github.com/frytegg" target="_blank" rel="noreferrer noopener">Alexandre Lemiere</a>{' '}
+            and <a className="lnk" href="https://github.com/andreagnzz" target="_blank" rel="noreferrer noopener">Andrea Gonzalez</a>
+            {' · '}1st place, De Vinci Blockchain XRPL Lending Protocol Hackathon 2026{' · '}
+            <a className="lnk" href="https://github.com/BuzzBallz/orma" target="_blank" rel="noreferrer noopener">Source</a>
+          </p>
         </div>
         <nav className="foot-nav" aria-label="Footer">
           {DESKS.map(([p, label]) => (
