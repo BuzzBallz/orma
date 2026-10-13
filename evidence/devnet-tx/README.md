@@ -17,17 +17,24 @@ below (the `Payment` that funded each facility's owner).
 ## Coverage: what the history routes fall back on
 
 `/nav-history` reads `account_tx` on a vault's pseudo-account, and `/broker-history` on the account that owns
-the vault and its loan brokers. The facilities' histories sit in ledgers 5261976-5262163, so they will drop
-below Devnet's floor a few days after the capture. `coverage` in `_manifest.json` declares, for each of the
+the vault and its loan brokers. The facilities' histories sit in ledgers 5261976-5262163. Devnet does not
+prune a ledger at a time: rippled's `online_delete` drops everything below a server's previous rotation
+point at once, and the servers behind the public endpoint rotate on their own schedules (on 13 October
+their oldest ledgers were 5042942, 5171980 and 5193077, and the last held for five hours of watching). So on each
+server the event's history will go in one piece, at a rotation no client can see coming. `coverage` in
+`_manifest.json` declares, for each of the
 four facilities in `demo/` and for each of those two accounts, the ledger range `account_tx` searched
 (`ledgerMin`-`ledgerMax`) and every hash it returned: 28 distinct transactions, all captured here. It was
 written by
 
 ```bash
-node src/dev/capture-history.mjs
+node src/dev/capture-history.mjs             # --dry-run: read and check, write nothing
 ```
 
-which is live and read-only, and only works while those ledgers are above the server's floor.
+which is live and read-only. A later run only extends a declaration: it refuses a listing that starts
+after the declared range ends or misses a declared transaction inside its own range, and it refuses to
+write a declaration that no longer holds the transaction creating its vault or broker. Run after Devnet
+has pruned the event, it therefore cannot replace the coverage with what is left.
 
 `src/archive.mjs` serves only what `coverage` declares. On every successful read, a history route merges the
 live transactions with the archived ones for the same account, by hash, the live copy winning; an archived

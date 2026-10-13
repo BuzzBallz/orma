@@ -1,8 +1,10 @@
 /**
  * The ledger history Devnet no longer keeps, read back from evidence/devnet-tx.
  *
- * Devnet prunes from the bottom, a ledger at a time and without saying so: an account_tx that
- * returned seven transactions returns five, then none. Both history routes read account_tx, so the
+ * Devnet prunes in steps, each server on its own schedule: rippled's online_delete drops everything
+ * below the server's previous rotation point at once. account_tx states the range it searched, never
+ * what it no longer holds, so depending on the server and the day a history comes back whole, cut
+ * where a rotation point falls inside it, or empty. Both history routes read account_tx, so the
  * facilities created at the event would lose their NAV series and, worse, their broker's defaults,
  * which a conduct grade would then read as a clean record.
  *
@@ -89,12 +91,22 @@ export function loadArchive(dir = ARCHIVE_DIR) {
         if (!read.has(h)) read.set(h, readCapture(dir, h))
         return read.get(h)
       })
-      accounts.set(c.account, {
+      const declared = {
         ledgerMin: c.ledgerMin, ledgerMax: c.ledgerMax,
         entries: entries.filter(Boolean),
         // A declared transaction that did not load leaves a hole the range would hide.
         intact: entries.every(Boolean),
-      })
+      }
+      // One owner behind two facilities is declared twice. Each declaration lists every transaction
+      // in its own range, so together they vouch for the range both cover, and no more.
+      const prior = accounts.get(c.account)
+      if (prior) {
+        declared.ledgerMin = Math.max(prior.ledgerMin, declared.ledgerMin)
+        declared.ledgerMax = Math.min(prior.ledgerMax, declared.ledgerMax)
+        declared.entries = [...new Map([...prior.entries, ...declared.entries].map((e) => [e.hash, e])).values()]
+        declared.intact = prior.intact && declared.intact && declared.ledgerMin <= declared.ledgerMax
+      }
+      accounts.set(c.account, declared)
     }
   }
   const rejected = [...read.values()].filter((e) => !e).length
@@ -137,24 +149,25 @@ function firstGap(ranges, a, b) {
 /**
  * Whether a merged history holds every transaction from the object's creation to its last change.
  *
- * The live read covers its floor to its top. The floor is the bottom of the range the server
- * searched; when the read stopped at its page limit with older transactions left, it is the ledger
- * after the oldest one it returned. The archive covers its declared range when every declared
- * transaction loaded. The history is complete when the creating transaction is in the merge and the
- * two ranges leave no ledger uncovered from it to the object's last change (PreviousTxnLgrSeq, read
- * from current state). Ending at the last change rather than at the current ledger is what keeps a
- * dormant facility complete once the live floor passes the archive's top.
+ * The live read covers the range the server says it searched. When the page limit stopped it with
+ * older transactions left, it covers from the ledger after the oldest one it returned, since that
+ * ledger may be cut; when the server states no range, only the span of what it returned. The
+ * archive covers its declared range when every declared transaction loaded. The history is complete
+ * when the creating transaction is in the merge and the two ranges leave no ledger uncovered from it
+ * to the object's last change (PreviousTxnLgrSeq, read from current state), or to the live read's
+ * top when that is unknown. Ending at the last change rather than at the current ledger is what
+ * keeps a dormant facility complete once the live floor passes the archive's top.
  */
 export function historyWindow({ live, coverage, capturedAt, merged, origin, lastChange }) {
   const ledgers = live.transactions.map(ledgerOf)
   const newest = ledgers.length ? Math.max(...ledgers) : null
   const oldest = ledgers.length ? Math.min(...ledgers) : null
-  // A server that does not state its range covers, provably, only what it returned.
-  const top = live.ledgerMax ?? newest ?? 0
-  let floor = live.ledgerMin ?? oldest ?? top + 1
-  if (live.truncated) floor = oldest === null ? top + 1 : oldest + 1
+  const top = live.ledgerMax ?? newest
+  let floor = live.ledgerMin ?? oldest
+  if (live.truncated) floor = oldest === null ? null : oldest + 1
+  const liveCovers = floor !== null && top !== null && floor <= top
 
-  const ranges = [[floor, top]]
+  const ranges = liveCovers ? [[floor, top]] : []
   if (coverage?.intact) ranges.push([coverage.ledgerMin, coverage.ledgerMax])
 
   const created = merged.find(origin) ?? null
@@ -163,9 +176,14 @@ export function historyWindow({ live, coverage, capturedAt, merged, origin, last
   let reason = null
   if (!created) {
     reason = 'the transaction that created it is in neither the live history nor the archive'
+  } else if (to === null) {
+    reason = 'its last change is unknown, and the live read stated no range'
+  } else if (to < from) {
+    reason = `its last change (ledger ${to}) is older than its creation (ledger ${from})`
   } else {
     const gap = firstGap(ranges, from, to)
-    if (gap !== null) reason = `ledger ${gap} is in neither the live window (${floor}-${top}) nor the archive`
+    const liveText = liveCovers ? `the live window (${floor}-${top})` : 'the live read'
+    if (gap !== null) reason = `ledger ${gap} is in neither ${liveText} nor the archive`
   }
 
   return {

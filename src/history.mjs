@@ -181,6 +181,10 @@ export async function fetchBrokerHistory(xrpl, ownerAccount, brokerId) {
  * window it covers. It must reach from the broker's creation to the later of its own last change
  * (defaults, cover movements) and its vault's (impairments touch the Vault and the Loan, never the
  * LoanBroker). Either one unknown, it must reach the current ledger.
+ *
+ * The vault's last change is a looser bound than the record needs: a withdrawal moves it too. The
+ * tight one, the broker's loans, would hold only if every loan read had succeeded, and a loan the
+ * reader missed would end the window before an impairment and call it complete. Loose fails safe.
  */
 export async function readBrokerHistory(xrpl, broker, vault, opts = {}) {
   const ends = [broker.lastChangeLedger, vault?.lastChangeLedger]
@@ -294,7 +298,10 @@ export function reputation(events, ordering, broker, window = null) {
   const defaults = events.filter((e) => e.kind === 'default')
   const impairs = events.filter((e) => e.kind === 'impair')
   const withdrawals = events.filter((e) => e.kind === 'cover_withdraw')
-  const caveat = 'Reconstructed from the public record only: the ledgers Devnet retains, and the transactions it has pruned as captured on 2026-10-13 in evidence/devnet-tx. The grade is withheld when that record does not reach back to the broker’s creation.'
+  const captured = window?.archive?.capturedAt?.slice(0, 10)
+  const caveat = 'Reconstructed from the public record only: the ledgers Devnet retains'
+    + (captured ? `, and the transactions it has pruned as captured on ${captured} in evidence/devnet-tx` : '')
+    + '. The grade is withheld when that record does not reach back to the broker’s creation.'
 
   const observations = (undeclared) => ({
     defaults: defaults.length,

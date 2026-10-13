@@ -5,16 +5,17 @@
 import { readFileSync, cpSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { loadArchive, mergeHistory, ARCHIVE_DIR } from '../archive.mjs'
+import { loadArchive, mergeHistory, historyWindow, creates, ARCHIVE_DIR } from '../archive.mjs'
 import { fetchNavHistory } from '../navhistory.mjs'
 import { readBrokerHistory, fetchBrokerHistory, analyseOrdering, reputation } from '../history.mjs'
 import { createApi } from '../api.mjs'
+import { extendDeclaration } from './capture-history.mjs'
 
 const COVERAGE = JSON.parse(readFileSync(join(ARCHIVE_DIR, '_manifest.json'), 'utf8')).coverage
 const MERIDIAN = '864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835'
 const KESTREL = '24EAA01AD4CE70D8ABB4ACB4255DC4C216B8AF3B9E7315DB8052BFC1E5810089'
 // PreviousTxnLgrSeq of each object, read from Devnet on 2026-10-13: where each history has to reach.
-const LAST_CHANGE = { [MERIDIAN]: 5262028, [KESTREL]: 5262083, kestrelBroker: 5262083 }
+const LAST_CHANGE = { [MERIDIAN]: 5262028, [KESTREL]: 5262083, meridianBroker: 5261989, kestrelBroker: 5262083 }
 const BEFORE_EVENT = 5193077   // the public server's floor on 2026-10-13
 const PRUNED = 6200000         // a floor above every event ledger
 const arc = loadArchive()
@@ -42,23 +43,25 @@ const vault = (id) => ({ vaultId: id, pseudoAccount: COVERAGE.vaults[id].pseudoA
 const nav = (h) => h.points.map((p) => `${p.kind} ${p.navNaive} ${p.navCorrect}`)
 const sources = (xs) => xs.map((x) => x.source)
 
-// The broker exactly as the ledger created it, from its LoanBrokerSet in the archive.
-const kestrel = (() => {
-  const { owner } = COVERAGE.vaults[KESTREL]
+// A broker exactly as the ledger created it, from its LoanBrokerSet in the archive.
+const brokerOf = (vaultId, lastChangeLedger) => {
+  const { owner } = COVERAGE.vaults[vaultId]
   const id = owner.loanBrokerIds[0]
   for (const e of arc.accounts.get(owner.account).entries) {
     const n = e.meta.AffectedNodes.find((a) => a.CreatedNode?.LedgerEntryType === 'LoanBroker' && a.CreatedNode.LedgerIndex === id)
     if (n) {
       const f = n.CreatedNode.NewFields
-      return { loanBrokerId: id, owner: owner.account, coverRateMinimum: f.CoverRateMinimum, coverRateLiquidation: f.CoverRateLiquidation, lastChangeLedger: LAST_CHANGE.kestrelBroker }
+      return { loanBrokerId: id, owner: owner.account, coverRateMinimum: f.CoverRateMinimum, coverRateLiquidation: f.CoverRateLiquidation, lastChangeLedger, createdIn: e.ledger_index }
     }
   }
-  throw new Error('no LoanBrokerSet for the Kestrel broker in the archive')
-})()
-const conduct = async (xrpl, opts = {}) => {
-  const { events, window } = await readBrokerHistory(xrpl, kestrel, vault(KESTREL), opts)
-  const ordering = analyseOrdering(events, kestrel, window)
-  const rep = reputation(events, ordering, kestrel, window)
+  throw new Error(`no LoanBrokerSet for the broker of ${vaultId.slice(0, 8)} in the archive`)
+}
+const kestrel = brokerOf(KESTREL, LAST_CHANGE.kestrelBroker)
+const meridian = brokerOf(MERIDIAN, LAST_CHANGE.meridianBroker)
+const conduct = async (xrpl, opts = {}, broker = kestrel, vaultId = KESTREL) => {
+  const { events, window } = await readBrokerHistory(xrpl, broker, vault(vaultId), opts)
+  const ordering = analyseOrdering(events, broker, window)
+  const rep = reputation(events, ordering, broker, window)
   return { events, window, ordering, rep, grade: `${rep.grade} ${rep.score}` }
 }
 
@@ -74,6 +77,22 @@ eq('a hash in both keeps the live copy', [merged.length, merged[0].source, merge
 eq('one only in the archive is marked so', merged[1].source, 'archive')
 const sameLedger = (i, h) => ({ hash: h, ledger_index: 7, meta: { TransactionIndex: i } })
 eq('newest first, by ledger then by position in it', mergeHistory([sameLedger(1, 'A'), sameLedger(3, 'B')], [sameLedger(2, 'C'), { hash: 'D', ledger_index: 8, meta: { TransactionIndex: 0 } }]).map((e) => e.hash), ['D', 'B', 'C', 'A'])
+
+console.log('\n  the window')
+const made = { hash: 'C', ledger_index: 150, meta: { TransactionIndex: 0, AffectedNodes: [{ CreatedNode: { LedgerEntryType: 'Vault', LedgerIndex: 'V' } }] } }
+const span = (live, coverage, lastChange = 250) => historyWindow({
+  live: { transactions: [], truncated: false, ...live }, coverage, capturedAt: null, merged: [made], origin: creates('Vault', 'V'), lastChange,
+})
+const kept100to200 = { ledgerMin: 100, ledgerMax: 200, entries: [made], intact: true }
+eq('archive and live windows that touch: complete', span({ ledgerMin: 201, ledgerMax: 300 }, kept100to200).complete, true)
+const holed = span({ ledgerMin: 202, ledgerMax: 300 }, kept100to200)
+eq('a single ledger between them: incomplete, and that ledger named', [holed.complete, holed.reason], [false, 'ledger 201 is in neither the live window (202-300) nor the archive'])
+eq('an archive with a transaction that did not load covers nothing', span({ ledgerMin: 201, ledgerMax: 300 }, { ...kept100to200, intact: false }).complete, false)
+const reached = { transactions: [made, { hash: 'N', ledger_index: 260, meta: { TransactionIndex: 0, AffectedNodes: [] } }], ledgerMin: 100, ledgerMax: 300 }
+eq('a live read that reached the creation: complete', span(reached, null).complete, true)
+eq('the same read stopped by its page limit at the creation ledger: incomplete', span({ ...reached, truncated: true }, null).complete, false)
+const blind = span({ ledgerMin: null, ledgerMax: null }, kept100to200, null)
+eq('no stated range, no last change, nothing returned: incomplete', [blind.complete, blind.reason], [false, 'its last change is unknown, and the live read stated no range'])
 
 console.log('\n  nav-history, Meridian')
 const whole = await fetchNavHistory(devnet(BEFORE_EVENT), vault(MERIDIAN), { archive: arc })
@@ -102,6 +121,17 @@ eq('all pruned, no archive: no grade at all, not A', [lost.rep.grade, lost.rep.s
 const firstDefault = live.events.find((e) => e.kind === 'default').ledgerIndex
 const half = await conduct(devnet(firstDefault + 1), { archive: null })
 eq('first default pruned, second still live, no archive: withheld', [half.events.filter((e) => e.kind === 'default').length, half.rep.grade], [1, null])
+const orphaned = await conduct(devnet(kestrel.createdIn + 1), { archive: null })
+eq('creation pruned, both defaults still live, no archive: no ordering either', [orphaned.events.filter((e) => e.kind === 'default').length, orphaned.ordering.applicable, orphaned.rep.grade], [2, false, null])
+// An archive captured before Meridian's impairment, the impairment since pruned: the broker itself
+// last changed before it, so only the vault's last change shows the record ends too early.
+const early = { ...arc, accounts: new Map(arc.accounts) }
+const impairAt = LAST_CHANGE[MERIDIAN]
+const ownerCov = arc.accounts.get(meridian.owner)
+early.accounts.set(meridian.owner, { ...ownerCov, ledgerMax: impairAt - 1, entries: ownerCov.entries.filter((e) => e.ledger_index < impairAt) })
+const beforeImpair = await conduct(devnet(PRUNED), { archive: early }, meridian, MERIDIAN)
+eq('archive ends before the last impairment: incomplete, though the broker had not changed since',
+  [beforeImpair.events.some((e) => e.kind === 'impair'), beforeImpair.window.complete, beforeImpair.rep.grade], [false, false, null])
 // What the build deployed on 13 September serves once the defaults are pruned: the case this fixes.
 const old = await fetchBrokerHistory({ accountTx: async (a) => (await devnet(PRUNED).accountTxWindow(a)).transactions }, kestrel.owner, kestrel.loanBrokerId)
 const oldRep = reputation(old, analyseOrdering(old, kestrel), kestrel)
@@ -122,7 +152,25 @@ try {
   const h = await fetchNavHistory(devnet(PRUNED), vault(MERIDIAN), { archive: damaged })
   eq('so the pruned series says it is incomplete', h.window.complete, false)
   eq('a missing directory is no archive', loadArchive(join(dir, 'absent')), null)
+  // One owner declared under two facilities: the archive vouches for the range both declarations cover.
+  const m = JSON.parse(readFileSync(join(dir, '_manifest.json'), 'utf8'))
+  const again = m.coverage.vaults[MERIDIAN].owner
+  m.coverage.vaults.extra = { label: 'same owner, captured earlier', pseudoAccount: null, owner: { ...again, ledgerMax: again.ledgerMax - 10 } }
+  writeFileSync(join(dir, '_manifest.json'), JSON.stringify(m, null, 2))
+  eq('an account declared twice keeps the range both cover', loadArchive(dir).accounts.get(again.account).ledgerMax, again.ledgerMax - 10)
 } finally { rmSync(dir, { recursive: true, force: true }) }
+
+console.log('\n  a later capture')
+const at = { A: [100, 0], B: [150, 0], C: [190, 0], D: [250, 1] }
+const declaredABC = { account: 'r1', ledgerMin: 50, ledgerMax: 200, transactions: ['A', 'B', 'C'] }
+const refusal = (fn) => { try { fn(); return 'accepted' } catch (e) { return e.message.slice(e.message.indexOf(': ') + 2).split(' ').slice(0, 4).join(' ') } }
+eq('after pruning, it extends the declaration and keeps what the earlier one held',
+  extendDeclaration(declaredABC, { account: 'r1', ledgerMin: 180, ledgerMax: 300, transactions: ['C', 'D'] }, (h) => at[h], 'x'),
+  { account: 'r1', ledgerMin: 50, ledgerMax: 300, transactions: ['A', 'B', 'C', 'D'] })
+eq('a listing that starts after the declared range ends is refused, not written over it',
+  refusal(() => extendDeclaration(declaredABC, { account: 'r1', ledgerMin: 400, ledgerMax: 500, transactions: [] }, (h) => at[h], 'x')), 'the new listing starts')
+eq('a listing missing a declared transaction inside its own range is refused',
+  refusal(() => extendDeclaration(declaredABC, { account: 'r1', ledgerMin: 120, ledgerMax: 300, transactions: ['C'] }, (h) => at[h], 'x')), 'the new listing misses')
 
 console.log('\n  the routes')
 const snap = (id, brokers) => ({ vaultId: id, vault: vault(id), brokers, loans: [] })
