@@ -103,7 +103,7 @@ const out = {
   question: 'Can a second publisher contest our reading without our permission, and does the ledger report the spread?',
   publishers: [
     { role: 'this service', account: ours.publisher, oracleDocumentId: ours.oracleDocumentId, provider: 'BuzzBallz Vault Solvency', nav: correct, basis: 're-reads the vault object' },
-    { role: 'an independent second reader', account: secondAddress, oracleDocumentId: DOC_ID, provider: 'Naive metadata indexer', nav: naive, basis: 'diffs transaction metadata', publishHash },
+    { role: 'a second account of ours, playing a naive indexer', account: secondAddress, oracleDocumentId: DOC_ID, provider: 'Naive metadata indexer', nav: naive, basis: 'the naive reading a metadata diff gives, copied from demo/indexer-race.json', publishHash },
   ],
   aggregate: agg
     ? {
@@ -117,7 +117,7 @@ const out = {
     : null,
   aggregateError: aggError,
   answer: agg
-    ? `Yes. Two publishers, no relationship between them, and rippled reports a median of ${agg.median} across a spread neither of them controls.`
+    ? `Yes. A second publisher can post a contrary reading without our permission; rippled reports a median of ${agg.median} across both. In this capture both accounts were ours.`
     : `INCONCLUSIVE: get_aggregate_price returned ${aggError}. Do not cite this.`,
   reproduce: {
     command: 'get_aggregate_price',

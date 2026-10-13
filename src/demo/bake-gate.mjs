@@ -12,7 +12,7 @@
  *   2. LP_GOOD opts in                               CredentialAccept
  *      Issuance alone grants nothing. Without this the deposit is still tecNO_AUTH, so a
  *      credential cannot be done TO someone.
- *   3. an INDEPENDENT vault owner names our issuer   PermissionedDomainSet
+ *   3. a SEPARATE vault owner names our issuer       PermissionedDomainSet
  *      We sign nothing. We are not asked. We cannot refuse. That is the correct shape
  *      for a rating: being cited without consent is how every rating agency works.
  *   4. that owner creates a private, gated vault     VaultCreate + tfVaultPrivate + DomainID
@@ -72,7 +72,7 @@ const { wallet: vaultOwner } = await c.fundWallet()
 const { wallet: lpGood } = await c.fundWallet()
 const { wallet: lpBad } = await c.fundWallet()
 console.log(`    rater       ${rater.address}`)
-console.log(`    vault owner ${vaultOwner.address}   (independent: never signs anything of ours)`)
+console.log(`    vault owner ${vaultOwner.address}   (separate key: never signs anything of ours)`)
 console.log(`    LP graded   ${lpGood.address}`)
 console.log(`    LP ungraded ${lpBad.address}`)
 
@@ -164,8 +164,8 @@ writeFileSync(OUT, JSON.stringify(out, null, 2) + '\n')
 //
 // Separate file, gitignored, and never referenced from demo/gate-vault.json: these are
 // worthless Devnet faucet keys and they are still private keys, so they stay out of the
-// artefact that gets committed. The pre-commit hook validates seeds by checksum and
-// will refuse them if this is ever staged by accident.
+// artefact that gets committed. During the event a local pre-commit hook, not part of this
+// repository, also refused any seed that was staged by accident.
 writeFileSync('.demo-keys.json', JSON.stringify({
   note: 'Devnet faucet keys for replaying the gate demo. Gitignored. Worthless, still private keys.',
   vaultId, domainId, credentialType: BAR.name,

@@ -18,12 +18,12 @@
       "basis": "re-reads the vault object"
     },
     {
-      "role": "an independent second reader",
+      "role": "a second account of ours, playing a naive indexer",
       "account": "raiwYKSDdrhiediLdgJyGEzP1estXcmVcM",
       "oracleDocumentId": 1,
       "provider": "Naive metadata indexer",
       "nav": "1.000000",
-      "basis": "diffs transaction metadata",
+      "basis": "the naive reading a metadata diff gives, copied from demo/indexer-race.json",
       "publishHash": null
     }
   ],
@@ -36,7 +36,7 @@
     "computedBy": "rippled, from get_aggregate_price. Neither publisher computed it and neither can alter it."
   },
   "aggregateError": null,
-  "answer": "Yes. Two publishers, no relationship between them, and rippled reports a median of 0.901961 across a spread neither of them controls.",
+  "answer": "Yes. A second publisher can post a contrary reading without our permission; rippled reports a median of 0.901961 across both. In this capture both accounts were ours.",
   "reproduce": {
     "command": "get_aggregate_price",
     "base_asset": "864C5A2DDCED78C6198B0703169D533B747A56E5",
