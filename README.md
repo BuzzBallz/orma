@@ -8,7 +8,7 @@ metadata diffs, publishes the result as a native XLS-47 Oracle object and as a p
 token's own metadata, and lets an independent third party gate deposits on it through XLS-70 credentials.
 
 **1st place of 14 projects**, De Vinci Blockchain XRPL Lending Protocol Hackathon, Paris, 12-13 September 2026 ([ESILV](https://www.esilv.fr/xrpl-hackathon-devinci-blockchain-remporte-deux-places-sur-le-podium/)).\
-**Upstream:** three notes on the closed-ended vault draft, addressed by its author and merged ([XRPL-Standards#587](https://github.com/XRPLF/XRPL-Standards/pull/587#issuecomment-5655843515)); the `PreviousFields` issue, moved by a RippleX maintainer to the documentation tracker, where it is open ([xrpl-dev-portal#3926](https://github.com/XRPLF/xrpl-dev-portal/issues/3926)).\
+**Upstream:** three notes on the closed-ended vault draft ([XRPL-Standards#587](https://github.com/XRPLF/XRPL-Standards/pull/587#issuecomment-5655843515)), addressed by its author ([reply](https://github.com/XRPLF/XRPL-Standards/pull/587#issuecomment-5665157387)) and merged on 15 September; the `PreviousFields` issue, moved by a RippleX maintainer to the documentation tracker, where it is open ([xrpl-dev-portal#3926](https://github.com/XRPLF/xrpl-dev-portal/issues/3926)).\
 **Live:** [app](https://ormaprotocol.vercel.app) · [API, Meridian `/nav`](https://orma-api.onrender.com/api/vaults/864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835/nav) (free tier: after an idle spell the first request is slow and can answer `VAULT_NOT_FOUND` until the facilities load; retry) · [docs](https://ormaprotocol.mintlify.site/) · [paper](paper/orma-paper.pdf)\
 Built by Alexandre Lemiere ([@frytegg](https://github.com/frytegg)) and Andrea Gonzalez ([@andreagnzz](https://github.com/andreagnzz)).
 
@@ -507,9 +507,9 @@ The three that cost us the most:
    the join. Before that fix, every default looked unsignalled, and the conduct rule written to reward
    disclosure was penalising it. That one shipped a wrong answer inside our own code before we caught it.
 
-The register is `feedback/appendix.pdf`. Upstream, three notes on the closed-ended vault draft were
-addressed by its author and merged
-([XRPL-Standards#587](https://github.com/XRPLF/XRPL-Standards/pull/587#issuecomment-5655843515)), and the
+The register is `feedback/appendix.pdf`. Upstream, three notes on the closed-ended vault draft
+([XRPL-Standards#587](https://github.com/XRPLF/XRPL-Standards/pull/587#issuecomment-5655843515)) were addressed by its author
+([reply](https://github.com/XRPLF/XRPL-Standards/pull/587#issuecomment-5665157387)) and merged on 15 September, and the
 `PreviousFields` issue is open as a documentation task
 ([xrpl-dev-portal#3926](https://github.com/XRPLF/xrpl-dev-portal/issues/3926)). `contrib/tutorial-fix/` is
 the tutorial fix we did not file, and `contrib/filings/` records the rest.
