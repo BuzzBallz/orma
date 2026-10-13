@@ -551,13 +551,12 @@ after:
 
 ---
 
-<!-- credit wording pending Andrea's review -->
 ## Team
 
 **Alexandre Lemiere** ([@frytegg](https://github.com/frytegg)): the reader, scoring, NAV, the XLS-47
 publisher and the credential gate (`src/`); the verification screen and demo exhibits in the app; the
 40-finding register (`feedback/`); the upstream filings and `contrib/`; the paper and the documentation.\
-**Andrea Gonzalez** ([@andreagnzz](https://github.com/andreagnzz)): the app (`app/`), its design and its redesign; the
+**Andrea Gonzalez** ([@andreagnzz](https://github.com/andreagnzz)): the app (`app/`), its visual identity (the Orma mark and palette) and its redesign; the
 three-page rewrite of the feedback report (`37d6a96`); `FINDINGS.md`; and the NAV-history API added after the
 event.
 
