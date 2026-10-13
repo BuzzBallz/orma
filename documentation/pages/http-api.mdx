@@ -1,16 +1,17 @@
 ---
 title: "API reference"
-description: "The eleven routes Orma serves, the question each one answers, its parameters, and a real Devnet response."
+description: "The twelve routes Orma serves, the question each one answers, its parameters, and a real Devnet response."
 ---
 
-Orma exposes eleven `GET` routes over plain HTTP. The server is `src/api.mjs`: `node:http`, no
+Orma exposes twelve `GET` routes over plain HTTP. The server is `src/api.mjs`: `node:http`, no
 framework, no middleware stack. The default listen address is `http://localhost:8787`, overridable
 with `PORT`.
 
 Every response body on this page was captured from the running service against XRPL Devnet on
 2026-09-12, server build `3.4.0-rc5`. All of them were taken at ledger `5263343` except the
-`/api/demo/state` capture, which is from ledger `5263439` a few minutes later. Responses are
-trimmed for length where noted, never rewritten.
+`/api/demo/state` capture, which is from ledger `5263439` a few minutes later, and the two history
+routes, captured on 2026-10-13 (server build `3.4.1`, ledgers `6091723` and `6091724`) once their
+responses stated the window they cover. Responses are trimmed for length where noted, never rewritten.
 
 <Warning>
 This runs on Devnet, not Mainnet. XLS-65 vaults and XLS-66 lending are not amended into Mainnet, so
@@ -547,9 +548,23 @@ Each point is read from that transaction's own metadata, not reconstructed: `Ass
 `LossUnrealized` from the `Vault` node's `FinalFields`, and the shares from the `MPTokenIssuance`
 node when the transaction moved them (between a deposit and a withdrawal the count carries forward).
 The transactions come from `account_tx` on the vault's pseudo-account, which lists the impairments;
-an `account_tx` on the broker's owner does not. The response is cached for 15 seconds, and
-`truncated` is `true` when the vault has 1,000 transactions or more, in which case the oldest are
-missing.
+an `account_tx` on the broker's owner does not. The response is cached for 15 seconds.
+
+Devnet prunes old ledgers from the bottom, a ledger at a time and without saying so, so every read is
+merged with the archive in `evidence/devnet-tx/`: the four facilities' account histories as captured on
+13 October 2026, declared per account in its `_manifest.json`. The two are merged by hash, the live copy
+winning, and a point whose transaction Devnet no longer returned says `"source": "archive"`. `window`
+says what the series rests on:
+
+| field | meaning |
+|---|---|
+| `complete` | `true` when no ledger is missing from the vault's creation (`fromLedger`) to its last change (`toLedger`, the Vault's `PreviousTxnLgrSeq`) |
+| `reason` | why not, when `complete` is `false`: the creating transaction was found in neither, or the first ledger that neither range covers |
+| `live` | the range the server searched (`account_tx`'s own `ledger_index_min` and `ledger_index_max`, which differ between servers), the transactions it returned, and `truncated` |
+| `archive` | the capture time, the declared range, the transactions declared for this account, whether all of them loaded (`intact`), and how many the live read no longer returned (`added`). `null` for an account the archive does not cover |
+
+`truncated` is `true` when the live read stopped at its page limit, 5 pages of 200, with older
+transactions left.
 
 ```bash
 curl -s http://localhost:8787/api/vaults/864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835/nav-history
@@ -557,8 +572,8 @@ curl -s http://localhost:8787/api/vaults/864C5A2DDCED78C6198B0703169D533B747A56E
 
 ```json
 {
-  "serverTime": "2026-10-13T12:41:50Z",
-  "ledgerIndex": 6089562,
+  "serverTime": "2026-10-13T14:31:50Z",
+  "ledgerIndex": 6091723,
   "vaultId": "864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835",
   "points": [
     {
@@ -569,7 +584,8 @@ curl -s http://localhost:8787/api/vaults/864C5A2DDCED78C6198B0703169D533B747A56E
       "navCorrect": "1.000000",
       "assetsTotal": "51000000",
       "lossUnrealized": "0",
-      "sharesOutstanding": "51000000"
+      "sharesOutstanding": "51000000",
+      "source": "live"
     },
     {
       "at": "2026-09-12T21:05:32Z",
@@ -579,7 +595,8 @@ curl -s http://localhost:8787/api/vaults/864C5A2DDCED78C6198B0703169D533B747A56E
       "navCorrect": "1.000000",
       "assetsTotal": "51000000",
       "lossUnrealized": "0",
-      "sharesOutstanding": "51000000"
+      "sharesOutstanding": "51000000",
+      "source": "live"
     },
     {
       "at": "2026-09-12T21:07:52Z",
@@ -589,10 +606,31 @@ curl -s http://localhost:8787/api/vaults/864C5A2DDCED78C6198B0703169D533B747A56E
       "navCorrect": "0.803922",
       "assetsTotal": "51000000",
       "lossUnrealized": "10000000",
-      "sharesOutstanding": "51000000"
+      "sharesOutstanding": "51000000",
+      "source": "live"
     }
   ],
-  "truncated": false
+  "truncated": false,
+  "window": {
+    "complete": true,
+    "reason": null,
+    "fromLedger": 5261980,
+    "toLedger": 5262028,
+    "live": {
+      "ledgerMin": 5171980,
+      "ledgerMax": 6091724,
+      "transactions": 5,
+      "truncated": false
+    },
+    "archive": {
+      "capturedAt": "2026-10-13T14:20:11Z",
+      "ledgerMin": 5193077,
+      "ledgerMax": 6091492,
+      "transactions": 5,
+      "intact": true,
+      "added": 0
+    }
+  }
 }
 ```
 
@@ -603,10 +641,11 @@ metadata diff sees nothing, but its `FinalFields` carry `LossUnrealized` and the
 `impair`, `unimpair` or `default`.
 
 <Warning>
-The series is only as long as the history the server still holds. Devnet prunes old ledgers (on
-13 October 2026 one public server's oldest had closed on 10 September), so for the facilities created at
-the event the earliest points will drop out and the series will then be empty. The three transactions
-above are archived in `evidence/devnet-tx/` and verify offline with `npm run check:evidence`.
+The archived transactions are captured, not verified. Each one is loaded only if it hashes to its id,
+but its metadata, which the points are read from, is the server's copy as served on 13 October 2026:
+binding it offline would need the ledger header and its transaction tree (`evidence/devnet-tx/README.md`).
+A series that leans on the archive says so point by point. `npm run check:archive` replays this route
+on the archive as Devnet's floor rises past the event.
 </Warning>
 
 ---
@@ -751,7 +790,9 @@ should they do next.
 |---|---|---|---|
 | `vaultId` | path | yes | 64 hex characters. The first `LoanBroker` on the vault is used |
 
-Cached 15 seconds per broker. Reconstructing the history is many round trips.
+Cached 15 seconds per broker. Reconstructing the history is many round trips. The record is the
+broker owner's `account_tx`, merged with the archive as on `nav-history` above: each event has a
+`source`, and the response a `window`.
 
 ```bash
 curl -s http://localhost:8787/api/vaults/24EAA01AD4CE70D8ABB4ACB4255DC4C216B8AF3B9E7315DB8052BFC1E5810089/broker-history
@@ -759,11 +800,12 @@ curl -s http://localhost:8787/api/vaults/24EAA01AD4CE70D8ABB4ACB4255DC4C216B8AF3
 
 ```jsonc
 {
-  "serverTime": "2026-09-12T22:20:22Z",
-  "ledgerIndex": 5263343,
+  "serverTime": "2026-10-13T14:31:51Z",
+  "ledgerIndex": 6091724,
   "loanBrokerId": "8DB104980C31CBE9F196508E7D748E8C31FB783CD4E0A3620AE0B476CBDEA3FA",
   "owner": "rD26gw5goDqU784caePMoA82givcJBjStk",
   "events": [
+    // one cover_deposit event at 2026-09-12T21:08:32Z comes first, then the two defaults:
     {
       "kind": "default",
       "at": "2026-09-12T21:11:02Z",
@@ -776,7 +818,9 @@ curl -s http://localhost:8787/api/vaults/24EAA01AD4CE70D8ABB4ACB4255DC4C216B8AF3
       "coverAfter": "9600000",
       "coverConsumed": "400000",
       "principal": "30000000",
-      "exposure": "30000000"
+      "exposure": "30000000",
+      "amount": null,
+      "source": "live"
     },
     {
       "kind": "default",
@@ -790,9 +834,10 @@ curl -s http://localhost:8787/api/vaults/24EAA01AD4CE70D8ABB4ACB4255DC4C216B8AF3
       "coverAfter": "9500000",
       "coverConsumed": "100000",
       "principal": "10000000",
-      "exposure": "10000000"
+      "exposure": "10000000",
+      "amount": null,
+      "source": "live"
     }
-    // ... preceded by one cover_deposit event at 2026-09-12T21:08:32Z
   ],
   "ordering": {
     "applicable": true,
@@ -810,6 +855,7 @@ curl -s http://localhost:8787/api/vaults/24EAA01AD4CE70D8ABB4ACB4255DC4C216B8AF3
   "reputation": {
     "grade": "E",
     "score": 25,
+    "withheld": false,
     "observations": {
       "defaults": 2,
       "impairments": 0,
@@ -827,12 +873,32 @@ curl -s http://localhost:8787/api/vaults/24EAA01AD4CE70D8ABB4ACB4255DC4C216B8AF3
         "detail": "2 exposures were written off with no prior warning, so the loss was never signalled before it was taken."
       }
     ],
-    "caveat": "Reconstructed from the public record only. Devnet prunes old ledgers, so conduct before the oldest retained ledger is not visible here."
+    "caveat": "Reconstructed from the public record only: the ledgers Devnet retains, and the transactions it has pruned as captured on 2026-10-13 in evidence/devnet-tx. The grade is withheld when that record does not reach back to the broker’s creation."
   },
   "recommendation": {
     "applicable": false,
     "reason": "fewer than two distressed loans",
     "candidates": 0
+  },
+  "window": {
+    "complete": true,
+    "reason": null,
+    "fromLedger": 5262038,
+    "toLedger": 5262083,
+    "live": {
+      "ledgerMin": 5171980,
+      "ledgerMax": 6091724,
+      "transactions": 9,
+      "truncated": false
+    },
+    "archive": {
+      "capturedAt": "2026-10-13T14:20:11Z",
+      "ledgerMin": 5193077,
+      "ledgerMax": 6091493,
+      "transactions": 9,
+      "intact": true,
+      "added": 0
+    }
   }
 }
 ```
@@ -863,6 +929,14 @@ all, so a naive filter over `account_tx` silently drops every impairment. The jo
 `Loan.FinalFields.LoanBrokerID` in the same transaction metadata. Before that fix every default
 looked unsignalled, and the rule written to reward disclosure was penalising it.
 </Note>
+
+`window` reads as on `nav-history`, over the owner's history: complete when no ledger is missing from
+the broker's creation to the later of its own last change and its vault's, since an impairment touches
+the `Vault` and the `Loan` but never the `LoanBroker`. When it is not complete, the grade is withheld
+rather than computed: `grade` and `score` are `null`, `withheld` is `true`, the one finding is
+`HISTORY_INCOMPLETE`, and `ordering` is not applicable. Pruning removes the oldest transactions first,
+and for this broker those are its defaults: graded on what would remain, the same record reads "no
+defaults declared" and scores A 100 instead of E 25. `npm run check:archive` replays that case.
 
 ---
 

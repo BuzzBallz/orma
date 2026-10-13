@@ -103,8 +103,9 @@ open the public explorer at https://devnet.xrpl.org. Devnet prunes old ledgers, 
 resolving. The raw transactions behind every hash in this README are committed under
 [`evidence/devnet-tx/`](evidence/devnet-tx/README.md), captured on 13 October 2026. Each signed transaction
 blob hashes back to its id, and its metadata is the server's copy as served, not hash-bound offline;
-`npm run check:evidence` checks both against the JSON. The vault, oracle and domain objects are ledger
-state, not history, and still verify live with `ledger_entry`.
+`npm run check:evidence` checks both against the JSON. The same directory holds every transaction the
+API's two history routes read for the four facilities, which they merge in as Devnet prunes them. The
+vault, oracle and domain objects are ledger state, not history, and still verify live with `ledger_entry`.
 
 ### Meridian Trade Finance I, the empty change set
 
@@ -341,6 +342,8 @@ npm run check:ordering   # the cover-ordering arithmetic, offline, against the f
 npm run check:history    # broker history reconstruction, live; funds fresh Devnet accounts from the faucet
 npm run check:oracle     # XLS-47 publication round trip, live; funds a fresh publisher from the faucet
 npm run check:api        # HEAD answers like GET, and "warming up" until a vault is first read, offline
+npm run check:navhistory # the NAV series, read from each transaction's own metadata, offline
+npm run check:archive    # both history routes as Devnet prunes the event, on the committed archive, offline
 ```
 
 The HTTP API is documented in `documentation/pages/http-api.mdx`:
@@ -549,6 +552,13 @@ after:
   answers `HEAD` and says `503 WARMING_UP` before its first snapshot. `FEEDBACK.pdf` corrected in four
   places, with a dated line under the signature (Andrea). An MIT licence. The repository as submitted is
   the [`hackathon-submission`](https://github.com/BuzzBallz/orma/releases/tag/hackathon-submission) release.
+- **13 October 2026.** The two history routes no longer depend on Devnet keeping the event's ledgers. Each
+  read is merged with the facilities' account histories, captured that day under
+  [`evidence/devnet-tx/`](evidence/devnet-tx/README.md); each point or event says whether it came from the
+  archive, and each response states the window it covers. When that window does not reach back to the
+  broker's creation, the conduct grade is withheld rather than computed: a pruned record would have graded
+  Kestrel's broker A 100 instead of E 25 (raised by Andrea). On a cold start, a facility not read yet answers
+  `503 WARMING_UP` rather than `404`. The deployed API does not serve these yet.
 
 ---
 
