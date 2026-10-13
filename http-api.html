@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>API reference — Orma</title>
-<meta name="description" content="The eleven routes Orma serves, the question each one answers, its parameters, and a real Devnet response.">
+<meta name="description" content="The thirteen routes Orma serves, the question each one answers, its parameters, and a real Devnet response.">
 <style>
 :root{--bg:#0A0B0E;--panel:#0E1015;--raised:#15171D;--fg:#EAE0CE;--dim:#B3AA99;--mute:#8C8578;
 --gold:#C9A45F;--line:#1F222A;--line2:#2C313B;--ok:#35D64A;--bad:#FF4A4A;
@@ -71,9 +71,9 @@ nav{position:static;height:auto;border-right:0;border-bottom:1px solid var(--lin
   </nav>
   <main>
     <h1>API reference</h1>
-    <p class="lede">The eleven routes Orma serves, the question each one answers, its parameters, and a real Devnet response.</p>
-    <p>Orma exposes eleven <code>GET</code> routes over plain HTTP. The server is <code>src/api.mjs</code>: <code>node:http</code>, no framework, no middleware stack. The default listen address is <code>http://localhost:8787</code>, overridable with <code>PORT</code>.</p>
-<p>Every response body on this page was captured from the running service against XRPL Devnet on 2026-09-12, server build <code>3.4.0-rc5</code>. All of them were taken at ledger <code>5263343</code> except the <code>/api/demo/state</code> capture, which is from ledger <code>5263439</code> a few minutes later. Responses are trimmed for length where noted, never rewritten.</p>
+    <p class="lede">The thirteen routes Orma serves, the question each one answers, its parameters, and a real Devnet response.</p>
+    <p>Orma exposes thirteen <code>GET</code> routes over plain HTTP. The server is <code>src/api.mjs</code>: <code>node:http</code>, no framework, no middleware stack. The default listen address is <code>http://localhost:8787</code>, overridable with <code>PORT</code>.</p>
+<p>Every response body on this page was captured from the running service against XRPL Devnet on 2026-09-12, server build <code>3.4.0-rc5</code>. All of them were taken at ledger <code>5263343</code> except the <code>/api/demo/state</code> capture, which is from ledger <code>5263439</code> a few minutes later, and the two history routes, captured on 2026-10-13 (server build <code>3.4.1</code>, ledgers <code>6091723</code> and <code>6091724</code>) once their responses stated the window they cover, and <code>/api/oracle-aggregate</code>, documented that day from ledger <code>6092503</code>. Responses are trimmed for length where noted, never rewritten.</p>
 <div class="callout warning"><span class="ck">Warning</span><div><p>This runs on Devnet, not Mainnet. XLS-65 vaults and XLS-66 lending are not amended into Mainnet, so</p><p>there is no production deployment to point at. <code>network</code> is hard-coded to <code>"devnet"</code> in</p><p><code>src/api.mjs</code>, and <code>health.source</code> reports where the data came from: <code>"devnet"</code> for live reads,</p><p><code>"fixtures"</code> for the recorded ring.</p></div></div>
 <h2 id="rules-that-bind-every-response">Rules that bind every response</h2>
 <p>These are contract-level, not per-route. They are what makes the responses safe to consume.</p>
@@ -109,7 +109,7 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
     "retryable": false
   }
 }</code></pre>
-<div class="tw"><table><thead><tr><th>code</th><th>status</th><th>retryable</th><th>raised when</th></tr></thead><tbody><tr><td><code>WARMING_UP</code></td><td>503</td><td>true</td><td>the reader has not read its first snapshot yet, so an id it does not know is unknown rather than absent. Vault and MPT routes answer this until the first read lands, a few seconds after a start</td></tr><tr><td><code>VAULT_NOT_FOUND</code></td><td>404</td><td>false</td><td>the id is well formed but no snapshot exists for it, once the reader has read its first snapshot</td></tr><tr><td><code>NO_SHARE_MPT</code></td><td>404</td><td>false</td><td>the vault has no share issuance, so there is nothing to value</td></tr><tr><td><code>NO_BROKER</code></td><td>404</td><td>false</td><td>the vault has no <code>LoanBroker</code>, so there is no conduct to reconstruct</td></tr><tr><td><code>SHARE_NOT_TRACKED</code></td><td>404</td><td>false</td><td>no facility on this service issues that MPT</td></tr><tr><td><code>NOT_FOUND</code></td><td>404</td><td>false</td><td>no route matched, or the demo capture file is missing</td></tr><tr><td><code>FORBIDDEN</code></td><td>403</td><td>false</td><td>an operator <code>POST</code> from something other than loopback</td></tr><tr><td><code>INTERNAL</code></td><td>500</td><td>true</td><td>anything unhandled</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>code</th><th>status</th><th>retryable</th><th>raised when</th></tr></thead><tbody><tr><td><code>WARMING_UP</code></td><td>503</td><td>true</td><td>the reader has not read that vault yet, so it is unknown rather than absent. Vault and MPT routes answer this until the reader's first pass over the facilities ends (it reads them one by one, a few seconds after a start). After it, a vault route answers it for a facility the reader tracks but has not managed to read, and an MPT route while any tracked facility is in that state</td></tr><tr><td><code>VAULT_NOT_FOUND</code></td><td>404</td><td>false</td><td>the id is well formed, the reader has finished a pass, and it either does not track that vault or the ledger answered that it does not exist</td></tr><tr><td><code>NO_SHARE_MPT</code></td><td>404</td><td>false</td><td>the vault has no share issuance, so there is nothing to value</td></tr><tr><td><code>NO_BROKER</code></td><td>404</td><td>false</td><td>the vault has no <code>LoanBroker</code>, so there is no conduct to reconstruct</td></tr><tr><td><code>SHARE_NOT_TRACKED</code></td><td>404</td><td>false</td><td>no facility on this service issues that MPT, once every tracked facility has been read or found not to exist</td></tr><tr><td><code>NOT_FOUND</code></td><td>404</td><td>false</td><td>no route matched, or the demo capture file is missing</td></tr><tr><td><code>FORBIDDEN</code></td><td>403</td><td>false</td><td>an operator <code>POST</code> from something other than loopback</td></tr><tr><td><code>INTERNAL</code></td><td>500</td><td>true</td><td>anything unhandled</td></tr></tbody></table></div>
 <p>Every route that answers <code>GET</code> also answers <code>HEAD</code>, with the same status and headers and no body, so a link checker sees the status a reader would.</p>
 <p>A vault id must match <code>[A-Fa-f0-9]{64}</code> and an MPT issuance id <code>[A-Fa-f0-9]{48}</code>. Lowercase hex is accepted and upper-cased before lookup. A path that matches no pattern returns <code>{"error":{"code":"NOT_FOUND","message":"No route GET /api/nope","retryable":false}}</code>.</p>
 <h3 id="6-cors-and-which-two-routes-are-deliberately-public">6. CORS, and which two routes are deliberately public</h3>
@@ -120,7 +120,7 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
 <div class="callout warning"><span class="ck">Warning</span><div><p>The metadata that carries the NAV URL is written into the <code>MPTokenIssuance</code> at creation and can</p><p>never be rewritten. The contract at the end of those two routes is therefore effectively permanent:</p><p>fields may be added, nothing may ever be renamed, retyped or removed.</p></div></div>
 <hr>
 <h2 id="route-index">Route index</h2>
-<div class="tw"><table><thead><tr><th>method and path</th><th>answers</th></tr></thead><tbody><tr><td><code>GET /api/health</code></td><td>is the reader connected, and how old is the data</td></tr><tr><td><code>GET /api/vaults</code></td><td>which facilities are tracked, worst first</td></tr><tr><td><code>GET /api/vaults/:vaultId</code></td><td>everything about one facility</td></tr><tr><td><code>GET /api/vaults/:vaultId/nav</code></td><td>what is one unit actually worth</td></tr><tr><td><code>GET /api/vaults/:vaultId/nav-history</code></td><td>what was one unit worth after each transaction that changed the vault</td></tr><tr><td><code>GET /api/vaults/:vaultId/gate</code></td><td>is this facility gated, and by whom</td></tr><tr><td><code>GET /api/vaults/:vaultId/collateral</code></td><td>what are the pledged shares worth to a lender</td></tr><tr><td><code>GET /api/vaults/:vaultId/broker-history</code></td><td>what did this manager actually do</td></tr><tr><td><code>GET /api/mpt/:mptId/nav</code></td><td>the same valuation, keyed by the token</td></tr><tr><td><code>GET /api/mpt/:mptId/resolve</code></td><td>can a stranger get from the token to a valuation</td></tr><tr><td><code>GET /api/indexer-race</code></td><td>proof the first impairment is invisible to metadata diffing</td></tr><tr><td><code>GET /api/demo/state</code></td><td>which facilities are baked and live</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>method and path</th><th>answers</th></tr></thead><tbody><tr><td><code>GET /api/health</code></td><td>is the reader connected, and how old is the data</td></tr><tr><td><code>GET /api/vaults</code></td><td>which facilities are tracked, worst first</td></tr><tr><td><code>GET /api/vaults/:vaultId</code></td><td>everything about one facility</td></tr><tr><td><code>GET /api/vaults/:vaultId/nav</code></td><td>what is one unit actually worth</td></tr><tr><td><code>GET /api/vaults/:vaultId/nav-history</code></td><td>what was one unit worth after each transaction that changed the vault</td></tr><tr><td><code>GET /api/vaults/:vaultId/gate</code></td><td>is this facility gated, and by whom</td></tr><tr><td><code>GET /api/vaults/:vaultId/collateral</code></td><td>what are the pledged shares worth to a lender</td></tr><tr><td><code>GET /api/vaults/:vaultId/broker-history</code></td><td>what did this manager actually do</td></tr><tr><td><code>GET /api/mpt/:mptId/nav</code></td><td>the same valuation, keyed by the token</td></tr><tr><td><code>GET /api/mpt/:mptId/resolve</code></td><td>can a stranger get from the token to a valuation</td></tr><tr><td><code>GET /api/indexer-race</code></td><td>proof the first impairment is invisible to metadata diffing</td></tr><tr><td><code>GET /api/oracle-aggregate</code></td><td>can a second publisher contest a reading, and what median does the ledger report</td></tr><tr><td><code>GET /api/demo/state</code></td><td>which facilities are baked and live</td></tr></tbody></table></div>
 <hr>
 <h2 id="get-api-health">GET /api/health</h2>
 <p>Is the reader up, which ledger is it on, and is it currently degraded. No parameters.</p>
@@ -395,11 +395,14 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
 <h2 id="get-api-vaults-vaultid-nav-history">GET /api/vaults/:vaultId/nav-history</h2>
 <p>What one unit of this facility was worth after each transaction that changed it: one point per successful transaction that modified the <code>Vault</code> while it had shares outstanding, oldest first.</p>
 <div class="tw"><table><thead><tr><th>parameter</th><th>in</th><th>required</th><th>notes</th></tr></thead><tbody><tr><td><code>vaultId</code></td><td>path</td><td>yes</td><td>64 hex characters</td></tr></tbody></table></div>
-<p>Each point is read from that transaction's own metadata, not reconstructed: <code>AssetsTotal</code> and <code>LossUnrealized</code> from the <code>Vault</code> node's <code>FinalFields</code>, and the shares from the <code>MPTokenIssuance</code> node when the transaction moved them (between a deposit and a withdrawal the count carries forward). The transactions come from <code>account_tx</code> on the vault's pseudo-account, which lists the impairments; an <code>account_tx</code> on the broker's owner does not. The response is cached for 15 seconds, and <code>truncated</code> is <code>true</code> when the vault has 1,000 transactions or more, in which case the oldest are missing.</p>
+<p>Each point is read from that transaction's own metadata, not reconstructed: <code>AssetsTotal</code> and <code>LossUnrealized</code> from the <code>Vault</code> node's <code>FinalFields</code>, and the shares from the <code>MPTokenIssuance</code> node when the transaction moved them (between a deposit and a withdrawal the count carries forward). The transactions come from <code>account_tx</code> on the vault's pseudo-account, which lists every transaction that touched the <code>Vault</code>, impairments included, whoever signed it. The response is cached for 15 seconds.</p>
+<p>Devnet prunes old ledgers in steps, each server on its own schedule: rippled's <code>online_delete</code> drops everything below the server's previous rotation point at once, and the public endpoint spreads requests over servers whose oldest ledgers differ. <code>account_tx</code> states the range it searched, never what it no longer holds, so a history can come back whole, cut or empty. Every read is therefore merged with the archive in <code>evidence/devnet-tx/</code>: the four facilities' account histories as captured on 13 October 2026, declared per account in its <code>_manifest.json</code>. The two are merged by hash, the live copy winning, and a point whose transaction Devnet no longer returned says <code>"source": "archive"</code>. <code>window</code> says what the series rests on:</p>
+<div class="tw"><table><thead><tr><th>field</th><th>meaning</th></tr></thead><tbody><tr><td><code>complete</code></td><td><code>true</code> when no ledger is missing from the vault's creation (<code>fromLedger</code>) to its last change (<code>toLedger</code>: the Vault's <code>PreviousTxnLgrSeq</code>, or the live read's top when that is unknown)</td></tr><tr><td><code>reason</code></td><td>why not, when <code>complete</code> is <code>false</code>: the creating transaction was found in neither, or the first ledger that neither range covers</td></tr><tr><td><code>live</code></td><td>the range the live read covers: the one <code>account_tx</code> says it searched (its <code>ledger_index_min</code> and <code>ledger_index_max</code>, which differ between servers), starting instead at the ledger after the oldest transaction returned when the page limit stopped the read, or the span of what it returned when it states no range; then the transactions it returned, and <code>truncated</code></td></tr><tr><td><code>archive</code></td><td>the capture time, the declared range, the transactions declared for this account, whether all of them loaded (<code>intact</code>), and how many the live read no longer returned (<code>added</code>). <code>null</code> for an account the archive does not cover</td></tr></tbody></table></div>
+<p><code>truncated</code> is <code>true</code> when the live read stopped at its page limit, 5 pages of 200, with older transactions left.</p>
 <pre class="code" data-lang="bash"><code>curl -s http://localhost:8787/api/vaults/864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835/nav-history</code></pre>
 <pre class="code" data-lang="json"><code>{
-  "serverTime": "2026-10-13T12:41:50Z",
-  "ledgerIndex": 6089562,
+  "serverTime": "2026-10-13T14:31:50Z",
+  "ledgerIndex": 6091723,
   "vaultId": "864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835",
   "points": [
     {
@@ -410,7 +413,8 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
       "navCorrect": "1.000000",
       "assetsTotal": "51000000",
       "lossUnrealized": "0",
-      "sharesOutstanding": "51000000"
+      "sharesOutstanding": "51000000",
+      "source": "live"
     },
     {
       "at": "2026-09-12T21:05:32Z",
@@ -420,7 +424,8 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
       "navCorrect": "1.000000",
       "assetsTotal": "51000000",
       "lossUnrealized": "0",
-      "sharesOutstanding": "51000000"
+      "sharesOutstanding": "51000000",
+      "source": "live"
     },
     {
       "at": "2026-09-12T21:07:52Z",
@@ -430,13 +435,34 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
       "navCorrect": "0.803922",
       "assetsTotal": "51000000",
       "lossUnrealized": "10000000",
-      "sharesOutstanding": "51000000"
+      "sharesOutstanding": "51000000",
+      "source": "live"
     }
   ],
-  "truncated": false
+  "truncated": false,
+  "window": {
+    "complete": true,
+    "reason": null,
+    "fromLedger": 5261980,
+    "toLedger": 5262028,
+    "live": {
+      "ledgerMin": 5171980,
+      "ledgerMax": 6091724,
+      "transactions": 5,
+      "truncated": false
+    },
+    "archive": {
+      "capturedAt": "2026-10-13T14:20:11Z",
+      "ledgerMin": 5193077,
+      "ledgerMax": 6091492,
+      "transactions": 5,
+      "intact": true,
+      "added": 0
+    }
+  }
 }</code></pre>
 <p>The third point is the first impairment. Its <code>Vault</code> node has an empty <code>PreviousFields</code>, so a metadata diff sees nothing, but its <code>FinalFields</code> carry <code>LossUnrealized</code> and the two NAVs part: 1.000000 reported, 0.803922 held. <code>kind</code> names the transaction: <code>create</code>, <code>deposit</code>, <code>withdraw</code>, <code>clawback</code>, <code>update</code>, <code>loan</code>, <code>payment</code>, <code>loan_closed</code>, and for a <code>LoanManage</code> the flag it set, <code>impair</code>, <code>unimpair</code> or <code>default</code>.</p>
-<div class="callout warning"><span class="ck">Warning</span><div><p>The series is only as long as the history the server still holds. Devnet prunes old ledgers (on</p><p>13 October 2026 one public server's oldest had closed on 10 September), so for the facilities created at</p><p>the event the earliest points will drop out and the series will then be empty. The three transactions</p><p>above are archived in <code>evidence/devnet-tx/</code> and verify offline with <code>npm run check:evidence</code>.</p></div></div>
+<div class="callout warning"><span class="ck">Warning</span><div><p>The archived transactions are captured, not verified. Each one is loaded only if it hashes to its id,</p><p>but its metadata, which the points are read from, is the server's copy as served on 13 October 2026:</p><p>binding it offline would need the ledger header and its transaction tree (<code>evidence/devnet-tx/README.md</code>).</p><p>A series that leans on the archive says so point by point. <code>npm run check:archive</code> replays this route</p><p>on the archive as Devnet's floor rises past the event.</p></div></div>
 <hr>
 <h2 id="get-api-vaults-vaultid-gate">GET /api/vaults/:vaultId/gate</h2>
 <p>Is this facility gated, and by whom. This is enforcement, not advice: an LP without an accepted credential from a named issuer cannot deposit at all, and the ledger is what refuses them.</p>
@@ -506,14 +532,15 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
 <h2 id="get-api-vaults-vaultid-broker-history">GET /api/vaults/:vaultId/broker-history</h2>
 <p>What did this manager actually do, what would the fair sequence have paid depositors, and what should they do next.</p>
 <div class="tw"><table><thead><tr><th>parameter</th><th>in</th><th>required</th><th>notes</th></tr></thead><tbody><tr><td><code>vaultId</code></td><td>path</td><td>yes</td><td>64 hex characters. The first <code>LoanBroker</code> on the vault is used</td></tr></tbody></table></div>
-<p>Cached 15 seconds per broker. Reconstructing the history is many round trips.</p>
+<p>Cached 15 seconds per broker. Reconstructing the history is many round trips. The record is the broker owner's <code>account_tx</code>, merged with the archive as on <code>nav-history</code> above: each event has a <code>source</code>, and the response a <code>window</code>.</p>
 <pre class="code" data-lang="bash"><code>curl -s http://localhost:8787/api/vaults/24EAA01AD4CE70D8ABB4ACB4255DC4C216B8AF3B9E7315DB8052BFC1E5810089/broker-history</code></pre>
 <pre class="code" data-lang="jsonc"><code>{
-  "serverTime": "2026-09-12T22:20:22Z",
-  "ledgerIndex": 5263343,
+  "serverTime": "2026-10-13T14:31:51Z",
+  "ledgerIndex": 6091724,
   "loanBrokerId": "8DB104980C31CBE9F196508E7D748E8C31FB783CD4E0A3620AE0B476CBDEA3FA",
   "owner": "rD26gw5goDqU784caePMoA82givcJBjStk",
   "events": [
+    // one cover_deposit event at 2026-09-12T21:08:32Z comes first, then the two defaults:
     {
       "kind": "default",
       "at": "2026-09-12T21:11:02Z",
@@ -526,7 +553,9 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
       "coverAfter": "9600000",
       "coverConsumed": "400000",
       "principal": "30000000",
-      "exposure": "30000000"
+      "exposure": "30000000",
+      "amount": null,
+      "source": "live"
     },
     {
       "kind": "default",
@@ -540,9 +569,10 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
       "coverAfter": "9500000",
       "coverConsumed": "100000",
       "principal": "10000000",
-      "exposure": "10000000"
+      "exposure": "10000000",
+      "amount": null,
+      "source": "live"
     }
-    // ... preceded by one cover_deposit event at 2026-09-12T21:08:32Z
   ],
   "ordering": {
     "applicable": true,
@@ -560,6 +590,7 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
   "reputation": {
     "grade": "E",
     "score": 25,
+    "withheld": false,
     "observations": {
       "defaults": 2,
       "impairments": 0,
@@ -577,12 +608,32 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
         "detail": "2 exposures were written off with no prior warning, so the loss was never signalled before it was taken."
       }
     ],
-    "caveat": "Reconstructed from the public record only. Devnet prunes old ledgers, so conduct before the oldest retained ledger is not visible here."
+    "caveat": "Reconstructed from the public record only: the ledgers Devnet retains, and the transactions it has pruned as captured on 2026-10-13 in evidence/devnet-tx. The grade is withheld when that record does not reach back to the broker’s creation."
   },
   "recommendation": {
     "applicable": false,
     "reason": "fewer than two distressed loans",
     "candidates": 0
+  },
+  "window": {
+    "complete": true,
+    "reason": null,
+    "fromLedger": 5262038,
+    "toLedger": 5262083,
+    "live": {
+      "ledgerMin": 5171980,
+      "ledgerMax": 6091724,
+      "transactions": 9,
+      "truncated": false
+    },
+    "archive": {
+      "capturedAt": "2026-10-13T14:20:11Z",
+      "ledgerMin": 5193077,
+      "ledgerMax": 6091493,
+      "transactions": 9,
+      "intact": true,
+      "added": 0
+    }
   }
 }</code></pre>
 <p>This is the second lever, measured. Cover liquidated on one default is</p>
@@ -592,6 +643,7 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
 <p>$$\phi = \frac{T_{\text{observed}} - T_{\min}}{T_{\max} - T_{\min}}$$</p>
 <p><code>"0.0000"</code> is the investor-worst sequence, <code>"1.0000"</code> the best, and it is defined as <code>"1.0000"</code> when the two extremes coincide. <code>recommendation</code> is the same arithmetic pointed forwards, and is only <code>applicable</code> with two or more distressed loans. Derivation in <a href="mathematics.html#3-the-ordering-result">/mathematics</a>.</p>
 <div class="callout note"><span class="ck">Note</span><div><p><code>LoanManage</code> carries no <code>LoanBrokerID</code>, and an impairment does not touch the <code>LoanBroker</code> object at</p><p>all, so a naive filter over <code>account_tx</code> silently drops every impairment. The join that closes it is</p><p><code>Loan.FinalFields.LoanBrokerID</code> in the same transaction metadata. Before that fix every default</p><p>looked unsignalled, and the rule written to reward disclosure was penalising it.</p></div></div>
+<p><code>window</code> reads as on <code>nav-history</code>, over the owner's history: complete when no ledger is missing from the broker's creation to the later of its own last change and its vault's, since an impairment touches the <code>Vault</code> and the <code>Loan</code> but never the <code>LoanBroker</code>. When it is not complete, the grade is withheld rather than computed: <code>grade</code>, <code>score</code> and <code>observations.defaultsWithoutPriorImpairment</code> are <code>null</code>, <code>withheld</code> is <code>true</code>, the one finding is <code>HISTORY_INCOMPLETE</code>, and <code>ordering</code> is not applicable. Pruning removes the oldest transactions first, and for this broker those are its defaults: graded on what would remain, the same record reads "no defaults declared" and scores A 100 instead of E 25. <code>npm run check:archive</code> replays that case.</p>
 <hr>
 <h2 id="get-api-mpt-mptid-nav">GET /api/mpt/:mptId/nav</h2>
 <p>The same valuation as <code>/api/vaults/:vaultId/nav</code>, keyed by the share token instead of the vault, because the issuance id is the only identifier a holder has. This is the route the token's own metadata resolves to.</p>
@@ -708,6 +760,71 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
 }</code></pre>
 <p><code>previousFields: {}</code> on the <code>Vault</code> node is the entire finding. A healthy vault carries no <code>LossUnrealized</code> field, and <code>PreviousFields</code> only records fields the object already had. Under cash-basis accounting (<code>LEVersion = 1</code>) impairment moves nothing else on the <code>Vault</code>, so the diff is empty while <code>FinalFields</code> carries a recognised loss of 10 XRP. The only signal anywhere in the metadata is the <code>Loan</code> node's flags going from <code>0</code> to <code>131072</code>, on a different object.</p>
 <p>This is why the reader in <code>src/poll.mjs</code> re-reads full state every 4 seconds and never diffs <code>PreviousFields</code>. Test flags by bit, not by equality: a loan can carry more than one flag, and <code>Flags === 131072</code> stops matching the day it does.</p>
+<hr>
+<h2 id="get-api-oracle-aggregate">GET /api/oracle-aggregate</h2>
+<p>The captured contest on Meridian: two XLS-47 publishers posting opposite readings of the same vault, and the median rippled computed across them with <code>get_aggregate_price</code>. No parameters. Served from <code>demo/oracle-aggregate.json</code>, <code>NOT_FOUND</code> without it.</p>
+<pre class="code" data-lang="bash"><code>curl -s http://localhost:8787/api/oracle-aggregate</code></pre>
+<pre class="code" data-lang="json"><code>{
+  "serverTime": "2026-10-13T15:13:50Z",
+  "ledgerIndex": 6092503,
+  "probedAt": "2026-09-13T10:01:52Z",
+  "probedDuring": "XRPL Lending Protocol Hackathon, Paris, 12-13 September 2026",
+  "network": "devnet",
+  "buildVersion": "3.4.0-rc5",
+  "label": "Meridian Trade Finance I",
+  "vaultId": "864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835",
+  "baseAsset": "864C5A2DDCED78C6198B0703169D533B747A56E5",
+  "quoteAsset": "NAV",
+  "question": "Can a second publisher contest our reading without our permission, and does the ledger report the spread?",
+  "publishers": [
+    {
+      "role": "this service",
+      "account": "rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B",
+      "oracleDocumentId": 2,
+      "provider": "BuzzBallz Vault Solvency",
+      "nav": "0.803922",
+      "basis": "re-reads the vault object"
+    },
+    {
+      "role": "a second account of ours, playing a naive indexer",
+      "account": "raiwYKSDdrhiediLdgJyGEzP1estXcmVcM",
+      "oracleDocumentId": 1,
+      "provider": "Naive metadata indexer",
+      "nav": "1.000000",
+      "basis": "the naive reading a metadata diff gives, copied from demo/indexer-race.json",
+      "publishHash": null
+    }
+  ],
+  "aggregate": {
+    "median": "0.901961",
+    "mean": "0.901961",
+    "standardDeviation": "0.1386480834414958655",
+    "size": 2,
+    "ledgerIndex": null,
+    "computedBy": "rippled, from get_aggregate_price. Neither publisher computed it and neither can alter it."
+  },
+  "aggregateError": null,
+  "answer": "Yes. A second publisher can post a contrary reading without our permission; rippled reports a median of 0.901961 across both. In this capture both accounts were ours.",
+  "reproduce": {
+    "command": "get_aggregate_price",
+    "base_asset": "864C5A2DDCED78C6198B0703169D533B747A56E5",
+    "quote_asset": "NAV",
+    "oracles": [
+      {
+        "account": "rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B",
+        "oracle_document_id": 2
+      },
+      {
+        "account": "raiwYKSDdrhiediLdgJyGEzP1estXcmVcM",
+        "oracle_document_id": 1
+      }
+    ]
+  },
+  "redacted": [
+    "The second publisher is a throwaway Devnet faucet account. Its seed was never written to disk."
+  ]
+}</code></pre>
+<p>Both publishers were accounts of ours: the event-time publisher, which re-reads the vault object (<code>0.803922</code>), and a throwaway faucet account that published, once, the <code>1.000000</code> a metadata-diffing indexer computes. So the capture shows that a second publisher needs nobody's permission to contest a reading, and that the ledger reports the spread; it does not show that an independent one exists. <code>reproduce</code> is the request to run it again: on 13 October 2026 it still returned a median of <code>0.901961</code>, since Oracle objects are ledger state and are not pruned.</p>
 <hr>
 <h2 id="get-api-demo-state">GET /api/demo/state</h2>
 <p>Which facilities are baked and which one the demo is pointed at. Operator route, read-only, no parameters. A consumer should not depend on it.</p>
