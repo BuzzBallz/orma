@@ -54,20 +54,29 @@ function padDp(s: string, dp: number): string {
 /** [CONTRACT §6] drops -> XRP. "51000000" -> "51.000000" ; "1" -> "0.000001" */
 export function dropsToXrp(drops: string): string { return padDp(shift(drops, -6), 6) }
 
+/** "10.000000" -> "10", "0.500000" -> "0.5": the padding after the point is not a figure. */
+export function trimZeros(full: string): string {
+  const { neg, int, frac } = split(full)
+  const f = frac.replace(/0+$/, '')
+  return (neg ? '-' : '') + int + (f ? '.' + f : '')
+}
+
 /**
- * An amount with a run of zeros as a significand and an exponent: "41.000000" -> 4.1 x 10^1.
- * Exact: only zeros are dropped. Null when there is nothing to save.
+ * An amount with a run of zeros as a significand and an exponent: "1000000" -> 1 x 10^6,
+ * "0.000001" -> 1 x 10^-6. Exact: only zeros are dropped. Null when there is nothing to
+ * save: the padding after the point is not a run, and a significand that still holds one
+ * ("5000.25") is no cleaner than the number.
  */
 export function compact(full: string): { mantissa: string; exp: number } | null {
   const { neg, int, frac } = split(full)
-  if (!/0{3,}/.test(frac)) return null
-  const all = int + frac
+  const all = int + frac.replace(/0+$/, '')
+  if (!/0{3,}/.test(all)) return null
   const first = all.search(/[1-9]/)
-  if (first < 0) return { mantissa: '0', exp: 0 }
+  if (first < 0) return null
   const sig = all.slice(first).replace(/0+$/, '')
   const mantissa = (neg ? '-' : '') + sig[0] + (sig.length > 1 ? '.' + sig.slice(1) : '')
-  const exp = int.length - 1 - first
-  return exp === 0 && mantissa === full ? null : { mantissa, exp }
+  if (/0{3,}/.test(mantissa)) return null
+  return { mantissa, exp: int.length - 1 - first }
 }
 
 /** A plotted position as an axis label, rounded half-up to `dp` places. */
