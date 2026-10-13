@@ -1,3 +1,5 @@
+Not sent. Written 12 September 2026; xrpl-dev-portal#3923, merged 16 September 2026, carries four of these five changes.
+
 # PR title
 
 ```
@@ -15,7 +17,7 @@ Alternate, if a shorter title is preferred:
 
 `_code-samples/lending-protocol/js/lendingSetup.js` does not run to completion on Devnet. It fails at
 `Setting up tutorial: 5/7` with a `TypeError`, not with a ledger result code. All six *Use the Lending
-Protocol* tutorials run this script first, so all six are currently un-followable.
+Protocol* tutorials run this script first, so none of the six could be followed on 12 September 2026.
 
 This PR makes the setup script create a **close-ended vault**, check engine results before indexing into
 transaction metadata, wait for the vault's investment period before originating loans, and bump the pinned

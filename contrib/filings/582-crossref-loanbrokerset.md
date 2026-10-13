@@ -1,3 +1,5 @@
+<!-- Posted 2026-09-13. #587 was merged on 2026-09-15 with the LoanBrokerSet restriction (since #636, 2026-09-25: 66.1.2-closed-ended-loan-gates.md §3.3), so "zero times" below describes the draft as it stood then. -->
+
 One cross-reference on §2.7, from building against this on Devnet this week.
 
 The deferral line — *"Closed-ended Vault phase checks on `LoanSet` and the closed-ended requirement on `LoanBrokerSet` are specified in [PR #587](https://github.com/XRPLF/XRPL-Standards/pull/587), not in this patch"* — currently points at a document that contains the string `LoanBrokerSet` zero times. #587 specifies `VaultCreate`, `VaultDeposit`, `VaultWithdraw`, `LoanSet` and `LoanAccept`, but not broker creation, and `LoanBrokerSet` is absent from its §2.1 permission matrix as well.

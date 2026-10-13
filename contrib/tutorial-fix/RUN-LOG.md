@@ -1,7 +1,7 @@
 # Run log — validation of the xrpl-dev-portal lending tutorial fix (finding D2)
 
 Date: 2026-09-12, morning (all timestamps UTC).
-Operator: validation subagent. Everything below was executed live; nothing is reconstructed.
+Run on Devnet, rippled 3.4.0-rc5. Everything below was executed live; nothing is reconstructed.
 
 ---
 
