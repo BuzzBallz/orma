@@ -111,13 +111,14 @@ Every finding also carries a **status**, which is a claim about the world and no
 ## 3. Index of findings
 
 **40 findings, plus three we withdrew (§10).** Statuses are as of 2026-09-12 and were re-checked against the
-live trackers that morning; §13 lists what moved.
+live trackers that morning; §13 lists what moved. *(Updated 2026-10-13: seven rows have moved upstream
+since the event. Each says so with its date, and §13 keeps what they said before.)*
 
 | ID | Sev | Status | Component | Finding |
 |---|---|---|---|---|
-| **D1** | **P0** | **Specified but unmerged / partially tracked** | XLS-65, XLS-66, docs | `LendingProtocolV1_1` ships behaviour whose specification has been an open PR for 53–80 days, and one rule that no *standard* states |
-| **X1** | **P0** | **Previously raised, closed untriaged** (`rippled#6487`) | rippled metadata | The first impairment of a healthy vault emits `PreviousFields: {}` and is invisible to every metadata-diffing indexer |
-| D2 | P0 | NEW | xrpl-dev-portal | The lending tutorial chain does not complete, and dies as a `TypeError` instead of reporting a result code |
+| **D1** | **P0** | **Merged upstream, 2026-09-15** ([`XRPL-Standards#587`](https://github.com/XRPLF/XRPL-Standards/pull/587)). All three of our notes are in the merged text, which [`#636`](https://github.com/XRPLF/XRPL-Standards/pull/636) restructured as 65.1.4 and 66.1.2 on 2026-09-25 ([the author's reply](https://github.com/XRPLF/XRPL-Standards/pull/587#issuecomment-5665157387)) | XLS-65, XLS-66, docs | `LendingProtocolV1_1` ships behaviour whose specification has been an open PR for 53–80 days, and one rule that no *standard* states |
+| **X1** | **P0** | **Previously raised, closed untriaged** (`rippled#6487`). Follow-up `rippled#8222` was moved on 2026-09-14 by Mayukha Vadari (Ripple) to [`xrpl-dev-portal#3926`](https://github.com/XRPLF/xrpl-dev-portal/issues/3926), renamed "Add clarification to docs on PreviousFields metadata rules" (open) | rippled metadata | The first impairment of a healthy vault emits `PreviousFields: {}` and is invisible to every metadata-diffing indexer |
+| D2 | P0 | **Partly fixed upstream, 2026-09-16** ([`xrpl-dev-portal#3923`](https://github.com/XRPLF/xrpl-dev-portal/pull/3923) merged): four of our five proposed fixes are in the JS sample. It still reads `AffectedNodes` without checking `TransactionResult`, so a `tec` is still a `TypeError` | xrpl-dev-portal | The lending tutorial chain does not complete, and dies as a `TypeError` instead of reporting a result code |
 | L1 | P0 | Fixed during our window | `ripple-binary-codec` ≤2.10.0 | `npm install xrpl` could not serialize a close-ended `VaultCreate`; `validate()` and `autofill()` both passed it |
 | L2 | P0 | NEW | xrpl-py (all versions) | No published version can sign a `LoanSet` counterparty signature; the `0x43505400` prefix does not exist in the package |
 | L3 | P0 | NEW | xrpl-py 5.1.0 | `pip install xrpl-py` cannot construct a close-ended `VaultCreate` |
@@ -133,18 +134,18 @@ live trackers that morning; §13 lists what moved.
 | U5 | P1 | Already reported (`xrpl-dev-portal#3612`), with a new ask | rippled API | Absent means zero across every read surface, with no normalising option |
 | M2 | P1 | NEW | rippled API | No native read of what a vault share is worth, and one valuation rule no external reader can reproduce |
 | M3 | P1 | NEW | rippled / Clio | No enumeration and no event stream for vaults, brokers or loans |
-| D3 | P1 | Partially tracked (`xrpl-dev-portal#3923`) | XLS-65, docs | Three `tec` outcomes that gate the lifecycle are absent from XLS-65, and the docs fix for them is unmerged |
+| D3 | P1 | **Fixed upstream.** [`xrpl-dev-portal#3923`](https://github.com/XRPLF/xrpl-dev-portal/pull/3923) merged 2026-09-16, and the three outcomes are now in the standard (`tecEXPIRED` in 65.1.4 §3.3.2, `tecTOO_SOON` in 65.1.4 §3.5 and 66.1.2 §3.2) | XLS-65, docs | Three `tec` outcomes that gate the lifecycle are absent from XLS-65, and the docs fix for them is unmerged |
 | D4 | P1 | NEW | xrpl-dev-portal | The faucets list still advertises a Lending Devnet whose hostnames do not resolve |
 | D5 | P1 | NEW | XLS-65 §3.9.1 | `vault_info`'s documented request parameter name is wrong |
 | D6 | P1 | NEW | XLS-65 §4.2 | `vault_list` is fully specified with three worked examples and unimplemented on both rippled and Clio |
 | D7 | P1 | NEW | xrpl-dev-portal | The canonical ledger-entry short-names table omits `Vault`, `Loan` and `LoanBroker` |
-| **D9** | **P1** | **NEW — settled by experiment** (was P2) | `XRPL-Standards#587` §7 | The draft and the implementation disagree about the loan-maturity buffer, and the draft is the one that is wrong |
+| **D9** | **P1** | **Fixed upstream, 2026-09-15** (`#587`; was settled by experiment, P2 then P1). 66.1.2 now names `LOAN_REDEMPTION_BUFFER` = 60 and requires `StartDate + (PaymentInterval × PaymentTotal) + LOAN_REDEMPTION_BUFFER <= RedemptionDate`, as the implementation does | `XRPL-Standards#587` §7 | The draft and the implementation disagree about the loan-maturity buffer, and the draft is the one that is wrong |
 | L8 | P2 | Already reported (`xrpl-py#978`) | xrpl-py | `get_amount_value()` returns `float` in a library whose Number fields carry 19 significant digits |
 | L9 | P2 | Already reported (`xrpl.js#3154`) | xrpl.js | `DEFAULT` fields typed as required; a defaulted loan deletes four of them |
 | L10 | P2 | NEW | xrpl.js 5.2.0 | `Loan.OverpaymentFee` typed as a string in the ledger model; the wire type is `UInt32` |
 | L11 | P2 | Specified but unmerged (`xrpl.js#3229`, `#2683`, `#2597`, `xrpl-py#899`) | both libraries | No custom-definitions API on the high-level client, which is what you need precisely when the release lags the network |
 | L12 | P2 | NEW | xrpl.js 5.2.0 | The library writes to the console on the success path, and the vendor's own tutorial monkey-patches it away |
-| L13 | P2 | Specified but unmerged (`xrpl.js#3430`) | xrpl.js | `VaultCreate` autofill charges the owner reserve and bypasses `maxFeeXRP` |
+| L13 | P2 | **Merged upstream, 2026-09-24** ([`xrpl.js#3430`](https://github.com/XRPLF/xrpl.js/pull/3430), "fix: use base fee for VaultCreate autofill") | xrpl.js | `VaultCreate` autofill charges the owner reserve and bypasses `maxFeeXRP` |
 | U6 | P2 | NEW | xrpl.js | A `tem`/`tel` rejection throws an error carrying no structured result; three failure layers surface three different ways |
 | U7 | P2 | NEW | xrpl.js | Client-side validators disagree with the server and cannot be bypassed through the supported API |
 | U8 | P2 | NEW | rippled | The protocol's minimum feedback loop is about three minutes and there is no way to shorten it on a test network |
@@ -152,7 +153,7 @@ live trackers that morning; §13 lists what moved.
 | U10 | P2 | NEW; the `VaultID` sub-case is `XRPL-Standards#497` + `rippled#6528` | XLS-66 / xrpl.js | One transaction, three field-shape conventions, and two write-once fields behind an undifferentiated error |
 | M4 | P2 | Partially tracked (`XRPL-Standards#623`, closed unmerged) | XLS-66, rippled API | XLS-66's two statements of the cover-liquidation formula disagree, and no read API previews it |
 | D8 | P2 | NEW | XLS-66 §3.11.1 | `LoanPay` is given transaction type 83; it is 84 |
-| D10 | P2 | Partially tracked (`XRPL-Standards#616`, `#555`) | XLS-65, XLS-66 | Twelve Invariants sections, plus XLS-65's Rationale and Security Considerations, are `TBD` |
+| D10 | P2 | Partially tracked: [`XRPL-Standards#555`](https://github.com/XRPLF/XRPL-Standards/pull/555) merged 2026-09-14; [`#616`](https://github.com/XRPLF/XRPL-Standards/pull/616) still open | XLS-65, XLS-66 | Twelve Invariants sections, plus XLS-65's Rationale and Security Considerations, are `TBD` |
 | **D11** | **P1** | **NEW** | XLS-65, XLS-66, docs | Both standards state the arithmetic completely and evaluate none of it. No number appears anywhere, and a rule nobody has evaluated reads as a rule with no consequences |
 | **M5** | **P1** | **NEW — found while building** | rippled | A LoanBroker's action history cannot be reconstructed by filtering: `LoanManage` names no broker and an impairment does not touch the broker object, so impairments vanish and the consumer cannot tell |
 | W1–W3 | — | **Withdrawn** | — | See §10 |
@@ -2080,6 +2081,22 @@ Beyond those two, re-verification changed eight more findings and we have marked
 
 No finding in this document failed to reproduce on the 2026-09-12 toolchain. The three that did not
 reproduce were withdrawn before submission and are in §10, with the reasoning intact.
+
+**Upstream since the event (added 2026-10-13).** Every upstream issue and pull request cited in §3 was
+re-read on GitHub on 2026-10-13. Seven rows moved; the others are unchanged.
+
+| ID | Status at the event | Status on 2026-10-13 |
+|---|---|---|
+| D1 | Specified but unmerged / partially tracked | Merged upstream, 2026-09-15 (`XRPL-Standards#587`), with all three of the notes we left on it ([our notes](https://github.com/XRPLF/XRPL-Standards/pull/587#issuecomment-5655843515), [the author's reply](https://github.com/XRPLF/XRPL-Standards/pull/587#issuecomment-5665157387)). `#636` restructured it on 2026-09-25 as `65.1.4-closed-ended-vault.md` and `66.1.2-closed-ended-loan-gates.md` |
+| D9 | NEW, settled by experiment | Fixed upstream, 2026-09-15: 66.1.2 §3.1 names `LOAN_REDEMPTION_BUFFER` = 60, and §3.2.1 rejects `StartDate + (PaymentInterval × PaymentTotal) + LOAN_REDEMPTION_BUFFER > RedemptionDate` |
+| X1 | Previously raised, closed untriaged (`rippled#6487`) | Unchanged, plus: our follow-up `rippled#8222` was moved on 2026-09-14 by Mayukha Vadari (Ripple) to `xrpl-dev-portal#3926`, renamed "Add clarification to docs on PreviousFields metadata rules" (open) |
+| D2 | NEW | Partly fixed upstream, 2026-09-16 (`xrpl-dev-portal#3923`): four of our five proposed fixes are in the JS sample; the `TransactionResult` guard is not |
+| D3 | Partially tracked (`xrpl-dev-portal#3923`) | Fixed upstream: `#3923` merged 2026-09-16, and the three outcomes are in the standard (`tecEXPIRED` in 65.1.4 §3.3.2, `tecTOO_SOON` in 65.1.4 §3.5 and 66.1.2 §3.2) |
+| L13 | Specified but unmerged (`xrpl.js#3430`) | Merged upstream, 2026-09-24, "fix: use base fee for VaultCreate autofill" |
+| D10 | Partially tracked (`#616`, `#555`) | `#555` merged 2026-09-14; `#616` still open |
+
+`#587` itself merged `XLS-draft-closed-ended-vault/README.md` and edits to XLS-65 and XLS-66; the two
+numbered files above come from `#636`.
 
 ---
 
