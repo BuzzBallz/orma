@@ -350,6 +350,7 @@ GET  /api/health
 GET  /api/vaults
 GET  /api/vaults/:vaultId
 GET  /api/vaults/:vaultId/nav
+GET  /api/vaults/:vaultId/nav-history
 GET  /api/vaults/:vaultId/collateral
 GET  /api/vaults/:vaultId/broker-history
 GET  /api/vaults/:vaultId/gate

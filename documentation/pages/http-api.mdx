@@ -168,6 +168,7 @@ fields may be added, nothing may ever be renamed, retyped or removed.
 | `GET /api/vaults` | which facilities are tracked, worst first |
 | `GET /api/vaults/:vaultId` | everything about one facility |
 | `GET /api/vaults/:vaultId/nav` | what is one unit actually worth |
+| `GET /api/vaults/:vaultId/nav-history` | what was one unit worth after each transaction that changed the vault |
 | `GET /api/vaults/:vaultId/gate` | is this facility gated, and by whom |
 | `GET /api/vaults/:vaultId/collateral` | what are the pledged shares worth to a lender |
 | `GET /api/vaults/:vaultId/broker-history` | what did this manager actually do |
@@ -530,6 +531,83 @@ $(51{,}000{,}000 - 10{,}000{,}000) / 51{,}000{,}000 = 0.803922$.
 
 `assessment` is labelled `advisory: true` and can be `null`. The valuation is a measurement, the
 grade is an opinion, and the grade failing to compute must never take the valuation down with it.
+
+---
+
+## GET /api/vaults/:vaultId/nav-history
+
+What one unit of this facility was worth after each transaction that changed it: one point per
+successful transaction that modified the `Vault` while it had shares outstanding, oldest first.
+
+| parameter | in | required | notes |
+|---|---|---|---|
+| `vaultId` | path | yes | 64 hex characters |
+
+Each point is read from that transaction's own metadata, not reconstructed: `AssetsTotal` and
+`LossUnrealized` from the `Vault` node's `FinalFields`, and the shares from the `MPTokenIssuance`
+node when the transaction moved them (between a deposit and a withdrawal the count carries forward).
+The transactions come from `account_tx` on the vault's pseudo-account, which lists the impairments;
+an `account_tx` on the broker's owner does not. The response is cached for 15 seconds, and
+`truncated` is `true` when the vault has 1,000 transactions or more, in which case the oldest are
+missing.
+
+```bash
+curl -s http://localhost:8787/api/vaults/864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835/nav-history
+```
+
+```json
+{
+  "serverTime": "2026-10-13T12:41:50Z",
+  "ledgerIndex": 6089562,
+  "vaultId": "864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835",
+  "points": [
+    {
+      "at": "2026-09-12T21:05:11Z",
+      "hash": "3ACF03E8E5E68CD30814694CC7CD5C4BBE67E2EA396EF61EA8C756063892AA8C",
+      "kind": "deposit",
+      "navNaive": "1.000000",
+      "navCorrect": "1.000000",
+      "assetsTotal": "51000000",
+      "lossUnrealized": "0",
+      "sharesOutstanding": "51000000"
+    },
+    {
+      "at": "2026-09-12T21:05:32Z",
+      "hash": "1523BD1B1548A01B46AAA88871EA965EE973BFA7016D7B8ACC950E463567AA4A",
+      "kind": "loan",
+      "navNaive": "1.000000",
+      "navCorrect": "1.000000",
+      "assetsTotal": "51000000",
+      "lossUnrealized": "0",
+      "sharesOutstanding": "51000000"
+    },
+    {
+      "at": "2026-09-12T21:07:52Z",
+      "hash": "075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3",
+      "kind": "impair",
+      "navNaive": "1.000000",
+      "navCorrect": "0.803922",
+      "assetsTotal": "51000000",
+      "lossUnrealized": "10000000",
+      "sharesOutstanding": "51000000"
+    }
+  ],
+  "truncated": false
+}
+```
+
+The third point is the first impairment. Its `Vault` node has an empty `PreviousFields`, so a
+metadata diff sees nothing, but its `FinalFields` carry `LossUnrealized` and the two NAVs part:
+1.000000 reported, 0.803922 held. `kind` names the transaction: `create`, `deposit`, `withdraw`,
+`clawback`, `update`, `loan`, `payment`, `loan_closed`, and for a `LoanManage` the flag it set,
+`impair`, `unimpair` or `default`.
+
+<Warning>
+The series is only as long as the history the server still holds. Devnet prunes old ledgers (on
+13 October 2026 one public server's oldest had closed on 10 September), so for the facilities created at
+the event the earliest points will drop out and the series will then be empty. The three transactions
+above are archived in `evidence/devnet-tx/` and verify offline with `npm run check:evidence`.
+</Warning>
 
 ---
 
