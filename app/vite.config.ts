@@ -15,7 +15,7 @@ import { defineConfig } from 'vite'
  * that address. Any other deploy uses its own hostname, and a local build falls back to
  * the dev server so the tag is never left holding an unreplaced token.
  */
-const PRODUCTION_ORIGIN = 'https://ormaprotocol.vercel.app'
+const PRODUCTION_ORIGIN = 'https://ormaprotocol.com'
 
 function siteOrigin(): string {
   const explicit = process.env.VITE_SITE_ORIGIN
