@@ -32,6 +32,7 @@ const TERMS: [RegExp, string][] = [
   // Amounts arrive denominated; the note states the reporting currency once, in the
   // methodology, rather than repeating a ticker against every figure.
   [/\s*\bXRP\b/g, ''],
+  [/\bFirstComeFirstServe\b/g, 'first come, first served'],
   [/\bon-chain\b/gi, 'reported'],
   [/\bledger\b/gi, 'register'],
 ]
@@ -39,6 +40,11 @@ const TERMS: [RegExp, string][] = [
 /** Apply to every backend-owned string before it reaches the screen. */
 export function creditText(s: string): string {
   return TERMS.reduce((acc, [re, to]) => acc.replace(re, to), s)
+}
+
+/** For a backend string that opens a sentence: creditText can leave it in lower case. */
+export function sentence(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
 /** Outlook, derived from the trend the backend actually sends. Never decorative. */

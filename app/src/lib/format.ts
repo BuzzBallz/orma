@@ -54,17 +54,39 @@ function padDp(s: string, dp: number): string {
 /** [CONTRACT §6] drops -> XRP. "51000000" -> "51.000000" ; "1" -> "0.000001" */
 export function dropsToXrp(drops: string): string { return padDp(shift(drops, -6), 6) }
 
+/** "10.000000" -> "10", "0.500000" -> "0.5": the padding after the point is not a figure. */
+export function trimZeros(full: string): string {
+  const { neg, int, frac } = split(full)
+  const f = frac.replace(/0+$/, '')
+  return (neg ? '-' : '') + int + (f ? '.' + f : '')
+}
+
+/**
+ * An amount with a run of zeros as a significand and an exponent: "1000000" -> 1 x 10^6,
+ * "0.000001" -> 1 x 10^-6. Exact: only zeros are dropped. Null when there is nothing to
+ * save: the padding after the point is not a run, and a significand that still holds one
+ * ("5000.25") is no cleaner than the number.
+ */
+export function compact(full: string): { mantissa: string; exp: number } | null {
+  const { neg, int, frac } = split(full)
+  const all = int + frac.replace(/0+$/, '')
+  if (!/0{3,}/.test(all)) return null
+  const first = all.search(/[1-9]/)
+  if (first < 0) return null
+  const sig = all.slice(first).replace(/0+$/, '')
+  const mantissa = (neg ? '-' : '') + sig[0] + (sig.length > 1 ? '.' + sig.slice(1) : '')
+  if (/0{3,}/.test(mantissa)) return null
+  return { mantissa, exp: int.length - 1 - first }
+}
+
+/** A plotted position as an axis label, rounded half-up to `dp` places. */
+export function axisLabel(v: number, dp = 2): string { return padDp(String(v), dp) }
+
 /** [CONTRACT §6] ratio string -> percent, 2dp. "0.8039" -> "80.39%" */
 export function ratioToPct(r: string): string { return padDp(shift(r, 2), 2) + '%' }
 
 /** [CONTRACT §6] 1e-5 rate -> percent, 3dp. 10000 -> "10.000%" ; 1000 -> "1.000%" */
 export function rateToPct(rate: number): string { return padDp(shift(String(rate), -3), 3) + '%' }
-
-/** [CONTRACT §6] negative -> "overdue 7m 00s" ; positive -> "in 2m 13s" */
-export function formatCountdown(seconds: number): string {
-  const late = seconds < 0
-  return (late ? 'overdue ' : 'in ') + duration(Math.abs(Math.trunc(seconds)))
-}
 
 /** bare duration, no prefix. 86100 -> "23h 55m 00s" ; 742 -> "12m 22s" */
 export function duration(absSeconds: number): string {

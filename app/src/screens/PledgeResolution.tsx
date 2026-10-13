@@ -1,5 +1,6 @@
 import type { Resolution } from '../lib/types'
 import { dropsToXrp } from '../lib/format'
+import { Exhibit } from '../components/Exhibit'
 
 /**
  * EXHIBIT 5 — what a second lender can establish from the units alone.
@@ -29,10 +30,9 @@ export function PledgeResolution({ r }: { r: Resolution | null }) {
   const pledge = nav?.pledge ?? r.pledge
 
   return (
-    <section className="op-sec">
-      <h3 className="op-h">Exhibit 5 · What a second lender can establish alone</h3>
-
-      <table className="op-tbl" style={{ marginTop: 12 }}>
+    <Exhibit title="Exhibit 5 · What a second lender can establish alone">
+      <div className="tbl-wrap">
+      <table className="op-tbl">
         <thead><tr><th>Step</th><th>Result</th></tr></thead>
         <tbody>
           {r.steps.map((s, i) => (
@@ -40,33 +40,35 @@ export function PledgeResolution({ r }: { r: Resolution | null }) {
               <td><b>{s.step}</b></td>
               <td className="op-says">
                 <span className={s.ok ? 'res-ok' : 'res-no'}>{s.ok ? 'yes' : 'no'}</span>
-                {s.detail ? <> — {s.detail}</> : null}
+                {s.detail ? <> · {s.detail}</> : null}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+      </div>
 
       {r.opaque && (
-        <p className="caption meth res-verdict">
+        <p className="caption res-verdict">
           The units carry nothing readable. A lender would have to price them on the
           borrower's word.
         </p>
       )}
 
       {conf && !conf.conformant && (
-        <p className="caption meth">
+        <p className="caption">
           The instrument does not meet the discovery standard
-          {conf.missing.length ? <> — missing {conf.missing.join(', ')}</> : null}. It is still
+          {conf.missing.length ? <>: missing {conf.missing.join(', ')}</> : null}. It is still
           readable, but catalogues and explorers are not obliged to list it.
         </p>
       )}
 
-      {conf?.taxonomyNote && <p className="caption meth">{conf.taxonomyNote}</p>}
+      {conf?.taxonomyNote && <p className="caption">{conf.taxonomyNote}</p>}
 
       {pledge && (
         <>
-          <table className="op-tbl" style={{ marginTop: 14 }}>
+          <div className="tbl-wrap">
+          <table className="op-tbl">
             <thead>
               <tr><th>A pledge of {SAMPLE_UNITS.toLocaleString()} units</th><th className="rt">XRP</th><th>Basis</th></tr>
             </thead>
@@ -88,16 +90,17 @@ export function PledgeResolution({ r }: { r: Resolution | null }) {
               </tr>
             </tbody>
           </table>
-          {pledge.unpriced && <p className="caption meth res-verdict">{pledge.unpriced}</p>}
+          </div>
+          {pledge.unpriced && <p className="caption res-verdict">{pledge.unpriced}</p>}
         </>
       )}
 
       {nav && (
-        <p className="caption meth" style={{ marginTop: 10 }}>
+        <p className="caption">
           Recompute: <b className="num">({dropsToXrp(nav.provenance.assetsTotal)} − {dropsToXrp(nav.provenance.lossUnrealized)}) ÷ {dropsToXrp(nav.provenance.unitsOutstanding)} = {nav.unitValue.held}</b>,
           ledger <b className="num">{nav.ledgerIndex ?? '—'}</b>.
         </p>
       )}
-    </section>
+    </Exhibit>
   )
 }

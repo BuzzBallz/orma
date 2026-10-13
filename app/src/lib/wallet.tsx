@@ -35,11 +35,8 @@ interface Wallet {
   state: WalletState
   network: string
   detected: Record<WalletKind, boolean>
-  /** The kind whose last connect attempt found nothing installed — drives the one banner. */
-  missing: WalletKind | null
   /** Xaman sign-in QR, while that flow is open. */
   qr: string | null
-  dismissMissing: () => void
   /** Opening the dialog is intent to connect: start fetching the toolkit chunk then. */
   prefetch: () => void
   connect: (kind: WalletKind) => Promise<void>
@@ -118,7 +115,6 @@ function useDetected(): Record<WalletKind, boolean> {
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<WalletState>({ status: 'disconnected' })
-  const [missing, setMissing] = useState<WalletKind | null>(null)
   const [qr, setQr] = useState<string | null>(null)
   const detected = useDetected()
   const booted = useRef(false)
@@ -132,11 +128,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }
 
   const onConnect = useCallback((address: string, via: WalletKind) => {
-    setQr(null); setMissing(null)
+    setQr(null)
     setState({ status: 'connected', address, via })
-    toast.success('Signed in', {
-      description: `${shortAddress(address)} · ${WALLETS.find(w => w.kind === via)?.name ?? via}`,
-    })
   }, [])
 
   const onDisconnect = useCallback(() => {
@@ -165,7 +158,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   const connect = useCallback(async (kind: WalletKind) => {
     if (kind === 'xaman' && !XAMAN_CONFIGURED) {
-      setMissing('xaman')
       toast.error('Mobile sign-in is not configured', {
         description: 'This deployment cannot issue a sign-in code. The desktop applications are unaffected.',
       })
@@ -176,8 +168,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const mgr = await getManager(onConnect, onDisconnect)
       // onQRCode is the adapter's own callback: the QR is whatever Xaman minted for this
       // sign-in, never an image we compose ourselves.
-      await mgr.connect(kind, kind === 'xaman' ? { onQRCode: url => setQr(url) } : undefined)
-      // the `connect` event does the rest — one path for a fresh connect and a restore
+      const account = await mgr.connect(kind, kind === 'xaman' ? { onQRCode: url => setQr(url) } : undefined)
+      // The `connect` event sets the state, for a fresh connect and a restore alike. Only a
+      // sign-in the reader asked for is announced: a session brought back on load is silent.
+      toast.success('Signed in', {
+        description: `${shortAddress(account.address)} · ${WALLETS.find(w => w.kind === kind)?.name ?? kind}`,
+      })
     } catch (e) {
       setQr(null)
       setState({ status: 'disconnected' })
@@ -185,7 +181,6 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const name = WALLETS.find(w => w.kind === kind)?.name ?? kind
 
       if (code === 'WALLET_NOT_AVAILABLE' || code === 'WALLET_NOT_INSTALLED' || code === 'WALLET_NOT_FOUND') {
-        setMissing(kind)
         toast.error(`${name} is not available here`, {
           description: 'Install it and reload, or continue as view only.',
         })
@@ -195,8 +190,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         toast.error('Request declined', { description: `${name} closed without signing in.` })
         return
       }
+      // The adapter's own message is for whoever debugs it, not for the reader of a credit note.
+      console.warn(`${kind} sign-in failed`, e)
       toast.error(`${name} could not sign in`, {
-        description: (e as Error)?.message ?? 'no reason was given',
+        description: 'The application did not accept the request. Try again, or continue as view only.',
       })
     }
   }, [onConnect, onDisconnect])
@@ -208,7 +205,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       return false
     }
     const next: WalletState = { status: 'connected', address: check.address, via: 'read-only' }
-    setState(next); remember(next); setMissing(null)
+    setState(next); remember(next)
     toast.success('Reading as view only', { description: shortAddress(check.address) })
     return true
   }, [])
@@ -227,10 +224,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, [onConnect, onDisconnect])
 
   const value = useMemo<Wallet>(() => ({
-    state, network: WALLET_NETWORK, detected, missing, qr,
-    dismissMissing: () => setMissing(null),
+    state, network: WALLET_NETWORK, detected, qr,
     prefetch, connect, connectReadOnly, disconnect,
-  }), [state, detected, missing, qr, prefetch, connect, connectReadOnly, disconnect])
+  }), [state, detected, qr, prefetch, connect, connectReadOnly, disconnect])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

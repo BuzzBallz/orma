@@ -10,12 +10,17 @@ import { defineConfig } from 'vite'
  * and this project has no fixed hostname: every preview deploy gets its own. So the
  * deployment stamps itself at build time instead of us hard-coding a URL that would be
  * correct on exactly one deploy and stale on all the others. VITE_SITE_ORIGIN wins if it
- * is set, Vercel's own hostname is used when it is not, and a local build falls back to
+ * is set. The production deployment is announced at one address, which Vercel's own
+ * production hostname is not (it names the project's first domain), so production stamps
+ * that address. Any other deploy uses its own hostname, and a local build falls back to
  * the dev server so the tag is never left holding an unreplaced token.
  */
+const PRODUCTION_ORIGIN = 'https://ormaprotocol.vercel.app'
+
 function siteOrigin(): string {
   const explicit = process.env.VITE_SITE_ORIGIN
   if (explicit) return explicit.replace(/\/+$/, '')
+  if (process.env.VERCEL_ENV === 'production') return PRODUCTION_ORIGIN
   const host = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL
   if (host) return `https://${host.replace(/^https?:\/\//, '').replace(/\/+$/, '')}`
   return 'http://localhost:5173'

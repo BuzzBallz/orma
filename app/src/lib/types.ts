@@ -66,7 +66,7 @@ export interface Loan {
 export interface PhaseInfo {
   phase: Phase; canDeposit: boolean; canWithdraw: boolean
   withdrawBlockedReason: string | null
-  nextBoundaryAt: string; secondsToNextBoundary: number
+  nextBoundaryAt: string | null; secondsToNextBoundary: number   // NULL in the last period
   claimsAtRedemption: string; liquidityAtRedemption: string
   projectedShortfall: string; shortfallPct: string
 }
@@ -267,6 +267,19 @@ export interface Resolution extends Stamped {
 // Read off the SHARE ISSUANCE, not the facility record: the domain reference does not
 // live on the facility itself, so the obvious lookup reads like "open to everyone".
 export interface AcceptedCredential { issuer: string; type: string | null; typeHex: string | null }
+
+// --- the NAV through time ----------------------------------------------------
+// One point per transaction that modified the vault, each read from that transaction's own
+// metadata. Between two points nothing can change the NAV, so the last one stands until now.
+export interface NavPoint {
+  at: string | null; hash: string | null
+  /** deposit | withdraw | loan | payment | impair | unimpair | default | clawback | ... */
+  kind: string
+  navNaive: string; navCorrect: string
+  assetsTotal: string; lossUnrealized: string; sharesOutstanding: string
+}
+
+export interface NavHistory extends Stamped { vaultId: string; points: NavPoint[]; truncated: boolean }
 
 export interface Gate extends Stamped {
   vaultId: string

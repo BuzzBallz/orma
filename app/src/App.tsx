@@ -1,181 +1,77 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, type ReactNode } from 'react'
 import './app.css'
 import { API_MIXED_ORIGIN, SUSPECT_AFTER_FAILS, SUSPECT_BACKOFF_MS } from './lib/api'
 import { usePoll } from './lib/usePoll'
 import { facilityName } from './lib/credit'
-import { useTick } from './lib/useTick'
-import { useRoute, type RoutePath } from './lib/useRoute'
-import type { BrokerHistory, Collateral, Gate, Health, IndexerRace, OracleContest, Resolution, VaultDetail as Detail, VaultsResponse } from './lib/types'
+import { follow, useRoute, type RoutePath } from './lib/useRoute'
+import type { BrokerHistory, Collateral, Gate, Health, IndexerRace, NavHistory, OracleContest, Resolution, VaultDetail as Detail, VaultsResponse } from './lib/types'
 import { HeaderBar } from './components/HeaderBar'
+import { Footer } from './components/Footer'
 import { StaleBar } from './components/StaleBar'
+import { FacilityPicker } from './components/VaultPicker'
 import { Portfolio } from './screens/Portfolio'
-import { Facility, Ladder } from './screens/Facility'
-import { Event } from './screens/Event'
+import { Facility, FacilityPlaceholder } from './screens/Facility'
+import { Event, EventPlaceholder } from './screens/Event'
 import { Methodology } from './screens/Methodology'
 import { Evidence } from './screens/Evidence'
-import { Tabs, TabsContent } from '@/components/ui/tabs'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Toaster } from '@/components/ui/sonner'
 import { toast } from 'sonner'
-import { WALLETS, WalletProvider, useWallet } from './lib/wallet'
-import { ArrowLeft, KeyRound } from 'lucide-react'
+import { WalletProvider } from './lib/wallet'
+import { ArrowLeft } from 'lucide-react'
 
 const POLL_MS = 3000
 
 /**
- * The note beside the screen when there is nothing to put on it. It states what is known
- * and what is missing, in the same language as the rest of the service — never a spinner,
- * never a placeholder figure.
+ * The note on a desk with nothing to put on it. It states what is known and what is
+ * missing, in the same language as the rest of the service — never a spinner, never a
+ * placeholder figure.
  */
-function Note({ heading, tone, said, aside, facts, action }: {
-  heading: string; tone: string
-  said: React.ReactNode; aside?: React.ReactNode
-  facts: [string, React.ReactNode][]
-  action?: React.ReactNode
+function Note({ heading, watch, said, facts, onBack }: {
+  heading: string; watch?: boolean; said: ReactNode
+  facts: [string, ReactNode][]
+  onBack: () => void
 }) {
   return (
-    <Card className="panel watch rail" style={{ ['--status-tone' as string]: tone }}>
-      <CardHeader className="rail-head">
-        <span className="rail-dot" aria-hidden />
-        <CardTitle className="rail-code">{heading}</CardTitle>
-      </CardHeader>
-      <CardContent className="rail-body">
-        <p className="said">{said}</p>
-        {aside && <p className="said">{aside}</p>}
-        {action}
+    <div className={'state' + (watch ? ' state-watch' : '')}>
+      <h2 className="t-heading-s">{heading}</h2>
+      <p className="t-body-s dim">{said}</p>
+      <a className="lnk" href="/" onClick={e => follow(e, onBack)}>
+        <ArrowLeft size={16} strokeWidth={1.75} aria-hidden /> Portfolio
+      </a>
+      {facts.length > 0 && (
         <dl className="facts">
           {facts.map(([k, v]) => (
-            <div key={k} style={{ display: 'contents' }}>
-              <dt className="label">{k}</dt>
-              <dd>{v}</dd>
-            </div>
+            <div key={k}><dt>{k}</dt><dd>{v}</dd></div>
           ))}
         </dl>
-      </CardContent>
-    </Card>
-  )
-}
-
-/** /facility with nothing selected: the shape of the note, with every field held open. */
-/** One held-open rail row. */
-function Slot({ k }: { k: string }) {
-  return (
-    <div className="kv">
-      <dt className="label">{k}</dt>
-      <dd className="num mute">n.a.</dd>
+      )}
     </div>
   )
 }
 
-/**
- * The credit opinion with every field held open.
- *
- * It used to be a different document: one narrow column of dashes beside a red banner
- * announcing the state. But a reader arriving at a withheld desk should be looking at the
- * shape figures will arrive into, not at a notice — and the state is already said once, in
- * the chrome, which is where it belongs. So this is the same two columns, the same four
- * rail blocks, in the same order, reading n.a. and em-dash throughout.
- */
-function FacilityPlaceholder({ name, said }: { name?: string; said?: React.ReactNode }) {
-  return (
-    <article className="opinion">
-      <div className="op-page">
-        <header className="op-top">
-          <div className="op-kind">
-            <span className="label">Credit Opinion</span>
-            <span className="op-date">—</span>
-          </div>
-          <h1 className="op-title mute">{name ?? '—'}</h1>
-          <p className="op-sub">Lending facility · — · internal score — · outlook —</p>
-        </header>
-
-        <div className="op-grid">
-          <div className="op-main">
-            <section className="op-sec" data-sec="summary">
-              <h3 className="op-h">Summary</h3>
-              <p>{said ?? <>No figure is shown until one is received.</>}</p>
-            </section>
-          </div>
-
-          <aside className="op-side">
-            <div className="op-box">
-              <div className="label">Ratings</div>
-              <dl className="op-ratings">
-                <Slot k="Internal Score" /><Slot k="Outlook" />
-                <Slot k="Status" /><Slot k="Scored At" />
-              </dl>
-            </div>
-
-            {/* The scale is part of the document, so it is drawn here too — extinguished,
-                and reading an em-dash. Leaving it out would make the withheld desk a
-                different shape from the one figures arrive into; filling it would invent
-                a grade. */}
-            <div className="op-box op-scale"><Ladder /></div>
-
-            <div className="op-box">
-              <div className="label">At a Glance</div>
-              <dl className="op-ratings">
-                <Slot k="Reported" /><Slot k="Held" /><Slot k="Gap" />
-                <Slot k="Coverage" /><Slot k="Remaining Term" /><Slot k="Exposures" />
-              </dl>
-            </div>
-
-            <div className="op-box">
-              <div className="label">Next Event</div>
-              <dl className="op-ratings">
-                <Slot k="Nothing on file" /><Slot k="Due" />
-              </dl>
-            </div>
-          </aside>
-        </div>
-      </div>
-    </article>
-  )
-}
-
-/** /event with nothing selected. */
-function EventPlaceholder() {
-  return (
-    <section className="panel ghost-desk rail slotdesk">
-      <h2 className="panel-title">Next Event</h2>
-      <div className="slot-big">
-        <span className="slot-dash">—</span>
-        <span className="slot-say">no scheduled event on file</span>
-      </div>
-      {/* The calendar's own shape, held open. This was four bullets with a dot in front
-          of each, which looked like a feature list rather than like the table figures
-          arrive into. Same two columns as the real calendar; the dates are em-dashes
-          because there are no dates. */}
-      <div className="tbl-scroll">
-        <table className="tbl">
-          <thead>
-            <tr><th>Event</th><th className="rt">Date</th></tr>
-          </thead>
-          <tbody>
-            {['Scheduled payment', 'Period boundary', 'Redemption date', 'Review date'].map(k => (
-              <tr key={k}>
-                <td className="mute">{k}</td>
-                <td className="rt num mute">—</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  )
-}
-
 function Desk() {
-  const tick = useTick()
   const { path, vaultId, navigate } = useRoute()
+
+  // A desk rises into place when a reader clicks to it, but not on the first paint and
+  // not when the keyboard took them there: a shortcut is used too often to be animated.
+  const quiet = useRef(true)
+  const go = useCallback((p: RoutePath, id?: string | null) => {
+    quiet.current = false
+    navigate(p, id)
+  }, [navigate])
+  // Back and forward are the browser's own navigation, often a key or an edge swipe that
+  // already animates: the desk they land on stays still. Capture phase, so this runs before
+  // the router's own listener, whose state update React renders before the next listener.
+  useEffect(() => {
+    const still = () => { quiet.current = true }
+    addEventListener('popstate', still, true)
+    return () => removeEventListener('popstate', still, true)
+  }, [])
 
   const slow = API_MIXED_ORIGIN
     ? { slowAfter: SUSPECT_AFTER_FAILS, slowCapMs: SUSPECT_BACKOFF_MS }
     : undefined
-  const wallet = useWallet()
   const health = usePoll<Health>('/api/health', 5000, slow)
   const vaults = usePoll<VaultsResponse>('/api/vaults', path === '/' ? POLL_MS : 15000, slow)
   const detail = usePoll<Detail>(vaultId ? `/api/vaults/${vaultId}` : null, POLL_MS, slow)
@@ -186,10 +82,11 @@ function Desk() {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const t = e.target as HTMLElement | null
-      if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.closest('[data-picker]'))) return
+      if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.closest('[data-picker], [role="dialog"]'))) return
       if (e.metaKey || e.ctrlKey || e.altKey) return
       const n = Number(e.key)
       if (n >= 1 && n <= 5 && rows[n - 1]) {
+        quiet.current = true
         navigate(path === '/' ? '/facility' : path, rows[n - 1].vaultId)
         return
       }
@@ -197,15 +94,13 @@ function Desk() {
         p: '/', f: '/facility', e: '/event', m: '/methodology', v: '/evidence',
       }
       const r = routes[e.key.toLowerCase()]
-      if (r) navigate(r)
+      if (r) { quiet.current = true; navigate(r) }
     }
     addEventListener('keydown', onKey)
     return () => removeEventListener('keydown', onKey)
   }, [rows, path, navigate])
 
-  // A finished capture, not a moving figure: fetch it only while its tab is open and
-  // do not re-ask every four seconds. null path means usePoll stays idle.
-  // Exhibits 3 and 4. Fetched only on the facility tab and only once a facility is
+  // Exhibits 3 and 4. Fetched only on the facility desk and only once a facility is
   // chosen, and slowly: a manager's track record is history, not a live figure. A 404
   // here (no manager, no pledges) is a normal state, so usePoll keeps data null and the
   // exhibits omit themselves rather than rendering an error into a credit opinion.
@@ -221,6 +116,9 @@ function Desk() {
   const resolution = usePoll<Resolution>(
     shareId ? `/api/mpt/${shareId}/resolve?units=1000000` : null, 60000)
   const collateral = usePoll<Collateral>(collPath, 20000)
+  // The NAV at each transaction that modified the vault. Ledger history, so slow; an older
+  // server without the route answers 404 and the desk simply omits the chart.
+  const navHist = usePoll<NavHistory>(path === '/facility' && vaultId ? `/api/vaults/${vaultId}/nav-history` : null, 30000)
   // An admission rule changes when its owner edits it, not every four seconds.
   const gate = usePoll<Gate>(path === '/facility' && vaultId ? `/api/vaults/${vaultId}/gate` : null, 30000)
 
@@ -231,17 +129,19 @@ function Desk() {
   const contest = usePoll<OracleContest>(path === '/facility' ? '/api/oracle-aggregate' : null, 60000)
 
   const primary = path === '/' ? vaults : detail
-  // The verification screen is not scoped to a facility, so it has no detail payload to
-  // date itself from, and the header read "figures received" with no as-of beside it --
-  // which invites exactly the question that screen exists to answer. The capture carries
-  // its own stamp, so use it.
-  //
-  // Only for the DATE. Staleness deliberately still comes from `primary`: a capture is a
-  // fixed historical artifact polled every 30s, so routing staleness through it would
-  // post a permanent "received 12s ago" warning over a transaction that is not going to
-  // change. Stale means a live figure stopped arriving. This one already arrived.
+  // The verification screen is not scoped to a facility, so it dates itself from its own
+  // capture. Only the DATE: staleness still comes from `primary`, because a capture is a
+  // fixed historical artifact and "stale" means a live figure stopped arriving.
   const stamp = path === '/' ? vaults.data : path === '/evidence' ? race.data : detail.data
   const notFound = detail.code === 'VAULT_NOT_FOUND'
+  // usePoll keeps the last good payload across a path change, so `detail.data` can still be
+  // the previous facility's while this one is in flight. A desk draws a payload only when
+  // it names the facility in the address bar, never one facility's figures under another's.
+  const own = detail.data && vaultId && detail.data.vault.vaultId.toUpperCase() === vaultId.toUpperCase()
+    ? detail.data : null
+  // A facility still in flight: after a click its frame is held invisible for a moment
+  // (app.css, .enter[data-wait]), so a quick answer enters once instead of replacing it mid-rise.
+  const waiting = (path === '/facility' || path === '/event') && !!vaultId && !own
 
   const wasWithheld = useRef(false)
   useEffect(() => {
@@ -252,181 +152,124 @@ function Desk() {
     }
   }, [vaults.fails, vaults.data])
 
-  const [dressed, setDressed] = useState(false)
-  useEffect(() => {
-    const idle = window.requestIdleCallback ?? ((f: () => void) => setTimeout(f, 200) as unknown as number)
-    const id = idle(() => setDressed(true))
-    return () => {
-      if (window.cancelIdleCallback) window.cancelIdleCallback(id as number)
-      else clearTimeout(id as unknown as ReturnType<typeof setTimeout>)
-    }
-  }, [])
-
-  const painted = useRef(false)
-  useEffect(() => { painted.current = true }, [])
+  const select = (id: string) => go(path === '/' || path === '/evidence' ? '/facility' : path, id)
+  const back = () => go('/', null)
+  // On a phone the masthead has no room for the picker, so the two desks that cover one
+  // facility carry it at their head instead.
+  const picker = <FacilityPicker vaults={rows} activeVaultId={vaultId} onSelect={select} variant="block" />
 
   function body() {
     if (path === '/evidence') {
-      // The capture is not facility-scoped, so the page takes its title from whichever
-      // facility the picker is holding. With none chosen it falls back to naming the
-      // finding rather than borrowing a name the record never claimed.
       // The capture names its own facility, so nothing here does. Passing the picked
       // facility's name put one facility's name over another's figures.
       return <Evidence d={race.data} />
     }
 
-    if (path === '/methodology') {
-      return <Methodology />
-    }
+    if (path === '/methodology') return <Methodology />
 
     if (path === '/') {
-      if (!vaults.data) {
-        return (
-          // No banner. The chrome reads "As of — Withheld" already, and a red heading
-          // beside a blotter of em-dashes was the same fact a second time in 36px.
-          <Portfolio
-            vaults={[]} receivedAt={0} tick={tick}
-            onOpen={() => navigate('/facility', null)}
-          />
-        )
-      }
+      // With nothing received the same page is drawn, reading em-dash; the masthead
+      // already says the figures are withheld.
       return (
         <Portfolio
-          vaults={rows} receivedAt={vaults.receivedAt} tick={tick}
-          onOpen={id => navigate('/facility', id)}
+          vaults={rows} received={vaults.data !== null} asOf={vaults.data?.serverTime ?? null}
+          onOpen={id => go('/facility', id)} onNavigate={go}
         />
       )
     }
 
+    const Placeholder = path === '/facility' ? FacilityPlaceholder : EventPlaceholder
+
     if (!vaultId) {
       return (
-        <div className="deskgrid">
-          {path === '/facility' ? <FacilityPlaceholder /> : <EventPlaceholder />}
+        <Placeholder picker={picker}>
           <Note
-            heading="No facility selected" tone="var(--fg-dim)"
+            heading="No facility selected"
             said={path === '/facility'
               ? <>A credit opinion covers one facility. Choose one from the portfolio.</>
               : <>The calendar covers one facility. Choose one from the portfolio.</>}
-            action={
-              <Button variant="outline" size="sm" className="btn-term" onClick={() => navigate('/', null)}>
-                <ArrowLeft size={12} strokeWidth={2.25} /> Portfolio
-              </Button>}
             facts={rows.length ? [['Facilities on File', String(rows.length)]] : []}
+            onBack={back}
           />
-        </div>
+        </Placeholder>
       )
     }
 
-    if (notFound && !detail.data) {
+    if (notFound && !own) {
       return (
-        <div className="deskgrid">
-          {path === '/facility' ? <FacilityPlaceholder /> : <EventPlaceholder />}
+        <Placeholder picker={picker}>
           <Note
-            heading="Not on file" tone="var(--warn)"
+            heading="Not on file" watch
             said={<>No facility on file under that reference.</>}
-            action={
-              <Button variant="outline" size="sm" className="btn-term" onClick={() => navigate('/', null)}>
-                <ArrowLeft size={12} strokeWidth={2.25} /> Portfolio
-              </Button>}
             facts={[['Reference', vaultId.slice(0, 12).toUpperCase()]]}
+            onBack={back}
           />
-        </div>
+        </Placeholder>
       )
     }
 
-    if (!detail.data) {
-      if (detail.fails === 0) return null
-      // No banner. The chrome already reads "As of — Withheld", and a red heading beside
-      // a page of em-dashes was the same fact a third time. The desk shows the shape the
-      // figures will arrive into and says, once, why it is empty.
-      if (path === '/facility') {
-        // The blotter already knows this facility's name even while its detail is
-        // unreachable, so the page can be headed properly instead of by an em-dash.
-        const known = rows.find(r => r.vaultId === vaultId)
-        return (
-          <FacilityPlaceholder
-            name={known ? facilityName(known) : undefined}
-            said={<>This facility is on file. No figure is shown until one is received.</>}
-          />
-        )
-      }
-      // Same reasoning as the facility desk: the chrome says it once, and the calendar
-      // shows the shape the dates will arrive into.
-      return <EventPlaceholder />
+    if (!own) {
+      // The blotter already knows this facility's name even while its detail is in
+      // flight or unreachable, so the page can be headed properly instead of by an
+      // em-dash. Still waiting draws the desk's shape alone; only a failure says why.
+      const known = rows.find(r => r.vaultId === vaultId)
+      return (
+        <Placeholder name={known ? facilityName(known) : undefined} picker={picker}>
+          {detail.fails > 0 && <p className="t-body-m dim">This facility is on file. No figure is shown until one is received.</p>}
+        </Placeholder>
+      )
     }
 
     if (path === '/facility') {
       // usePoll deliberately keeps the last good payload across a path change, so that a
-      // blip never blanks the figures. For these two exhibits that same behaviour would
+      // blip never blanks the figures. For these exhibits that same behaviour would
       // attribute one facility's manager -- and their conduct grade -- to the next
       // facility opened, for as long as the new request is in flight. So each exhibit is
       // shown only when the payload identifies ITSELF as belonging to this facility.
-      // Matching on the payload's own id is stronger than matching on the url it came
-      // from: it survives a redirect, a cache and a race.
-      const d = detail.data
+      const d = own
       const h = history.data && d.broker && history.data.loanBrokerId === d.broker.loanBrokerId
         ? history.data : null
       const c = collateral.data && d.vault.shareMptId && collateral.data.shareMptId === d.vault.shareMptId
         ? collateral.data : null
-      // Same identity check as the other two exhibits: the resolution must name the
-      // share token this facility actually issues, or it belongs to a different page.
       const rz = resolution.data && d.vault.shareMptId
         && resolution.data.issuanceId?.toUpperCase() === d.vault.shareMptId.toUpperCase()
         ? resolution.data : null
       const gt = gate.data && gate.data.vaultId?.toUpperCase() === d.vault.vaultId.toUpperCase()
         ? gate.data : null
-      return <Facility d={d} history={h} collateral={c} resolution={rz} gate={gt} contest={contest.data} />
+      const nh = navHist.data && navHist.data.vaultId?.toUpperCase() === d.vault.vaultId.toUpperCase()
+        ? navHist.data : null
+      return <Facility d={d} history={h} collateral={c} resolution={rz} gate={gt} contest={contest.data} navHistory={nh} picker={picker} />
     }
-    return <Event d={detail.data} tick={tick} />
+    return <Event d={own} picker={picker} />
   }
 
   return (
     <TooltipProvider delayDuration={250} skipDelayDuration={400}>
-    <Tabs
-      className="tabs-root"
-      value={path}
-      onValueChange={v => navigate(v as RoutePath)}
-    >
-      {dressed && (
-        <div className="ground" aria-hidden style={{ ['--poll' as string]: POLL_MS + 'ms' }}>
-          <span className="g-vignette" />
-        </div>
-      )}
-      {dressed && <>
-        <span className="veil" aria-hidden />
-        <span className="veil-grain" aria-hidden />
-      </>}
-      <Toaster position="bottom-right" closeButton={false} duration={4000} />
+      <a className="skip" href="#main">Skip to content</a>
+      <Toaster
+        position="bottom-right" closeButton={false} duration={4000}
+        offset={{ bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))', right: 'calc(24px + env(safe-area-inset-right, 0px))' }}
+        mobileOffset={{ bottom: 'calc(16px + env(safe-area-inset-bottom, 0px))' }}
+      />
 
       <HeaderBar
-        health={health.data}
-        healthUnreachable={health.data === null || health.stale}
         vaults={rows}
         activeVaultId={vaultId}
         path={path}
         asOf={stamp?.serverTime ?? null}
-        receivedAt={primary.receivedAt}
-        pollMs={POLL_MS}
-        onSelect={id => navigate(path === '/' || path === '/evidence' ? '/facility' : path, id)}
+        withheld={health.fails > 0 || health.stale}
+        slide={!quiet.current}
+        onNavigate={go}
+        onSelect={select}
       />
 
-      {primary.stale && path !== '/evidence'
-        ? <StaleBar ageMs={primary.ageMs} fails={primary.fails} />
-        : wallet.missing && (
-          <Alert className="wbanner" onClick={wallet.dismissMissing}>
-            <KeyRound size={14} strokeWidth={2} aria-hidden />
-            <AlertTitle>{WALLETS.find(w => w.kind === wallet.missing)?.name} is not available in this browser</AlertTitle>
-            <AlertDescription>Every figure is shown either way.</AlertDescription>
-          </Alert>
-        )}
+      {primary.stale && path !== '/evidence' && <StaleBar ageMs={primary.ageMs} />}
 
-      <TabsContent value={path}>
-        <main className={'page' + (path === '/event' ? ' tight' : '')}>
-          <div key={path} className={painted.current ? 'view' : undefined}>{body()}</div>
-        </main>
-      </TabsContent>
+      <main id="main" className="page" tabIndex={-1}>
+        <div key={path} className={'view' + (quiet.current ? '' : ' enter')} data-wait={waiting || undefined}>{body()}</div>
+      </main>
 
-    </Tabs>
+      <Footer vaultId={vaultId} onNavigate={go} />
     </TooltipProvider>
   )
 }

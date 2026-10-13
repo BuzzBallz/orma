@@ -7,9 +7,12 @@
          screenshotted the page instead. Full-bleed square on the brand ground —
          Apple rounds the corners itself, so rounding them here would double up. -->
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover lets the safe-area insets in the stylesheet mean something;
+         resizes-content makes an Android keyboard push the sign-in sheet up, as iOS does. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="color-scheme" content="light dark" />
     <title>Orma — credit opinions</title>
-    <meta name="description" content="Internal credit scores and opinions on lending facilities, from figures supplied by the calculation agent." />
+    <meta name="description" content="Internal credit scores and opinions on lending facilities. Every reading is supplied by the calculation agent and also published as a native XLS-47 Oracle object." />
 
     <!-- The card this link unfurls into.
          Pasted into a chat window the link showed nothing at all, which is the first thing
@@ -23,7 +26,7 @@
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Orma" />
     <meta property="og:title" content="Orma — credit opinions" />
-    <meta property="og:description" content="Internal credit scores and opinions on lending facilities, from figures supplied by the calculation agent." />
+    <meta property="og:description" content="Internal credit scores and opinions on lending facilities. Every reading is supplied by the calculation agent and also published as a native XLS-47 Oracle object." />
     <meta property="og:image" content="__SITE_ORIGIN__/assets/og-card.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -32,7 +35,12 @@
     <meta name="twitter:title" content="Orma — credit opinions" />
     <meta name="twitter:description" content="Internal credit scores and opinions on lending facilities." />
     <meta name="twitter:image" content="__SITE_ORIGIN__/assets/og-card.png" />
-    <meta name="theme-color" content="#0A0B0E" />
+    <!-- The browser chrome follows the page, which follows the reader's system setting. -->
+    <meta name="theme-color" content="#F4F4F2" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0B0C0F" media="(prefers-color-scheme: dark)" />
+    <!-- The two faces the first screen is set in, fetched before the stylesheet asks. -->
+    <link rel="preload" href="/assets/fonts/plex-serif-400.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/assets/fonts/plex-sans-var.woff2" as="font" type="font/woff2" crossorigin />
   </head>
   <body>
     <div id="root"></div>

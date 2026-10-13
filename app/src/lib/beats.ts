@@ -16,6 +16,8 @@ export type Beat = {
   who: string
   amount: string | null
   tone: '--bad' | '--warn' | '--fg-dim'
+  /** The redemption date, once behind us: the facility is over, not late. */
+  matured?: boolean
 }
 
 const STATUS_TONE: Record<string, '--bad' | '--warn' | '--fg-dim'> = {
@@ -47,25 +49,39 @@ function loanBeats(loans: Loan[]): Beat[] {
   })
 }
 
+function redemptionBeat(d: VaultDetail): Beat {
+  const v = d.vault
+  const matured = v.secondsToRedemption <= 0
+  return {
+    when: v.redemptionAt, inSeconds: v.secondsToRedemption,
+    what: matured ? 'Matured' : 'Redemption date', who: facilityName(v),
+    amount: d.phaseInfo.claimsAtRedemption,
+    tone: Number(d.phaseInfo.projectedShortfall) > 0 ? '--bad' : '--fg-dim',
+    matured,
+  }
+}
+
 /** Everything on the facility's calendar, soonest first. */
 export function beatRows(d: VaultDetail): Beat[] {
   const v = d.vault
-  const scheduled: Beat[] = [
-    {
+  const scheduled: Beat[] = [redemptionBeat(d)]
+  // The last period has no boundary after it. A row with no date is not a calendar entry,
+  // and sorted by its zero seconds it would head the list as the next event.
+  if (d.phaseInfo.nextBoundaryAt) {
+    scheduled.push({
       when: d.phaseInfo.nextBoundaryAt, inSeconds: d.phaseInfo.secondsToNextBoundary,
       what: `${v.phase} period ends`, who: facilityName(v), amount: null, tone: '--fg-dim',
-    },
-    {
-      when: v.redemptionAt, inSeconds: v.secondsToRedemption,
-      what: 'Redemption date', who: facilityName(v),
-      amount: d.phaseInfo.claimsAtRedemption,
-      tone: Number(d.phaseInfo.projectedShortfall) > 0 ? '--bad' : '--fg-dim',
-    },
-  ]
+    })
+  }
   return [...scheduled, ...loanBeats(d.loans)].sort((a, b) => a.inSeconds - b.inSeconds)
 }
 
-/** The soonest one, or null when the facility has no dated obligation on file. */
+/**
+ * The soonest one, or null when the facility has no dated obligation on file. Past its
+ * redemption date nothing lies ahead: the oldest overdue payment would sort first and read
+ * as the facility being late, when what happened to the facility is that it matured. Each
+ * overdue payment keeps its own row on the calendar.
+ */
 export function nextBeat(d: VaultDetail): Beat | null {
-  return beatRows(d)[0] ?? null
+  return d.vault.secondsToRedemption <= 0 ? redemptionBeat(d) : beatRows(d)[0] ?? null
 }
