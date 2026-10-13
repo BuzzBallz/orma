@@ -7,6 +7,11 @@ enforcement layer for XLS-65 vaults and XLS-66 lending that reads solvency from 
 metadata diffs, publishes the result as a native XLS-47 Oracle object and as a pointer inside the share
 token's own metadata, and lets an independent third party gate deposits on it through XLS-70 credentials.
 
+**1st place of 14 projects**, De Vinci Blockchain XRPL Lending Protocol Hackathon, Paris, 12-13 September 2026 ([ESILV](https://www.esilv.fr/xrpl-hackathon-devinci-blockchain-remporte-deux-places-sur-le-podium/)).\
+**Upstream:** three notes on the closed-ended vault draft, addressed by its author and merged ([XRPL-Standards#587](https://github.com/XRPLF/XRPL-Standards/pull/587#issuecomment-5655843515)); the `PreviousFields` issue, moved by a RippleX maintainer to the documentation tracker, where it is open ([xrpl-dev-portal#3926](https://github.com/XRPLF/xrpl-dev-portal/issues/3926)).\
+**Live:** [app](https://ormaprotocol.vercel.app) · [API, Meridian `/nav`](https://orma-api.onrender.com/api/vaults/864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835/nav) (free tier: after an idle spell the first request is slow and can answer `VAULT_NOT_FOUND` until the facilities load; retry) · [docs](https://ormaprotocol.mintlify.site/) · [paper](paper/orma-paper.pdf)\
+Built by Alexandre Lemiere ([@frytegg](https://github.com/frytegg)) and Andrea Gonzalez ([@andreagnzz](https://github.com/andreagnzz)).
+
 **The asymmetry.** The party who decides *when* a vault recognises a loss is the same party who decides *in
 what order* those losses are realised. The `LoanBroker` owner is necessarily the vault owner, by protocol.
 Both decisions move money from investors to them, and neither is visible with the standard tools. Orma
@@ -78,7 +83,7 @@ Devnet transactions the project submitted during the event; the full record is u
 
 | Transaction | What Orma uses it for | Verified on Devnet |
 |---|---|---|
-| `PermissionedDomainSet` | An independent vault owner names Orma's issuer as an accepted credential. We signed nothing, and we cannot decline. | [Thorne domain](https://devnet.xrpl.org/transactions/4C425830675B021EB8A74904783D1DBDE516C74534C76E84A2899695DF3D87F9) |
+| `PermissionedDomainSet` | A separate vault-owner account (for the demo, a Devnet wallet our setup script created) names Orma's issuer as an accepted credential. Our issuer signs nothing and cannot decline. | [Thorne domain](https://devnet.xrpl.org/transactions/4C425830675B021EB8A74904783D1DBDE516C74534C76E84A2899695DF3D87F9) |
 
 ### Supporting standards
 
@@ -94,7 +99,12 @@ Devnet transactions the project submitted during the event; the full record is u
 
 Every hash below is a validated transaction on XRPL Devnet (`network_id` 2), submitted by this project
 during the event and re-read from the ledger with `tx` and `account_tx` on 13 September 2026. The links
-open the public explorer at https://devnet.xrpl.org. Devnet keeps roughly 29 days of history.
+open the public explorer at https://devnet.xrpl.org. Devnet prunes old ledgers, so those links will stop
+resolving. The raw transactions behind every hash in this README are committed under
+[`evidence/devnet-tx/`](evidence/devnet-tx/README.md), captured on 13 October 2026. Each signed transaction
+blob hashes back to its id, and its metadata is the server's copy as served, not hash-bound offline;
+`npm run check:evidence` checks both against the JSON. The vault, oracle and domain objects are ledger
+state, not history, and still verify live with `ledger_entry`.
 
 ### Meridian Trade Finance I, the empty change set
 
@@ -139,7 +149,7 @@ The `VaultCreate` here carries the share token's XLS-89 metadata and its valuati
 
 ### Thorne Senior Secured I, the gate
 
-An unrelated vault owner names our credential issuer in their Permissioned Domain. The ledger then admits
+A vault owner names our credential issuer in their Permissioned Domain (in the demo, a separate account our setup script created). The ledger then admits
 the graded investor and refuses the ungraded one, and after revocation it refuses entry but still allows
 the exit.
 
@@ -188,19 +198,34 @@ overran the redemption buffer; `feedback/appendix.pdf`, Appendix E, isolates tha
 | Vault shares pledged on ledger to that lender | `EscrowCreate` | `tesSUCCESS` | [`3322B921…1C1536`](https://devnet.xrpl.org/transactions/3322B9214FB87822BA5699423691DAED4A043121D1E17080673F6292E01C1536) |
 | Delegation positive control: `Payment` delegates, the lending permissions return `temMALFORMED` and never reach a ledger | `DelegateSet` | `tesSUCCESS` | [`547DA719…10AF17`](https://devnet.xrpl.org/transactions/547DA71992D469ACA345A0B3CEAD07864E2801919201B256EA606C3A7910AF17) |
 
-The live Oracle object for Kestrel is `C67EBC7A…80DCC1`, published by
-[`rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B`](https://devnet.xrpl.org/accounts/rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B).
-`devnet.xrpl.org` has no route for a bare ledger index, so fetch the object itself rather than
-following a link to it:
+The reader numbers XLS-47 documents in the order it first publishes them (`src/oracle.mjs`, `docIdFor`).
+On 13 October 2026 that gave the same ids on both publisher accounts: **1** Thorne, **2** Meridian, **3** Calder,
+**4** Kestrel. The id is not fixed, so identify a vault by `BaseAsset`, the first 20 bytes of its vault id.
+Two accounts hold them:
 
-```json
-{ "command": "ledger_entry", "oracle": { "account": "rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B", "oracle_document_id": 3 } }
+| Publisher | What its objects are |
+|---|---|
+| [`rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B`](https://devnet.xrpl.org/accounts/rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B) | Written during the event and frozen since, `LastUpdateTime` 2026-09-13 between 14:20 and 14:21 UTC. Kestrel's is `C67EBC7A…80DCC1`. |
+| [`rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H`](https://devnet.xrpl.org/accounts/rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H) | The deployed reader's publisher. It republishes when a vault's NAV or grade changes, and on a 60-second heartbeat, while the service runs; the service sleeps when idle, so `LastUpdateTime` says how fresh an object is. Kestrel's is `ADE9F4B4…EF805C`. |
+
+`devnet.xrpl.org` has no route for a bare ledger index, so fetch the object itself rather than
+following a link to it. Kestrel, from the deployed publisher:
+
+```bash
+curl -s https://s.devnet.rippletest.net:51234 -H 'Content-Type: application/json' -d '{"method":"ledger_entry","params":[{"oracle":{"account":"rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H","oracle_document_id":4},"ledger_index":"validated"}]}'
 ```
 
-Two publishers disagree about Meridian on purpose, so `get_aggregate_price` has something to
-aggregate: ours reads the vault object and reports `0.803922`, a second account diffs metadata
-and reports `1.000000`, and rippled returns a median of `0.901961` across the two. The capture is
-in [`demo/oracle-aggregate.json`](demo/oracle-aggregate.json) with the request to reproduce it.
+Every `PriceData` entry carries `BaseAsset` `24EAA01AD4CE70D8ABB4ACB4255DC4C216B8AF3B`, the first 20 bytes
+of Kestrel's vault id, and `NAV` reads `33450` hex at `Scale` 6, which is 0.210000. Put
+`rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B` in `account` for the event-time object.
+
+During the event we set two publishers against each other on Meridian, so `get_aggregate_price` had
+something to aggregate. The event-time publisher, `rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B` (document 2),
+reads the vault object and reports `0.803922`. A third account, `raiwYKSDdrhiediLdgJyGEzP1estXcmVcM`
+(document 1), is a throwaway Devnet faucet account we created to stand in for a naive indexer: it published,
+once, the `1.000000` that a metadata-diffing indexer computes, taken from `demo/indexer-race.json`. It is ours, not an independent publisher. rippled returned a median of
+`0.901961` across the two. The capture is in [`demo/oracle-aggregate.json`](demo/oracle-aggregate.json)
+with the request to reproduce it.
 
 ---
 
@@ -218,11 +243,15 @@ impair  075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3
 file    demo/indexer-race.json
 ```
 
-`LossUnrealized` moved from 0, and rippled omits from `PreviousFields` any field whose previous value was the
-type default. Under cash-basis accounting nothing else on the Vault object changes. The metadata is
-therefore emitted empty: an indexer that diffs it sees a node touched but unchanged. Naive NAV reads
-`1.000000`. Net of the recognised loss it is `0.803922`. **1961 basis points apart, on the same transaction,
-from the same ledger.**
+A healthy Vault does not carry `LossUnrealized` at all: rippled declares the field `SoeDefault` (optional,
+and never stored at its default), so it is left off the object while it is 0. `PreviousFields` records a
+previous value only for a field that was there before, so the first impairment, which creates the field, has
+nothing to record. Under cash-basis accounting nothing else on the Vault object changes. The metadata is
+therefore emitted empty: an indexer that diffs it sees a node touched but unchanged. The rule is presence,
+not value: the same transaction records the Loan's previous `Flags` of 0, because `Flags` is a required field
+and is always on the object. Naive NAV reads `1.000000`. Net of the recognised loss it is `0.803922`.
+**1961 basis points apart, on the same transaction, from the same ledger.** (Restated on 13 October 2026; see
+[Since the event](#since-the-event).)
 
 ### 2. Kestrel Bridge Financing II, the ordering lever
 
@@ -270,7 +299,7 @@ issuer  rKQjjU5KFs9RAZCDvYVjcaoVK5gGsCJgkP, credential type ORMA-IG
 file    demo/gate-vault.json
 ```
 
-An unrelated vault owner named our credential issuer in their `PermissionedDomain` and bound the domain to
+A separate vault owner, an account our setup script created for the demo, named our credential issuer in their `PermissionedDomain` and bound the domain to
 their vault. Two investors, same second: the graded one deposited, the ungraded one was refused **by the
 ledger**, not by us. When the credential is revoked, `VaultDeposit` is refused and `VaultWithdraw` still
 succeeds. A rater who could trap capital would be a worse problem than the one we solve.
@@ -398,12 +427,16 @@ verdict, plus `delegation.json`, the delegation probe and its positive control. 
 
 ### `contrib/`
 
-`contrib/tutorial-fix/` is our code contribution upstream: a Devnet-proven fix for the official XRPL lending
-tutorial. `lendingSetup.js` creates an open-ended vault, `submitAndWait` does not throw on a `tec`, and
-`.find()` over the metadata returns `undefined`, so the script dies at `Setting up tutorial: 5/7` with a
-`TypeError` rather than a result code. All six *Use the Lending Protocol* tutorials run it first, so all six
-are currently un-followable. The directory holds the diff, the ready-to-paste PR body, a full run log, the
-before and after scripts, and the upstream sources it was taken from.
+`contrib/tutorial-fix/` is a Devnet-proven fix for the official XRPL lending tutorial, written during the
+event. On 12 September `lendingSetup.js` created an open-ended vault, `submitAndWait` did not throw on a `tec`,
+and `.find()` over the metadata returned `undefined`, so the script died at `Setting up tutorial: 5/7` with a
+`TypeError` rather than a result code, and all six *Use the Lending Protocol* tutorials ran it first. We did
+not file it: [xrpl-dev-portal#3923](https://github.com/XRPLF/xrpl-dev-portal/pull/3923), merged on
+16 September 2026, carries four of its five changes. What remains is the engine-result guard. The directory
+holds the diff, the PR body we did not send, a full run log, the before and after scripts, and the upstream
+sources it was taken from.
+
+`contrib/filings/` records what was filed upstream and what was not, and why.
 
 ### `paper/`
 
@@ -411,7 +444,9 @@ before and after scripts, and the upstream sources it was taken from.
 arithmetic the protocol runs on so a reader can check it rather than read JavaScript: the two net asset
 value readings and why the naive one is not merely lazy, the cover liquidation formula and its three
 non-obvious properties, and the ordering result as a theorem with its proof. Every measured figure in it
-was read from live Devnet during the event, and every claim carries a transaction hash.
+was read from live Devnet during the event, and every claim carries a transaction hash. The exception is
+the oldest ledger one Devnet server reported on 13 October 2026, given in one of the paper's two dated
+corrections of that day.
 
 ### `documentation/`
 
@@ -427,7 +462,11 @@ self-contained deck that opens in a browser and prints to PDF. No slide toolchai
 ### `FEEDBACK.pdf` and `feedback/`
 
 `FEEDBACK.pdf` is the developer feedback report: **three pages**, written from the build, signed. It is
-short on purpose, because it is read by someone who did not ask for it.
+short on purpose, because it is read by someone who did not ask for it. It is kept as submitted on
+13 September 2026. Its body states the presence rule, but its closing paragraph still words the
+`PreviousFields` fix by value, it calls the prior report on `rippled#6487` our strongest evidence, which the
+register no longer does, and the filings it calls ready were since filed or overtaken
+([`contrib/filings/`](contrib/filings/README.md); [xrpl-dev-portal#3926](https://github.com/XRPLF/xrpl-dev-portal/issues/3926)).
 
 Its evidence is `feedback/appendix.pdf`, the full 40-finding register — 33 pages, every claim carrying a
 transaction hash, repro steps and tracker status.
@@ -451,23 +490,69 @@ trackers, and a Devnet repro.
 The three that cost us the most:
 
 1. **The metadata hides the one credit event that matters.** The first impairment of a healthy vault emits
-   `PreviousFields: {}` while `FinalFields` carries a non-zero `LossUnrealized`. This was raised before us
-   as `rippled#6487` by the operator of an XRPL explorer, and closed by its reporter the same day as
-   not-a-bug. That was half right: it is correct metadata, and it is still a silent wrong answer for every consumer downstream.
-2. **The documented first hour cannot complete.** The fix, verified green on rc5, is in `contrib/tutorial-fix`.
+   `PreviousFields: {}` while `FinalFields` carries a non-zero `LossUnrealized`: the field was not on the
+   object before, so there is no previous value to record. It was raised before us as
+   [`rippled#6487`](https://github.com/XRPLF/rippled/issues/6487) by the operator of an XRPL explorer, and
+   closed by its reporter as not a bug; we left a [comment crediting it](https://github.com/XRPLF/rippled/issues/6487#issuecomment-5655575723).
+   The metadata follows rippled's rules, and a consumer that diffs it still gets the wrong answer. The
+   follow-up we filed as `rippled#8222` was moved by a RippleX maintainer to the documentation tracker as
+   [xrpl-dev-portal#3926](https://github.com/XRPLF/xrpl-dev-portal/issues/3926), *Add clarification to docs
+   on PreviousFields metadata rules*.
+2. **The documented first hour could not complete.** Our fix, verified green on rc5, is in
+   `contrib/tutorial-fix`; [xrpl-dev-portal#3923](https://github.com/XRPLF/xrpl-dev-portal/pull/3923), merged
+   on 16 September 2026, carries four of its five changes, and the engine-result guard is what remains.
 3. **A broker's action history cannot be reconstructed by filtering.** `LoanManage` carries no
    `LoanBrokerID`, and an impairment does not touch the `LoanBroker` object at all, so a filter over
    `account_tx` silently drops every impairment. `Loan.FinalFields.LoanBrokerID` in the same metadata closes
    the join. Before that fix, every default looked unsignalled, and the conduct rule written to reward
    disclosure was penalising it. That one shipped a wrong answer inside our own code before we caught it.
 
-The register is `feedback/appendix.pdf`. The contribution is `contrib/tutorial-fix/`.
+The register is `feedback/appendix.pdf`. Upstream, three notes on the closed-ended vault draft were
+addressed by its author and merged
+([XRPL-Standards#587](https://github.com/XRPLF/XRPL-Standards/pull/587#issuecomment-5655843515)), and the
+`PreviousFields` issue is open as a documentation task
+([xrpl-dev-portal#3926](https://github.com/XRPLF/xrpl-dev-portal/issues/3926)). `contrib/tutorial-fix/` is
+the tutorial fix we did not file, and `contrib/filings/` records the rest.
 
 ---
 
+## Since the event
+
+Up to 1 October 2026, 139 of the 141 commits on `main` were dated 12 and 13 September 2026. What happened
+after:
+
+- **14 September 2026.** `FINDINGS.md`, an index of the 40 findings, with statuses as of that day (Andrea).
+- **14 September 2026.** A RippleX maintainer moved our `PreviousFields` issue, `rippled#8222`, to
+  [xrpl-dev-portal#3926](https://github.com/XRPLF/xrpl-dev-portal/issues/3926) as a documentation task.
+- **15 September 2026.** The closed-ended vault draft,
+  [XRPL-Standards#587](https://github.com/XRPLF/XRPL-Standards/pull/587), merged with our three notes addressed.
+- **From 23 September 2026.** A UI redesign on the unmerged branch `feat/redesign` (Andrea). It is what
+  https://ormaprotocol.vercel.app serves.
+- **1 October 2026.** A NAV-history route, `GET /api/vaults/:vaultId/nav-history`, a vault's NAV at every
+  transaction that modified it, on `main` (Andrea). The deployed API does not serve it yet.
+- **13 October 2026.** Corrections to this README and the docs: the `PreviousFields` mechanism restated
+  (presence, not value), the Kestrel oracle query fixed (document 4, deployed publisher), the oracle document
+  ids described as assigned in publish order, the upstream statuses updated, and the raw transactions behind
+  every hash captured under [`evidence/devnet-tx/`](evidence/devnet-tx/README.md). The paper and the
+  register (`feedback/register.md`, `feedback/appendix.pdf`) carry dated correction notes on the
+  `PreviousFields` mechanism and on Devnet's history window, which they had given as roughly 29 days, and the
+  source comments in `src/` were restated to match. Also corrected: the Meridian contest (the second
+  publisher was a second account of ours, not an independent one), the credential gate (its vault owner was
+  an account our setup script created), the pre-commit hook (local during the event, not in this
+  repository), the quickstart's first step (`tools/verify-toolchain.mjs` is not in the repository), and the
+  deck's speaker notes in four places.
+
+---
+
+<!-- credit wording pending Andrea's review -->
 ## Team
 
-**Alexandre Lemiere**, backend, protocol, research.
-**Andrea Gonzalez**, frontend.
+**Alexandre Lemiere** ([@frytegg](https://github.com/frytegg)): the reader, scoring, NAV, the XLS-47
+publisher and the credential gate (`src/`); the verification screen and demo exhibits in the app; the
+40-finding register (`feedback/`); the upstream filings and `contrib/`; the paper and the documentation.\
+**Andrea Gonzalez** ([@andreagnzz](https://github.com/andreagnzz)): the app (`app/`), its design and its redesign; the
+three-page rewrite of the feedback report (`37d6a96`); `FINDINGS.md`; and the NAV-history API added after the
+event.
 
-Team BuzzBallz. De Vinci Blockchain XRPL Lending Protocol Hackathon, Paris, 12 and 13 September 2026.
+Team BuzzBallz, 1st place of 14 projects. De Vinci Blockchain XRPL Lending Protocol Hackathon, Paris, 12 and
+13 September 2026.
