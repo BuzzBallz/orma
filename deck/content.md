@@ -2,6 +2,7 @@
 
 <!-- 10 slides, 4:00 total. Matches docs/45-RUNSHEET.md beat for beat, slide for slide. -->
 <!-- Renderer: one slide per level-two heading. Nothing above the first one is rendered. -->
+<!-- Notes from 13 September 2026, corrected on 13 October 2026 in S4 (the field rule), S7 (the second publisher was our own account), S8 (the vault owner was an account we created) and S9 (the #6487 wording; the tutorial PR was never filed). The notes as delivered are in git history at 9417fd2. Since then #587 was merged (15 Sep) with the LoanBrokerSet rule, and xrpl-dev-portal#3923 (16 Sep) carries four of the five tutorial fixes. -->
 
 ## S1 - Orma
 <!-- time: 0:00 | duration: 30s | layout: cover -->
@@ -75,7 +76,7 @@ Reported, one point zero zero. // Held, zero point eight zero. // **Nineteen hun
 
 **Point at the Change set column.**
 
-And here is why. Three dashes. The change set is **empty** — `PreviousFields`, bottom left, is two braces. // `LossUnrealized` was not on the object at all before this — a field at its default is not stored — so there is no previous value for the change set to record. // Nothing in it says this vault moved.
+And here is why. Three dashes. The change set is **empty** — `PreviousFields`, bottom left, is two braces. // `LossUnrealized` was not on the object at all before this — an optional (SoeDefault) field at its default is not stored — so there is no previous value for the change set to record. // Nothing in it says this vault moved.
 
 So the manager who disclosed and the manager who hid it **look identical from outside**. That is what we set out to fix.
 
@@ -159,7 +160,7 @@ Everything so far was our reading, and you have been asked to believe it. // Thi
 
 **Point at the contest table.**
 
-And here is why it is an oracle and not an API. // A second publisher posted their own reading of the same vault: **one point zero zero**, the naive number. They did not ask us. We cannot touch their document. // **rippled** computed the median across both. Not us. // If we are wrong, the spread is on the ledger and anyone can see it.
+And here is why it is an oracle and not an API. // A second publisher posted its own reading of the same vault: **one point zero zero**, the naive number. Here that publisher is a second account of ours; anyone could do the same without asking us, and we could not touch their document. // **rippled** computed the median across both. Not us. // If we are wrong, the spread is on the ledger and anyone can see it.
 
 *Two publishers, size 2, standard deviation 0.1386. The second reading is a throwaway Devnet account publishing the naive figure deliberately, and say so if asked: the point is not that someone disagrees, it is that they can, without our permission.*
 
@@ -178,7 +179,7 @@ And here is why it is an oracle and not an API. // A second publisher posted the
 ### notes
 Picker → **Thorne Senior Secured I** → scroll to Exhibit 6, it sits above Key Indicators. The chain is nine rows with a hash on each.
 
-Measuring is advice. This is enforcement. // An independent vault owner named our issuer in their domain. We signed nothing, and we cannot decline. // Two investors, same second: one admitted, the other refused **by the ledger**, not by us.
+Measuring is advice. This is enforcement. // A separate vault owner named our issuer in their domain; for the demo it is an account we created. Our issuer signed nothing, and cannot decline. // Two investors, same second: one admitted, the other refused **by the ledger**, not by us.
 
 *`[+]` at 5:00 only: and when we revoke, entry closes and the exit stays open. A rater who could trap capital would be a worse problem than the one we solve.*
 
@@ -198,13 +199,13 @@ Measuring is advice. This is enforcement. // An independent vault owner named ou
 ### notes
 We did not set out to write a feedback report. // **Every demo you just watched started as something that broke.**
 
-**One.** The empty change set. // That is not a slide we wrote to be clever, it is the first thing that went wrong, and the reader exists because of it. // One paragraph on the metadata page fixes it. // And it was reported before us, by the author of an XRPL explorer — exactly the person this trap is built for. // He closed it himself. **"Not a bug."** // He was half right: the ledger is behaving as designed. What is missing is the sentence that would have told him so.
+**One.** The empty change set. // That is not a slide we wrote to be clever, it is the first thing that went wrong, and the reader exists because of it. // One paragraph on the metadata page fixes it. // And it was reported before us, by the author of an XRPL explorer — exactly the person this trap is built for. // He closed it as **"Not a bug."** // And it is not one: the ledger is behaving as designed. What is missing is the sentence that says so.
 
 **Two.** A manager's history cannot be rebuilt from the record by filtering: an impairment does not touch the manager's object, so it vanishes. // The conduct exhibit you just saw exists because we hit that. // And it shipped **a wrong answer inside our own code** first: the rule we wrote to reward disclosure was punishing it. We caught it because we were writing the finding up.
 
 **Three.** Nothing off the ledger can prove a fact about ledger state. There is no proof option to ask for. // **That** is why the score is a ledger object and not an API of ours. // The third demo is not a feature we chose. It is what that finding left us.
 
-And what we give back. // The documented first hour cannot complete — we wrote the fix and it is a pull request. // And the standard lists ten ways `LoanBrokerSet` can fail. The rule that stops every one of these vaults existing is not one of the ten. // Merge the three that have been open for weeks, and add the eleventh.
+And what we give back. // The documented first hour cannot complete — we wrote the fix. // And the standard lists ten ways `LoanBrokerSet` can fail. The rule that stops every one of these vaults existing is not one of the ten. // Merge the three that have been open for weeks, and add the eleventh.
 
 **Forty findings.** Three of them changed the product while we were still building it. // That code takes you to all of them.
 
