@@ -1,0 +1,64 @@
+{
+  "Account": "rBioJJ4yf66JxfgosFeWErn1rAZzR4FYKB",
+  "Fee": "1",
+  "Flags": 0,
+  "LastLedgerSequence": 5255270,
+  "MPTokenIssuanceID": "000000011AA710702E7C55ED53EF8F71D41D0059471637D6",
+  "Sequence": 5255246,
+  "SigningPubKey": "ED8B1971A8F1ADB6E1B3F7C0AA3D4B1894172CF25D9705FAF9EA3724E569BA6944",
+  "TransactionType": "MPTokenAuthorize",
+  "TxnSignature": "EF1789B6381F3E4A195796B088CABAA38DF5883A761631BD6A9D0D7CB27526EBE216C0B5843CCC732AB6296AD817B8861D078D7A2EFD3C816D84D827B0CB1F06",
+  "ctid": "C050305400010002",
+  "date": 842540340,
+  "hash": "4D3A062391D872BD3581AA421A9B4DE68058E1CFCC0CA21A8FE61D480C7E3B93",
+  "inLedger": 5255252,
+  "ledger_index": 5255252,
+  "meta": {
+    "AffectedNodes": [
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Account": "rBioJJ4yf66JxfgosFeWErn1rAZzR4FYKB",
+            "Balance": "99999999",
+            "Flags": 0,
+            "OwnerCount": 1,
+            "Sequence": 5255247
+          },
+          "LedgerEntryType": "AccountRoot",
+          "LedgerIndex": "3474F5CD83F3DC00C3AFE2B11ECE3EBFB229B3C38D2D0CDDA6DB5821FAF06FB9",
+          "PreviousFields": {
+            "Balance": "100000000",
+            "OwnerCount": 0,
+            "Sequence": 5255246
+          },
+          "PreviousTxnID": "5B9D595CE53A5F403C973D9E7A522F1BCD5F9518D8FE19BBD181D1D0D427DF22",
+          "PreviousTxnLgrSeq": 5255246
+        }
+      },
+      {
+        "CreatedNode": {
+          "LedgerEntryType": "MPToken",
+          "LedgerIndex": "E5940FFF00AD41174AFBA83F052D26B86800F4202786818770A8216B407C4A83",
+          "NewFields": {
+            "Account": "rBioJJ4yf66JxfgosFeWErn1rAZzR4FYKB",
+            "MPTokenIssuanceID": "000000011AA710702E7C55ED53EF8F71D41D0059471637D6"
+          }
+        }
+      },
+      {
+        "CreatedNode": {
+          "LedgerEntryType": "DirectoryNode",
+          "LedgerIndex": "E8BCDBCC6F6B43F96E799B5CE8F629885BC360D55FF7F2745CCDA81ED6606F7E",
+          "NewFields": {
+            "Owner": "rBioJJ4yf66JxfgosFeWErn1rAZzR4FYKB",
+            "RootIndex": "E8BCDBCC6F6B43F96E799B5CE8F629885BC360D55FF7F2745CCDA81ED6606F7E"
+          }
+        }
+      }
+    ],
+    "TransactionIndex": 1,
+    "TransactionResult": "tesSUCCESS"
+  },
+  "status": "success",
+  "validated": true
+}

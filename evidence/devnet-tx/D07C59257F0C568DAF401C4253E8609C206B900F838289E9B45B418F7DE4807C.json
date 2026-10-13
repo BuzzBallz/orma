@@ -1,0 +1,120 @@
+{
+  "Account": "rH7LXexgwZVNcH2ARsi22FjNqHJFFjhevA",
+  "Asset": {
+    "currency": "XRP"
+  },
+  "Fee": "200000",
+  "Flags": 0,
+  "LastLedgerSequence": 5261998,
+  "RedemptionDate": 842627125,
+  "Sequence": 5261976,
+  "SigningPubKey": "ED33939142E11518417237F76264B23718F078D7A8C85E5C664833BDC1F20A4C13",
+  "SubscriptionDate": 842562325,
+  "TransactionType": "VaultCreate",
+  "TxnSignature": "12BA10F0A374C2F421A46A0674E82D228313A9B692F541965391F9395902DFBB56045AE1E82A850AC18DF9FCDA571B3E9846BEE04B9F1BCE279913BB6CCB580D",
+  "VaultKind": 1,
+  "WithdrawalPolicy": 1,
+  "ctid": "C0504A9C00100002",
+  "date": 842562302,
+  "hash": "D07C59257F0C568DAF401C4253E8609C206B900F838289E9B45B418F7DE4807C",
+  "inLedger": 5261980,
+  "ledger_index": 5261980,
+  "meta": {
+    "AffectedNodes": [
+      {
+        "CreatedNode": {
+          "LedgerEntryType": "MPTokenIssuance",
+          "LedgerIndex": "198014869C21CA397F36EA8F274C6ABB99117BD23BC5F08CA008BD7562DC8C30",
+          "NewFields": {
+            "Flags": 56,
+            "Issuer": "rfN71PmswUhMAyxWi4jX9KYQnLvr1x5i51",
+            "Sequence": 1
+          }
+        }
+      },
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Account": "rH7LXexgwZVNcH2ARsi22FjNqHJFFjhevA",
+            "Balance": "99800000",
+            "Flags": 0,
+            "OwnerCount": 3,
+            "Sequence": 5261977
+          },
+          "LedgerEntryType": "AccountRoot",
+          "LedgerIndex": "25158ECD45E3D134B8565708C29C3909378387C24CD509569ECBA06151862488",
+          "PreviousFields": {
+            "Balance": "100000000",
+            "OwnerCount": 0,
+            "Sequence": 5261976
+          },
+          "PreviousTxnID": "3A53805C9CDC8A6768D17E1A8345E90BF9472CDFB925AD1178829B7D0BF9927F",
+          "PreviousTxnLgrSeq": 5261976
+        }
+      },
+      {
+        "CreatedNode": {
+          "LedgerEntryType": "AccountRoot",
+          "LedgerIndex": "5E85BEF3350E5FEBAAAEBAFC2327C22E30F24E9839AB206F21CB18171BBF9C88",
+          "NewFields": {
+            "Account": "rfN71PmswUhMAyxWi4jX9KYQnLvr1x5i51",
+            "Flags": 26214400,
+            "OwnerCount": 1,
+            "VaultID": "864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835"
+          }
+        }
+      },
+      {
+        "CreatedNode": {
+          "LedgerEntryType": "DirectoryNode",
+          "LedgerIndex": "63ACF6AEE9D31E24CBD99C2F593DC1BF9B9A26A950BCDA65F56ABED4CCD1244D",
+          "NewFields": {
+            "Owner": "rH7LXexgwZVNcH2ARsi22FjNqHJFFjhevA",
+            "RootIndex": "63ACF6AEE9D31E24CBD99C2F593DC1BF9B9A26A950BCDA65F56ABED4CCD1244D"
+          }
+        }
+      },
+      {
+        "CreatedNode": {
+          "LedgerEntryType": "Vault",
+          "LedgerIndex": "864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835",
+          "NewFields": {
+            "Account": "rfN71PmswUhMAyxWi4jX9KYQnLvr1x5i51",
+            "LEVersion": 1,
+            "Owner": "rH7LXexgwZVNcH2ARsi22FjNqHJFFjhevA",
+            "RedemptionDate": 842627125,
+            "Sequence": 5261976,
+            "ShareMPTID": "00000001445D6D0A3C01CD265D6D674FB2F9FF60D0E2A0A3",
+            "SubscriptionDate": 842562325,
+            "VaultKind": 1,
+            "WithdrawalPolicy": 1
+          }
+        }
+      },
+      {
+        "CreatedNode": {
+          "LedgerEntryType": "MPToken",
+          "LedgerIndex": "B4A4B26309FEC01D6CA89AB7A1529E6C34A02CC2397875C6251CE44E2B22FBB2",
+          "NewFields": {
+            "Account": "rH7LXexgwZVNcH2ARsi22FjNqHJFFjhevA",
+            "MPTokenIssuanceID": "00000001445D6D0A3C01CD265D6D674FB2F9FF60D0E2A0A3"
+          }
+        }
+      },
+      {
+        "CreatedNode": {
+          "LedgerEntryType": "DirectoryNode",
+          "LedgerIndex": "BAB45829F264A851BF93248C5A6C786B6A18AEDF6FFEFEDF883C04A1A181929D",
+          "NewFields": {
+            "Owner": "rfN71PmswUhMAyxWi4jX9KYQnLvr1x5i51",
+            "RootIndex": "BAB45829F264A851BF93248C5A6C786B6A18AEDF6FFEFEDF883C04A1A181929D"
+          }
+        }
+      }
+    ],
+    "TransactionIndex": 16,
+    "TransactionResult": "tesSUCCESS"
+  },
+  "status": "success",
+  "validated": true
+}

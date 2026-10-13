@@ -1,0 +1,130 @@
+{
+  "Account": "rnc7dQyrcFyXE9nyYbRaJ8tV3CZcFNEsfq",
+  "Amount": "5000000",
+  "Fee": "1",
+  "Flags": 0,
+  "LastLedgerSequence": 5262181,
+  "Sequence": 5262149,
+  "SigningPubKey": "EDA73B899A71F06AA76F6102EC7F9A5D2304FBD16A778181B5FE8FEF351197542C",
+  "TransactionType": "VaultWithdraw",
+  "TxnSignature": "DC3DD81DF7CED55EA30D138167BC9E045E5A4CF83F4E5E537074CBEAF5616F103B8EAA820E0B46099B143FAA3062DEF48214D890050E9D69C8E17B5A8EC11E07",
+  "VaultID": "4A5A8E3716D52E334AEB077ADB09456EF4A941CC26021A8EAD37F95B00190DF5",
+  "ctid": "C0504B5300020002",
+  "date": 842562950,
+  "hash": "2E71A25973D55E26C8AECFDFDF1EF3BF0571B8FB4DD9D524B6A8C750994F39FE",
+  "inLedger": 5262163,
+  "ledger_index": 5262163,
+  "meta": {
+    "AffectedNodes": [
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Account": "rMFuftAjmzbCHvbfm5whSJqcARyHCdavHx",
+            "Balance": "15000000",
+            "Flags": 26214400,
+            "OwnerCount": 1,
+            "Sequence": 0,
+            "VaultID": "4A5A8E3716D52E334AEB077ADB09456EF4A941CC26021A8EAD37F95B00190DF5"
+          },
+          "LedgerEntryType": "AccountRoot",
+          "LedgerIndex": "356AF9004E9D703DE474472901A07E066368B56857F90698FBFC7F49D19E819E",
+          "PreviousFields": {
+            "Balance": "20000000"
+          },
+          "PreviousTxnID": "7FC5C01BD735E9A41A0AC6ACFA4B6994B1347A8FA06DAEF8012A62B0E1DF98AF",
+          "PreviousTxnLgrSeq": 5262158
+        }
+      },
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Account": "rMFuftAjmzbCHvbfm5whSJqcARyHCdavHx",
+            "Asset": {
+              "currency": "XRP"
+            },
+            "AssetsAvailable": "15000000",
+            "AssetsTotal": "15000000",
+            "Flags": 65536,
+            "LEVersion": 1,
+            "Owner": "rGFFSqqY1R3764FKF7crU5F6bYh9qaD45S",
+            "OwnerNode": "0",
+            "RedemptionDate": 842692520,
+            "Sequence": 5262145,
+            "ShareMPTID": "00000001E4719291D12AC748C90E15CA6BD11D0C366B54D6",
+            "SubscriptionDate": 842627720,
+            "VaultKind": 1,
+            "WithdrawalPolicy": 1
+          },
+          "LedgerEntryType": "Vault",
+          "LedgerIndex": "4A5A8E3716D52E334AEB077ADB09456EF4A941CC26021A8EAD37F95B00190DF5",
+          "PreviousFields": {
+            "AssetsAvailable": "20000000",
+            "AssetsTotal": "20000000"
+          },
+          "PreviousTxnID": "7FC5C01BD735E9A41A0AC6ACFA4B6994B1347A8FA06DAEF8012A62B0E1DF98AF",
+          "PreviousTxnLgrSeq": 5262158
+        }
+      },
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Account": "rnc7dQyrcFyXE9nyYbRaJ8tV3CZcFNEsfq",
+            "Balance": "84999996",
+            "Flags": 0,
+            "OwnerCount": 1,
+            "Sequence": 5262150
+          },
+          "LedgerEntryType": "AccountRoot",
+          "LedgerIndex": "C4014B8BEAEB8D498FC39B2343BF8D8ECC3C5C097EB6103CC8D213ADE748DB50",
+          "PreviousFields": {
+            "Balance": "79999997",
+            "Sequence": 5262149
+          },
+          "PreviousTxnID": "AA25246AE452DF1719751E4F03BAD8B6C286250DE8FB65EC2B7FBBFE272ADDBF",
+          "PreviousTxnLgrSeq": 5262161
+        }
+      },
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Account": "rnc7dQyrcFyXE9nyYbRaJ8tV3CZcFNEsfq",
+            "Flags": 0,
+            "MPTAmount": "15000000",
+            "MPTokenIssuanceID": "00000001E4719291D12AC748C90E15CA6BD11D0C366B54D6",
+            "OwnerNode": "0"
+          },
+          "LedgerEntryType": "MPToken",
+          "LedgerIndex": "CB804E946A8250A5A4E7F07815AD3C03B505E3BFEAC9A0CE34B47E87BFC6022C",
+          "PreviousFields": {
+            "MPTAmount": "20000000"
+          },
+          "PreviousTxnID": "7FC5C01BD735E9A41A0AC6ACFA4B6994B1347A8FA06DAEF8012A62B0E1DF98AF",
+          "PreviousTxnLgrSeq": 5262158
+        }
+      },
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "DomainID": "FFBEC89D98B4E7CF52F4F254235086514A90CED0EC531941BDF747AF40C5A2FB",
+            "Flags": 60,
+            "Issuer": "rMFuftAjmzbCHvbfm5whSJqcARyHCdavHx",
+            "OutstandingAmount": "15000000",
+            "OwnerNode": "0",
+            "Sequence": 1
+          },
+          "LedgerEntryType": "MPTokenIssuance",
+          "LedgerIndex": "F781EB68A9780EDF1D1FA09BE577B78547F755CD2EE4C1508DBA04C2E287F067",
+          "PreviousFields": {
+            "OutstandingAmount": "20000000"
+          },
+          "PreviousTxnID": "7FC5C01BD735E9A41A0AC6ACFA4B6994B1347A8FA06DAEF8012A62B0E1DF98AF",
+          "PreviousTxnLgrSeq": 5262158
+        }
+      }
+    ],
+    "TransactionIndex": 2,
+    "TransactionResult": "tesSUCCESS"
+  },
+  "status": "success",
+  "validated": true
+}

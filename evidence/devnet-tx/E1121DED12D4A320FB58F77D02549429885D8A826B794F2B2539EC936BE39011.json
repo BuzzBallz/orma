@@ -1,0 +1,54 @@
+{
+  "Account": "r4bWbrKjqQUAJ8Ht6qijknyRrnbSLeptGC",
+  "Counterparty": "r9ECFxtwCnogHnk5yWZvSxWaQtVc1tUJ47",
+  "CounterpartySignature": {
+    "SigningPubKey": "EDDE501D3CEEEC3C09EB25707296C5C6CFA3B282D28C129AD80306F05FA4BE8D84",
+    "TxnSignature": "87513DB36A119AF14AE3E4D2E424C2DAC8419474C069332758E410F2CFBDB243299F6351C79A7B4941061DC955B2A0A2570D4DD6567E64D6E528FE9E5C87940E"
+  },
+  "Fee": "4",
+  "Flags": 0,
+  "GracePeriod": 60,
+  "InterestRate": 100000,
+  "LastLedgerSequence": 5255763,
+  "LateInterestRate": 20000,
+  "LoanBrokerID": "E2583D0275DD0F8AFE2CBDD3B32181AFC3ADFE266ED1811C19C3A004CF5B3359",
+  "PaymentInterval": 60,
+  "PaymentTotal": 2,
+  "PrincipalRequested": "10000000",
+  "Sequence": 5255732,
+  "SigningPubKey": "EDC4188CD5A7F1BC658D4D926E9369BFB3B99136790E0424525B3A83654B52DDC2",
+  "TransactionType": "LoanSet",
+  "TxnSignature": "A8A853A580A56D53389E7568BEDFD804C480DE8CB35E3FAC21039E1F3E0B7D10864E1E7D44EA2A46573A7BB0F894871C4A1814BB10426D1FA3697E5F2CE86E06",
+  "ctid": "C050324100090002",
+  "date": 842542000,
+  "hash": "E1121DED12D4A320FB58F77D02549429885D8A826B794F2B2539EC936BE39011",
+  "inLedger": 5255745,
+  "ledger_index": 5255745,
+  "meta": {
+    "AffectedNodes": [
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Account": "r4bWbrKjqQUAJ8Ht6qijknyRrnbSLeptGC",
+            "Balance": "85599991",
+            "Flags": 0,
+            "OwnerCount": 8,
+            "Sequence": 5255733
+          },
+          "LedgerEntryType": "AccountRoot",
+          "LedgerIndex": "DF12BC20765A6439069CD300EF0A43ABE75C4616575356D8ED1756F00C4DE787",
+          "PreviousFields": {
+            "Balance": "85599995",
+            "Sequence": 5255732
+          },
+          "PreviousTxnID": "793FF8F5F57FEA6E3CB9818633BAEF0BC49F979BB8D1547608A3A52EB2A754A0",
+          "PreviousTxnLgrSeq": 5255743
+        }
+      }
+    ],
+    "TransactionIndex": 9,
+    "TransactionResult": "tecTOO_SOON"
+  },
+  "status": "success",
+  "validated": true
+}

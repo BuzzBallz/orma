@@ -1,0 +1,79 @@
+{
+  "AcceptedCredentials": [
+    {
+      "Credential": {
+        "CredentialType": "4F524D412D4947",
+        "Issuer": "rKQjjU5KFs9RAZCDvYVjcaoVK5gGsCJgkP"
+      }
+    }
+  ],
+  "Account": "rGFFSqqY1R3764FKF7crU5F6bYh9qaD45S",
+  "Fee": "1",
+  "Flags": 0,
+  "LastLedgerSequence": 5262172,
+  "Sequence": 5262144,
+  "SigningPubKey": "ED6440CB475375822DE092EDB8050EECBE8CAFE407D71561B1E1E051FC238AE050",
+  "TransactionType": "PermissionedDomainSet",
+  "TxnSignature": "182C1FCC33E65680C953E1E2C3EB787EC68D4298A2A0BCC4388205C5404E9CE3B66AE4B3EAEF4A24F1D3CFA7041E046C3962A5E68F9E8A17330ED6D5CD167D04",
+  "ctid": "C0504B4A00000002",
+  "date": 842562920,
+  "hash": "4C425830675B021EB8A74904783D1DBDE516C74534C76E84A2899695DF3D87F9",
+  "inLedger": 5262154,
+  "ledger_index": 5262154,
+  "meta": {
+    "AffectedNodes": [
+      {
+        "CreatedNode": {
+          "LedgerEntryType": "DirectoryNode",
+          "LedgerIndex": "5DA73D65F61F8856C2708DF9AF493A861011BAFF3B74E72D453ED8809B205D67",
+          "NewFields": {
+            "Owner": "rGFFSqqY1R3764FKF7crU5F6bYh9qaD45S",
+            "RootIndex": "5DA73D65F61F8856C2708DF9AF493A861011BAFF3B74E72D453ED8809B205D67"
+          }
+        }
+      },
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Account": "rGFFSqqY1R3764FKF7crU5F6bYh9qaD45S",
+            "Balance": "99999999",
+            "Flags": 0,
+            "OwnerCount": 1,
+            "Sequence": 5262145
+          },
+          "LedgerEntryType": "AccountRoot",
+          "LedgerIndex": "EDE0D09B22AD2708232BC1189727D93E2FE72EC745D4BDC8A0984BC34C1B53F9",
+          "PreviousFields": {
+            "Balance": "100000000",
+            "OwnerCount": 0,
+            "Sequence": 5262144
+          },
+          "PreviousTxnID": "935F87258B0E618CDE854A42822D6D1E5802786AB73989D9F128D3A211DDB3BF",
+          "PreviousTxnLgrSeq": 5262144
+        }
+      },
+      {
+        "CreatedNode": {
+          "LedgerEntryType": "PermissionedDomain",
+          "LedgerIndex": "FFBEC89D98B4E7CF52F4F254235086514A90CED0EC531941BDF747AF40C5A2FB",
+          "NewFields": {
+            "AcceptedCredentials": [
+              {
+                "Credential": {
+                  "CredentialType": "4F524D412D4947",
+                  "Issuer": "rKQjjU5KFs9RAZCDvYVjcaoVK5gGsCJgkP"
+                }
+              }
+            ],
+            "Owner": "rGFFSqqY1R3764FKF7crU5F6bYh9qaD45S",
+            "Sequence": 5262144
+          }
+        }
+      }
+    ],
+    "TransactionIndex": 0,
+    "TransactionResult": "tesSUCCESS"
+  },
+  "status": "success",
+  "validated": true
+}

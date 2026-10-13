@@ -1,0 +1,127 @@
+{
+  "Account": "rGFFSqqY1R3764FKF7crU5F6bYh9qaD45S",
+  "Asset": {
+    "currency": "XRP"
+  },
+  "DomainID": "FFBEC89D98B4E7CF52F4F254235086514A90CED0EC531941BDF747AF40C5A2FB",
+  "Fee": "200000",
+  "Flags": 65536,
+  "LastLedgerSequence": 5262174,
+  "RedemptionDate": 842692520,
+  "Sequence": 5262145,
+  "SigningPubKey": "ED6440CB475375822DE092EDB8050EECBE8CAFE407D71561B1E1E051FC238AE050",
+  "SubscriptionDate": 842627720,
+  "TransactionType": "VaultCreate",
+  "TxnSignature": "37A4256F78076D44052303E5D260D47327D62BFAD1FA2ED9DAF6DFDA0A67BE5E96A5F32A173F298B0E1246FF890F26D6A2EC7758613B46205F92E2D491F0450D",
+  "VaultKind": 1,
+  "WithdrawalPolicy": 1,
+  "ctid": "C0504B4C00000002",
+  "date": 842562922,
+  "hash": "3FC79BF77240B0D52148428DABEAC0A5F4971957ABEC1D429ABDF297470F2461",
+  "inLedger": 5262156,
+  "ledger_index": 5262156,
+  "meta": {
+    "AffectedNodes": [
+      {
+        "CreatedNode": {
+          "LedgerEntryType": "AccountRoot",
+          "LedgerIndex": "356AF9004E9D703DE474472901A07E066368B56857F90698FBFC7F49D19E819E",
+          "NewFields": {
+            "Account": "rMFuftAjmzbCHvbfm5whSJqcARyHCdavHx",
+            "Flags": 26214400,
+            "OwnerCount": 1,
+            "VaultID": "4A5A8E3716D52E334AEB077ADB09456EF4A941CC26021A8EAD37F95B00190DF5"
+          }
+        }
+      },
+      {
+        "CreatedNode": {
+          "LedgerEntryType": "Vault",
+          "LedgerIndex": "4A5A8E3716D52E334AEB077ADB09456EF4A941CC26021A8EAD37F95B00190DF5",
+          "NewFields": {
+            "Account": "rMFuftAjmzbCHvbfm5whSJqcARyHCdavHx",
+            "Flags": 65536,
+            "LEVersion": 1,
+            "Owner": "rGFFSqqY1R3764FKF7crU5F6bYh9qaD45S",
+            "RedemptionDate": 842692520,
+            "Sequence": 5262145,
+            "ShareMPTID": "00000001E4719291D12AC748C90E15CA6BD11D0C366B54D6",
+            "SubscriptionDate": 842627720,
+            "VaultKind": 1,
+            "WithdrawalPolicy": 1
+          }
+        }
+      },
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Flags": 0,
+            "Owner": "rGFFSqqY1R3764FKF7crU5F6bYh9qaD45S",
+            "RootIndex": "5DA73D65F61F8856C2708DF9AF493A861011BAFF3B74E72D453ED8809B205D67"
+          },
+          "LedgerEntryType": "DirectoryNode",
+          "LedgerIndex": "5DA73D65F61F8856C2708DF9AF493A861011BAFF3B74E72D453ED8809B205D67",
+          "PreviousTxnID": "4C425830675B021EB8A74904783D1DBDE516C74534C76E84A2899695DF3D87F9",
+          "PreviousTxnLgrSeq": 5262154
+        }
+      },
+      {
+        "CreatedNode": {
+          "LedgerEntryType": "DirectoryNode",
+          "LedgerIndex": "A03ADFC3B78190890E5BA098CC5302A065A3607B8D514911E0C2ECF7F362D87D",
+          "NewFields": {
+            "Owner": "rMFuftAjmzbCHvbfm5whSJqcARyHCdavHx",
+            "RootIndex": "A03ADFC3B78190890E5BA098CC5302A065A3607B8D514911E0C2ECF7F362D87D"
+          }
+        }
+      },
+      {
+        "CreatedNode": {
+          "LedgerEntryType": "MPToken",
+          "LedgerIndex": "D68E25650D6197E89D9C5A163030596116F67CC78BE987E42B4E81C572964B31",
+          "NewFields": {
+            "Account": "rGFFSqqY1R3764FKF7crU5F6bYh9qaD45S",
+            "Flags": 2,
+            "MPTokenIssuanceID": "00000001E4719291D12AC748C90E15CA6BD11D0C366B54D6"
+          }
+        }
+      },
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Account": "rGFFSqqY1R3764FKF7crU5F6bYh9qaD45S",
+            "Balance": "99799999",
+            "Flags": 0,
+            "OwnerCount": 4,
+            "Sequence": 5262146
+          },
+          "LedgerEntryType": "AccountRoot",
+          "LedgerIndex": "EDE0D09B22AD2708232BC1189727D93E2FE72EC745D4BDC8A0984BC34C1B53F9",
+          "PreviousFields": {
+            "Balance": "99999999",
+            "OwnerCount": 1,
+            "Sequence": 5262145
+          },
+          "PreviousTxnID": "4C425830675B021EB8A74904783D1DBDE516C74534C76E84A2899695DF3D87F9",
+          "PreviousTxnLgrSeq": 5262154
+        }
+      },
+      {
+        "CreatedNode": {
+          "LedgerEntryType": "MPTokenIssuance",
+          "LedgerIndex": "F781EB68A9780EDF1D1FA09BE577B78547F755CD2EE4C1508DBA04C2E287F067",
+          "NewFields": {
+            "DomainID": "FFBEC89D98B4E7CF52F4F254235086514A90CED0EC531941BDF747AF40C5A2FB",
+            "Flags": 60,
+            "Issuer": "rMFuftAjmzbCHvbfm5whSJqcARyHCdavHx",
+            "Sequence": 1
+          }
+        }
+      }
+    ],
+    "TransactionIndex": 0,
+    "TransactionResult": "tesSUCCESS"
+  },
+  "status": "success",
+  "validated": true
+}

@@ -1,0 +1,124 @@
+{
+  "Account": "rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B",
+  "Fee": "1",
+  "Flags": 0,
+  "LastLedgerSequence": 5262212,
+  "OracleDocumentID": 1,
+  "Sequence": 5262069,
+  "SigningPubKey": "ED2F83700E3390142ACF0AEE7DF0EF1854CA33E6CF1B69248775BEC1A839DD8277",
+  "TransactionType": "OracleDelete",
+  "TxnSignature": "78EA56A69D37A12ADECFF151AEC9895BE209794FB4AAC3AA76B1D16C7E67A9ED0F5DFECDC386AC746EF7C527143B2B046352C720EE48258CF836F77F8E7C5D0E",
+  "ctid": "C0504B7200120002",
+  "date": 842563060,
+  "hash": "37A65CF8C94687C8B39EA66E92D777477F0088196153BEB82807CD58975F4347",
+  "inLedger": 5262194,
+  "ledger_index": 5262194,
+  "meta": {
+    "AffectedNodes": [
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Flags": 0,
+            "Owner": "rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B",
+            "RootIndex": "6F087E7A82021915E095407FFF10E1B3885B49A0FC7178D5EE3DF42AA2D9F3C3"
+          },
+          "LedgerEntryType": "DirectoryNode",
+          "LedgerIndex": "6F087E7A82021915E095407FFF10E1B3885B49A0FC7178D5EE3DF42AA2D9F3C3",
+          "PreviousTxnID": "1DFD7259B7DC0EC114884285A282F183C05A82E2D95C936B54B41D9F4443D92E",
+          "PreviousTxnLgrSeq": 5261939
+        }
+      },
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Account": "rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B",
+            "Balance": "99999609",
+            "Flags": 0,
+            "OwnerCount": 6,
+            "Sequence": 5262070
+          },
+          "LedgerEntryType": "AccountRoot",
+          "LedgerIndex": "8F9D976026E5F2C2E6F083F12114095138A25C959C3C9CECB765EF7D236CA946",
+          "PreviousFields": {
+            "Balance": "99999610",
+            "OwnerCount": 8,
+            "Sequence": 5262069
+          },
+          "PreviousTxnID": "463D1CA41C044D38F2F8B6ACF388DD301903AAFE94AF27465AF6072294ABA200",
+          "PreviousTxnLgrSeq": 5262192
+        }
+      },
+      {
+        "DeletedNode": {
+          "FinalFields": {
+            "AssetClass": "7269736B",
+            "Flags": 0,
+            "LastUpdateTime": 1789246890,
+            "OracleDocumentID": 1,
+            "Owner": "rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B",
+            "OwnerNode": "0",
+            "PreviousTxnID": "0CCA58EA89902A1981FE13F0C3D28A2FA145ED7E8795956553300B8C7AA66D07",
+            "PreviousTxnLgrSeq": 5261920,
+            "PriceDataSeries": [
+              {
+                "PriceData": {
+                  "AssetPrice": "2710",
+                  "BaseAsset": "F8941703977DDC15ACC7C8758C8609A9EDC60A43",
+                  "QuoteAsset": "CNC",
+                  "Scale": 4
+                }
+              },
+              {
+                "PriceData": {
+                  "AssetPrice": "64",
+                  "BaseAsset": "F8941703977DDC15ACC7C8758C8609A9EDC60A43",
+                  "QuoteAsset": "COV",
+                  "Scale": 4
+                }
+              },
+              {
+                "PriceData": {
+                  "AssetPrice": "0",
+                  "BaseAsset": "F8941703977DDC15ACC7C8758C8609A9EDC60A43",
+                  "QuoteAsset": "DDL",
+                  "Scale": 4
+                }
+              },
+              {
+                "PriceData": {
+                  "AssetPrice": "22c4",
+                  "BaseAsset": "F8941703977DDC15ACC7C8758C8609A9EDC60A43",
+                  "QuoteAsset": "HDL",
+                  "Scale": 4
+                }
+              },
+              {
+                "PriceData": {
+                  "AssetPrice": "1f67",
+                  "BaseAsset": "F8941703977DDC15ACC7C8758C8609A9EDC60A43",
+                  "QuoteAsset": "LIQ",
+                  "Scale": 4
+                }
+              },
+              {
+                "PriceData": {
+                  "AssetPrice": "c4452",
+                  "BaseAsset": "F8941703977DDC15ACC7C8758C8609A9EDC60A43",
+                  "QuoteAsset": "NAV",
+                  "Scale": 6
+                }
+              }
+            ],
+            "Provider": "42757A7A42616C6C7A205661756C7420536F6C76656E6379"
+          },
+          "LedgerEntryType": "Oracle",
+          "LedgerIndex": "9175B079C45BCEDD0806C167580C740E5AA166A465BBBCAFE7D446C2A5FDF47C"
+        }
+      }
+    ],
+    "TransactionIndex": 18,
+    "TransactionResult": "tesSUCCESS"
+  },
+  "status": "success",
+  "validated": true
+}

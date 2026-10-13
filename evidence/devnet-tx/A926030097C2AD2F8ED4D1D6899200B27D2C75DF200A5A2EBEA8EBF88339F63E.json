@@ -1,0 +1,54 @@
+{
+  "Account": "r4bWbrKjqQUAJ8Ht6qijknyRrnbSLeptGC",
+  "Counterparty": "r9ECFxtwCnogHnk5yWZvSxWaQtVc1tUJ47",
+  "CounterpartySignature": {
+    "SigningPubKey": "EDDE501D3CEEEC3C09EB25707296C5C6CFA3B282D28C129AD80306F05FA4BE8D84",
+    "TxnSignature": "84D7730F0648C0EE8D81C8444638BBCF1BB2E3DE68E208BCA36A0E69B77399FB4841650405CF22FFE9E44FC4A24D50988E2A9CEEB212499B15B5831BDCB8C60E"
+  },
+  "Fee": "4",
+  "Flags": 0,
+  "GracePeriod": 60,
+  "InterestRate": 100000,
+  "LastLedgerSequence": 5255775,
+  "LateInterestRate": 20000,
+  "LoanBrokerID": "E2583D0275DD0F8AFE2CBDD3B32181AFC3ADFE266ED1811C19C3A004CF5B3359",
+  "PaymentInterval": 60,
+  "PaymentTotal": 2,
+  "PrincipalRequested": "10000000",
+  "Sequence": 5255733,
+  "SigningPubKey": "EDC4188CD5A7F1BC658D4D926E9369BFB3B99136790E0424525B3A83654B52DDC2",
+  "TransactionType": "LoanSet",
+  "TxnSignature": "E35F64F05B78274C3F873B3A498479B48F90548A5572D75A632B9A914A4775A2BB13B4FACC40154CA599FC0B002631DC4F8CCDE7E5B7B400C534BEA4CA0D8702",
+  "ctid": "C050324D00060002",
+  "date": 842542032,
+  "hash": "A926030097C2AD2F8ED4D1D6899200B27D2C75DF200A5A2EBEA8EBF88339F63E",
+  "inLedger": 5255757,
+  "ledger_index": 5255757,
+  "meta": {
+    "AffectedNodes": [
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Account": "r4bWbrKjqQUAJ8Ht6qijknyRrnbSLeptGC",
+            "Balance": "85599987",
+            "Flags": 0,
+            "OwnerCount": 8,
+            "Sequence": 5255734
+          },
+          "LedgerEntryType": "AccountRoot",
+          "LedgerIndex": "DF12BC20765A6439069CD300EF0A43ABE75C4616575356D8ED1756F00C4DE787",
+          "PreviousFields": {
+            "Balance": "85599991",
+            "Sequence": 5255733
+          },
+          "PreviousTxnID": "E1121DED12D4A320FB58F77D02549429885D8A826B794F2B2539EC936BE39011",
+          "PreviousTxnLgrSeq": 5255745
+        }
+      }
+    ],
+    "TransactionIndex": 6,
+    "TransactionResult": "tecNO_PERMISSION"
+  },
+  "status": "success",
+  "validated": true
+}

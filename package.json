@@ -17,7 +17,9 @@
     "check:oracle": "node src/dev/check-oracle.mjs",
     "check:collateral": "node src/dev/check-collateral.mjs",
     "check:ordering": "node src/dev/check-ordering-math.mjs",
-    "check:history": "node src/dev/check-history.mjs"
+    "check:history": "node src/dev/check-history.mjs",
+    "check:evidence": "node src/dev/check-evidence.mjs",
+    "check:evidence:self-test": "node src/dev/check-evidence.mjs --self-test"
   },
   "dependencies": {
     "decimal.js": "10.6.0",

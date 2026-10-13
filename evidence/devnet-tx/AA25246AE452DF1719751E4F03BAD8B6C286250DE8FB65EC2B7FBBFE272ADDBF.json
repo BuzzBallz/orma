@@ -1,0 +1,44 @@
+{
+  "Account": "rnc7dQyrcFyXE9nyYbRaJ8tV3CZcFNEsfq",
+  "Amount": "3000000",
+  "Fee": "1",
+  "Flags": 0,
+  "LastLedgerSequence": 5262179,
+  "Sequence": 5262148,
+  "SigningPubKey": "EDA73B899A71F06AA76F6102EC7F9A5D2304FBD16A778181B5FE8FEF351197542C",
+  "TransactionType": "VaultDeposit",
+  "TxnSignature": "8D32619BC801118573979F4A2D2EE32544932F5953BF1CFB981DE8C76D41D6F80CD035E8B210294F02D2EA1835342DF6958AF6B0D562EDC26AD5751832FC2C02",
+  "VaultID": "4A5A8E3716D52E334AEB077ADB09456EF4A941CC26021A8EAD37F95B00190DF5",
+  "ctid": "C0504B51000E0002",
+  "date": 842562941,
+  "hash": "AA25246AE452DF1719751E4F03BAD8B6C286250DE8FB65EC2B7FBBFE272ADDBF",
+  "inLedger": 5262161,
+  "ledger_index": 5262161,
+  "meta": {
+    "AffectedNodes": [
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Account": "rnc7dQyrcFyXE9nyYbRaJ8tV3CZcFNEsfq",
+            "Balance": "79999997",
+            "Flags": 0,
+            "OwnerCount": 1,
+            "Sequence": 5262149
+          },
+          "LedgerEntryType": "AccountRoot",
+          "LedgerIndex": "C4014B8BEAEB8D498FC39B2343BF8D8ECC3C5C097EB6103CC8D213ADE748DB50",
+          "PreviousFields": {
+            "Balance": "79999998",
+            "Sequence": 5262148
+          },
+          "PreviousTxnID": "E2D6F396F4A92DE4F36BDF6FD360EC8C849D4ED9DFDF8585998161098DE8C86D",
+          "PreviousTxnLgrSeq": 5262159
+        }
+      }
+    ],
+    "TransactionIndex": 14,
+    "TransactionResult": "tecNO_AUTH"
+  },
+  "status": "success",
+  "validated": true
+}

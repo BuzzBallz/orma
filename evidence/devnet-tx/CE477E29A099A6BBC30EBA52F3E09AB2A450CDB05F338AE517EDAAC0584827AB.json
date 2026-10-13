@@ -1,0 +1,47 @@
+{
+  "Account": "r4bWbrKjqQUAJ8Ht6qijknyRrnbSLeptGC",
+  "CoverRateLiquidation": 10000,
+  "CoverRateMinimum": 10000,
+  "DebtMaximum": "5000000",
+  "Fee": "1",
+  "Flags": 0,
+  "LastLedgerSequence": 5255753,
+  "ManagementFeeRate": 1000,
+  "Sequence": 5255728,
+  "SigningPubKey": "EDC4188CD5A7F1BC658D4D926E9369BFB3B99136790E0424525B3A83654B52DDC2",
+  "TransactionType": "LoanBrokerSet",
+  "TxnSignature": "CE87D2E4A71F47EB6B5CC38549A846A4B45CCBE1445DB2788ECE574411CDD4EA47A422EEC88EB63AAFF2C768DEB1E2898061546871DACB79E7A25BB19369B10A",
+  "VaultID": "C10D1813DECEFA75B23D9436AE1F9E24406EDB7AF038DF09E088A270036F649C",
+  "ctid": "C0503237000B0002",
+  "date": 842541961,
+  "hash": "CE477E29A099A6BBC30EBA52F3E09AB2A450CDB05F338AE517EDAAC0584827AB",
+  "inLedger": 5255735,
+  "ledger_index": 5255735,
+  "meta": {
+    "AffectedNodes": [
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Account": "r4bWbrKjqQUAJ8Ht6qijknyRrnbSLeptGC",
+            "Balance": "90799997",
+            "Flags": 0,
+            "OwnerCount": 3,
+            "Sequence": 5255729
+          },
+          "LedgerEntryType": "AccountRoot",
+          "LedgerIndex": "DF12BC20765A6439069CD300EF0A43ABE75C4616575356D8ED1756F00C4DE787",
+          "PreviousFields": {
+            "Balance": "90799998",
+            "Sequence": 5255728
+          },
+          "PreviousTxnID": "E394EA9BD518BEE31275EC9ECA8DD4D1DF5837EAD315BD0530F0A4936EF11E61",
+          "PreviousTxnLgrSeq": 5255733
+        }
+      }
+    ],
+    "TransactionIndex": 11,
+    "TransactionResult": "tecNO_PERMISSION"
+  },
+  "status": "success",
+  "validated": true
+}

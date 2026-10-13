@@ -1,0 +1,170 @@
+{
+  "Account": "rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B",
+  "AssetClass": "7269736B",
+  "Fee": "1",
+  "Flags": 0,
+  "LastLedgerSequence": 5261728,
+  "LastUpdateTime": 1789246142,
+  "OracleDocumentID": 1,
+  "PriceDataSeries": [
+    {
+      "PriceData": {
+        "AssetPrice": "c4452",
+        "BaseAsset": "F8941703977DDC15ACC7C8758C8609A9EDC60A43",
+        "QuoteAsset": "NAV",
+        "Scale": 6
+      }
+    },
+    {
+      "PriceData": {
+        "AssetPrice": "22c4",
+        "BaseAsset": "F8941703977DDC15ACC7C8758C8609A9EDC60A43",
+        "QuoteAsset": "HDL",
+        "Scale": 4
+      }
+    },
+    {
+      "PriceData": {
+        "AssetPrice": "1f67",
+        "BaseAsset": "F8941703977DDC15ACC7C8758C8609A9EDC60A43",
+        "QuoteAsset": "LIQ",
+        "Scale": 4
+      }
+    },
+    {
+      "PriceData": {
+        "AssetPrice": "64",
+        "BaseAsset": "F8941703977DDC15ACC7C8758C8609A9EDC60A43",
+        "QuoteAsset": "COV",
+        "Scale": 4
+      }
+    },
+    {
+      "PriceData": {
+        "AssetPrice": "2710",
+        "BaseAsset": "F8941703977DDC15ACC7C8758C8609A9EDC60A43",
+        "QuoteAsset": "CNC",
+        "Scale": 4
+      }
+    },
+    {
+      "PriceData": {
+        "AssetPrice": "0",
+        "BaseAsset": "F8941703977DDC15ACC7C8758C8609A9EDC60A43",
+        "QuoteAsset": "DDL",
+        "Scale": 4
+      }
+    }
+  ],
+  "Provider": "42757A7A42616C6C7A205661756C7420536F6C76656E6379",
+  "Sequence": 5261679,
+  "SigningPubKey": "ED2F83700E3390142ACF0AEE7DF0EF1854CA33E6CF1B69248775BEC1A839DD8277",
+  "TransactionType": "OracleSet",
+  "TxnSignature": "175E94FA508CCFD9DCDFDB1DE87409DE367A0C2F00212AE22C10D8A667580CC480693B7950856ABB33386B039C912AF117F0C64BFC4BEA9C601182F38D470702",
+  "ctid": "C050498E000E0002",
+  "date": 842561351,
+  "hash": "DC5754D2EE4A6A7AB9233EA3EE704A9C2FD97FA06C80EA364E5D4811CAD75255",
+  "inLedger": 5261710,
+  "ledger_index": 5261710,
+  "meta": {
+    "AffectedNodes": [
+      {
+        "CreatedNode": {
+          "LedgerEntryType": "DirectoryNode",
+          "LedgerIndex": "6F087E7A82021915E095407FFF10E1B3885B49A0FC7178D5EE3DF42AA2D9F3C3",
+          "NewFields": {
+            "Owner": "rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B",
+            "RootIndex": "6F087E7A82021915E095407FFF10E1B3885B49A0FC7178D5EE3DF42AA2D9F3C3"
+          }
+        }
+      },
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Account": "rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B",
+            "Balance": "99999999",
+            "Flags": 0,
+            "OwnerCount": 2,
+            "Sequence": 5261680
+          },
+          "LedgerEntryType": "AccountRoot",
+          "LedgerIndex": "8F9D976026E5F2C2E6F083F12114095138A25C959C3C9CECB765EF7D236CA946",
+          "PreviousFields": {
+            "Balance": "100000000",
+            "OwnerCount": 0,
+            "Sequence": 5261679
+          },
+          "PreviousTxnID": "3A20D15175F4734218AB5A33C846C2B1CBA398BB8EBCB83C6F28580FA9517768",
+          "PreviousTxnLgrSeq": 5261679
+        }
+      },
+      {
+        "CreatedNode": {
+          "LedgerEntryType": "Oracle",
+          "LedgerIndex": "9175B079C45BCEDD0806C167580C740E5AA166A465BBBCAFE7D446C2A5FDF47C",
+          "NewFields": {
+            "AssetClass": "7269736B",
+            "LastUpdateTime": 1789246142,
+            "OracleDocumentID": 1,
+            "Owner": "rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B",
+            "PriceDataSeries": [
+              {
+                "PriceData": {
+                  "AssetPrice": "2710",
+                  "BaseAsset": "F8941703977DDC15ACC7C8758C8609A9EDC60A43",
+                  "QuoteAsset": "CNC",
+                  "Scale": 4
+                }
+              },
+              {
+                "PriceData": {
+                  "AssetPrice": "64",
+                  "BaseAsset": "F8941703977DDC15ACC7C8758C8609A9EDC60A43",
+                  "QuoteAsset": "COV",
+                  "Scale": 4
+                }
+              },
+              {
+                "PriceData": {
+                  "AssetPrice": "0",
+                  "BaseAsset": "F8941703977DDC15ACC7C8758C8609A9EDC60A43",
+                  "QuoteAsset": "DDL",
+                  "Scale": 4
+                }
+              },
+              {
+                "PriceData": {
+                  "AssetPrice": "22c4",
+                  "BaseAsset": "F8941703977DDC15ACC7C8758C8609A9EDC60A43",
+                  "QuoteAsset": "HDL",
+                  "Scale": 4
+                }
+              },
+              {
+                "PriceData": {
+                  "AssetPrice": "1f67",
+                  "BaseAsset": "F8941703977DDC15ACC7C8758C8609A9EDC60A43",
+                  "QuoteAsset": "LIQ",
+                  "Scale": 4
+                }
+              },
+              {
+                "PriceData": {
+                  "AssetPrice": "c4452",
+                  "BaseAsset": "F8941703977DDC15ACC7C8758C8609A9EDC60A43",
+                  "QuoteAsset": "NAV",
+                  "Scale": 6
+                }
+              }
+            ],
+            "Provider": "42757A7A42616C6C7A205661756C7420536F6C76656E6379"
+          }
+        }
+      }
+    ],
+    "TransactionIndex": 14,
+    "TransactionResult": "tesSUCCESS"
+  },
+  "status": "success",
+  "validated": true
+}
