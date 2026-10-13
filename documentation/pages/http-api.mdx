@@ -1,9 +1,9 @@
 ---
 title: "API reference"
-description: "The twelve routes Orma serves, the question each one answers, its parameters, and a real Devnet response."
+description: "The thirteen routes Orma serves, the question each one answers, its parameters, and a real Devnet response."
 ---
 
-Orma exposes twelve `GET` routes over plain HTTP. The server is `src/api.mjs`: `node:http`, no
+Orma exposes thirteen `GET` routes over plain HTTP. The server is `src/api.mjs`: `node:http`, no
 framework, no middleware stack. The default listen address is `http://localhost:8787`, overridable
 with `PORT`.
 
@@ -11,7 +11,8 @@ Every response body on this page was captured from the running service against X
 2026-09-12, server build `3.4.0-rc5`. All of them were taken at ledger `5263343` except the
 `/api/demo/state` capture, which is from ledger `5263439` a few minutes later, and the two history
 routes, captured on 2026-10-13 (server build `3.4.1`, ledgers `6091723` and `6091724`) once their
-responses stated the window they cover. Responses are trimmed for length where noted, never rewritten.
+responses stated the window they cover, and `/api/oracle-aggregate`, documented that day from ledger
+`6092503`. Responses are trimmed for length where noted, never rewritten.
 
 <Warning>
 This runs on Devnet, not Mainnet. XLS-65 vaults and XLS-66 lending are not amended into Mainnet, so
@@ -115,11 +116,11 @@ distressed loans and reports par.
 
 | code | status | retryable | raised when |
 |---|---|---|---|
-| `WARMING_UP` | 503 | true | the reader has not read that vault yet, so it is unknown rather than absent. Vault and MPT routes answer this until the reader's first pass over the facilities ends (it reads them one by one, a few seconds after a start), and vault routes afterwards for a facility it tracks whose first read has not succeeded |
-| `VAULT_NOT_FOUND` | 404 | false | the id is well formed, the reader has finished a pass, and it does not track that vault |
+| `WARMING_UP` | 503 | true | the reader has not read that vault yet, so it is unknown rather than absent. Vault and MPT routes answer this until the reader's first pass over the facilities ends (it reads them one by one, a few seconds after a start). After it, a vault route answers it for a facility the reader tracks but has not managed to read, and an MPT route while any tracked facility is in that state |
+| `VAULT_NOT_FOUND` | 404 | false | the id is well formed, the reader has finished a pass, and it either does not track that vault or the ledger answered that it does not exist |
 | `NO_SHARE_MPT` | 404 | false | the vault has no share issuance, so there is nothing to value |
 | `NO_BROKER` | 404 | false | the vault has no `LoanBroker`, so there is no conduct to reconstruct |
-| `SHARE_NOT_TRACKED` | 404 | false | no facility on this service issues that MPT |
+| `SHARE_NOT_TRACKED` | 404 | false | no facility on this service issues that MPT, once every tracked facility has been read or found not to exist |
 | `NOT_FOUND` | 404 | false | no route matched, or the demo capture file is missing |
 | `FORBIDDEN` | 403 | false | an operator `POST` from something other than loopback |
 | `INTERNAL` | 500 | true | anything unhandled |
@@ -176,6 +177,7 @@ fields may be added, nothing may ever be renamed, retyped or removed.
 | `GET /api/mpt/:mptId/nav` | the same valuation, keyed by the token |
 | `GET /api/mpt/:mptId/resolve` | can a stranger get from the token to a valuation |
 | `GET /api/indexer-race` | proof the first impairment is invisible to metadata diffing |
+| `GET /api/oracle-aggregate` | can a second publisher contest a reading, and what median does the ledger report |
 | `GET /api/demo/state` | which facilities are baked and live |
 
 ---
@@ -547,20 +549,23 @@ successful transaction that modified the `Vault` while it had shares outstanding
 Each point is read from that transaction's own metadata, not reconstructed: `AssetsTotal` and
 `LossUnrealized` from the `Vault` node's `FinalFields`, and the shares from the `MPTokenIssuance`
 node when the transaction moved them (between a deposit and a withdrawal the count carries forward).
-The transactions come from `account_tx` on the vault's pseudo-account, which lists the impairments;
-an `account_tx` on the broker's owner does not. The response is cached for 15 seconds.
+The transactions come from `account_tx` on the vault's pseudo-account, which lists every transaction
+that touched the `Vault`, impairments included, whoever signed it. The response is cached for 15 seconds.
 
-Devnet prunes old ledgers from the bottom, a ledger at a time and without saying so, so every read is
-merged with the archive in `evidence/devnet-tx/`: the four facilities' account histories as captured on
+Devnet prunes old ledgers in steps, each server on its own schedule: rippled's `online_delete` drops
+everything below the server's previous rotation point at once, and the public endpoint spreads requests
+over servers whose oldest ledgers differ. `account_tx` states the range it searched, never what it no
+longer holds, so a history can come back whole, cut or empty. Every read is therefore merged with the
+archive in `evidence/devnet-tx/`: the four facilities' account histories as captured on
 13 October 2026, declared per account in its `_manifest.json`. The two are merged by hash, the live copy
 winning, and a point whose transaction Devnet no longer returned says `"source": "archive"`. `window`
 says what the series rests on:
 
 | field | meaning |
 |---|---|
-| `complete` | `true` when no ledger is missing from the vault's creation (`fromLedger`) to its last change (`toLedger`, the Vault's `PreviousTxnLgrSeq`) |
+| `complete` | `true` when no ledger is missing from the vault's creation (`fromLedger`) to its last change (`toLedger`: the Vault's `PreviousTxnLgrSeq`, or the live read's top when that is unknown) |
 | `reason` | why not, when `complete` is `false`: the creating transaction was found in neither, or the first ledger that neither range covers |
-| `live` | the range the server searched (`account_tx`'s own `ledger_index_min` and `ledger_index_max`, which differ between servers), the transactions it returned, and `truncated` |
+| `live` | the range the live read covers: the one `account_tx` says it searched (its `ledger_index_min` and `ledger_index_max`, which differ between servers), starting instead at the ledger after the oldest transaction returned when the page limit stopped the read, or the span of what it returned when it states no range; then the transactions it returned, and `truncated` |
 | `archive` | the capture time, the declared range, the transactions declared for this account, whether all of them loaded (`intact`), and how many the live read no longer returned (`added`). `null` for an account the archive does not cover |
 
 `truncated` is `true` when the live read stopped at its page limit, 5 pages of 200, with older
@@ -933,8 +938,8 @@ looked unsignalled, and the rule written to reward disclosure was penalising it.
 `window` reads as on `nav-history`, over the owner's history: complete when no ledger is missing from
 the broker's creation to the later of its own last change and its vault's, since an impairment touches
 the `Vault` and the `Loan` but never the `LoanBroker`. When it is not complete, the grade is withheld
-rather than computed: `grade` and `score` are `null`, `withheld` is `true`, the one finding is
-`HISTORY_INCOMPLETE`, and `ordering` is not applicable. Pruning removes the oldest transactions first,
+rather than computed: `grade`, `score` and `observations.defaultsWithoutPriorImpairment` are `null`,
+`withheld` is `true`, the one finding is `HISTORY_INCOMPLETE`, and `ordering` is not applicable. Pruning removes the oldest transactions first,
 and for this broker those are its defaults: graded on what would remain, the same record reads "no
 defaults declared" and scores A 100 instead of E 25. `npm run check:archive` replays that case.
 
@@ -1127,6 +1132,88 @@ metadata is the `Loan` node's flags going from `0` to `131072`, on a different o
 This is why the reader in `src/poll.mjs` re-reads full state every 4 seconds and never diffs
 `PreviousFields`. Test flags by bit, not by equality: a loan can carry more than one flag, and
 `Flags === 131072` stops matching the day it does.
+
+---
+
+## GET /api/oracle-aggregate
+
+The captured contest on Meridian: two XLS-47 publishers posting opposite readings of the same vault, and
+the median rippled computed across them with `get_aggregate_price`. No parameters. Served from
+`demo/oracle-aggregate.json`, `NOT_FOUND` without it.
+
+```bash
+curl -s http://localhost:8787/api/oracle-aggregate
+```
+
+```json
+{
+  "serverTime": "2026-10-13T15:13:50Z",
+  "ledgerIndex": 6092503,
+  "probedAt": "2026-09-13T10:01:52Z",
+  "probedDuring": "XRPL Lending Protocol Hackathon, Paris, 12-13 September 2026",
+  "network": "devnet",
+  "buildVersion": "3.4.0-rc5",
+  "label": "Meridian Trade Finance I",
+  "vaultId": "864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835",
+  "baseAsset": "864C5A2DDCED78C6198B0703169D533B747A56E5",
+  "quoteAsset": "NAV",
+  "question": "Can a second publisher contest our reading without our permission, and does the ledger report the spread?",
+  "publishers": [
+    {
+      "role": "this service",
+      "account": "rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B",
+      "oracleDocumentId": 2,
+      "provider": "BuzzBallz Vault Solvency",
+      "nav": "0.803922",
+      "basis": "re-reads the vault object"
+    },
+    {
+      "role": "a second account of ours, playing a naive indexer",
+      "account": "raiwYKSDdrhiediLdgJyGEzP1estXcmVcM",
+      "oracleDocumentId": 1,
+      "provider": "Naive metadata indexer",
+      "nav": "1.000000",
+      "basis": "the naive reading a metadata diff gives, copied from demo/indexer-race.json",
+      "publishHash": null
+    }
+  ],
+  "aggregate": {
+    "median": "0.901961",
+    "mean": "0.901961",
+    "standardDeviation": "0.1386480834414958655",
+    "size": 2,
+    "ledgerIndex": null,
+    "computedBy": "rippled, from get_aggregate_price. Neither publisher computed it and neither can alter it."
+  },
+  "aggregateError": null,
+  "answer": "Yes. A second publisher can post a contrary reading without our permission; rippled reports a median of 0.901961 across both. In this capture both accounts were ours.",
+  "reproduce": {
+    "command": "get_aggregate_price",
+    "base_asset": "864C5A2DDCED78C6198B0703169D533B747A56E5",
+    "quote_asset": "NAV",
+    "oracles": [
+      {
+        "account": "rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B",
+        "oracle_document_id": 2
+      },
+      {
+        "account": "raiwYKSDdrhiediLdgJyGEzP1estXcmVcM",
+        "oracle_document_id": 1
+      }
+    ]
+  },
+  "redacted": [
+    "The second publisher is a throwaway Devnet faucet account. Its seed was never written to disk."
+  ]
+}
+```
+
+Both publishers were accounts of ours: the event-time publisher, which re-reads the vault object
+(`0.803922`), and a throwaway faucet account that published, once, the `1.000000` a metadata-diffing
+indexer computes. So the capture shows that a second publisher needs nobody's permission to contest a
+reading, and that the ledger reports the spread; it does not show that an independent one exists.
+`reproduce` is the request to run it again: on 13 October 2026 it still returned a median of `0.901961`,
+since Oracle objects are ledger state and are not pruned.
 
 ---
 

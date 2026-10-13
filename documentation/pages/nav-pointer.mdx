@@ -343,7 +343,7 @@ hostname you are willing to keep serving for the full life of the vault, on http
 a host you might move off is the one mistake this design cannot recover from.
 
 **The `icon` in that blob does not resolve.** `http://localhost:8787/assets/mark.svg` is
-written into the permanent metadata, and the reader serves twelve JSON routes and no static
+written into the permanent metadata, and the reader serves thirteen JSON routes and no static
 files, so that URL is a 404 today. Nothing in the resolution loop reads `icon`. It is an XLS-89
 discoverability field for explorers, and `resolveFromIssuance()` never fetches it, so the
 valuation path is unaffected. It is stated here because it is the same permanence

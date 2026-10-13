@@ -6,8 +6,7 @@
  * LossUnrealized on the Vault node, and the shares on the MPTokenIssuance node when the
  * transaction moved them (there is no SharesTotal on the Vault, see xrpl.mjs). The two
  * NAVs use the formulas of poll.mjs. account_tx on the vault's pseudo-account lists every
- * transaction that touched the Vault node, impairments included, which an account_tx on
- * the broker's owner alone does not.
+ * transaction that touched the Vault node, impairments included, whoever signed it.
  *
  * Devnet prunes that history, so it is read through archive.mjs: merged with the copy in
  * evidence/devnet-tx, each point saying which of the two it came from, and the response

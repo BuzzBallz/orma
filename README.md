@@ -359,6 +359,9 @@ GET  /api/vaults/:vaultId/broker-history
 GET  /api/vaults/:vaultId/gate
 GET  /api/mpt/:mptIssuanceId/nav          # CORS-open: called by a party with no relationship to us
 GET  /api/mpt/:mptIssuanceId/resolve      # CORS-open
+GET  /api/indexer-race                    # captures from the event
+GET  /api/oracle-aggregate
+GET  /api/demo/state
 ```
 
 ### Deploying
