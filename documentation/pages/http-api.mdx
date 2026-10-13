@@ -51,7 +51,8 @@ displayed as a figure, it is not.
 
 ### 2. Absent means zero, and the API normalises it away
 
-rippled omits any field whose value equals the type default. A vault carrying no unrealised loss
+rippled does not store an optional field (declared `SoeDefault`) while it holds its type default, so
+absent means zero. A vault carrying no unrealised loss
 has **no `LossUnrealized` key at all**, not `"0"`. That single behaviour is the root of the finding
 this whole project is built on, and it is handled in exactly one place: `num()` in `src/num.mjs`,
 which maps `undefined`, `null` and `""` to zero.
@@ -429,6 +430,11 @@ Things in there that are easy to misread:
   is a `UInt64` serialised as hex. `c4452` is 803922, which at `scale: 6` decodes to `0.803922`.
   Writing `"100"` into that field means 256, not one hundred. Full detail in
   [/mathematics](/mathematics#8-publication-as-an-oracle-object).
+- `oracle.publisher` and `oracle.oracleDocumentId` name the account and document the answering
+  reader publishes to. This capture is from the event, when that was `rpVg1…`, whose objects stopped
+  updating on 13 September; the deployed reader publishes from `rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H`.
+  Document id 3 is Calder on both accounts. The full mapping is in
+  [the quickstart](/quickstart#reading-the-objects-already-on-devnet).
 - `coverRateMinimum` and `coverRateLiquidation` are in units of $10^{-5}$. A stated `10000` is
   $0.10$. **Both** are divided by $10^{5}$, which is why `maxLiquidatableNow` is
   $\lceil 10{,}000{,}000 \times 0.10 \times 0.10 \rceil = 100{,}000$ drops against a
@@ -739,7 +745,7 @@ curl -s http://localhost:8787/api/vaults/24EAA01AD4CE70D8ABB4ACB4255DC4C216B8AF3
         "detail": "2 exposures were written off with no prior warning, so the loss was never signalled before it was taken."
       }
     ],
-    "caveat": "Reconstructed from the public record only, which is retained for roughly 29 days. Conduct before that window is not visible here."
+    "caveat": "Reconstructed from the public record only. Devnet prunes old ledgers, so conduct before the oldest retained ledger is not visible here."
   },
   "recommendation": {
     "applicable": false,
@@ -925,7 +931,7 @@ curl -s http://localhost:8787/api/indexer-race
   "transactionHash": "075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3",
   "transactionResult": "tesSUCCESS",
   "finding": "The first impairment of a previously-healthy vault is invisible to metadata diffing.",
-  "why": "LossUnrealized was 0 (the type default) so rippled omits it from PreviousFields. Under cash-basis accounting impairment changes nothing else on the Vault, so PreviousFields is entirely {} while FinalFields carries a non-zero LossUnrealized.",
+  "why": "A healthy vault does not carry LossUnrealized (an optional (SoeDefault) field at its default is not stored on the object), so there is no previous value for PreviousFields to record. Under cash-basis accounting impairment changes nothing else on the Vault, so PreviousFields is entirely {} while FinalFields carries a non-zero LossUnrealized.",
   "vaultId": "864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835",
   "loanBrokerId": "41BD2EA81CD03ED9EAC612BFFC6179AC742120FC4A5E0DD1D3E4DCE7DB5B2F38",
   "loanId": "60C170A9F1096E7200196E2DBC5849A5D8991C2F630123E77FF359B68F2B4188",
@@ -956,8 +962,8 @@ curl -s http://localhost:8787/api/indexer-race
 }
 ```
 
-`previousFields: {}` on the `Vault` node is the entire finding. `LossUnrealized` moved from zero, and
-rippled omits from `PreviousFields` any field whose previous value was the type default. Under
+`previousFields: {}` on the `Vault` node is the entire finding. A healthy vault carries no
+`LossUnrealized` field, and `PreviousFields` only records fields the object already had. Under
 cash-basis accounting (`LEVersion = 1`) impairment moves nothing else on the `Vault`, so the diff is
 empty while `FinalFields` carries a recognised loss of 10 XRP. The only signal anywhere in the
 metadata is the `Loan` node's flags going from `0` to `131072`, on a different object.

@@ -276,9 +276,9 @@ volatility in a number that is correct. It does not absorb a number that is wron
 
 <Note>
 The impairment on this facility is transaction
-`BD18EFB94490CA540E7A9C249971740C1228D1FBC3ED97C9BA9F4908F52D5F4F` on Devnet. rippled
-omits from `PreviousFields` any field whose previous value was the type default, so an
-impairment that moves `LossUnrealized` off zero emits an empty `PreviousFields` and an
+`BD18EFB94490CA540E7A9C249971740C1228D1FBC3ED97C9BA9F4908F52D5F4F` on Devnet.
+`PreviousFields` records only fields the object already had, and a healthy vault carries no
+`LossUnrealized`, so the impairment that creates it emits an empty `PreviousFields` and an
 indexer that diffs metadata sees no change at all. That behaviour is captured on a separate
 facility, transaction
 `075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3` in

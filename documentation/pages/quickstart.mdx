@@ -1,6 +1,6 @@
 ---
 title: "Quickstart"
-description: "Clone, prove the toolchain, start the reader against four live Devnet facilities, run the frontend, then bake your own."
+description: "Clone, install and check, start the reader against four live Devnet facilities, run the frontend, then bake your own."
 ---
 
 Orma is two processes. A Node reader that polls XLS-65 vaults on XRPL Devnet, scores them and
@@ -22,9 +22,10 @@ how to build your own.
 Two runtime dependencies, both pinned exactly: `xrpl` at `5.2.0` and `decimal.js` at `10.6.0`.
 
 <Warning>
-Do not run `npm install` or `pnpm install` in the repository root. `node_modules/` ships installed
-and verified, and re-resolving it is the one reliable way to lose a working toolchain. The
-frontend is the exception: `app/` is a separate tree and `pnpm install` there is expected.
+Install the repository root with `npm ci`, not `npm install`. `npm ci` installs the committed
+`package-lock.json` exactly, and re-resolving it can move `ripple-binary-codec`, the package that
+serialises closed-ended vaults. The frontend is separate: `app/` is its own tree and
+`pnpm install` there is expected.
 </Warning>
 
 ## Why the xrpl pin is exact
@@ -59,33 +60,29 @@ Two sharp edges survive on 5.2.0, and both are in the shipped code:
 `xrpl-py` is still on 5.1.0 and did not get either fix. Keep Python out of the signing path.
 </Note>
 
-## Step 1: prove the toolchain
-
-Run this first, every session, before trusting anything else. It drives the entire lending chain
-against live Devnet with no workarounds: `VaultCreate` to `VaultDeposit` to `LoanBrokerSet` to
-`LoanBrokerCoverDeposit` to `LoanSet` with a native counterparty signature.
+## Step 1: install and check
 
 ```bash
-npm run verify          # = node tools/verify-toolchain.mjs
+npm ci
+npm run check:ordering
 ```
 
+`check:ordering` needs no network. It recomputes, with the reader's own `coverForOrder` in
+`src/history.mjs`, the first-loss cover consumed by two defaults of 30 and 10 XRP declared in
+either order, and compares the result with the figures measured on-chain:
+
 ```
-[39.2s] vault+deposit+broker+cover all tesSUCCESS, zero workarounds
-For LoanSet transaction the auto calculated Fee accounts for total number of signers the counterparty has to avoid transaction failure.
-[47.1s] LoanSet tesSUCCESS  loan=86C4316664B46577…
+  BIG-FIRST    computed  500000  measured on-chain  500000  MATCH
+  SMALL-FIRST  computed  700000  measured on-chain  700000  MATCH
+  swing 40.00%  (measured 40.00%)  MATCH
+  closed form big-first   500000
+  closed form small-first 700000
 
-CONFIRMED: xrpl@5.2.0 signs the counterparty signature natively. Both recon workarounds are OBSOLETE.
+  PASS: the module reproduces the on-chain measurements exactly
 ```
 
-That is one real run. The middle line is `autofill`'s own warning about the second signature, and
-it is the warning described below: it is printed, and then the fee is not doubled. The loan id is
-different every time, because the script builds a fresh vault each run. The elapsed markers move
-with Devnet close times: 44.8 seconds is the figure recorded in the backend spec, the run above
-took 47.1 seconds, and both were all `tesSUCCESS`. It funds two throwaway faucet wallets and
-leaves a vault behind, which is fine: Devnet.
-
-If this fails, stop. Nothing downstream will work and the failure is almost certainly the
-toolchain rather than your code.
+It exits non-zero on any mismatch. If it fails, stop: the install is not the one the figures on
+these pages were produced with.
 
 ## Step 2: start the reader
 
@@ -173,10 +170,40 @@ objects across restarts.
 
 <Warning>
 Devnet faucet seeds are worthless and they are still private keys. `.env` and `/.demo-keys.json`
-are gitignored, and `tools/pre-commit` greps the added lines of every staged file for an XRPL
-family seed (`s…` or `sEd…`) and rejects the commit if it finds one. Do not weaken the hook, move
-the seed.
+are gitignored. We ran a local pre-commit hook that greps staged lines for an XRPL family seed
+(`s…` or `sEd…`); it is not part of this repository, so a clone has no such check. Add your own
+before you commit anywhere near a seed.
 </Warning>
+
+### Reading the objects already on Devnet
+
+The scores of the four baked facilities sit on two publisher accounts.
+`rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B`, the one in the log line above, published during the event;
+its objects were last updated between 14:20 and 14:21 UTC on 13 September 2026.
+`rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H` is the deployed reader behind
+`orma-api.onrender.com`, which publishes while the service runs. The free tier can sleep when idle,
+so read `LastUpdateTime` before using a value. The reader numbers documents in the order it first
+publishes them (`docIdFor` in `src/oracle.mjs`), so the ids are not fixed. Today both accounts use
+the same ones:
+
+| `oracle_document_id` | Facility | Vault id |
+|---|---|---|
+| 1 | Thorne Senior Secured I | `4A5A8E37…5B00190DF5` |
+| 2 | Meridian Trade Finance I | `864C5A2D…E37E8C835` |
+| 3 | Calder Structured Credit III | `5763707D…2A96CB0E5` |
+| 4 | Kestrel Bridge Financing II | `24EAA01A…1E5810089` |
+
+Kestrel, from the deployed publisher:
+
+```json
+{ "command": "ledger_entry", "oracle": { "account": "rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H", "oracle_document_id": 4 }, "ledger_index": "validated" }
+```
+
+Every `BaseAsset` in the answer is the first 20 bytes of the vault id,
+`24EAA01AD4CE70D8ABB4ACB4255DC4C216B8AF3B` for Kestrel, which is how to check that the object is
+the vault you meant. The same request with the `rpVg1…` account returns Kestrel as it stood at the
+end of the event. `GET /api/vaults/:vaultId` reports the publisher, document id and object index a
+reader is using, under `oracle`.
 
 ## Step 4: the frontend
 
@@ -242,8 +269,8 @@ AAA	100	1.000000	1.000000	0bp	Thorne Senior Secured I
 
 Two things to read off that table. Meridian and Calder both report a unit value of `1.000000` and
 hold `0.803922`: 1961 basis points of divergence that an indexer diffing transaction metadata
-never sees, because `LossUnrealized` moved from zero and rippled omits type-default previous
-values from `PreviousFields`. Kestrel shows zero divergence and still grades **B**, because its
+never sees, because a healthy vault carries no `LossUnrealized` and `PreviousFields` only records
+fields the object already had. Kestrel shows zero divergence and still grades **B**, because its
 losses were not impaired, they were defaulted, and a realised write-off leaves no provision behind
 to diverge from. The score's memory term is what catches it. Full method at
 [/mathematics](/mathematics), sections 4 to 6.

@@ -63,11 +63,11 @@ The rule is written down, in C++. `LoanBrokerSet.cpp` lines 149 to 161 at commit
 confusion it causes, ending in `JLOG(ctx.j.warn()) << "LoanBroker requires a closed-ended Vault.";`. rippled
 computes that sentence and then discards it.
 
-Across the published `XLS-0065`, `XLS-0065/65.1` and `XLS-0066` documents on `master`, the strings
-`VaultKind`, `SubscriptionDate`, `RedemptionDate`, `LEVersion` and "closed-ended" each occur **zero** times.
-The closed-ended vault is specified in `XRPL-Standards` PR #587 (open since 2026-07-21), cash-basis
-accounting in PR #582 (2026-07-16), two-step loan creation in PR #570 (80 days). The library maintainers
-cite #587 as their source, so they can read it and application developers cannot.
+At the event, across the published `XLS-0065`, `XLS-0065/65.1` and `XLS-0066` documents on `master`, the
+strings `VaultKind`, `SubscriptionDate`, `RedemptionDate`, `LEVersion` and "closed-ended" each occurred
+**zero** times. The closed-ended vault was specified in `XRPL-Standards` PR #587 (opened 2026-07-21),
+cash-basis accounting in PR #582 (2026-07-16), two-step loan creation in PR #570 (80 days). The library
+maintainers cited #587 as their source, so they could read it and application developers could not.
 
 **What it cost.** Two hours, ending in reading the transactor source. It is worse than that for anyone who
 does not: `VaultKind` is immutable, `VaultSet` rejects it at deserialization with
@@ -78,8 +78,12 @@ discovers the whole thing has to be torn down. The cost of the missing paragraph
 **Cheapest fix.** One line. Add an eleventh protocol-level failure condition to XLS-66 §3.3.3.2, in the
 create branch: *"`Vault(VaultID).VaultKind` is not `ClosedEnded` (`tecNO_PERMISSION`), requires
 `LendingProtocolV1_1`."* The behaviour is already agreed (`rippled#8076`, merged 2026-08-26) and already
-documented downstream in the open `xrpl-dev-portal#3923`, which targets `release-3.4.0` and so is not on
-xrpl.org yet.
+documented downstream in `xrpl-dev-portal#3923`, which targets `release-3.4.0` and was merged on 2026-09-16.
+
+**Since the event.** We left three notes on the closed-ended vault draft, among them this missing
+`LoanBrokerSet` condition. Its author addressed them and #587 was merged on 2026-09-15. The condition is now
+in the draft amendment XLS-66.1.2 (status: Draft) on `master`,
+`XLS-0066-lending-protocol/66.1/66.1.2-closed-ended-loan-gates.md` §3.3.
 
 ---
 
@@ -128,8 +132,8 @@ what the live demonstration uses. Two vaults, two transactions, one result.
 }
 ```
 
-rippled omits from `PreviousFields` any field whose previous value equalled the type default.
-`LossUnrealized` defaults to 0, so there is nothing to record. Under cash-basis accounting an impairment
+`PreviousFields` records a previous value only for a field the object already had. A healthy vault
+carries no `LossUnrealized` at all, so there is nothing to record. Under cash-basis accounting an impairment
 changes nothing else on the Vault: `AssetsTotal` and `AssetsAvailable` are untouched. The net result is a
 `ModifiedNode` that reads as touched but unchanged.
 
@@ -149,7 +153,7 @@ The reason it survives casual testing is that it is asymmetric. Same field, thre
 
 | Event | Previous value | `PreviousFields` | Visible to a diff |
 |---|---|---|---|
-| First impairment of a healthy vault | 0, the type default | `{}` | **No** |
+| First impairment of a healthy vault | none, the field is absent | `{}` | **No** |
 | `tfLoanUnimpair` | 10000000 | `{"LossUnrealized":"10000000"}` | Yes |
 | Second impairment while one is outstanding | 2000000 | `{"LossUnrealized":"2000000"}` | Yes |
 
@@ -159,23 +163,25 @@ reversal, or a second impairment, sees correct metadata and concludes the system
 breaks is the transition from healthy to distressed.
 
 <Warning>
-The same rule hides the first non-zero `DebtTotal`, the first `CoverAvailable`, the first `AssetsTotal`.
-`LossUnrealized` is only where it hurts most. There is a matching trap at the other end of the lifecycle:
+The same absence hides the first `AssetsTotal` of a vault (first `VaultDeposit`, `202F9600CC1D85266FFB27B70F26CE09AB0FE0423D4A8E77FA12F7F8D515F6C1`), the
+first `CoverAvailable` of a broker (first `LoanBrokerCoverDeposit`, `13ECAC8451FB861723953DFE8BA9EC8B642A14FA5255943E7C7B1349EB1DD562`) and its first
+`DebtTotal` (first `LoanSet`, `525FC003CF1D4C99B82E876DE945000A681230D4312C03DE1120EA9F905118AB`). `LossUnrealized` is only where it hurts most.
+There is a matching trap at the other end of the lifecycle:
 `tfLoanDefault` **deletes** `PrincipalOutstanding`, `TotalValueOutstanding`, `PaymentRemaining` and
 `NextPaymentDueDate` from the `Loan` object, so `loan.PrincipalOutstanding` after a default is `undefined`,
 not `"0"`. That crashed our own reader once before we guarded it.
 </Warning>
 
-**Prior art, and why it is the strongest evidence in the register.** `XRPLF/rippled#6487`, opened
-2026-03-05 by `zgrguric` of XRPLWin, an XRPL explorer operator, reports exactly this with a live Devnet
-reproduction. He closed it himself the same day with one comment: "Not a bug." No maintainer replied. The
-behaviour is unchanged six months later on 3.4.0-rc5, re-confirmed by
-`BF3C131BFCDB0BA867DDA4A3AC2F99360A7E4D7AA196F35BEB0906CA4FF9A94C`. The person this trap is built for hit
-it, could not distinguish a silent correctness bug from intended behaviour, and filed it away as his own
-misunderstanding. That closure is the finding.
+**Prior art.** `XRPLF/rippled#6487`, opened 2026-03-05 by `zgrguric` of XRPLWin, an XRPL explorer
+operator, reported the same empty `PreviousFields` with a live Devnet reproduction, and its reporter closed
+it the same day as not a bug. The behaviour is unchanged on 3.4.0-rc5, re-confirmed by
+`BF3C131BFCDB0BA867DDA4A3AC2F99360A7E4D7AA196F35BEB0906CA4FF9A94C`. We commented on #6487 and filed the
+documentation gap as `rippled#8222`, which a maintainer moved to the documentation repository as
+[`xrpl-dev-portal#3926`](https://github.com/XRPLF/xrpl-dev-portal/issues/3926), "Add clarification to docs
+on PreviousFields metadata rules", open as of 13 October 2026.
 
-**Cheapest fix.** One paragraph on the transaction-metadata page: *"`PreviousFields` omits any field whose
-previous value equalled the type default. Do not infer 'unchanged' from an empty `PreviousFields`."* The
+**Cheapest fix.** One paragraph on the transaction-metadata page: *"`PreviousFields` records only fields
+that existed on the object before the transaction. Do not infer 'unchanged' from an empty `PreviousFields`."* The
 correct fix, emitting the default into `PreviousFields` when a field is created on an existing node, changes
 the metadata format and needs an amendment. The paragraph does not.
 
@@ -488,9 +494,11 @@ if (result === 'tecARRAY_TOO_LARGE') {
 }
 ```
 
-The two rules we follow as a result: always resend the full six-dimension series, and take
-`OracleDocumentID` from an explicit table rather than from a hash of the vault id, since the id is a
-`UInt32` scoped to the account and a collision silently overwrites another vault's scores.
+The two rules we follow as a result: always resend the full six-dimension series, and number
+`OracleDocumentID`s from a counter in the order vaults are first published rather than from a hash of the
+vault id, since the id is a `UInt32` scoped to the account and a collision silently overwrites another
+vault's scores. The counter lives in memory, so a restart that meets the vaults in a different order
+assigns different ids; identify a vault by `BaseAsset`, not by document id.
 
 **Cheapest fix.** Put all four behaviours in the `OracleSet` reference page, and say plainly that the
 transaction replaces the document rather than merging into it. Then document the non-price use, because
@@ -518,12 +526,16 @@ Stated so nobody builds on a claim we did not make.
 
 ## Where these findings live
 
-The findings are filed upstream. Where a search found an existing issue we comment there with our
-lending-specific reproduction rather than open a duplicate, which is the case for X1 on
-`XRPLF/rippled#6487` and for fourteen others. Where an open pull request already implements the fix we ask
-for, we say so and support it rather than ask twice: `rippled#7848` for U1, `rippled#7950` for the
+Where a search found an existing upstream issue or pull request, the register cites it rather than
+proposing a duplicate: X1 on `XRPLF/rippled#6487` and fourteen others. Where a pull request already
+implements the fix we ask for, we say so rather than ask twice: `rippled#7848` for U1, `rippled#7950` for the
 withdrawal codes, `xrpl-dev-portal#3923` and `XRPL-Standards#587`, `#582` and `#570` for D1. Three findings
 were withdrawn after re-verification and are listed rather than deleted.
+
+What we actually posted upstream is six items, listed in `contrib/filings/README.md`: two issues
+(`rippled#8222`, since moved to `xrpl-dev-portal#3926`, and `xrpl.js#3477`) and four comments
+(`rippled#6487`, `XRPL-Standards#587` and `#582`, `xrpl.js#3435`). The tutorial pull request was
+deliberately not filed, because `xrpl-dev-portal#3923` already carried four of its five fixes.
 
 The complete register is `feedback/appendix.pdf`: 40 findings with transaction
 hashes, file and line references, verbatim error strings, upstream issue and pull request numbers, and the

@@ -58,8 +58,8 @@ is `075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3`, result
 }
 ```
 
-`previousFields` is empty. `rippled` omits from `PreviousFields` any field whose previous
-value was the type default, and `LossUnrealized` was `0`. Under cash-basis accounting
+`previousFields` is empty. `PreviousFields` records a previous value only for a field the
+object already had, and a healthy vault carries no `LossUnrealized`. Under cash-basis accounting
 (`LEVersion = 1`) an impairment touches nothing else on the Vault object: it does not move
 `AssetsTotal` and it does not move `AssetsAvailable`. So there is no field left to diff. An
 indexer that builds vault state by applying transaction metadata deltas is told nothing at
@@ -265,8 +265,9 @@ every response that carries a grade. When the grade cannot be computed the block
 and the valuation stands on its own. Orma is not a regulated rating agency and the method
 version is `1.0.0`, which means it has existed for one weekend.
 
-Conduct history is reconstructed from the public transaction record, which a Devnet node
-retains for roughly 29 days. Anything a manager did before that window is not visible, and
+Conduct history is reconstructed from the public transaction record, which Devnet prunes. The
+window is not a fixed number of days; on 13 October 2026 it reached back about a month. Anything
+a manager did before that window is not visible, and
 the API says so in a `caveat` field rather than pretending the record is complete.
 
 Reconstructing that history needed a join that is not documented anywhere: `LoanManage`

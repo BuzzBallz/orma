@@ -31,7 +31,7 @@ significant digits. All arithmetic is done at 40 significant digits with `decima
 `parseFloat` are never applied to a monetary value: 19 significant digits do not survive an IEEE-754
 double, and `BigInt("1e17")` throws on the scientific notation rippled sometimes emits. One helper,
 `num()` in `src/num.mjs`, is the single place where "field absent" is coalesced to zero, because
-rippled omits any field equal to its type default.
+rippled does not store an optional field (declared `SoeDefault`) while it holds its type default.
 
 ### Rate scale
 
@@ -88,8 +88,8 @@ report 1960. If you reimplement this and get 1960, that is the reason.
 
 ### Why the naive figure is not merely lazy
 
-rippled omits from `PreviousFields` any field whose previous value was the type default. On the first
-impairment of a healthy vault, $L$ moves from $0$, so `PreviousFields` is emitted **empty**. Under
+`PreviousFields` records a previous value only for a field the object already had. A healthy vault
+carries no `LossUnrealized` field, so its first impairment emits `PreviousFields` **empty**. Under
 cash-basis accounting (`LEVersion = 1`) impairment changes nothing else on the Vault object. An
 indexer that diffs transaction metadata therefore observes no change at all on the vault it is
 watching.
@@ -412,8 +412,9 @@ was penalising it.
 
 Two further honesty notes on this section. A defaulted loan drops `PrincipalOutstanding` from
 `FinalFields`, so the exposure a default was taken against is read from `PreviousFields` and, failing
-that, from the decrement in `DebtTotal`. And Devnet prunes account history to roughly 29 days, so this
-is a window, not a lifetime. The API says so in a `caveat` field on the `reputation` block of
+that, from the decrement in `DebtTotal`. And Devnet prunes old ledgers, so this
+is a window, not a lifetime. The window is not a fixed number of days and varies by server; on
+13 October 2026 one public server's oldest ledger had closed on 10 September, and another served older ones. The API says so in a `caveat` field on the `reputation` block of
 `GET /api/vaults/{id}/broker-history`.
 
 Implemented in `src/history.mjs`.
@@ -502,9 +503,11 @@ Each of these corrupts data silently rather than erroring.
    so reusing a document id for a different set of assets accumulates stale pairs until the series
    passes the ledger's ceiling and `OracleSet` returns `tecARRAY_TOO_LARGE`. Recovery is either
    listing every stale pair with no price, or `OracleDelete` then recreate, which is what this
-   publisher does because it does not know what the stale pairs were. Document ids come from an explicit table, never from a hash of the
-   vault id, because the id is a `UInt32` scoped to (account, id) and a collision would silently
-   overwrite another vault's scores.
+   publisher does because it does not know what the stale pairs were. Document ids come from a counter, in
+   the order the publisher first meets each vault (`docIdFor` in `src/oracle.mjs`), never from a hash of
+   the vault id, because the id is a `UInt32` scoped to (account, id) and a collision would silently
+   overwrite another vault's scores. The counter lives in memory, so a restart that meets the vaults in a
+   different order assigns different ids. `BaseAsset` identifies the vault; the document id does not.
 2. `LastUpdateTime` must **strictly increase**. Equal or lower gives `tecINVALID_UPDATE_TIME`, burning
    a fee and a sequence number.
 3. A `LastUpdateTime` in the **future bricks** the object until wall clock catches up. Never add a
@@ -516,9 +519,10 @@ Each of these corrupts data silently rather than erroring.
 
 ### Read back from the ledger
 
-Decoded from the live Oracle object
+Decoded from the Oracle object
 `03C7B0E151129510F11FF92CCE8FBB3E7AD3C55B25EDA6EB414324E3E995078A`, document id 3, for Calder
-Structured Credit III:
+Structured Credit III, as the event publisher `rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B` left it on
+13 September 2026:
 
 | code | raw | scale | decoded | check |
 |---|---|---|---|---|
@@ -610,8 +614,10 @@ await client.disconnect()
 
 `AssetsTotal` and `LossUnrealized` should equal `provenance.assetsTotal` and
 `provenance.lossUnrealized` as of the `ledgerIndex` on the response envelope. If `LossUnrealized` is
-absent from the node's response, that means zero: rippled omits any field equal to its type default,
-which is the same rule that makes the first impairment invisible to a diffing indexer.
+absent from the node's response, that means zero: rippled does not store an optional field (declared
+`SoeDefault`) while it holds its type default. Because the field is absent before the first impairment,
+`PreviousFields` has no previous value to record for it, which is what makes that impairment invisible to
+a diffing indexer.
 
 Three further checks, in increasing order of effort:
 

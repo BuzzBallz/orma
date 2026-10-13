@@ -358,8 +358,8 @@ verdict: {
 
 The four Devnet seeds are written separately to `.demo-keys.json`, which is gitignored, so the gate can be
 replayed live rather than only recounted. Faucet keys on a test network are worthless and they are still
-private keys, so they stay out of the committed artefact. A pre-commit hook checks staged content for seeds
-by checksum and refuses the commit if one appears.
+private keys, so they stay out of the committed artefact. The pre-commit hook that checked staged content
+for seeds during the event was local and is not part of this repository.
 
 ## What this does not do
 

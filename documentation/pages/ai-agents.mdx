@@ -276,14 +276,14 @@ Decimal.set({ precision: 40 })
 const assets = new Decimal(vault.AssetsTotal ?? 0)
 ```
 
-Also: rippled omits any field whose value equals the type default. A vault with no unrealised
-loss has **no `LossUnrealized` key at all**, not `"0"`. Coalesce absent to zero in one helper so
+Also: rippled does not store an optional field (declared `SoeDefault`) while it holds its type
+default, so absent means zero. A vault with no unrealised loss has **no `LossUnrealized` key at all**, not `"0"`. Coalesce absent to zero in one helper so
 a call site cannot forget.
 
 ### 2. Never diff `PreviousFields`
 
-`PreviousFields` omits any field whose previous value was the type default. On the first
-impairment of a healthy vault, `LossUnrealized` moves up from 0, so it is omitted, and under
+`PreviousFields` records a previous value only for a field the object already had. On the first
+impairment of a healthy vault, `LossUnrealized` did not exist before, so it is omitted, and under
 cash-basis accounting (`LEVersion = 1`) impairment changes nothing else on the Vault object.
 The Vault node's `PreviousFields` is emitted **empty**. An indexer that diffs metadata sees no
 change at all.
@@ -405,9 +405,10 @@ scale `s` decodes to `v * 10^-s`.
 1. Monetary values are decimal strings up to 19 significant digits. Use decimal.js at
    precision 40. Never Number(), never parseFloat, never BigInt() on a value that may be
    in scientific notation.
-2. An absent ledger field means zero, not missing. rippled omits type defaults.
-3. Never diff PreviousFields. It omits any field whose previous value was the default, so
-   the first impairment of a healthy vault emits PreviousFields: {}. Re-read the object.
+2. An absent optional ledger field means zero, not missing. rippled does not store an
+   optional (SoeDefault) field while it holds its type default.
+3. Never diff PreviousFields. It only records fields the object already had, so the
+   first impairment of a healthy vault emits PreviousFields: {}. Re-read the object.
 4. DomainID lives on the share MPTokenIssuance, not on the Vault. tfVaultPrivate
    (0x00010000) is required alongside it or nothing is gated.
 5. LoanManage carries LoanID only, no LoanBrokerID, and an impairment does not touch the
@@ -427,6 +428,7 @@ scale `s` decodes to `v * 10^-s`.
 <Tip>
 If an assistant writes ledger-reading code that has not been run against a live node, treat the
 output as unverified. Two research agents contradicted each other during this project's recon
-and only live execution settled it. `npm run verify` proves the full lending chain on Devnet in
-about 45 seconds.
+and only live execution settled it. `npm run check:history` builds a broker with two loans on
+live Devnet, defaults both, and checks that the reader reconstructs the order and its cost, in about
+three and a half minutes.
 </Tip>

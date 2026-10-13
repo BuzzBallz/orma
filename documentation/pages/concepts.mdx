@@ -32,9 +32,10 @@ units outstanding live on a different ledger object entirely, the share token's 
 A tool that reads `AssetsTotal` and divides by units is reading the fund before provisions.
 
 <Warning>
-rippled omits any field whose value equals the type default. A vault with no recognised loss has no
-`LossUnrealized` key at all, not `"0"`. Absent means zero everywhere, and confusing "absent because
-zero" with "absent because deleted" is a real source of wrong numbers. See `src/num.mjs`.
+rippled does not store an optional field (declared `SoeDefault`) while it holds its type default, so
+absent means zero. A vault with no recognised loss has no `LossUnrealized` key at all, not `"0"`.
+Required fields such as `Flags` are stored even at 0. Confusing "absent because zero" with "absent
+because deleted" is a real source of wrong numbers. See `src/num.mjs`.
 </Warning>
 
 ## Open-ended and closed-ended
@@ -290,9 +291,9 @@ $S = 51{,}000{,}000$. Naive reads $1.000000$ and held reads $0.803922$, a diverg
 points. Same object, same instant, two answers.
 
 The delay is not merely invisible to careless tools. It is invisible to careful ones that watch
-transaction metadata. rippled omits from `PreviousFields` any field whose previous value was the
-type default. On the first impairment of a healthy vault, `LossUnrealized` moves from zero, and
-under cash basis nothing else on the Vault changes, so `PreviousFields` is emitted **empty** and an
+transaction metadata. `PreviousFields` records a previous value only for a field the object
+already had. A healthy vault carries no `LossUnrealized` field, its first impairment creates one,
+and under cash basis nothing else on the Vault changes, so `PreviousFields` is emitted **empty** and an
 indexer that diffs metadata sees no change at all on the most important credit event the protocol
 has. Captured in transaction
 `075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3`, result `tesSUCCESS`; the

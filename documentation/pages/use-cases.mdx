@@ -137,7 +137,8 @@ curl -s localhost:8787/api/vaults/24EAA01AD4CE70D8ABB4ACB4255DC4C216B8AF3B9E7315
 ```
 
 <Note>
-Conduct is reconstructed from `account_tx`, which Devnet retains for roughly 29 days. The
+Conduct is reconstructed from `account_tx`, and Devnet prunes old ledgers: on 13 October 2026
+the oldest one the public endpoint served was about a month old. The
 API returns that caveat in the response body rather than burying it in a footnote. Conduct
 before the retention window is not visible and is not claimed to be.
 </Note>
@@ -405,7 +406,8 @@ issuer, and every deposit is then checked against it by consensus.
 - Devnet only, because XLS-65 and XLS-66 are not on Mainnet. XLS-70 credentials and
   XLS-80 permissioned domains are, so the enforcement half of case 4 has a production
   path ahead of the measurement half.
-- Conduct history is bounded by `account_tx` retention, roughly 29 days.
+- Conduct history is bounded by how far back the queried server keeps ledgers, which on Devnet
+  is not a fixed number of days (about a month on 13 October 2026).
 - The credential bar is a fixed threshold, `ORMA-IG` at BBB- or better. Nothing
   automatically reissues or revokes when a grade moves.
 - The pointer written into Calder's metadata is a `localhost` URL and cannot be changed.
