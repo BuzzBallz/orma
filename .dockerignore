@@ -5,3 +5,6 @@
 !package-lock.json
 !src/**
 !demo/**
+# The Devnet transactions the history routes fall back on once Devnet prunes them. Without this
+# line the image starts, logs that it has no archive, and the history of the event goes missing.
+!evidence/devnet-tx/**

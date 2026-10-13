@@ -1,7 +1,9 @@
 # The reader and its HTTP API. The frontend is static and deploys separately, from app/.
 #
 # The image carries exactly what the process reads at runtime: the lockfile's dependencies,
-# src/ and the committed facility captures in demo/. Nothing is written to disk, so it runs
+# src/, the committed facility captures in demo/, and the Devnet transactions in
+# evidence/devnet-tx that the history routes merge in once Devnet has pruned them (src/archive.mjs
+# resolves them next to src/). Nothing is written to disk, so it runs
 # as the unprivileged node user. No key is baked in: PUBLISH_SEED, when used, comes from the
 # platform's environment.
 FROM node:24.13.0-bookworm-slim
@@ -16,6 +18,7 @@ RUN npm ci --omit=dev && npm cache clean --force
 
 COPY src ./src
 COPY demo ./demo
+COPY evidence/devnet-tx ./evidence/devnet-tx
 
 USER node
 EXPOSE 8787
