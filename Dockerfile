@@ -11,7 +11,7 @@ FROM node:24.13.0-bookworm-slim@sha256:4660b1ca8b28d6d1906fd644abe34b2ed81d15434
 WORKDIR /srv/orma
 ENV NODE_ENV=production
 
-# npm ci installs the committed lockfile exactly (xrpl 5.2.0, ripple-binary-codec 2.11.0),
+# npm ci installs the committed lockfile exactly (xrpl 5.3.0, ripple-binary-codec 2.11.0),
 # rather than re-resolving it: the codec is the package that serializes closed-ended vaults.
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
