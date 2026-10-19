@@ -23,8 +23,8 @@ importers:
         specifier: ^0.7.1
         version: 0.7.1
       cn:
-        specifier: ^0.3.0
-        version: 0.3.0
+        specifier: ^0.5.0
+        version: 0.5.0
       lucide-react:
         specifier: ^1.45.0
         version: 1.45.0(react@19.3.0)
@@ -1430,9 +1430,9 @@ packages:
     engines: {node: '>=20'}
     hasBin: true
 
-  cn@0.3.0:
-    resolution: {integrity: sha512-qRoU0ARrZD3Bbj1wKFftEKxPjSnzTEdFkf22NVhW+zU9D/wajhoP+qUZ5DChhhSOBCH1onV12hrmGqfu1+5Z2Q==}
-    engines: {node: '>=20'}
+  cn@0.5.0:
+    resolution: {integrity: sha512-JGEixZEpfFXm1P5uXwvEobOFLlHwIWi5v4tjd1ZwfiYmcEilkuD2l+054rvJcYCR1B+uVThHeUbgmNz1FwuxuA==}
+    engines: {node: '>=22'}
     hasBin: true
 
   code-block-writer@13.0.3:
@@ -4079,7 +4079,7 @@ snapshots:
 
   cn@0.2.6: {}
 
-  cn@0.3.0: {}
+  cn@0.5.0: {}
 
   code-block-writer@13.0.3: {}
 
