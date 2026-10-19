@@ -46,7 +46,7 @@ export function Methodology({ rules }: { rules: MethodRules | null }) {
               down by the share it lost. The first band met applies; a ceiling holds however strong
               the rest of the facility is.
             </p>
-            <div className="tbl-wrap fac-list">
+            <div className="tbl-wrap">
               <table className="op-tbl fit">
                 <thead><tr><th>Capital destroyed</th><th className="rt">Notches</th><th>At most</th></tr></thead>
                 <tbody>
@@ -67,7 +67,7 @@ export function Methodology({ rules }: { rules: MethodRules | null }) {
               place points are used: it starts at 100, loses points for each finding below, and
               reads a letter off what is left.
             </p>
-            <div className="tbl-wrap fac-list">
+            <div className="tbl-wrap">
               <table className="op-tbl fit">
                 <thead><tr><th>Finding</th><th className="rt">Points</th></tr></thead>
                 <tbody>
