@@ -91,6 +91,7 @@ export function NavChart({ points }: { points: NavPoint[] }) {
     <div className="navc" ref={box}>
       <TooltipProvider delayDuration={100}>
         <svg
+          width={width} height={H} viewBox={`0 0 ${width} ${H}`} role="img"
           aria-label={`NAV over ${n} transactions: reported ${points[0].navNaive} to ${last.navNaive}, held ${points[0].navCorrect} to ${last.navCorrect}.`}
         >
           {ticks.map(t => (

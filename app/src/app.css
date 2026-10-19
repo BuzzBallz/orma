@@ -571,7 +571,9 @@ main:focus{ outline: none; }
 /* NAV history: reported against held at every transaction, the turning points in the brand gold. */
 .op-nav{ padding-top: var(--space-16); display: flex; flex-direction: column; gap: var(--space-2); }
 .navc{ margin-top: var(--space-5); display: flex; flex-direction: column; gap: var(--space-5); }
-.navc svg{ display: block; max-width: 100%; overflow: visible; }
+/* The viewBox lets the chart scale down whole where its box is narrower than it was drawn for
+   (paper, or the moment before the resize observer answers) instead of being cut off. */
+.navc svg{ display: block; max-width: 100%; height: auto; overflow: visible; }
 .navc-grid{ stroke: var(--color-line); stroke-width: 1; }
 .navc-tick{ font: 400 12px var(--font-mono); fill: var(--color-text-3); }
 .navc-xl{ font: 500 12px var(--font-sans); fill: var(--color-text-2); }
