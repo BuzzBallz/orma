@@ -244,7 +244,7 @@ function Desk() {
         ? gate.data : null
       const nh = navHist.data && navHist.data.vaultId?.toUpperCase() === d.vault.vaultId.toUpperCase()
         ? navHist.data : null
-      return <Facility d={d} history={h} collateral={c} resolution={rz} gate={gt} contest={contest.data} navHistory={nh} picker={picker} />
+      return <Facility d={d} history={h} collateral={c} resolution={rz} gate={gt} contest={contest.data?.vaultId?.toUpperCase() === d.vault.vaultId.toUpperCase() ? contest.data : null} navHistory={nh} picker={picker} />
     }
     return <Event d={own} picker={picker} />
   }
