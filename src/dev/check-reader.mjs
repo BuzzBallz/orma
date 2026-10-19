@@ -1,4 +1,4 @@
-import { Reader } from './poll.mjs'
+import { Reader } from '../poll.mjs'
 // The vault from the A2 verification run: 100 XRP, two 10 XRP loans, BOTH impaired.
 // Known-correct answer: naive 1.000000, correct 0.800000, 2000 bps.
 const VAULT = '0B1014D870ECF81C2D9F860E101B04C0631F6A775E5B84AA0E73CBAC3EF97F6C'

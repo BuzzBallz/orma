@@ -1,5 +1,5 @@
-import { Reader } from './poll.mjs'
-import { deriveScoreInputs, buildScore } from './score.mjs'
+import { Reader } from '../poll.mjs'
+import { deriveScoreInputs, buildScore } from '../score.mjs'
 const VAULT = '0B1014D870ECF81C2D9F860E101B04C0631F6A775E5B84AA0E73CBAC3EF97F6C'
 const r = new Reader([VAULT]); await r.xrpl.connect(); await r.tick()
 const s = r.get(VAULT)
