@@ -38,8 +38,10 @@ export function usePoll<T>(path: string | null, intervalMs: number, opts?: {
 }): Poll<T> {
   const slowAfter = opts?.slowAfter ?? Infinity
   const slowCapMs = opts?.slowCapMs ?? BACKOFF_CAP_MS
-  const [state, setState] = useState<Omit<Poll<T>, 'stale' | 'ageMs'>>({
-    data: null, error: null, code: null, fails: 0, receivedAt: 0, waiting: false,
+  // `path` is the address the error, the code and the waiting flag belong to. They are dropped as
+  // soon as the address changes: the last facility's 404 is not the next one's.
+  const [state, setState] = useState<Omit<Poll<T>, 'stale' | 'ageMs'> & { path: string | null }>({
+    data: null, error: null, code: null, fails: 0, receivedAt: 0, waiting: false, path: null,
   })
   // A tick purely to re-render so `stale`/`ageMs` stay live between polls.
   const [, setBeat] = useState(0)
@@ -57,18 +59,20 @@ export function usePoll<T>(path: string | null, intervalMs: number, opts?: {
     async function cycle() {
       if (cancelled) return
       if (path === null) { timer = setTimeout(cycle, intervalMs); return }
-      const slow = setTimeout(() => { if (!cancelled) setState(s => ({ ...s, waiting: true })) }, WAITING_AFTER_MS)
+      const slow = setTimeout(() => {
+        if (!cancelled) setState(s => ({ ...(s.path === path ? s : { ...s, error: null, code: null, fails: 0 }), waiting: true, path }))
+      }, WAITING_AFTER_MS)
       try {
         const data = await getJson<T>(path)
         if (cancelled) return
         fails = 0
-        setState({ data, error: null, code: null, fails: 0, receivedAt: performance.now(), waiting: false })
+        setState({ data, error: null, code: null, fails: 0, receivedAt: performance.now(), waiting: false, path })
       } catch (e) {
         if (cancelled) return
         const f = e instanceof ApiFailure ? e : null
         fails += 1
         // keep data: last good payload stays on screen
-        setState(s => ({ ...s, error: f?.message ?? 'network error', code: f?.code ?? null, fails: s.fails + 1, waiting: false }))
+        setState(s => ({ ...s, error: f?.message ?? 'network error', code: f?.code ?? null, fails: (s.path === path ? s.fails : 0) + 1, waiting: false, path }))
       } finally {
         clearTimeout(slow)
         // whatever the outcome, schedule the next poll. The loop must be unkillable —
@@ -87,5 +91,9 @@ export function usePoll<T>(path: string | null, intervalMs: number, opts?: {
   }, [])
 
   const ageMs = state.receivedAt === 0 ? 0 : performance.now() - state.receivedAt
-  return { ...state, ageMs, stale: state.receivedAt !== 0 && ageMs > STALE_AFTER_MS }
+  const mine = state.path === path
+  return {
+    data: state.data, receivedAt: state.receivedAt, ageMs, stale: state.receivedAt !== 0 && ageMs > STALE_AFTER_MS,
+    error: mine ? state.error : null, code: mine ? state.code : null, fails: mine ? state.fails : 0, waiting: mine && state.waiting,
+  }
 }
