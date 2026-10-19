@@ -281,7 +281,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
           </section>
 
           <section className="op-sec op-why">
-            <h3 className="t-heading-s">Why the Score Sits {moves.length > 0 ? 'Below' : 'at'} the Anchor</h3>
+            <h3 className="t-heading-s">Why the score sits {moves.length > 0 ? 'below' : 'at'} the anchor</h3>
             {moves.length > 0
               ? (
                 <div>
@@ -372,7 +372,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
 
       <section className="wrap op-exhibits" aria-label="Exhibits">
         <div className="op-exhibits-in">
-          <Exhibit title="Exhibit 1 · Factor Scores" open>
+          <Exhibit title="Exhibit 1 · Factor scores" open>
             <div className="tbl-wrap">
               <table className="op-tbl fac-tbl">
                 <thead>
@@ -400,7 +400,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
               This is the same five factors, ungrouped, in the order the calculation agent
               sends them, each with the figure it was scored on — nothing summarised away. */}
           <Exhibit
-            title="Exhibit 2 · Measured Factors"
+            title="Exhibit 2 · Measured factors"
             meta={headline ? <>{creditText(headline.label)} <GradeLetter grade={headline.grade} size="sm" /></> : undefined}
           >
             <div className="tbl-wrap">
