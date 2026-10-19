@@ -99,7 +99,7 @@ export function Evidence({ d, name }: { d: IndexerRace | null; name?: string }) 
           </div>
           <div className="evd-gap">
             <span className="t-label-s mute">Gap</span>
-            <span className={'t-fig-l' + (gap > 0 ? ' loss' : '')}>{gap.toLocaleString('en-US').replace(/,/g, ' ')} bp</span>
+            <span className={'t-fig-l' + (gap > 0 ? ' loss' : '')}>{gap} bps</span>
           </div>
         </div>
         <p className="evd-under t-body-s mute">Same transaction, same record.</p>
