@@ -5,9 +5,10 @@
   "version": "0.1.0",
   "license": "MIT",
   "engines": {
-    "node": ">=20"
+    "node": ">=20.19.0"
   },
   "scripts": {
+    "test": "npm run check:ordering && npm run check:api && npm run check:navhistory && npm run check:archive && npm run check:evidence && npm run check:evidence:self-test",
     "check:reader": "node src/dev/check-reader.mjs",
     "check:score": "node src/dev/check-score.mjs",
     "start": "node src/index.mjs",
