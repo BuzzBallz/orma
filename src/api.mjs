@@ -7,6 +7,7 @@
  */
 import { createServer } from 'node:http'
 import { readFileSync, existsSync } from 'node:fs'
+import { isValidClassicAddress } from 'xrpl'
 import { presentVault, presentRow, setLabel } from './present.mjs'
 import { findShareEscrows, presentCollateral } from './collateral.mjs'
 import { readBrokerHistory, analyseOrdering, reputation, recommendOrder } from './history.mjs'
@@ -146,12 +147,16 @@ export function createApi(reader, opts = {}) {
         if (!shareMptId) return fail(404, 'NO_SHARE_MPT', 'vault has no share issuance', false)
         // No reverse index exists from an MPT issuance to the escrows holding it, so a
         // lender must be told which accounts to look at. Reported as a feedback item.
-        const accounts = [
-          ...(url.searchParams.get('accounts')?.split(',').filter(Boolean) ?? []),
-          ...(opts.watchAccounts ?? []),
-          snap.vault.owner,
-        ]
+        // Each account costs a ledger round trip, so a caller names at most ten, and real ones.
+        const asked = url.searchParams.get('accounts')?.split(',').filter(Boolean) ?? []
+        if (asked.length > 10 || !asked.every(isValidClassicAddress)) {
+          return fail(400, 'BAD_ACCOUNTS', 'accounts: at most 10 classic addresses, comma-separated', false)
+        }
+        const accounts = [...asked, ...(opts.watchAccounts ?? []), snap.vault.owner]
         const haircut = Number(url.searchParams.get('haircut') ?? 0)
+        if (!Number.isFinite(haircut) || haircut < 0 || haircut > 100) {
+          return fail(400, 'BAD_HAIRCUT', 'haircut: a percentage from 0 to 100', false)
+        }
         const escrows = await findShareEscrows(reader.xrpl, shareMptId, accounts)
         return send(200, stamp(presentCollateral(escrows, snap, haircut)))
       }

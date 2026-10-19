@@ -64,6 +64,14 @@ eq('an operator POST from a page', await post({ origin: 'https://evil.example', 
 eq('an operator POST from a script, no such action', await post({}), 404)
 eq('a preflight no longer offers POST', (await fetch(base + '/api/health', { method: 'OPTIONS' })).headers.get('access-control-allow-methods'), 'GET,HEAD,OPTIONS')
 
+// Collateral parameters are bounded before any ledger read.
+reader.get = () => ({ vaultId: ID, vault: { shareMptId: MPT, owner: 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh' } })
+const accounts = (n) => Array(n).fill('rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh').join(',')
+eq('eleven accounts', (await call('GET', `/api/vaults/${ID}/collateral?accounts=${accounts(11)}`)).code, 'BAD_ACCOUNTS')
+eq('an account that is not an address', (await call('GET', `/api/vaults/${ID}/collateral?accounts=nope`)).code, 'BAD_ACCOUNTS')
+eq('a negative haircut', (await call('GET', `/api/vaults/${ID}/collateral?haircut=-1`)).code, 'BAD_HAIRCUT')
+eq('a haircut that is not a number', (await call('GET', `/api/vaults/${ID}/collateral?haircut=abc`)).code, 'BAD_HAIRCUT')
+
 await api.close()
 console.log(bad ? `\n  ${bad} FAILED` : '\n  all ok')
 process.exitCode = bad ? 1 : 0  // not process.exit(): on Windows it aborts while the closed sockets are still closing
