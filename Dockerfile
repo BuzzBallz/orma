@@ -6,7 +6,7 @@
 # resolves them next to src/). Nothing is written to disk, so it runs
 # as the unprivileged node user. No key is baked in: PUBLISH_SEED, when used, comes from the
 # platform's environment.
-FROM node:24.13.0-bookworm-slim
+FROM node:24.13.0-bookworm-slim@sha256:4660b1ca8b28d6d1906fd644abe34b2ed81d15434d26d845ef0aced307cf4b6f
 
 WORKDIR /srv/orma
 ENV NODE_ENV=production
