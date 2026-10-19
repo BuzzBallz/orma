@@ -409,7 +409,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
                   {d.score.dimensions.map(dim => (
                     <tr key={dim.key}>
                       <td><b>{creditText(dim.label)}</b></td>
-                      <td className="rt num">{dim.value}{dim.unit === 'pct' ? '%' : dim.unit && dim.unit !== 'none' ? ` ${dim.unit}` : ''}</td>
+                      <td className="rt num">{dim.value}{dim.unit === 'percent' ? '%' : ` ${dim.unit}`}</td>
                       <td className="rt"><GradeLetter grade={dim.grade} size="sm" /></td>
                       <td className="op-says">{sentence(creditText(dim.explain))}</td>
                     </tr>

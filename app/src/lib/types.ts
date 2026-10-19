@@ -41,7 +41,7 @@ export interface Broker {
 }
 
 export interface Dimension {
-  key: DimKey; label: string; value: string; unit: string
+  key: DimKey; label: string; value: string; unit: 'ratio' | 'seconds' | 'percent' | 'grade'
   grade: string; notches: number; explain: string; worseIsHigher: boolean
 }
 
