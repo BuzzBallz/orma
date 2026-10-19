@@ -124,6 +124,7 @@ export class Reader {
     this.ledgerIndex = this.xrpl.lastLedger
     this.serverTime = new Date((closeTime + 946684800) * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z')
 
+    let failed = false
     for (const id of this.vaultIds) {
       try {
         const { vault, brokers, loans } = await this.readVault(id, closeTime)
@@ -143,7 +144,6 @@ export class Reader {
         this.missing.delete(id)
         if (this.onSnapshot) { try { this.onSnapshot(snap) } catch { /* never let a consumer break a read */ } }
         this.lastGoodAt = Date.now()
-        this.degraded = false
 
         // Log only transitions, so the operator console stays readable on stage.
         if (!prev || prev.navCorrect !== snap.navCorrect || prev.loans.length !== snap.loans.length) {
@@ -160,6 +160,7 @@ export class Reader {
       } catch (e) {
         const code = e?.data?.error
         if (code === 'entryNotFound' || code === 'objectNotFound') this.missing.add(id)
+        failed = true
         this.degraded = true
         log.warn('vault read failed, keeping last good snapshot', {
           vault: id.slice(0, 12),
@@ -167,6 +168,8 @@ export class Reader {
         })
       }
     }
+    // Degraded until a whole pass reads every vault: one vault read fine says nothing of the next.
+    this.degraded = failed
     this.passes++
   }
 
@@ -178,7 +181,10 @@ export class Reader {
     const loop = async () => {
       while (this._running) {
         const t0 = Date.now()
-        try { await this.tick() } catch (e) { log.error('tick failed', { err: String(e).slice(0, 120) }) }
+        try { await this.tick() } catch (e) {
+          this.degraded = true
+          log.error('tick failed', { err: String(e).slice(0, 120) })
+        }
         await sleep(Math.max(0, POLL_MS - (Date.now() - t0)))
       }
     }

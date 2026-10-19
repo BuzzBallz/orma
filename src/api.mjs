@@ -41,7 +41,8 @@ export function createApi(reader, opts = {}) {
 
   const health = () => {
     const h = {
-      ok: Boolean(reader.serverTime),
+      // Not ok while the last pass failed to read a vault: a stale figure is not a healthy one.
+      ok: Boolean(reader.serverTime) && !reader.degraded,
       contractVersion: CONTRACT_VERSION,
       source,
       network: 'devnet',
@@ -61,6 +62,7 @@ export function createApi(reader, opts = {}) {
     presentRow(snap, {
       prevNavCorrect: prevNav.get(snap.vaultId),
       oracle: opts.oracleFor?.(snap.vaultId) ?? null,
+      closeTime: reader.closeTime,
     })
 
   const server = createServer(async (req, res) => {
@@ -121,6 +123,7 @@ export function createApi(reader, opts = {}) {
         const detail = presentVault(snap, {
           prevNavCorrect: prevNav.get(snap.vaultId),
           oracle: opts.oracleFor?.(snap.vaultId) ?? null,
+          closeTime: reader.closeTime,
         })
         prevNav.set(snap.vaultId, snap.navCorrect)
         return send(200, stamp(detail))
@@ -228,8 +231,7 @@ export function createApi(reader, opts = {}) {
         return send(200, stamp(presentNav(snap, {
           score, source, network: 'devnet',
           buildVersion: reader.xrpl?.buildVersion ?? null,
-          asOf: reader.serverTime ?? null,
-          ledgerIndex: reader.ledgerIndex ?? null,
+          closeTime: reader.closeTime,
         })), { cors: true })
       }
 
@@ -283,7 +285,7 @@ export function createApi(reader, opts = {}) {
         const body = presentNav(snap, {
           score, source, network: 'devnet',
           buildVersion: reader.xrpl?.buildVersion ?? null,
-          asOf: reader.serverTime ?? null, ledgerIndex: reader.ledgerIndex ?? null,
+          closeTime: reader.closeTime,
         })
         const units = url.searchParams.get('units')
         if (units) body.pledge = valuePledge(body, units)

@@ -17,6 +17,20 @@ const DISTRESSED = new Set(['overdue', 'impaired', 'defaultable', 'defaulted'])
 
 /** Labels are cosmetic and optional; a vault we were never given a name for shows its id. */
 const labels = new Map()
+
+/** A snapshot older than this, in ledger time, is served marked stale rather than as current. */
+export const STALE_AFTER_SECONDS = 30
+
+/**
+ * How old a snapshot is. When a vault's read fails the reader keeps its last good snapshot; it
+ * must then be served with the ledger it came from, not as the reading of the latest tick.
+ * @param {{readAt:string, ledgerIndex:number, closeTimeUsed:number}} snap
+ * @param {number|null|undefined} closeTime the reader's latest validated close time
+ */
+export function freshness(snap, closeTime) {
+  const ageSeconds = closeTime == null ? 0 : Math.max(0, closeTime - snap.closeTimeUsed)
+  return { readAt: snap.readAt, readLedgerIndex: snap.ledgerIndex, ageSeconds, stale: ageSeconds > STALE_AFTER_SECONDS }
+}
 export function setLabel(vaultId, label) { labels.set(vaultId, label) }
 
 /**
@@ -222,5 +236,6 @@ export function presentRow(snap, opts = {}) {
     loanCount: loans.length,
     distressedLoanCount: loans.filter((l) => DISTRESSED.has(l.status)).length,
     oraclePublished: Boolean(opts.oracle?.published),
+    freshness: freshness(snap, opts.closeTime),
   }
 }

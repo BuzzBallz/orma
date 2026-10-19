@@ -186,8 +186,9 @@ fields may be added, nothing may ever be renamed, retyped or removed.
 
 Is the reader up, which ledger is it on, and is it currently degraded. No parameters.
 
-`ok` is `false` until the first poll tick completes. The API starts listening before the reader
-connects, which is honest rather than pretending to be ready.
+`ok` is `false` until the first poll tick completes, and again whenever the last pass failed to read
+a vault. The API starts listening before the reader connects, which is honest rather than pretending
+to be ready.
 
 ```bash
 curl -s http://localhost:8787/api/health
@@ -209,6 +210,16 @@ Two fields appear only while upstream is unhappy: `degraded: true` and
 `lastLedgerAgeSeconds: <number>`. They are additive, and `source` never flips automatically. On a
 failed read the reader keeps the last good snapshot rather than blanking, so a consumer should show
 stale data with an age banner rather than an empty screen.
+
+Each vault row, each vault detail and each `orma.nav/1` document carries the age of its own
+snapshot, which can be behind the envelope's `ledgerIndex` when that vault's last read failed:
+
+```json
+"freshness": { "readAt": "2026-09-12T22:20:22Z", "readLedgerIndex": 5263343, "ageSeconds": 0, "stale": false }
+```
+
+`ageSeconds` is in ledger time; `stale` turns true past 30 seconds. In an `orma.nav/1` document,
+`asOf` and `ledgerIndex` are the snapshot's own.
 
 `buildVersion` is reported, never asserted. Devnet moves.
 
@@ -483,6 +494,7 @@ curl -s http://localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955
   "ledgerIndex": 5263343,
   "schema": "orma.nav/1",
   "asOf": "2026-09-12T22:20:22Z",
+  "freshness": { "readAt": "2026-09-12T22:20:22Z", "readLedgerIndex": 5263343, "ageSeconds": 0, "stale": false },
   "instrument": {
     "kind": "vault-share",
     "vaultId": "5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5",
