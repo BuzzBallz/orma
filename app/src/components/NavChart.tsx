@@ -14,6 +14,7 @@ const SHORT: Record<string, string> = { ...LONG, withdraw: 'Withdraw', impair: '
 const KEY = new Set(['impair', 'unimpair', 'default', 'clawback'])
 
 const H = 248, PAD = { l: 48, r: 14, t: 20, b: 46 }
+const EXPLORER_TX = 'https://devnet.xrpl.org/transactions/'
 const STEPS = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1]
 
 /** The width of an axis label in its own face, so labels are spaced by what they really take. */
@@ -155,7 +156,11 @@ export function NavChart({ points }: { points: NavPoint[] }) {
                   <td>{KEY.has(p.kind) && <span className="navc-dot" aria-hidden />}{LONG[p.kind] ?? p.kind}</td>
                   <td className="rt num">{p.navNaive}</td>
                   <td className="rt num">{p.navCorrect}</td>
-                  <td className="op-says num">{short(p.hash, 10)}</td>
+                  <td className="op-says num">
+                    {p.hash
+                      ? <a className="tx-link" href={EXPLORER_TX + p.hash} target="_blank" rel="noreferrer noopener" aria-label={`Transaction ${p.hash} on the explorer`}>{short(p.hash, 10)}</a>
+                      : '—'}
+                  </td>
                 </tr>
               ))}
             </tbody>
