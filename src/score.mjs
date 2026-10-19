@@ -25,6 +25,25 @@ export const LADDER = ['AAA', 'AA+', 'AA', 'AA-', 'A+', 'A', 'A-', 'BBB+', 'BBB'
 export const notch = (grade, delta) => LADDER[Math.min(LADDER.length - 1, Math.max(0, LADDER.indexOf(grade) - delta))]
 export const gradeNumeric = (g) => Math.round((1 - LADDER.indexOf(g) / (LADDER.length - 1)) * 100)
 
+/** Bumped whenever a rule below changes a grade: 1.1.0 added the CCC and D floors for capital destroyed. */
+export const METHOD_VERSION = '1.1.0'
+
+/**
+ * Notches for subscribed capital already destroyed: the first band met applies. A floor caps the
+ * grade however high the anchor, so a facility that lost nine tenths of its capital cannot rate
+ * above CCC, and one that lost all of it is D. Published by GET /api/methodology.
+ */
+export const REALISED_LOSS_BANDS = [
+  { atLeastPct: 100, notches: -14, floor: 'D' },
+  { atLeastPct: 90, notches: -14, floor: 'CCC' },
+  { atLeastPct: 75, notches: -14, floor: null },
+  { atLeastPct: 50, notches: -12, floor: null },
+  { atLeastPct: 25, notches: -8, floor: null },
+  { atLeastPct: 10, notches: -5, floor: null },
+  { atLeastPct: 2, notches: -3, floor: null },
+  { atLeastPct: 0, notches: -1, floor: null },
+]
+
 export function baseGradeFromRatio(r, bands) {
   for (const [threshold, grade] of bands) if (D(r).gte(threshold)) return grade
   return 'D'
@@ -80,8 +99,10 @@ export function buildScore({ liquidityRatio, coverAdequacy, concentration, recog
   if (rl.gt(0)) {
     // Bands, not a formula: the grade is ordinal and each step has to be defensible on
     // its own rather than emerging from arithmetic nobody can check on a slide.
-    const delta = rl.gte(75) ? -14 : rl.gte(50) ? -12 : rl.gte(25) ? -8 : rl.gte(10) ? -5 : rl.gte(2) ? -3 : -1
-    const tR = notch(headline, delta)
+    const band = REALISED_LOSS_BANDS.find((b) => rl.gte(b.atLeastPct))
+    let tR = notch(headline, band.notches)
+    if (band.floor && LADDER.indexOf(tR) < LADDER.indexOf(band.floor)) tR = band.floor
+    const delta = LADDER.indexOf(headline) - LADDER.indexOf(tR)
     trace.push({ from: headline, rule: `${rl.toFixed(1)}% of subscribed capital destroyed and written off`, delta, to: tR })
     headline = tR
   }
@@ -95,7 +116,7 @@ export function buildScore({ liquidityRatio, coverAdequacy, concentration, recog
   dims.push({ key: 'HEADLINE', label: 'Composite', value: headline, unit: 'grade', grade: headline, notches: 0,
     explain: 'Ordinal notching of the five measured dimensions. No weights are applied anywhere.', worseIsHigher: false })
 
-  return { grade: headline, gradeNumeric: gradeNumeric(headline), computedAt: null, methodVersion: '1.0.0', dimensions: dims, notchTrace: trace }
+  return { grade: headline, gradeNumeric: gradeNumeric(headline), computedAt: null, methodVersion: METHOD_VERSION, dimensions: dims, notchTrace: trace }
 }
 
 // ---------------------------------------------------------------------------

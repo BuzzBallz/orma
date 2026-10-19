@@ -350,6 +350,7 @@ The HTTP API is documented in `documentation/pages/http-api.mdx`:
 
 ```
 GET  /api/health
+GET  /api/methodology
 GET  /api/vaults
 GET  /api/vaults/:vaultId
 GET  /api/vaults/:vaultId/nav

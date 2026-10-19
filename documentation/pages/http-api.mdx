@@ -167,6 +167,7 @@ fields may be added, nothing may ever be renamed, retyped or removed.
 | method and path | answers |
 |---|---|
 | `GET /api/health` | is the reader connected, and how old is the data |
+| `GET /api/methodology` | which notches a destroyed share of capital costs, and under which method version |
 | `GET /api/vaults` | which facilities are tracked, worst first |
 | `GET /api/vaults/:vaultId` | everything about one facility |
 | `GET /api/vaults/:vaultId/nav` | what is one unit actually worth |
@@ -211,6 +212,34 @@ failed read the reader keeps the last good snapshot rather than blanking, so a c
 stale data with an age banner rather than an empty screen.
 
 `buildVersion` is reported, never asserted. Devnet moves.
+
+---
+
+## GET /api/methodology
+
+The table the score applies for capital already destroyed, served from the code that applies it.
+No parameters, no ledger read.
+
+```json
+{
+  "methodVersion": "1.1.0",
+  "ladder": ["AAA", "AA+", "AA", "...", "C", "D"],
+  "realisedLoss": [
+    { "atLeastPct": 100, "notches": -14, "floor": "D" },
+    { "atLeastPct": 90, "notches": -14, "floor": "CCC" },
+    { "atLeastPct": 75, "notches": -14, "floor": null },
+    { "atLeastPct": 50, "notches": -12, "floor": null },
+    { "atLeastPct": 25, "notches": -8, "floor": null },
+    { "atLeastPct": 10, "notches": -5, "floor": null },
+    { "atLeastPct": 2, "notches": -3, "floor": null },
+    { "atLeastPct": 0, "notches": -1, "floor": null }
+  ]
+}
+```
+
+The first row whose `atLeastPct` the destroyed share meets applies, and only above zero. A `floor`
+caps the grade however high the anchor. Method 1.1.0 added the CCC and D floors; below 90% every
+grade is the one 1.0.0 gave.
 
 ---
 

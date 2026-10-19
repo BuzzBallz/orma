@@ -13,7 +13,7 @@ import { readBrokerHistory, analyseOrdering, reputation, recommendOrder } from '
 import { fetchNavHistory } from './navhistory.mjs'
 import { presentNav, resolveFromIssuance, valuePledge } from './nav.mjs'
 import { gateStatus, isNamedIn } from './credentials.mjs'
-import { deriveScoreInputs, buildScore } from './score.mjs'
+import { deriveScoreInputs, buildScore, LADDER, METHOD_VERSION, REALISED_LOSS_BANDS } from './score.mjs'
 import { logger } from './log.mjs'
 
 const log = logger('api')
@@ -101,6 +101,12 @@ export function createApi(reader, opts = {}) {
 
     try {
       if (key === 'GET /api/health') return send(200, health())
+
+      // The rules a grade is built from, so the methodology page shows the bands the code applies
+      // rather than a copy that can drift from them.
+      if (key === 'GET /api/methodology') {
+        return send(200, { methodVersion: METHOD_VERSION, ladder: LADDER, realisedLoss: REALISED_LOSS_BANDS })
+      }
 
       if (key === 'GET /api/vaults') {
         const vaults = reader.all().map(rowFor)
