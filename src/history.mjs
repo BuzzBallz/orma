@@ -364,7 +364,7 @@ export function reputation(events, ordering, broker, window = null, asset = null
   }
   if (withdrawals.length > 0) {
     score -= CONDUCT.deductions.perCoverWithdrawal * withdrawals.length
-    findings.push({ code: 'COVER_WITHDRAWN', detail: `${withdrawals.length} withdrawal${withdrawals.length === 1 ? '' : 's'} of first-loss capital on record. Cover taken out ahead of a deteriorating book is the shape that preceded the losses at Maple in 2022.` })
+    findings.push({ code: 'COVER_WITHDRAWN', detail: `${withdrawals.length} withdrawal${withdrawals.length === 1 ? '' : 's'} of first-loss capital on record. Cover taken out ahead of a deteriorating book leaves depositors less first-loss protection when they need it most.` })
   }
   if (defaults.length === 0) findings.push({ code: 'NO_DEFAULTS', detail: 'No defaults declared in the retained history.' })
 
