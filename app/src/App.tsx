@@ -27,6 +27,13 @@ const POLL_MS = 3000
  * missing, in the same language as the rest of the service — never a spinner, never a
  * placeholder figure.
  */
+/** Why no figure is shown yet, in the reader's words. Every case retries on its own. */
+function waitingWords(code: string | null): string {
+  if (code === 'WARMING_UP') return 'The service has just started and has not read this facility yet. The figures appear on their own.'
+  if (code === 'TIMEOUT' || code === null) return 'The service is not answering. It sleeps when idle and takes about half a minute to wake. The figures appear on their own.'
+  return 'This facility is on file. No figure is shown until one is received.'
+}
+
 function Note({ heading, watch, said, facts, onBack }: {
   heading: string; watch?: boolean; said: ReactNode
   facts: [string, ReactNode][]
@@ -139,6 +146,15 @@ function Desk() {
   // it names the facility in the address bar, never one facility's figures under another's.
   const own = detail.data && vaultId && detail.data.vault.vaultId.toUpperCase() === vaultId.toUpperCase()
     ? detail.data : null
+  // The figures can also be old while the page is current: the service answered, but its last
+  // read of a facility failed and it is serving the one before. On the book, any facility.
+  const readAge = path === '/'
+    ? Math.max(0, ...rows.map(r => (r.freshness?.stale ? r.freshness.ageSeconds : 0)))
+    : own?.vault.freshness?.stale ? own.vault.freshness.ageSeconds : 0
+  // Only a desk showing live figures gets the age bar: on Methodology, or on a facility desk with
+  // no facility, the last poll's age is no figure's age.
+  const live = path === '/' || ((path === '/facility' || path === '/event') && own !== null)
+  const ageBar = live && ((path === '/' ? vaults.stale : detail.stale) || readAge > 0)
   // A facility still in flight: after a click its frame is held invisible for a moment
   // (app.css, .enter[data-wait]), so a quick answer enters once instead of replacing it mid-rise.
   const waiting = (path === '/facility' || path === '/event') && !!vaultId && !own
@@ -173,6 +189,7 @@ function Desk() {
       return (
         <Portfolio
           vaults={rows} received={vaults.data !== null} asOf={vaults.data?.serverTime ?? null}
+          pending={vaults.fails > 0 || vaults.waiting ? waitingWords(vaults.code) : null}
           onOpen={id => go('/facility', id)} onNavigate={go}
         />
       )
@@ -215,7 +232,7 @@ function Desk() {
       const known = rows.find(r => r.vaultId === vaultId)
       return (
         <Placeholder name={known ? facilityName(known) : undefined} picker={picker}>
-          {detail.fails > 0 && <p className="t-body-m dim">This facility is on file. No figure is shown until one is received.</p>}
+          {(detail.fails > 0 || detail.waiting) && <p className="t-body-m dim">{waitingWords(detail.code)}</p>}
         </Placeholder>
       )
     }
@@ -263,7 +280,7 @@ function Desk() {
         onSelect={select}
       />
 
-      {primary.stale && path !== '/evidence' && <StaleBar ageMs={primary.ageMs} />}
+      {ageBar && <StaleBar ageMs={Math.max(primary.ageMs, readAge * 1000)} />}
 
       <main id="main" className="page" tabIndex={-1}>
         <div key={path} className={'view' + (quiet.current ? '' : ' enter')} data-wait={waiting || undefined}>{body()}</div>

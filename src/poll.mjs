@@ -70,11 +70,10 @@ export class Reader {
           const l = await this.xrpl.loan({ loan_broker_id: b.loanBrokerId, loan_seq: seq }, at)
           loans.push(normaliseLoan({ ...l, index: l.index ?? l.LedgerIndex }, closeTime))
         } catch (e) {
-          // A deleted (fully repaid) loan is expected to be missing. Not an error.
+          // A deleted (fully repaid) loan is expected to be missing. Not an error. Any other failure
+          // fails the vault's read: a snapshot missing a loan grades the facility as if it never lent.
           const code = e?.data?.error
-          if (code !== 'entryNotFound' && code !== 'objectNotFound') {
-            log.debug('loan read failed', { broker: b.loanBrokerId?.slice(0, 12), seq, err: code ?? String(e).slice(0, 60) })
-          }
+          if (code !== 'entryNotFound' && code !== 'objectNotFound') throw e
         }
       }
     }
@@ -124,17 +123,27 @@ export class Reader {
 
   /** One full pass over every tracked vault. */
   async tick() {
-    const closeTime = await this.xrpl.closeTime()
+    let closeTime
+    try {
+      closeTime = await this.xrpl.closeTime()
+    } catch (e) {
+      this.degraded = true
+      throw e
+    }
     this.closeTime = closeTime
     this.ledgerIndex = this.xrpl.lastLedger
     this.serverTime = new Date((closeTime + 946684800) * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z')
 
+    let failed = false
     for (const id of this.vaultIds) {
       try {
         const { vault, brokers, loans } = await this.readVault(id, closeTime)
         const snap = {
           vaultId: id,
           readAt: this.serverTime,
+          // Wall clock as well as ledger time: when the ledger cannot be read at all, the ledger
+          // clock stops too, and only this one says how old the snapshot has become.
+          readMs: Date.now(),
           closeTimeUsed: closeTime,
           ledgerIndex: this.ledgerIndex,
           vault,
@@ -148,7 +157,6 @@ export class Reader {
         this.missing.delete(id)
         if (this.onSnapshot) { try { this.onSnapshot(snap) } catch { /* never let a consumer break a read */ } }
         this.lastGoodAt = Date.now()
-        this.degraded = false
 
         // Log only transitions, so the operator console stays readable on stage.
         if (!prev || prev.navCorrect !== snap.navCorrect || prev.loans.length !== snap.loans.length) {
@@ -165,6 +173,7 @@ export class Reader {
       } catch (e) {
         const code = e?.data?.error
         if (code === 'entryNotFound' || code === 'objectNotFound') this.missing.add(id)
+        failed = true
         this.degraded = true
         log.warn('vault read failed, keeping last good snapshot', {
           vault: id.slice(0, 12),
@@ -172,6 +181,8 @@ export class Reader {
         })
       }
     }
+    // Degraded until a whole pass reads every vault: one vault read fine says nothing of the next.
+    this.degraded = failed
     this.passes++
   }
 

@@ -276,6 +276,7 @@ main:focus{ outline: none; }
 .desk-ind{ position: absolute; left: 0; bottom: 0; width: 1px; height: 2px; background: var(--color-rule); transform-origin: 0 0; pointer-events: none; }
 .mast-right{ margin-left: auto; display: flex; align-items: center; gap: var(--space-5); min-width: 0; }
 .stamp{ font: 400 13px/1.5 var(--font-mono); color: var(--color-text-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.net-pill{ font: 500 12px/1.4 var(--font-sans); color: var(--color-watch); border: 1px solid currentColor; border-radius: var(--radius-full); padding: 2px var(--space-2); white-space: nowrap; }
 .stamp-state{ font: 500 13px/1.4 var(--font-sans); color: var(--color-watch); margin-left: var(--space-2); }
 .menu-btn, .menu-x{
   width: var(--size-control); height: var(--size-control); align-items: center; justify-content: center;
@@ -283,7 +284,12 @@ main:focus{ outline: none; }
 }
 .menu-btn{ display: none; margin-left: auto; margin-right: -10px; }
 .menu-x{ display: inline-flex; }
-@media (max-width: 1279px){ .mast-in{ gap: var(--space-6); } .mast-right{ gap: var(--space-4); } .mast .stamp{ display: none; } }
+@media (max-width: 1279px){ .mast-in{ gap: var(--space-6); } .mast-right{ gap: var(--space-4); } }
+/* The portfolio hero and the phone menu carry the stamp; the masthead keeps it only where it fits. */
+@media (max-width: 1439px){ .mast .stamp{ display: none; } }
+/* The masthead is as wide as .wrap at any viewport, and the facility picker needs the room: on its
+   desks the pill moves into the opinion's own heading line and Docs stays in the footer. */
+.mast-right[data-picker-desk] :is(.net-pill, .mast-docs){ display: none; }
 @media (max-width: 1099px){
   :root{ --masthead: 64px; }
   .desks, .mast-right{ display: none; }

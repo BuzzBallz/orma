@@ -20,6 +20,7 @@ import { lookup } from 'node:dns/promises'
 import { BlockList, isIP } from 'node:net'
 import { num, wholeShares, amountStr } from './num.mjs'
 import { parseShareMetadata, navPointerFrom, xls89Report } from './metadata.mjs'
+import { freshness } from './present.mjs'
 import { logger } from './log.mjs'
 
 const log = logger('nav')
@@ -72,8 +73,11 @@ export function presentNav(snap, opts = {}) {
     // document on purpose: a consumer who caches or forwards just this object must still
     // be able to say how old the figure is. A valuation without an as-of is not a
     // valuation.
-    asOf: opts.asOf ?? null,
-    ledgerIndex: opts.ledgerIndex ?? null,
+    // The snapshot's own read, not the latest tick: a vault whose read failed keeps its last
+    // good snapshot, and `freshness` says how far behind the ledger that is.
+    asOf: snap.readAt ?? null,
+    ledgerIndex: snap.ledgerIndex ?? null,
+    freshness: freshness(snap, opts.closeTime),
 
     instrument: {
       kind: 'vault-share',

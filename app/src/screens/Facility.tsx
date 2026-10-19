@@ -142,12 +142,12 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
         <div className="op-kind">
           <span className="t-label-s mute">Credit Opinion</span>
           <span className="t-fig-s mute">
-            {d.serverTime ? <>Figures Received {fmtIso(d.serverTime)}</> : <>Figures Withheld</>}
+            {d.serverTime ? <>Figures Received {fmtIso(d.vault.freshness?.readAt ?? d.serverTime)}</> : <>Figures Withheld</>}
           </span>
         </div>
         <h1 className="t-display-l">{name}</h1>
         <p className="t-body-m dim">
-          {kind[0].toUpperCase() + kind.slice(1)} lending facility · {v.phase} · internal score {v.grade} · outlook {outlook}
+          {kind[0].toUpperCase() + kind.slice(1)} lending facility · {v.phase} · internal score {v.grade} · outlook {outlook} · test network
         </p>
         {picker && <div className="op-pick">{picker}</div>}
       </header>

@@ -24,6 +24,13 @@ export interface VaultRow {
   navNaive: string; navCorrect: string; navDivergenceBps: number
   redemptionAt: string | null; secondsToRedemption: number | null
   loanCount: number; distressedLoanCount: number; oraclePublished: boolean
+  /** Absent from a server older than this field. */
+  freshness?: Freshness
+}
+
+/** How old this facility's own reading is: a failed read keeps the last good one. */
+export interface Freshness {
+  readAt: string; readLedgerIndex: number; ageSeconds: number; stale: boolean
 }
 
 export interface VaultDetailFields extends VaultRow {

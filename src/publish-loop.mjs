@@ -100,7 +100,11 @@ export class PublishLoop {
   }
 
   oracleFor(vaultId) {
-    return this.oracleCache.get(vaultId) ?? null
+    const o = this.oracleCache.get(vaultId)
+    if (!o?.lastUpdateAt) return o ?? null
+    // The cache is read when we publish; its age is now, not then.
+    const age = Math.max(0, Math.floor((Date.now() - Date.parse(o.lastUpdateAt)) / 1000))
+    return { ...o, ageSeconds: age, stale: age > 60 }
   }
 
   stats() {
