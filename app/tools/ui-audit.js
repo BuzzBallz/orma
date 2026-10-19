@@ -146,6 +146,13 @@ window.uiAudit = async function uiAudit(opts = {}) {
             ox === 'auto' || ox === 'scroll', `${ox} — needs ${t.scrollWidth}, box ${box.clientWidth}`)
         }
       }
+
+      // The NAV chart's axis labels share one baseline; two that touch read as one word.
+      const xl = [...document.querySelectorAll('.navc-xl')].map(t => t.getBoundingClientRect())
+      if (xl.length) {
+        const hits = xl.filter((a, i) => xl.some((b, j) => j > i && a.left < b.right && a.right > b.left))
+        record('layout', `${label} · NAV axis labels do not overlap`, hits.length === 0, `${xl.length} labels, ${hits.length} touching`)
+      }
     }
   }
 
