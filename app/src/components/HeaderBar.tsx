@@ -88,9 +88,12 @@ export function HeaderBar({ vaults, activeVaultId, path, asOf, withheld, slide, 
           />
         </nav>
 
-        <div className="mast-right">
+        <div className="mast-right" data-picker-desk={showPicker || undefined}>
+          {/* Every name and figure here is made up for a test network; a visitor must not have to
+              open an exhibit to learn it. */}
+          <span className="net-pill" title="Every facility shown is demonstration data on a test network">Test network</span>
           {showStamp && <Stamp asOf={asOf} withheld={withheld} />}
-          <a className="lnk lnk-plain" href={DOCS_URL} target="_blank" rel="noreferrer noopener">
+          <a className="lnk lnk-plain mast-docs" href={DOCS_URL} target="_blank" rel="noreferrer noopener">
             Docs <ArrowUpRight size={16} strokeWidth={1.75} aria-hidden />
           </a>
           {showPicker && <FacilityPicker vaults={vaults} activeVaultId={activeVaultId} onSelect={onSelect} />}

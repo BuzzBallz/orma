@@ -1,0 +1,17 @@
+name: keepalive
+
+# Render's free plan sleeps the API after 15 minutes without traffic, and the reader and the
+# Oracle publisher sleep with it. A request every ten minutes keeps the published objects current.
+# Scheduled runs can start a few minutes late; that is still inside the window.
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -fsS --max-time 60 -o /dev/null https://orma-api.onrender.com/api/health

@@ -30,8 +30,8 @@ serialises closed-ended vaults. The frontend is separate: `app/` is its own tree
 
 ## Why the xrpl pin is exact
 
-`xrpl@5.2.0` was published on 2026-09-11 at 22:20 UTC, roughly five hours before the hackathon
-opened. It matters more than a version number usually does.
+`xrpl@5.2.0` was published on 2026-09-11 at 22:20 UTC, eight hours and forty minutes before the
+hackathon opened. It matters more than a version number usually does.
 
 Every lending vault on XRPL must be closed-ended. `LoanBrokerSet` returns `tecNO_PERMISSION`
 against an open-ended vault, so a `VaultCreate` carrying `VaultKind: 1`, `SubscriptionDate` and
@@ -215,10 +215,8 @@ pnpm dev
 
 Vite serves on `http://localhost:5173`. The variable that points the app at the reader is
 `VITE_API_BASE`, which defaults to `http://localhost:8787`, so on a laptop with the reader already
-running there is nothing to configure. Three more are read and all three are optional:
-`VITE_XRPL_NETWORK` (which network the wallet side connects to, default `testnet` in the code and
-`devnet` in `app/.env.example`), `VITE_XAMAN_API_KEY` (a public Xaman app key; leave it out and
-Crossmark and GemWallet still work) and `VITE_DOCS_URL` (where the header's docs link points).
+running there is nothing to configure. One more is read, and it is optional: `VITE_DOCS_URL`
+(where the header's docs link points).
 
 Everything under `VITE_` is inlined into the bundle and shipped to every visitor. No secret
 belongs there. On a deployed preview served over https, an

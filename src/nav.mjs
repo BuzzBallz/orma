@@ -16,13 +16,44 @@
  * be rewritten (Appendix D1), so the contract at the end of it is effectively permanent.
  * Fields may be added. Nothing here may ever be renamed, retyped or removed.
  */
-import { num } from './num.mjs'
+import { lookup } from 'node:dns/promises'
+import { BlockList, isIP } from 'node:net'
+import { num, wholeShares, amountStr } from './num.mjs'
 import { parseShareMetadata, navPointerFrom, xls89Report } from './metadata.mjs'
+import { freshness } from './present.mjs'
 import { logger } from './log.mjs'
 
 const log = logger('nav')
 
 export const NAV_SCHEMA = 'orma.nav/1'
+
+// Anyone can mint a share whose pointer names a host inside our network. The resolver
+// follows only hosts every address of which is public, and reads at most this much.
+const NOT_PUBLIC = new BlockList()
+for (const [net, bits] of [['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16], ['172.16.0.0', 12], ['192.168.0.0', 16]]) NOT_PUBLIC.addSubnet(net, bits, 'ipv4')
+// No ::ffff:0:0/96 rule: BlockList already checks an IPv4-mapped address against the IPv4
+// rules, and such a rule would match every IPv4 address.
+for (const [net, bits] of [['::', 127], ['fc00::', 7], ['fe80::', 10]]) NOT_PUBLIC.addSubnet(net, bits, 'ipv6')
+const MAX_POINTER_BYTES = 64 * 1024
+
+// shortcut: the address is checked, then fetch resolves the name again, so a DNS rebinding
+// in between gets through; pin the checked address in an http agent if that matters.
+async function isPublicHost(hostname) {
+  const host = hostname.replace(/^\[|\]$/g, '')
+  const addrs = isIP(host) ? [{ address: host, family: isIP(host) }] : await lookup(host, { all: true })
+  return addrs.length > 0 && addrs.every((a) => !NOT_PUBLIC.check(a.address, a.family === 6 ? 'ipv6' : 'ipv4'))
+}
+
+async function readCapped(res) {
+  const chunks = []
+  let size = 0
+  for await (const chunk of res.body) {
+    size += chunk.length
+    if (size > MAX_POINTER_BYTES) return null
+    chunks.push(chunk)
+  }
+  return Buffer.concat(chunks).toString('utf8')
+}
 
 /**
  * The valuation itself, from a reader snapshot.
@@ -42,8 +73,11 @@ export function presentNav(snap, opts = {}) {
     // document on purpose: a consumer who caches or forwards just this object must still
     // be able to say how old the figure is. A valuation without an as-of is not a
     // valuation.
-    asOf: opts.asOf ?? null,
-    ledgerIndex: opts.ledgerIndex ?? null,
+    // The snapshot's own read, not the latest tick: a vault whose read failed keeps its last
+    // good snapshot, and `freshness` says how far behind the ledger that is.
+    asOf: snap.readAt ?? null,
+    ledgerIndex: snap.ledgerIndex ?? null,
+    freshness: freshness(snap, opts.closeTime),
 
     instrument: {
       kind: 'vault-share',
@@ -84,10 +118,11 @@ export function presentNav(snap, opts = {}) {
     provenance: {
       network: opts.network ?? 'devnet',
       source: opts.source ?? 'devnet',
-      assetsTotal: v.assetsTotal.toFixed(0),
-      lossUnrealized: v.lossUnrealized.toFixed(0),
+      assetsTotal: amountStr(v.assetsTotal, v.asset),
+      lossUnrealized: amountStr(v.lossUnrealized, v.asset),
       unitsOutstanding: v.sharesOutstanding.toFixed(0),
-      recompute: '(assetsTotal - lossUnrealized) / unitsOutstanding',
+      scale: v.scale ?? 0,
+      recompute: '(assetsTotal - lossUnrealized) / (unitsOutstanding / 10^scale)',
       buildVersion: opts.buildVersion ?? null,
     },
   }
@@ -114,14 +149,19 @@ export function valuePledge(nav, units) {
       unpriced: 'the document at the pointer carries no unitValue, so this pledge cannot be valued',
     }
   }
+  // The unit value is per whole share; a pledge counts raw share units. A document without a
+  // scale is an XRP or MPT vault (Scale 0), whose amounts are integers.
+  const scale = Number(nav.provenance?.scale ?? 0)
   const u = num(units)
-  const held = u.times(num(uv.held))
-  const reported = u.times(num(uv.reported))
+  const whole = wholeShares(u, scale)
+  const held = whole.times(num(uv.held))
+  const reported = whole.times(num(uv.reported))
+  const fmt = (d) => (scale ? d.toFixed() : d.toFixed(0))
   return {
     units: u.toFixed(0),
-    valueHeld: held.toFixed(0),
-    valueReported: reported.toFixed(0),
-    overstatement: reported.minus(held).toFixed(0),
+    valueHeld: fmt(held),
+    valueReported: fmt(reported),
+    overstatement: fmt(reported.minus(held)),
   }
 }
 
@@ -141,7 +181,8 @@ export function valuePledge(nav, units) {
  *
  * @param {import('./xrpl.mjs').Xrpl} xrpl
  * @param {string} issuanceId
- * @param {{resolve?: boolean, fetchImpl?: Function, localBase?: string}} [opts]
+ * @param {{resolve?: boolean, fetchImpl?: Function, localBase?: string, allowPrivate?: boolean}} [opts]
+ *   allowPrivate: follow a pointer to a private host. For the operator's own bake, never the API.
  */
 export async function resolveFromIssuance(xrpl, issuanceId, opts = {}) {
   const steps = []
@@ -205,14 +246,32 @@ export async function resolveFromIssuance(xrpl, issuanceId, opts = {}) {
 
   // Following the pointer is the last step and the only one that leaves the ledger. It
   // is a URL written by a third party, so it is bounded and its failure is data.
+  // Its failures are reported in fixed words: a detail that echoes the error or the body
+  // tells the caller what answers inside our network.
   const fetchImpl = opts.fetchImpl ?? globalThis.fetch
   const ctl = new AbortController()
   const timer = setTimeout(() => ctl.abort(), 2500)
   try {
-    const res = await fetchImpl(pointer, { signal: ctl.signal, headers: { accept: 'application/json' } })
-    const body = await res.json()
+    if (!opts.allowPrivate && !(await isPublicHost(new URL(pointer).hostname))) {
+      step('follow pointer', false, 'not followed: the host is not a public address')
+      return out
+    }
+    const res = await fetchImpl(pointer, { signal: ctl.signal, redirect: 'manual', headers: { accept: 'application/json' } })
+    if (res.status >= 300 && res.status < 400) {
+      step('follow pointer', false, `HTTP ${res.status}, redirect not followed`)
+      return out
+    }
     if (!res.ok) {
       step('follow pointer', false, `HTTP ${res.status}`)
+      return out
+    }
+    const text = await readCapped(res)
+    let body = null
+    try { body = text === null ? null : JSON.parse(text) } catch { /* reported below */ }
+    if (text === null) {
+      step('follow pointer', false, `answered, but over ${MAX_POINTER_BYTES / 1024} KB`)
+    } else if (body === null) {
+      step('follow pointer', false, 'answered, but not JSON')
     } else if (!body?.unitValue?.held) {
       // A 200 that is not a valuation. Reporting this as success is how a caller ends up
       // trusting a document that says nothing.
@@ -222,7 +281,7 @@ export async function resolveFromIssuance(xrpl, issuanceId, opts = {}) {
       step('follow pointer', true, `unit value ${body.unitValue.held}`)
     }
   } catch (e) {
-    step('follow pointer', false, (e?.name === 'AbortError' ? 'timeout' : String(e)).slice(0, 100))
+    step('follow pointer', false, e?.name === 'AbortError' ? 'timeout' : 'no answer')
     log.warn('nav pointer did not answer', { pointer, err: String(e).slice(0, 80) })
   } finally {
     clearTimeout(timer)

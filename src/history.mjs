@@ -37,7 +37,7 @@
  * difference is depositor money. Nothing about that required privileged access:
  * it is all public ledger state.
  */
-import { num, Decimal } from './num.mjs'
+import { num, Decimal, amountText } from './num.mjs'
 import { logger } from './log.mjs'
 import { readHistory, creates } from './archive.mjs'
 
@@ -202,6 +202,8 @@ const INCOMPLETE = 'the retained record does not reach back to the broker’s cr
 /**
  * Total cover consumed for a given ordering of principals.
  * Mirrors the ledger exactly: ceil at each step, base is the remaining book.
+ * shortcut: rounds to whole drops for every asset; an issued-currency broker's cover would be
+ * rounded to whole units here. Thread the vault's asset in when an IOU broker is tracked.
  */
 export function coverForOrder(principals, startingDebt, cmin, cliq, coverAvailable) {
   const c = num(cmin).div(100000).times(num(cliq).div(100000))
@@ -242,6 +244,11 @@ export function analyseOrdering(events, broker, window = null) {
   const desc = [...asc].reverse()
   const best = coverForOrder(asc, startingDebt, broker.coverRateMinimum, broker.coverRateLiquidation, startingCover)
   const worst = coverForOrder(desc, startingDebt, broker.coverRateMinimum, broker.coverRateLiquidation, startingCover)
+  // The verdict compares orders, so the chosen one goes through the same back-to-back model as
+  // the other two. The ledger's own total includes whatever happened between the defaults (a loan
+  // repaid, a new one written), and set against the model it graded a depositor-optimal order as
+  // self-serving. actualCoverPaid still reports what the ledger took.
+  const chosen = coverForOrder(principals, startingDebt, broker.coverRateMinimum, broker.coverRateLiquidation, startingCover)
   const span = best.minus(worst)
 
   return {
@@ -251,9 +258,9 @@ export function analyseOrdering(events, broker, window = null) {
     bestPossible: best.toFixed(0),
     worstPossible: worst.toFixed(0),
     // What the chosen sequence cost depositors relative to the LP-optimal one.
-    costToDepositors: best.minus(actual).toFixed(0),
+    costToDepositors: best.minus(chosen).toFixed(0),
     spread: span.toFixed(0),
-    fairness: span.isZero() ? '1.0000' : actual.minus(worst).div(span).toFixed(4),
+    fairness: span.isZero() ? '1.0000' : chosen.minus(worst).div(span).toFixed(4),
     observedOrder: defaults.map((d) => ({
       loanId: d.loanId, at: d.at, hash: d.hash,
       principal: d.principal.toFixed(0),
@@ -294,7 +301,17 @@ export function recommendOrder(loans, broker) {
  * Reputation. Ordinal and rule-based like the vault score: a broker is graded on what
  * they did, not on a weighted opinion of it.
  */
-export function reputation(events, ordering, broker, window = null) {
+/**
+ * Manager conduct is a points assessment, apart from the internal score and unlike it: it starts at
+ * 100 and deducts for each finding, then reads a letter off the total. Published by
+ * GET /api/methodology, so the deductions shown are the ones applied.
+ */
+export const CONDUCT = {
+  deductions: { orderingSelfServing: 35, orderingMixed: 15, perDefaultWithoutImpairment: 20, perCoverWithdrawal: 10 },
+  grades: [{ atLeast: 90, grade: 'A' }, { atLeast: 75, grade: 'B' }, { atLeast: 55, grade: 'C' }, { atLeast: 35, grade: 'D' }, { atLeast: 0, grade: 'E' }],
+}
+
+export function reputation(events, ordering, broker, window = null, asset = null) {
   const defaults = events.filter((e) => e.kind === 'default')
   const impairs = events.filter((e) => e.kind === 'impair')
   const withdrawals = events.filter((e) => e.kind === 'cover_withdraw')
@@ -336,23 +353,23 @@ export function reputation(events, ordering, broker, window = null) {
 
   if (ordering.applicable) {
     const f = Number(ordering.fairness)
-    if (f < 0.25) { score -= 35; findings.push({ code: 'ORDERING_SELF_SERVING', detail: `Declared losses in an order close to the one that minimises their own first-loss contribution (sequence score ${ordering.fairness}). The choice cost investors ${(Number(ordering.costToDepositors) / 1e6).toFixed(6)} XRP against the fair order.` }) }
-    else if (f < 0.75) { score -= 15; findings.push({ code: 'ORDERING_MIXED', detail: `The sequence sits between the fair and the self-serving one (sequence score ${ordering.fairness}).` }) }
+    if (f < 0.25) { score -= CONDUCT.deductions.orderingSelfServing; findings.push({ code: 'ORDERING_SELF_SERVING', detail: `Declared losses in an order close to the one that minimises their own first-loss contribution (sequence score ${ordering.fairness}). The choice cost investors ${amountText(ordering.costToDepositors, asset, 6)} against the fair order.` }) }
+    else if (f < 0.75) { score -= CONDUCT.deductions.orderingMixed; findings.push({ code: 'ORDERING_MIXED', detail: `The sequence sits between the fair and the self-serving one (sequence score ${ordering.fairness}).` }) }
     else findings.push({ code: 'ORDERING_FAIR', detail: `Declared in an order close to the one that maximises first-loss capital applied on investors' behalf (sequence score ${ordering.fairness}).` })
   }
 
   if (undeclaredDefaults > 0) {
-    score -= 20 * undeclaredDefaults
+    score -= CONDUCT.deductions.perDefaultWithoutImpairment * undeclaredDefaults
     findings.push({ code: 'DEFAULT_WITHOUT_IMPAIRMENT', detail: `${undeclaredDefaults} exposure${undeclaredDefaults === 1 ? ' was' : 's were'} written off with no prior warning, so the loss was never signalled before it was taken.` })
   }
   if (withdrawals.length > 0) {
-    score -= 10 * withdrawals.length
+    score -= CONDUCT.deductions.perCoverWithdrawal * withdrawals.length
     findings.push({ code: 'COVER_WITHDRAWN', detail: `${withdrawals.length} withdrawal${withdrawals.length === 1 ? '' : 's'} of first-loss capital on record. Cover taken out ahead of a deteriorating book is the shape that preceded the losses at Maple in 2022.` })
   }
   if (defaults.length === 0) findings.push({ code: 'NO_DEFAULTS', detail: 'No defaults declared in the retained history.' })
 
   score = Math.max(0, Math.min(100, score))
-  const grade = score >= 90 ? 'A' : score >= 75 ? 'B' : score >= 55 ? 'C' : score >= 35 ? 'D' : 'E'
+  const grade = CONDUCT.grades.find((g) => score >= g.atLeast).grade
 
   return {
     grade,

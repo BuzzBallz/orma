@@ -1,9 +1,19 @@
-export type Phase = 'Subscription' | 'Investment' | 'Redemption'
+export type Phase = 'Subscription' | 'Investment' | 'Redemption' | 'Open'
 export type Trend = 'improving' | 'stable' | 'deteriorating'
 export type Severity = 'info' | 'medium' | 'high' | 'critical'
 export type LoanStatus =
   | 'current' | 'due_soon' | 'overdue' | 'impaired' | 'defaultable' | 'defaulted' | 'closed'
 export type DimKey = 'LIQUIDITY' | 'COVER' | 'CONCENT' | 'RECOG' | 'DEADLINE' | 'HEADLINE'
+
+/** GET /api/methodology: the table the score applies for capital already destroyed. */
+export interface MethodRules {
+  methodVersion: string; ladder: string[]
+  realisedLoss: { atLeastPct: number; notches: number; floor: string | null }[]
+  managerConduct: {
+    deductions: { orderingSelfServing: number; orderingMixed: number; perDefaultWithoutImpairment: number; perCoverWithdrawal: number }
+    grades: { atLeast: number; grade: string }[]
+  }
+}
 
 export interface Health {
   ok: boolean; contractVersion: string; source: 'fixtures' | 'devnet'
@@ -22,8 +32,15 @@ export interface VaultRow {
   grade: string; gradeNumeric: number; trend: Trend
   assetsTotal: string; assetsAvailable: string; lossUnrealized: string
   navNaive: string; navCorrect: string; navDivergenceBps: number
-  redemptionAt: string; secondsToRedemption: number
+  redemptionAt: string | null; secondsToRedemption: number | null
   loanCount: number; distressedLoanCount: number; oraclePublished: boolean
+  /** Absent from a server older than this field. */
+  freshness?: Freshness
+}
+
+/** How old this facility's own reading is: a failed read keeps the last good one. */
+export interface Freshness {
+  readAt: string; readLedgerIndex: number; ageSeconds: number; stale: boolean
 }
 
 export interface VaultDetailFields extends VaultRow {
@@ -41,7 +58,7 @@ export interface Broker {
 }
 
 export interface Dimension {
-  key: DimKey; label: string; value: string; unit: string
+  key: DimKey; label: string; value: string; unit: 'ratio' | 'seconds' | 'percent' | 'grade'
   grade: string; notches: number; explain: string; worseIsHigher: boolean
 }
 
@@ -83,7 +100,8 @@ export interface Oracle {
   /** The OracleSet that last wrote this object. The explorer has no route for a bare index. */
   lastPublishTx: string | null
   explorerUrl: string
-  dimensionsOnChain: { key: string; value: string; raw: string; scale: number }[]
+  /** raw is null when the object carries the pair without a price. */
+  dimensionsOnChain: { key: string; value: string; raw: string | null; scale: number }[]
   aggregate: OracleAggregate | null           // NULL with fewer than two publishers
 }
 

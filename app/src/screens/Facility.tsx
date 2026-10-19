@@ -3,13 +3,14 @@ import type { BrokerHistory, Collateral, Dimension, Gate, NavHistory, OracleCont
 import { GradeLetter } from '../components/GradeLetter'
 import { Scale } from '../components/Scale'
 import { Amount } from '../components/Amount'
+import { AmountAsset } from '../lib/asset'
 import { NavChart } from '../components/NavChart'
 import { Exhibit } from '../components/Exhibit'
 import { Mark } from '../components/Lockup'
 import { gradeIndex } from '../lib/grades'
 import { nextBeat } from '../lib/beats'
 import { useFlash } from '../lib/useFlash'
-import { bpsToPct, duration, fmtIso, ratioToPct, rateToPct } from '../lib/format'
+import { bpsToPct, duration, fmtIso, percent, ratioToPct, rateToPct } from '../lib/format'
 import { creditText, facilityName, facilityRef, factorRows, outlookOf, sentence, splitFactors } from '../lib/credit'
 import { ManagerConduct, PledgedCollateral } from './FacilityExhibits'
 import { PledgeResolution } from './PledgeResolution'
@@ -128,7 +129,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
   const kind = v.vaultKind === 'ClosedEnded' ? 'closed-ended' : 'open-ended'
 
   return (
-    <>
+    <AmountAsset.Provider value={d.vault.asset}>
       {/* Letterhead, print only: the masthead is the first thing the print sheet drops. */}
       <div className="wrap op-letterhead" aria-hidden>
         <Mark size={18} />
@@ -141,12 +142,12 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
         <div className="op-kind">
           <span className="t-label-s mute">Credit Opinion</span>
           <span className="t-fig-s mute">
-            {d.serverTime ? <>Figures Received {fmtIso(d.serverTime)}</> : <>Figures Withheld</>}
+            {d.serverTime ? <>Figures Received {fmtIso(d.vault.freshness?.readAt ?? d.serverTime)}</> : <>Figures Withheld</>}
           </span>
         </div>
         <h1 className="t-display-l">{name}</h1>
         <p className="t-body-m dim">
-          {kind[0].toUpperCase() + kind.slice(1)} lending facility · {v.phase} · internal score {v.grade} · outlook {outlook}
+          {kind[0].toUpperCase() + kind.slice(1)} lending facility · {v.phase} · internal score {v.grade} · outlook {outlook} · test network
         </p>
         {picker && <div className="op-pick">{picker}</div>}
       </header>
@@ -170,8 +171,9 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
               v={<><Amount drops={d.broker.coverAvailable} /> of <Amount drops={d.broker.coverRequired} /> required</>}
             />
             <Glance
-              k="Remaining Term" phrase={v.secondsToRedemption <= 0}
-              v={v.secondsToRedemption > 0 ? duration(v.secondsToRedemption) : `matured ${fmtIso(v.redemptionAt).slice(0, 10)}`}
+              k="Remaining Term" phrase={v.secondsToRedemption === null || v.secondsToRedemption <= 0}
+              v={v.secondsToRedemption === null ? 'no redemption date'
+                : v.secondsToRedemption > 0 ? duration(v.secondsToRedemption) : `matured ${fmtIso(v.redemptionAt).slice(0, 10)}`}
             />
             <Glance k="Exposures" v={`${v.loanCount} · ${v.distressedLoanCount} non-performing`} phrase moved={exposuresMoved} />
           </dl>
@@ -198,8 +200,10 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
             <p>
               {name} is a {kind} lending facility carrying {v.loanCount} exposure{v.loanCount === 1 ? '' : 's'},
               of which {v.distressedLoanCount} {v.distressedLoanCount === 1 ? 'is' : 'are'}{' '}
-              non-performing. It is in its {v.phase.toLowerCase()} period, with redemption
-              scheduled for {fmtIso(v.redemptionAt)}.
+              non-performing. It is in its {v.phase.toLowerCase()} period,{' '}
+              {v.redemptionAt === null ? 'with no redemption date'
+                : v.secondsToRedemption !== null && v.secondsToRedemption > 0 ? `with redemption scheduled for ${fmtIso(v.redemptionAt)}`
+                : `its redemption date, ${fmtIso(v.redemptionAt)}, behind it`}.
             </p>
             {hasGap ? (
               <p>
@@ -248,11 +252,11 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
           <section className="op-sec op-outlook">
             <h2 className="t-heading-m">Outlook</h2>
             <p className="dim">
-              The outlook is {outlook}, taken from the direction of the measured factors
-              rather than from any view of the obligors.
-              {v.trend === 'deteriorating' && <> The factors are moving against the facility.</>}
+              The outlook is {outlook}, taken from the state of the book rather than from any
+              view of the obligors.
+              {v.trend === 'deteriorating' && <> At least one exposure is non-performing, or claims exceed liquidity at redemption.</>}
               {v.trend === 'improving' && <> The factors are moving in the facility's favour.</>}
-              {v.trend === 'stable' && <> The factors are holding.</>}
+              {v.trend === 'stable' && <> No exposure is non-performing and claims are met at redemption.</>}
             </p>
             <p className="dim">
               {d.phaseInfo.canWithdraw
@@ -277,7 +281,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
           </section>
 
           <section className="op-sec op-why">
-            <h3 className="t-heading-s">Why the Score Sits {moves.length > 0 ? 'Below' : 'at'} the Anchor</h3>
+            <h3 className="t-heading-s">Why the score sits {moves.length > 0 ? 'below' : 'at'} the anchor</h3>
             {moves.length > 0
               ? (
                 <div>
@@ -357,7 +361,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
             <p>
               <Amount drops={v.assetsAvailable} /> available of <Amount drops={v.assetsTotal} />.
               Redemption {fmtIso(v.redemptionAt)}
-              {v.secondsToRedemption > 0 ? `, in ${duration(v.secondsToRedemption)}` : ''}.
+              {v.secondsToRedemption !== null && v.secondsToRedemption > 0 ? `, in ${duration(v.secondsToRedemption)}` : ''}.
               {Number(redemptionShortfall) > 0
                 ? <> Claims exceed projected liquidity by <Amount drops={redemptionShortfall} />.</>
                 : ' Claims are covered by projected liquidity.'}
@@ -368,7 +372,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
 
       <section className="wrap op-exhibits" aria-label="Exhibits">
         <div className="op-exhibits-in">
-          <Exhibit title="Exhibit 1 · Factor Scores" open>
+          <Exhibit title="Exhibit 1 · Factor scores" open>
             <div className="tbl-wrap">
               <table className="op-tbl fac-tbl">
                 <thead>
@@ -396,7 +400,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
               This is the same five factors, ungrouped, in the order the calculation agent
               sends them, each with the figure it was scored on — nothing summarised away. */}
           <Exhibit
-            title="Exhibit 2 · Measured Factors"
+            title="Exhibit 2 · Measured factors"
             meta={headline ? <>{creditText(headline.label)} <GradeLetter grade={headline.grade} size="sm" /></> : undefined}
           >
             <div className="tbl-wrap">
@@ -408,7 +412,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
                   {d.score.dimensions.map(dim => (
                     <tr key={dim.key}>
                       <td><b>{creditText(dim.label)}</b></td>
-                      <td className="rt num">{dim.value}{dim.unit === 'pct' ? '%' : dim.unit && dim.unit !== 'none' ? ` ${dim.unit}` : ''}</td>
+                      <td className="rt num">{dim.value}{dim.unit === 'percent' ? '%' : ` ${dim.unit}`}</td>
                       <td className="rt"><GradeLetter grade={dim.grade} size="sm" /></td>
                       <td className="op-says">{sentence(creditText(dim.explain))}</td>
                     </tr>
@@ -443,7 +447,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
                   <tr><td>Largest exposure</td><td className="rt num">{largest ? ratioToPct(largest.shareOfDebtTotal) : 'n.a.'}</td><td className="op-says">share of drawn debt</td></tr>
                   <tr><td>Exposures</td><td className="rt num">{v.loanCount}</td><td className="op-says">{v.distressedLoanCount} non-performing, {overdue} past due</td></tr>
                   <tr><td>Claims at redemption</td><td className="rt num"><Amount drops={d.phaseInfo.claimsAtRedemption} /></td><td className="op-says">against <Amount drops={d.phaseInfo.liquidityAtRedemption} /> liquidity</td></tr>
-                  <tr><td>Projected shortfall</td><td className="rt num"><Amount drops={redemptionShortfall} /></td><td className="op-says">{ratioToPct(d.phaseInfo.shortfallPct)} of claims</td></tr>
+                  <tr><td>Projected shortfall</td><td className="rt num"><Amount drops={redemptionShortfall} /></td><td className="op-says">{percent(d.phaseInfo.shortfallPct)} of claims</td></tr>
                 </tbody>
               </table>
             </div>
@@ -451,6 +455,6 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
         </div>
         <p className="op-foot">This note does not announce a rating action.</p>
       </section>
-    </>
+    </AmountAsset.Provider>
   )
 }

@@ -14,6 +14,7 @@
  * to "how did you choose your weights": we do not weight, we notch.
  */
 import Decimal from 'decimal.js'
+import { wholeShares } from './num.mjs'
 
 Decimal.set({ precision: 40, toExpNeg: -9e15, toExpPos: 9e15 })
 
@@ -24,6 +25,25 @@ export const LADDER = ['AAA', 'AA+', 'AA', 'AA-', 'A+', 'A', 'A-', 'BBB+', 'BBB'
 // LADDER is ordered best -> worst, so a worse grade is a HIGHER index. Hence minus.
 export const notch = (grade, delta) => LADDER[Math.min(LADDER.length - 1, Math.max(0, LADDER.indexOf(grade) - delta))]
 export const gradeNumeric = (g) => Math.round((1 - LADDER.indexOf(g) / (LADDER.length - 1)) * 100)
+
+/** Bumped whenever a rule below changes a grade: 1.1.0 added the CCC and D floors for capital destroyed. */
+export const METHOD_VERSION = '1.1.0'
+
+/**
+ * Notches for subscribed capital already destroyed: the first band met applies. A floor caps the
+ * grade however high the anchor, so a facility that lost nine tenths of its capital cannot rate
+ * above CCC, and one that lost all of it is D. Published by GET /api/methodology.
+ */
+export const REALISED_LOSS_BANDS = [
+  { atLeastPct: 100, notches: -14, floor: 'D' },
+  { atLeastPct: 90, notches: -14, floor: 'CCC' },
+  { atLeastPct: 75, notches: -14, floor: null },
+  { atLeastPct: 50, notches: -12, floor: null },
+  { atLeastPct: 25, notches: -8, floor: null },
+  { atLeastPct: 10, notches: -5, floor: null },
+  { atLeastPct: 2, notches: -3, floor: null },
+  { atLeastPct: 0, notches: -1, floor: null },
+]
 
 export function baseGradeFromRatio(r, bands) {
   for (const [threshold, grade] of bands) if (D(r).gte(threshold)) return grade
@@ -80,8 +100,10 @@ export function buildScore({ liquidityRatio, coverAdequacy, concentration, recog
   if (rl.gt(0)) {
     // Bands, not a formula: the grade is ordinal and each step has to be defensible on
     // its own rather than emerging from arithmetic nobody can check on a slide.
-    const delta = rl.gte(75) ? -14 : rl.gte(50) ? -12 : rl.gte(25) ? -8 : rl.gte(10) ? -5 : rl.gte(2) ? -3 : -1
-    const tR = notch(headline, delta)
+    const band = REALISED_LOSS_BANDS.find((b) => rl.gte(b.atLeastPct))
+    let tR = notch(headline, band.notches)
+    if (band.floor && LADDER.indexOf(tR) < LADDER.indexOf(band.floor)) tR = band.floor
+    const delta = LADDER.indexOf(headline) - LADDER.indexOf(tR)
     trace.push({ from: headline, rule: `${rl.toFixed(1)}% of subscribed capital destroyed and written off`, delta, to: tR })
     headline = tR
   }
@@ -95,7 +117,7 @@ export function buildScore({ liquidityRatio, coverAdequacy, concentration, recog
   dims.push({ key: 'HEADLINE', label: 'Composite', value: headline, unit: 'grade', grade: headline, notches: 0,
     explain: 'Ordinal notching of the five measured dimensions. No weights are applied anywhere.', worseIsHigher: false })
 
-  return { grade: headline, gradeNumeric: gradeNumeric(headline), computedAt: null, methodVersion: '1.0.0', dimensions: dims, notchTrace: trace }
+  return { grade: headline, gradeNumeric: gradeNumeric(headline), computedAt: null, methodVersion: METHOD_VERSION, dimensions: dims, notchTrace: trace }
 }
 
 // ---------------------------------------------------------------------------
@@ -109,7 +131,7 @@ const PERFORMING = new Set(['current', 'due_soon'])
 const DISTRESSED = new Set(['overdue', 'impaired', 'defaultable'])
 
 /**
- * @param {{assetsTotal:any, assetsAvailable:any, lossUnrealized:any, sharesOutstanding:any,
+ * @param {{assetsTotal:any, assetsAvailable:any, lossUnrealized:any, sharesOutstanding:any, scale?:number, asset?:{kind:string},
  *          broker:{debtTotal:any, coverAvailable:any, coverRateMinimum:number, coverRateLiquidation:number},
  *          loans:Array<{status:string, principalOutstanding:any, totalValueOutstanding:any, secondsUntilDue:number}>,
  *          phase:string}} o
@@ -126,14 +148,21 @@ export function deriveScoreInputs(o) {
   // The DOUBLE PRODUCT. Both rates are 1e-5 units so BOTH are divided by 1e5.
   // Verified on-chain: cover consumed == ceil(DebtTotal * cmin * cliq), keyed to the
   // broker's TOTAL debt at that instant, not to the defaulting loan's principal.
-  const maxLiquidatableNow = debtTotal.times(cmin).times(cliq).ceil()
-  const coverRequired = debtTotal.times(cmin).ceil()
+  // Rounded up to the drop (or MPT unit) as the ledger does; an issued currency has no such unit.
+  const toUnit = (d) => (o.asset?.kind === 'IOU' ? d : d.ceil())
+  const maxLiquidatableNow = toUnit(debtTotal.times(cmin).times(cliq))
+  const coverRequired = toUnit(debtTotal.times(cmin))
   const coverShortfall = Decimal.max(0, coverRequired.minus(coverAvailable))
   const strandedCoverFraction = coverAvailable.isZero()
     ? D(0)
     : Decimal.max(0, coverAvailable.minus(maxLiquidatableNow)).div(coverAvailable)
 
-  const largest = o.loans.reduce((m, l) => Decimal.max(m, D(l.principalOutstanding)), D(0))
+  // Concentration is a share of THIS broker's debt, so only its own loans count. A second broker's
+  // loans divided by the first one's debt read as 500%.
+  // shortcut: cover and recovery below are the first broker's alone, which understates both when a
+  // vault has two; score each broker and keep the worst once a vault with two is tracked.
+  const ownLoans = o.broker.loanBrokerId ? o.loans.filter((l) => l.loanBrokerId === o.broker.loanBrokerId) : o.loans
+  const largest = ownLoans.reduce((m, l) => Decimal.max(m, D(l.principalOutstanding)), D(0))
   const concentration = debtTotal.isZero() ? D(0) : largest.div(debtTotal)
   const recogLagSeconds = Math.max(
     0,
@@ -176,7 +205,7 @@ export function deriveScoreInputs(o) {
   // recover; it must NOT be counted here, or an honest manager who writes down early
   // would be punished for the disclosure. Only a write-off, which removes the asset
   // from AssetsTotal outright, is permanent destruction.
-  const shares = D(o.sharesOutstanding)
+  const shares = wholeShares(o.sharesOutstanding, o.scale)
   const realisedLossPct = shares.isZero() || assetsTotal.gte(shares)
     ? D(0)
     : shares.minus(assetsTotal).div(shares).times(100)

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="robots" content="noindex" />
+    <title>Not on file · Orma</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Served for a file that does not exist: the app itself answers every page address, so this
+         is only ever seen for a mistyped asset or document URL. Same faces and palette as the site,
+         no script. -->
+    <style>
+      @font-face{ font-family: "Plex Serif"; font-weight: 400; font-display: swap; src: url("/assets/fonts/plex-serif-400.woff2") format("woff2"); }
+      @font-face{ font-family: "Plex Sans"; font-weight: 400 600; font-display: swap; src: url("/assets/fonts/plex-sans-var.woff2") format("woff2"); }
+      :root{ --bg: #F4F4F2; --text: #121418; --text-2: #454B54; --rule: #121418; }
+      @media (prefers-color-scheme: dark){ :root{ --bg: #0B0C0F; --text: #EFE8DA; --text-2: #ADA697; --rule: #EFE8DA; } }
+      html{ color-scheme: light dark; }
+      body{
+        margin: 0; min-height: 100svh; display: grid; place-items: center;
+        background: var(--bg); color: var(--text); border-top: 4px solid var(--rule);
+        font: 400 16px/1.55 "Plex Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased;
+      }
+      main{ width: min(560px, 100% - 40px); padding-block: 48px; }
+      .k{ margin: 0 0 12px; font: 500 13px/1.4 "Plex Sans", system-ui, sans-serif; color: var(--text-2); }
+      h1{ margin: 0; font: 400 52px/1.1 "Plex Serif", Georgia, serif; letter-spacing: -.015em; }
+      p{ margin: 16px 0 0; color: var(--text-2); text-wrap: pretty; }
+      a{ display: inline-flex; align-items: center; min-height: 44px; margin-top: 16px; color: var(--text); font-weight: 500; text-decoration: underline; text-underline-offset: 5px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="k">Orma</p>
+      <h1>Not on file.</h1>
+      <p>There is no document at this address. Every credit opinion is reached from the portfolio.</p>
+      <a href="/">Portfolio</a>
+    </main>
+  </body>
+</html>

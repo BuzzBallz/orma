@@ -44,6 +44,38 @@ export function num(v) {
 }
 
 /**
+ * Shares in whole units. A vault mints 10^Scale share units per unit of asset at a unit value of
+ * one (XLS-65): Scale is 0 for XRP and MPT assets, 6 by default for an issued currency, so dividing
+ * assets by raw shares would value a healthy USD vault at 0.000001.
+ * @param {unknown} shares @param {number} [scale]
+ * @returns {Dec}
+ */
+export function wholeShares(shares, scale = 0) {
+  return num(shares).div(new Decimal(10).pow(scale))
+}
+
+/**
+ * An amount as the API serves it: whole drops or MPT units, or an issued currency with its own
+ * decimals. Rounding an IOU to a whole unit turned 1.5 USD into "2".
+ * @param {unknown} v @param {{kind:string}|null|undefined} asset
+ */
+export function amountStr(v, asset) {
+  return asset?.kind === 'IOU' ? num(v).toFixed() : num(v).toFixed(0)
+}
+
+/**
+ * An amount in a vault's asset, for a sentence: XRP from drops, an issued currency as it is, an
+ * MPT in whole units. No asset is XRP.
+ * @param {unknown} v @param {{kind:string, currency:string|null}|null|undefined} asset @param {number} [dp]
+ */
+export function amountText(v, asset, dp = 2) {
+  const d = num(v)
+  if (!asset || asset.kind === 'XRP') return `${d.div(1e6).toFixed(dp)} XRP`
+  if (asset.kind === 'IOU') return `${d.toFixed(dp)} ${asset.currency}`
+  return `${d.toFixed(0)} units`
+}
+
+/**
  * Serialise for the API. Always a plain decimal string, never scientific notation,
  * never a JS number.
  * @param {Dec|string|number|undefined|null} v

@@ -170,7 +170,7 @@ writeFileSync('.demo-keys.json', JSON.stringify({
   note: 'Devnet faucet keys for replaying the gate demo. Gitignored. Worthless, still private keys.',
   vaultId, domainId, credentialType: BAR.name,
   rater: rater.seed, vaultOwner: vaultOwner.seed, lpGraded: lpGood.seed, lpUngraded: lpBad.seed,
-}, null, 2) + String.fromCharCode(10))
+}, null, 2) + String.fromCharCode(10), { mode: 0o600 })
 console.log('  keys for a live replay -> .demo-keys.json (gitignored)')
 console.log(`\n  -> ${OUT}\n`)
 

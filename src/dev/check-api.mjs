@@ -1,6 +1,7 @@
 // Offline check of two api.mjs behaviours: HEAD answers like GET, and a vault not read yet is
 // "warming up" (503), not "no such vault" (404). No network, no ledger.
 //   node src/dev/check-api.mjs
+import { connect } from 'node:net'
 import { createApi } from '../api.mjs'
 
 const ID = 'AB'.repeat(32)
@@ -47,6 +48,39 @@ eq('a share id while a tracked vault is unread', (await call('GET', `/api/mpt/${
 reader.missing = new Set([ID])
 eq('a tracked vault the ledger says does not exist', (await call('GET', `/api/vaults/${ID}/nav`)).code, 'VAULT_NOT_FOUND')
 eq('and a share id once every tracked vault is read or missing', (await call('GET', `/api/mpt/${MPT}/nav`)).code, 'SHARE_NOT_TRACKED')
+
+// A request target the URL parser rejects is a 400, and the server is still up after it.
+const raw = await new Promise((resolve) => {
+  const s = connect(api.server.address().port, '127.0.0.1', () => s.write('GET //[ HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n'))
+  let got = ''
+  s.on('data', (c) => (got += c)).on('end', () => resolve(got.split(' ')[1]))
+})
+eq('a malformed request target', raw, '400')
+eq('and the server still answers', (await call('GET', '/api/health')).status, 200)
+
+// Operator routes: a browser's POST carries Origin and is refused before anything runs.
+const post = async (headers) => (await fetch(base + '/api/demo/default', { method: 'POST', headers, body: 'x' })).status
+eq('an operator POST from a page', await post({ origin: 'https://evil.example', 'content-type': 'text/plain' }), 403)
+eq('an operator POST from a script, no such action', await post({}), 404)
+eq('a preflight no longer offers POST', (await fetch(base + '/api/health', { method: 'OPTIONS' })).headers.get('access-control-allow-methods'), 'GET,HEAD,OPTIONS')
+
+// Collateral parameters are bounded before any ledger read.
+reader.get = () => ({ vaultId: ID, vault: { shareMptId: MPT, owner: 'rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh' } })
+const accounts = (n) => Array(n).fill('rHb9CJAWyB4rj91VRWn96DkukG4bwdtyTh').join(',')
+eq('eleven accounts', (await call('GET', `/api/vaults/${ID}/collateral?accounts=${accounts(11)}`)).code, 'BAD_ACCOUNTS')
+eq('an account that is not an address', (await call('GET', `/api/vaults/${ID}/collateral?accounts=nope`)).code, 'BAD_ACCOUNTS')
+eq('a negative haircut', (await call('GET', `/api/vaults/${ID}/collateral?haircut=-1`)).code, 'BAD_HAIRCUT')
+eq('a haircut that is not a number', (await call('GET', `/api/vaults/${ID}/collateral?haircut=abc`)).code, 'BAD_HAIRCUT')
+
+// A pledge in scientific notation would have Decimal write out every digit: refused before any work.
+eq('units in scientific notation, on the share valuation', (await call('GET', `/api/mpt/${MPT}/nav?units=1e9999999`)).code, 'BAD_UNITS')
+eq('and on the diagnostic', (await call('GET', `/api/mpt/${MPT}/resolve?units=1e9999999`)).code, 'BAD_UNITS')
+
+// Five resolves at once against a slow ledger: four run, the fifth is told to retry.
+reader.xrpl = { mptIssuance: () => new Promise((_, reject) => setTimeout(() => reject(new Error('slow')), 300)) }
+const burst = await Promise.all(Array.from({ length: 5 }, () => call('GET', `/api/mpt/${MPT}/resolve`)))
+eq('a burst of ledger walks is capped', burst.map((r) => r.status).sort(), [200, 200, 200, 200, 503])
+eq('and the cap lets go once they finish', (await call('GET', `/api/mpt/${MPT}/resolve`)).status, 200)
 
 await api.close()
 console.log(bad ? `\n  ${bad} FAILED` : '\n  all ok')

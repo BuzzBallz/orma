@@ -18,7 +18,7 @@
  * reality, and the impairment that caused it emitted PreviousFields:{} so a
  * metadata-diffing indexer never saw it.
  */
-import { num, str, Decimal } from './num.mjs'
+import { num, str, Decimal, wholeShares, amountStr, rippleToIso } from './num.mjs'
 import { logger } from './log.mjs'
 
 const log = logger('collateral')
@@ -62,8 +62,9 @@ export async function findShareEscrows(xrpl, shareMptId, accounts) {
         pledgor: o.Account,
         beneficiary: o.Destination ?? null,
         shares: num(amt.value),
-        finishAfter: o.FinishAfter ?? null,
-        cancelAfter: o.CancelAfter ?? null,
+        // ISO like every other time on the API: a Ripple-epoch integer read as Unix time is 30 years early.
+        finishAfter: rippleToIso(o.FinishAfter),
+        cancelAfter: rippleToIso(o.CancelAfter),
         condition: o.Condition ?? null,
         // Same reasoning as the oracle object: the explorer resolves transactions, not
         // bare ledger indexes. For an escrow that has not been finished or cancelled this
@@ -80,17 +81,19 @@ export async function findShareEscrows(xrpl, shareMptId, accounts) {
  * @param {{shares: import('decimal.js').Decimal}} escrow
  * @param {string} navNaive  decimal string, assets per share
  * @param {string} navCorrect decimal string, loss-adjusted assets per share
+ * @param {{scale?:number, asset?:object}} vault the unit value is per whole share: 10^scale units
  */
-export function valuePledge(escrow, navNaive, navCorrect) {
+export function valuePledge(escrow, navNaive, navCorrect, vault = {}) {
   const shares = num(escrow.shares)
-  const naive = shares.times(num(navNaive))
-  const correct = shares.times(num(navCorrect))
+  const whole = wholeShares(shares, vault.scale)
+  const naive = whole.times(num(navNaive))
+  const correct = whole.times(num(navCorrect))
   const overstatement = naive.minus(correct)
   return {
     shares: shares.toFixed(0),
-    valueNaive: naive.toFixed(0),
-    valueCorrect: correct.toFixed(0),
-    overstatement: overstatement.toFixed(0),
+    valueNaive: amountStr(naive, vault.asset),
+    valueCorrect: amountStr(correct, vault.asset),
+    overstatement: amountStr(overstatement, vault.asset),
     overstatementPct: naive.isZero() ? '0.00' : overstatement.div(naive).times(100).toFixed(2),
   }
 }
@@ -103,7 +106,7 @@ export function valuePledge(escrow, navNaive, navCorrect) {
 export function presentCollateral(escrows, snap, haircutPct = 0) {
   const hc = num(haircutPct).div(100)
   const pledges = escrows.map((e) => {
-    const v = valuePledge(e, snap.navNaive, snap.navCorrect)
+    const v = valuePledge(e, snap.navNaive, snap.navCorrect, snap.vault)
     const lendable = num(v.valueCorrect).times(new Decimal(1).minus(hc))
     return {
       escrowId: e.escrowId,
@@ -111,7 +114,7 @@ export function presentCollateral(escrows, snap, haircutPct = 0) {
       beneficiary: e.beneficiary,
       ...v,
       haircutPct: num(haircutPct).toFixed(2),
-      maxLendable: lendable.toFixed(0),
+      maxLendable: amountStr(lendable, snap.vault.asset),
       finishAfter: e.finishAfter,
       cancelAfter: e.cancelAfter,
       lastTxId: e.lastTxId ?? null,
@@ -130,9 +133,9 @@ export function presentCollateral(escrows, snap, haircutPct = 0) {
     navCorrect: snap.navCorrect,
     pledgeCount: pledges.length,
     totalShares: totalShares.toFixed(0),
-    totalValueNaive: totalNaive.toFixed(0),
-    totalValueCorrect: totalCorrect.toFixed(0),
-    totalOverstatement: totalOver.toFixed(0),
+    totalValueNaive: amountStr(totalNaive, snap.vault.asset),
+    totalValueCorrect: amountStr(totalCorrect, snap.vault.asset),
+    totalOverstatement: amountStr(totalOver, snap.vault.asset),
     totalOverstatementPct: totalNaive.isZero() ? '0.00' : totalOver.div(totalNaive).times(100).toFixed(2),
     pledges,
   }

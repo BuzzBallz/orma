@@ -3,8 +3,9 @@ import './app.css'
 import { API_MIXED_ORIGIN, SUSPECT_AFTER_FAILS, SUSPECT_BACKOFF_MS } from './lib/api'
 import { usePoll } from './lib/usePoll'
 import { facilityName } from './lib/credit'
-import { follow, useRoute, type RoutePath } from './lib/useRoute'
-import type { BrokerHistory, Collateral, Gate, Health, IndexerRace, NavHistory, OracleContest, Resolution, VaultDetail as Detail, VaultsResponse } from './lib/types'
+import { DESKS, follow, hrefFor, useRoute, type RoutePath } from './lib/useRoute'
+import type { BrokerHistory, Collateral, Gate, Health, IndexerRace, MethodRules, NavHistory, OracleContest, Resolution, VaultDetail as Detail, VaultRow, VaultsResponse } from './lib/types'
+import { GradeLetter } from './components/GradeLetter'
 import { HeaderBar } from './components/HeaderBar'
 import { Footer } from './components/Footer'
 import { StaleBar } from './components/StaleBar'
@@ -27,15 +28,36 @@ const POLL_MS = 3000
  * missing, in the same language as the rest of the service — never a spinner, never a
  * placeholder figure.
  */
-function Note({ heading, watch, said, facts, onBack }: {
+/** Why no figure is shown yet, in the reader's words. Every case retries on its own. */
+function waitingWords(code: string | null): string {
+  if (code === 'WARMING_UP') return 'The service has just started and has not read this facility yet. The figures appear on their own.'
+  if (code === 'TIMEOUT' || code === null) return 'The service is not answering. It sleeps when idle and takes about half a minute to wake. The figures appear on their own.'
+  return 'This facility is on file. No figure is shown until one is received.'
+}
+
+function Note({ heading, watch, said, facts, choices, onBack }: {
   heading: string; watch?: boolean; said: ReactNode
   facts: [string, ReactNode][]
+  /** Facilities to open straight from the note, on the desk it stands on. */
+  choices?: { desk: RoutePath; rows: VaultRow[]; onChoose: (vaultId: string) => void }
   onBack: () => void
 }) {
   return (
     <div className={'state' + (watch ? ' state-watch' : '')}>
       <h2 className="t-heading-s">{heading}</h2>
       <p className="t-body-s dim">{said}</p>
+      {choices && choices.rows.length > 0 && (
+        <ul className="state-choices">
+          {choices.rows.map(v => (
+            <li key={v.vaultId}>
+              <a href={hrefFor(choices.desk, v.vaultId)} onClick={e => follow(e, () => choices.onChoose(v.vaultId))}>
+                <span>{facilityName(v)}</span>
+                <GradeLetter grade={v.grade} size="sm" />
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
       <a className="lnk" href="/" onClick={e => follow(e, onBack)}>
         <ArrowLeft size={16} strokeWidth={1.75} aria-hidden /> Portfolio
       </a>
@@ -59,6 +81,8 @@ function Desk() {
   const go = useCallback((p: RoutePath, id?: string | null) => {
     quiet.current = false
     navigate(p, id)
+    // The new desk is where a keyboard or screen-reader user now is; focus stayed on the old link.
+    document.getElementById('main')?.focus({ preventScroll: true })
   }, [navigate])
   // Back and forward are the browser's own navigation, often a key or an edge swipe that
   // already animates: the desk they land on stays still. Capture phase, so this runs before
@@ -68,13 +92,21 @@ function Desk() {
     addEventListener('popstate', still, true)
     return () => removeEventListener('popstate', still, true)
   }, [])
+  // One title per desk, so a tab, a history entry and a screen reader say where the reader is.
+  useEffect(() => {
+    document.title = `${DESKS.find(([p]) => p === path)?.[1] ?? 'Portfolio'} · Orma`
+  }, [path])
 
   const slow = API_MIXED_ORIGIN
     ? { slowAfter: SUSPECT_AFTER_FAILS, slowCapMs: SUSPECT_BACKOFF_MS }
     : undefined
-  const health = usePoll<Health>('/api/health', 5000, slow)
+  // At the desk's pace: every 5 s, one slow answer outlived the 6 s stale mark and flashed Withheld.
+  const health = usePoll<Health>('/api/health', POLL_MS, slow)
+  // Only a vault id reaches a URL. Anything else in ?facility= is not on file: passed through,
+  // ../health fetched /api/health and blanked the desk, and a 12-character reference polled forever.
+  const ref = vaultId && /^[0-9a-f]{64}$/i.test(vaultId) ? vaultId : null
   const vaults = usePoll<VaultsResponse>('/api/vaults', path === '/' ? POLL_MS : 15000, slow)
-  const detail = usePoll<Detail>(vaultId ? `/api/vaults/${vaultId}` : null, POLL_MS, slow)
+  const detail = usePoll<Detail>(ref ? `/api/vaults/${ref}` : null, POLL_MS, slow)
 
   const rows = vaults.data?.vaults ?? []
 
@@ -104,8 +136,8 @@ function Desk() {
   // chosen, and slowly: a manager's track record is history, not a live figure. A 404
   // here (no manager, no pledges) is a normal state, so usePoll keeps data null and the
   // exhibits omit themselves rather than rendering an error into a credit opinion.
-  const histPath = path === '/facility' && vaultId ? `/api/vaults/${vaultId}/broker-history` : null
-  const collPath = path === '/facility' && vaultId ? `/api/vaults/${vaultId}/collateral` : null
+  const histPath = path === '/facility' && ref ? `/api/vaults/${ref}/broker-history` : null
+  const collPath = path === '/facility' && ref ? `/api/vaults/${ref}/collateral` : null
   const history = usePoll<BrokerHistory>(histPath, 20000)
   // Exhibit 5 is keyed on the SHARE token, not on the vault: it is the lookup a holder
   // has. It needs the detail payload to know the share id, so it starts one poll behind
@@ -118,11 +150,13 @@ function Desk() {
   const collateral = usePoll<Collateral>(collPath, 20000)
   // The NAV at each transaction that modified the vault. Ledger history, so slow; an older
   // server without the route answers 404 and the desk simply omits the chart.
-  const navHist = usePoll<NavHistory>(path === '/facility' && vaultId ? `/api/vaults/${vaultId}/nav-history` : null, 30000)
+  const navHist = usePoll<NavHistory>(path === '/facility' && ref ? `/api/vaults/${ref}/nav-history` : null, 30000)
   // An admission rule changes when its owner edits it, not every four seconds.
-  const gate = usePoll<Gate>(path === '/facility' && vaultId ? `/api/vaults/${vaultId}/gate` : null, 30000)
+  const gate = usePoll<Gate>(path === '/facility' && ref ? `/api/vaults/${ref}/gate` : null, 30000)
 
   const race = usePoll<IndexerRace>(path === '/evidence' ? '/api/indexer-race' : null, 30000)
+  // The rules change with a release, not with the ledger.
+  const method = usePoll<MethodRules>(path === '/methodology' ? '/api/methodology' : null, 300000)
 
   // The contestability capture. A fixed historical artifact like the race capture, and on
   // the facility desk because that is where the oracle object it argues about lives.
@@ -133,15 +167,24 @@ function Desk() {
   // capture. Only the DATE: staleness still comes from `primary`, because a capture is a
   // fixed historical artifact and "stale" means a live figure stopped arriving.
   const stamp = path === '/' ? vaults.data : path === '/evidence' ? race.data : detail.data
-  const notFound = detail.code === 'VAULT_NOT_FOUND'
+  const notFound = detail.code === 'VAULT_NOT_FOUND' || (vaultId !== null && ref === null)
   // usePoll keeps the last good payload across a path change, so `detail.data` can still be
   // the previous facility's while this one is in flight. A desk draws a payload only when
   // it names the facility in the address bar, never one facility's figures under another's.
   const own = detail.data && vaultId && detail.data.vault.vaultId.toUpperCase() === vaultId.toUpperCase()
     ? detail.data : null
+  // The figures can also be old while the page is current: the service answered, but its last
+  // read of a facility failed and it is serving the one before. On the book, any facility.
+  const readAge = path === '/'
+    ? Math.max(0, ...rows.map(r => (r.freshness?.stale ? r.freshness.ageSeconds : 0)))
+    : own?.vault.freshness?.stale ? own.vault.freshness.ageSeconds : 0
+  // Only a desk showing live figures gets the age bar: on Methodology, or on a facility desk with
+  // no facility, the last poll's age is no figure's age.
+  const live = path === '/' || ((path === '/facility' || path === '/event') && own !== null)
+  const ageBar = live && ((path === '/' ? vaults.stale : detail.stale) || readAge > 0)
   // A facility still in flight: after a click its frame is held invisible for a moment
   // (app.css, .enter[data-wait]), so a quick answer enters once instead of replacing it mid-rise.
-  const waiting = (path === '/facility' || path === '/event') && !!vaultId && !own
+  const waiting = (path === '/facility' || path === '/event') && !!ref && !own
 
   const wasWithheld = useRef(false)
   useEffect(() => {
@@ -165,7 +208,7 @@ function Desk() {
       return <Evidence d={race.data} />
     }
 
-    if (path === '/methodology') return <Methodology />
+    if (path === '/methodology') return <Methodology rules={method.data} />
 
     if (path === '/') {
       // With nothing received the same page is drawn, reading em-dash; the masthead
@@ -173,6 +216,7 @@ function Desk() {
       return (
         <Portfolio
           vaults={rows} received={vaults.data !== null} asOf={vaults.data?.serverTime ?? null}
+          pending={vaults.fails > 0 || vaults.waiting ? waitingWords(vaults.code) : null}
           onOpen={id => go('/facility', id)} onNavigate={go}
         />
       )
@@ -186,9 +230,10 @@ function Desk() {
           <Note
             heading="No facility selected"
             said={path === '/facility'
-              ? <>A credit opinion covers one facility. Choose one from the portfolio.</>
-              : <>The calendar covers one facility. Choose one from the portfolio.</>}
-            facts={rows.length ? [['Facilities on File', String(rows.length)]] : []}
+              ? <>A credit opinion covers one facility. Choose one, weakest first.</>
+              : <>The calendar covers one facility. Choose one, weakest first.</>}
+            facts={[]}
+            choices={{ desk: path, rows, onChoose: id => go(path, id) }}
             onBack={back}
           />
         </Placeholder>
@@ -215,7 +260,7 @@ function Desk() {
       const known = rows.find(r => r.vaultId === vaultId)
       return (
         <Placeholder name={known ? facilityName(known) : undefined} picker={picker}>
-          {detail.fails > 0 && <p className="t-body-m dim">This facility is on file. No figure is shown until one is received.</p>}
+          {(detail.fails > 0 || detail.waiting) && <p className="t-body-m dim">{waitingWords(detail.code)}</p>}
         </Placeholder>
       )
     }
@@ -238,7 +283,7 @@ function Desk() {
         ? gate.data : null
       const nh = navHist.data && navHist.data.vaultId?.toUpperCase() === d.vault.vaultId.toUpperCase()
         ? navHist.data : null
-      return <Facility d={d} history={h} collateral={c} resolution={rz} gate={gt} contest={contest.data} navHistory={nh} picker={picker} />
+      return <Facility d={d} history={h} collateral={c} resolution={rz} gate={gt} contest={contest.data?.vaultId?.toUpperCase() === d.vault.vaultId.toUpperCase() ? contest.data : null} navHistory={nh} picker={picker} />
     }
     return <Event d={own} picker={picker} />
   }
@@ -256,14 +301,14 @@ function Desk() {
         vaults={rows}
         activeVaultId={vaultId}
         path={path}
-        asOf={stamp?.serverTime ?? null}
+        asOf={(path === '/evidence' ? race.data?.capturedAt : stamp?.serverTime) ?? null}
         withheld={health.fails > 0 || health.stale}
         slide={!quiet.current}
         onNavigate={go}
         onSelect={select}
       />
 
-      {primary.stale && path !== '/evidence' && <StaleBar ageMs={primary.ageMs} />}
+      {ageBar && <StaleBar ageMs={Math.max(primary.ageMs, readAge * 1000)} />}
 
       <main id="main" className="page" tabIndex={-1}>
         <div key={path} className={'view' + (quiet.current ? '' : ' enter')} data-wait={waiting || undefined}>{body()}</div>
@@ -274,7 +319,26 @@ function Desk() {
   )
 }
 
+/**
+ * On paper every exhibit is open: a folded one would print as its title alone. The ones opened for
+ * printing fold again afterwards, so the screen comes back as the reader left it.
+ */
+function usePrintOpensExhibits() {
+  useEffect(() => {
+    let opened: HTMLDetailsElement[] = []
+    const before = () => {
+      opened = [...document.querySelectorAll('details:not([open])')] as HTMLDetailsElement[]
+      opened.forEach(d => { d.open = true })
+    }
+    const after = () => { opened.forEach(d => { d.open = false }); opened = [] }
+    addEventListener('beforeprint', before)
+    addEventListener('afterprint', after)
+    return () => { removeEventListener('beforeprint', before); removeEventListener('afterprint', after) }
+  }, [])
+}
+
 export default function App() {
+  usePrintOpensExhibits()
   return (
     <WalletProvider>
       <Desk />

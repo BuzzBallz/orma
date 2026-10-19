@@ -15,6 +15,7 @@ export function Footer({ vaultId, onNavigate }: {
           <Lockup small onClick={e => follow(e, () => onNavigate('/'))} />
         </div>
         <div className="foot-lines">
+          <p>Every facility shown is demonstration data on a test network. No real money is lent.</p>
           <p>Nothing on these pages is behind a sign-in.</p>
           <p>A stale figure is never carried forward as current and never estimated.</p>
           <p>Every reading is also published as a <span data-vocab-exempt>native XLS-47 Oracle object</span>.</p>

@@ -145,7 +145,8 @@ rather than trust:
   "assetsTotal": "51000000",
   "lossUnrealized": "10000000",
   "unitsOutstanding": "51000000",
-  "recompute": "(assetsTotal - lossUnrealized) / unitsOutstanding",
+  "scale": 0,
+  "recompute": "(assetsTotal - lossUnrealized) / (unitsOutstanding / 10^scale)",
   "buildVersion": "3.4.0-rc5"
 }
 ```
@@ -157,7 +158,7 @@ import Decimal from 'decimal.js'
 Decimal.set({ precision: 40 })
 
 const p = nav.provenance
-const check = new Decimal(p.assetsTotal).minus(p.lossUnrealized).div(p.unitsOutstanding)
+const check = new Decimal(p.assetsTotal).minus(p.lossUnrealized).div(new Decimal(p.unitsOutstanding).div(new Decimal(10).pow(p.scale ?? 0)))
 if (check.toFixed(6) !== nav.unitValue.held) {
   throw new Error(`stated ${nav.unitValue.held}, recomputes to ${check.toFixed(6)}`)
 }
@@ -237,7 +238,7 @@ tokens. So an agent can hard-code `nav.unitValue.held` and expect it to be there
 still treat unknown fields as additive rather than erroring on them.
 
 <Note>
-`assessment.methodVersion` (`"1.0.0"`) versions the grading opinion, not the wire format. The
+`assessment.methodVersion` (`"1.1.0"`) versions the grading opinion, not the wire format. The
 grade can be recalibrated without touching the schema. `health.contractVersion` versions the
 wider API, which has no such write-once constraint. See [the NAV pointer](/nav-pointer).
 </Note>
@@ -252,6 +253,36 @@ wider API, which has no such write-once constraint. See [the NAV pointer](/nav-p
 - There is no reverse index from an MPT issuance to the escrows holding it, so collateral
   discovery needs a list of accounts to look at. That is reported as a protocol feedback item,
   not solved here.
+
+### As an MCP server
+
+`src/mcp.mjs` exposes the same readings as MCP tools over stdio, so an agent reads a facility
+without integration code. It holds no key and signs nothing: each tool is one `GET` against
+`ORMA_API`, and an argument that is not a 64- or 48-hex id, or a count of units, is refused before a
+request is made. No dependency: the server speaks JSON-RPC itself.
+
+```json
+{
+  "mcpServers": {
+    "orma": {
+      "command": "node",
+      "args": ["/path/to/orma/src/mcp.mjs"],
+      "env": { "ORMA_API": "https://orma-api.onrender.com" }
+    }
+  }
+}
+```
+
+| tool | route |
+|---|---|
+| `list_facilities` | `GET /api/vaults` |
+| `get_valuation` | `GET /api/vaults/:vaultId/nav` |
+| `get_valuation_by_share` | `GET /api/mpt/:mptId/nav?units=` |
+| `get_facility` | `GET /api/vaults/:vaultId` |
+| `get_manager_conduct` | `GET /api/vaults/:vaultId/broker-history` |
+
+A client that prefers to generate its own: `GET /api/openapi.json` is the OpenAPI 3.1 description
+of every route.
 
 ---
 

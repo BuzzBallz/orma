@@ -14,7 +14,21 @@ const SHORT: Record<string, string> = { ...LONG, withdraw: 'Withdraw', impair: '
 const KEY = new Set(['impair', 'unimpair', 'default', 'clawback'])
 
 const H = 248, PAD = { l: 48, r: 14, t: 20, b: 46 }
+const EXPLORER_TX = 'https://devnet.xrpl.org/transactions/'
 const STEPS = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1]
+
+/** The width of an axis label in its own face, so labels are spaced by what they really take. */
+let measure: CanvasRenderingContext2D | null | undefined
+function textWidth(text: string): number {
+  if (measure === undefined) {
+    measure = typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d')
+    if (measure) measure.font = '500 12px "Plex Sans", system-ui, sans-serif'
+  }
+  return measure ? measure.measureText(text).width : text.length * 7   // server render: a safe estimate
+}
+
+/** Which axis labels win when they would collide: key moments, then Now (index n), then the first point, then the rest. */
+const rank = (points: NavPoint[], i: number) => (i === points.length ? 1 : KEY.has(points[i].kind) ? 0 : i === 0 ? 2 : 3)
 
 /**
  * Reported and held NAV at every transaction that modified the facility, the moments the
@@ -40,7 +54,9 @@ export function NavChart({ points }: { points: NavPoint[] }) {
   let lo = Math.min(...all), hi = Math.max(...all)
   if (hi - lo < 0.02) { const mid = (hi + lo) / 2; lo = mid - 0.05; hi = mid + 0.05 }
   else { const pad = (hi - lo) * 0.18; lo = Math.max(0, lo - pad); hi += pad }
-  const step = STEPS.find(s => (hi - lo) / s <= 6) ?? 1
+  // Past the table, a power of ten that still gives six ticks: a fixed fallback of 1 drew one
+  // tick per unit, millions of them for a NAV in the millions, and froze the tab.
+  const step = STEPS.find(s => (hi - lo) / s <= 6) ?? 10 ** Math.ceil(Math.log10((hi - lo) / 6))
   const ticks: number[] = []
   for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) ticks.push(Math.round(t / step) * step)
 
@@ -53,7 +69,22 @@ export function NavChart({ points }: { points: NavPoint[] }) {
   const lone = Math.abs(y(held[n - 1]) - y(rep[n - 1])) < 20
   const slot = plotW / n
   const wide = slot >= 100
-  const labelled = (i: number, p: NavPoint) => slot >= 70 || KEY.has(p.kind) || i === 0
+  // Axis labels never overlap. The moments the value changed come first, then Now, then the
+  // first point, then the rest, each drawn only where it clears the ones already placed: two
+  // defaults a few pixels apart printed as DefaultDefault on a phone.
+  const name = (p: NavPoint) => (wide ? LONG : SHORT)[p.kind] ?? p.kind
+  const span = (text: string) => textWidth(text) + 8
+  const NOW = n   // the end of the axis, right-aligned rather than centred on a point
+  const order = [...points.map((_, i) => i), NOW].sort((a, b) => rank(points, a) - rank(points, b) || a - b)
+  const placed: [number, number][] = []
+  const shown = new Set<number>()
+  for (const i of order) {
+    const w = span(i === NOW ? 'Now' : name(points[i]))
+    const box: [number, number] = i === NOW ? [x(n) - w, x(n)] : [x(i) - w / 2, x(i) + w / 2]
+    if (placed.some(([l, r]) => box[0] < r && box[1] > l)) continue
+    placed.push(box)
+    shown.add(i)
+  }
   // The last value is written on the line only where the final step leaves room for it.
   const ends = slot >= (lone ? 26 : 17) * 8 + 12
 
@@ -61,7 +92,7 @@ export function NavChart({ points }: { points: NavPoint[] }) {
     <div className="navc" ref={box}>
       <TooltipProvider delayDuration={100}>
         <svg
-          width={width} height={H} role="img"
+          width={width} height={H} viewBox={`0 0 ${width} ${H}`} role="img"
           aria-label={`NAV over ${n} transactions: reported ${points[0].navNaive} to ${last.navNaive}, held ${points[0].navCorrect} to ${last.navCorrect}.`}
         >
           {ticks.map(t => (
@@ -99,10 +130,10 @@ export function NavChart({ points }: { points: NavPoint[] }) {
             </Tooltip>
           ))}
 
-          {points.map((p, i) => labelled(i, p) && (
-            <text key={i} className="navc-xl" x={x(i)} y={H - PAD.b + 22} textAnchor="middle">{(wide ? LONG : SHORT)[p.kind] ?? p.kind}</text>
+          {points.map((p, i) => shown.has(i) && (
+            <text key={i} className="navc-xl" x={x(i)} y={H - PAD.b + 22} textAnchor="middle">{name(p)}</text>
           ))}
-          <text className="navc-xl" x={x(n)} y={H - PAD.b + 22} textAnchor="end">Now</text>
+          {shown.has(NOW) && <text className="navc-xl" x={x(n)} y={H - PAD.b + 22} textAnchor="end">Now</text>}
         </svg>
       </TooltipProvider>
 
@@ -125,7 +156,11 @@ export function NavChart({ points }: { points: NavPoint[] }) {
                   <td>{KEY.has(p.kind) && <span className="navc-dot" aria-hidden />}{LONG[p.kind] ?? p.kind}</td>
                   <td className="rt num">{p.navNaive}</td>
                   <td className="rt num">{p.navCorrect}</td>
-                  <td className="op-says num">{short(p.hash, 10)}</td>
+                  <td className="op-says num">
+                    {p.hash
+                      ? <a className="tx-link" href={EXPLORER_TX + p.hash} target="_blank" rel="noreferrer noopener" aria-label={`Transaction ${p.hash} on the explorer`}>{short(p.hash, 10)}</a>
+                      : '—'}
+                  </td>
                 </tr>
               ))}
             </tbody>

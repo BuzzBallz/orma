@@ -27,8 +27,8 @@ measures both, publishes them, and enforces on them. One asymmetry, two levers, 
 | Flavour | **Loaded**: XLS-65 and XLS-66, plus XLS-47 Price Oracle, XLS-70 Credentials, XLS-80 Permissioned Domains, XLS-85 Token Escrow and XLS-33 MPT shares |
 | Network | XRPL **Devnet**, `wss://s.devnet.rippletest.net:51233`, `network_id` **2** |
 | Explorer, faucet | https://devnet.xrpl.org · https://faucet.devnet.rippletest.net/accounts |
-| `rippled` | **3.4.0-rc5** |
-| Libraries | `xrpl` **5.2.0** with `ripple-binary-codec` **2.11.0**, `decimal.js` **10.6.0**; frontend `xrpl-connect` **0.8.2**, React 19, Vite |
+| `rippled` | **3.4.0-rc5** during the event; Devnet has run **3.4.1** since |
+| Libraries | `xrpl` **5.3.0** with `ripple-binary-codec` **2.11.0**, `decimal.js` **10.6.0**; frontend React 19, Vite |
 | Runtime | Node **24.13.0** |
 | Team | **BuzzBallz** |
 
@@ -309,7 +309,7 @@ succeeds. A rater who could trap capital would be a worse problem than the one w
 
 ## Running it
 
-Node 24.13.0 (Node 20 or later works). The reader needs outbound access to Devnet and no keys: every
+Node 24.13.0 (Node 20.19 or later works). The reader needs outbound access to Devnet and no keys: every
 facility it serves is public ledger state.
 
 ```bash
@@ -350,6 +350,7 @@ The HTTP API is documented in `documentation/pages/http-api.mdx`:
 
 ```
 GET  /api/health
+GET  /api/methodology
 GET  /api/vaults
 GET  /api/vaults/:vaultId
 GET  /api/vaults/:vaultId/nav
@@ -362,6 +363,7 @@ GET  /api/mpt/:mptIssuanceId/resolve      # CORS-open
 GET  /api/indexer-race                    # captures from the event
 GET  /api/oracle-aggregate
 GET  /api/demo/state
+GET  /api/openapi.json                    # OpenAPI 3.1; src/mcp.mjs serves the same readings as MCP tools
 ```
 
 ### Deploying
@@ -393,7 +395,6 @@ sets the Vite build and the single-page rewrite.
 | Variable | Value |
 |---|---|
 | `VITE_API_BASE` | The backend's public URL. It must be `https://`: an https page cannot call http. |
-| `VITE_XRPL_NETWORK` | `devnet` |
 | `VITE_DOCS_URL` | Optional. Defaults to https://buzzballz.github.io/orma/. |
 
 `VITE_` variables are inlined into the bundle at build time, so changing one needs a redeploy, and no

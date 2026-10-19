@@ -17,8 +17,9 @@
  *  2. LastUpdateTime must STRICTLY INCREASE. Equal or lower gives
  *     tecINVALID_UPDATE_TIME, burning a fee and a sequence number. One update per
  *     second per object, maximum.
- *  3. A FUTURE LastUpdateTime BRICKS the object until wall clock catches up. Never
- *     add a safety margin. A clock-skewed laptop on stage takes the oracle offline.
+ *  3. LastUpdateTime must sit within 300 s of the validated ledger's close, either side
+ *     (measured with simulate on Devnet). Ledger time decides, never this host's clock:
+ *     a clock-skewed laptop on stage would take the oracle offline.
  *  4. AssetPrice is a UInt64 serialised as a HEX string. Writing "100" means 256.
  *     Every read and write goes through encodePrice/decodePrice below.
  *
@@ -134,18 +135,18 @@ export class OraclePublisher {
     const docId = this.docIdFor(vaultId)
 
     // Invariant 2, enforced locally: LastUpdateTime must strictly increase, so we
-    // bump rather than reject. Devnet close_time lags wall clock, and that lag is
-    // budget we can borrow from: two publishes in the same wall second get
-    // consecutive timestamps. We only skip once bumping would land in the future,
-    // which is invariant 3. The goal is never to burn a fee on
-    // tecINVALID_UPDATE_TIME, not to rate-limit for its own sake.
+    // bump rather than reject: two publishes on the same ledger close get consecutive
+    // timestamps. We only skip once the bump would run far ahead of the ledger,
+    // invariant 3. The goal is never to burn a fee on tecINVALID_UPDATE_TIME, not to
+    // rate-limit for its own sake.
     const prev = this._lastUpdate.get(docId) ?? 0
-    // Invariant 3: never in the future. Use ledger time, clamped to now.
-    const nowUnix = Math.floor(Date.now() / 1000)
-    let lut = Math.min(ledgerCloseUnix, nowUnix)
-    if (lut <= prev) lut = prev + 1
-    if (lut > nowUnix) {
-      log.debug('publish skipped, would need a future timestamp', { docId })
+    // Invariant 3: rippled accepts a LastUpdateTime within 300 s of the ledger's close and refuses
+    // it otherwise (measured with simulate on Devnet: -290 and +290 pass, -400 and +400 fail). So
+    // ledger time alone decides. Clamping it to this host's clock, as before, made a host six minutes
+    // slow publish timestamps the ledger refused, at a fee each, every tick. A bump stays within 60 s.
+    const lut = Math.max(ledgerCloseUnix, prev + 1)
+    if (lut > ledgerCloseUnix + 60) {
+      log.debug('publish skipped, the bump would run too far ahead of the ledger', { docId })
       return { skipped: true, reason: 'rate' }
     }
 

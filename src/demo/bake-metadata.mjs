@@ -139,7 +139,7 @@ const issuanceId = vault.shares?.mpt_issuance_id
 console.log(`\n  share issuance ${issuanceId}`)
 console.log('\n  RESOLVING FROM THE TOKEN ALONE')
 
-const resolved = await resolveFromIssuance(x, issuanceId, {})
+const resolved = await resolveFromIssuance(x, issuanceId, { allowPrivate: true })
 for (const s of resolved.steps) {
   console.log(`    ${s.ok ? 'ok  ' : 'FAIL'} ${s.step.padEnd(26)} ${String(s.detail ?? '').slice(0, 74)}`)
 }

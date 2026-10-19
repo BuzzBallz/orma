@@ -1,2 +1,3 @@
 User-agent: *
 Allow: /
+Sitemap: https://ormaprotocol.com/sitemap.xml

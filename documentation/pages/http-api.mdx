@@ -122,7 +122,12 @@ distressed loans and reports par.
 | `NO_BROKER` | 404 | false | the vault has no `LoanBroker`, so there is no conduct to reconstruct |
 | `SHARE_NOT_TRACKED` | 404 | false | no facility on this service issues that MPT, once every tracked facility has been read or found not to exist |
 | `NOT_FOUND` | 404 | false | no route matched, or the demo capture file is missing |
-| `FORBIDDEN` | 403 | false | an operator `POST` from something other than loopback |
+| `FORBIDDEN` | 403 | false | an operator `POST` from something other than loopback, or from a browser page |
+| `BAD_REQUEST` | 400 | false | a request target the URL parser rejects |
+| `BAD_ACCOUNTS` | 400 | false | collateral `accounts` names more than 10 accounts, or one that is not a classic address |
+| `BAD_HAIRCUT` | 400 | false | collateral `haircut` is not a number from 0 to 100 |
+| `BAD_UNITS` | 400 | false | `units` on an MPT route is not a whole number of at most 30 digits |
+| `BUSY` | 503 | true | four collateral or resolve requests are already reading the ledger; retry shortly |
 | `INTERNAL` | 500 | true | anything unhandled |
 
 Every route that answers `GET` also answers `HEAD`, with the same status and headers and no body, so a
@@ -132,11 +137,12 @@ A vault id must match `[A-Fa-f0-9]{64}` and an MPT issuance id `[A-Fa-f0-9]{48}`
 accepted and upper-cased before lookup. A path that matches no pattern returns
 `{"error":{"code":"NOT_FOUND","message":"No route GET /api/nope","retryable":false}}`.
 
-### 6. CORS, and which two routes are deliberately public
+### 6. CORS, and which three routes are deliberately public
 
-Every response carries `Access-Control-Allow-Origin: *`, `Access-Control-Allow-Headers: *` and
-`Access-Control-Allow-Methods: GET,POST,OPTIONS`, set unconditionally at the top of the request
-handler so the local demo frontend works from any origin. `OPTIONS` returns `204`.
+Every `GET`, `HEAD` and `OPTIONS` response carries `Access-Control-Allow-Origin: *`,
+`Access-Control-Allow-Headers: *` and `Access-Control-Allow-Methods: GET,HEAD,OPTIONS`, so the
+frontend works from any origin. `OPTIONS` returns `204`. A `POST` gets none of them, and an operator
+`POST` that carries an `Origin` header, which a browser always sends, is refused `403` before it runs.
 
 The meaningful distinction is caching, and it is opt-in per route. The default is
 `Cache-Control: no-store`. Three routes pass `{ cors: true }` and get `Cache-Control: public,
@@ -167,6 +173,7 @@ fields may be added, nothing may ever be renamed, retyped or removed.
 | method and path | answers |
 |---|---|
 | `GET /api/health` | is the reader connected, and how old is the data |
+| `GET /api/methodology` | which notches a destroyed share of capital costs, and under which method version |
 | `GET /api/vaults` | which facilities are tracked, worst first |
 | `GET /api/vaults/:vaultId` | everything about one facility |
 | `GET /api/vaults/:vaultId/nav` | what is one unit actually worth |
@@ -179,6 +186,7 @@ fields may be added, nothing may ever be renamed, retyped or removed.
 | `GET /api/indexer-race` | proof the first impairment is invisible to metadata diffing |
 | `GET /api/oracle-aggregate` | can a second publisher contest a reading, and what median does the ledger report |
 | `GET /api/demo/state` | which facilities are baked and live |
+| `GET /api/openapi.json` | the OpenAPI 3.1 description of these routes |
 
 ---
 
@@ -186,8 +194,9 @@ fields may be added, nothing may ever be renamed, retyped or removed.
 
 Is the reader up, which ledger is it on, and is it currently degraded. No parameters.
 
-`ok` is `false` until the first poll tick completes. The API starts listening before the reader
-connects, which is honest rather than pretending to be ready.
+`ok` is `false` until the first poll tick completes, and again whenever the last pass failed to read
+a vault. The API starts listening before the reader connects, which is honest rather than pretending
+to be ready.
 
 ```bash
 curl -s http://localhost:8787/api/health
@@ -210,7 +219,45 @@ Two fields appear only while upstream is unhappy: `degraded: true` and
 failed read the reader keeps the last good snapshot rather than blanking, so a consumer should show
 stale data with an age banner rather than an empty screen.
 
+Each vault row, each vault detail and each `orma.nav/1` document carries the age of its own
+snapshot, which can be behind the envelope's `ledgerIndex` when that vault's last read failed:
+
+```json
+"freshness": { "readAt": "2026-09-12T22:20:22Z", "readLedgerIndex": 5263343, "ageSeconds": 0, "stale": false }
+```
+
+`ageSeconds` is in ledger time; `stale` turns true past 30 seconds. In an `orma.nav/1` document,
+`asOf` and `ledgerIndex` are the snapshot's own.
+
 `buildVersion` is reported, never asserted. Devnet moves.
+
+---
+
+## GET /api/methodology
+
+The table the score applies for capital already destroyed, served from the code that applies it.
+No parameters, no ledger read.
+
+```json
+{
+  "methodVersion": "1.1.0",
+  "ladder": ["AAA", "AA+", "AA", "...", "C", "D"],
+  "realisedLoss": [
+    { "atLeastPct": 100, "notches": -14, "floor": "D" },
+    { "atLeastPct": 90, "notches": -14, "floor": "CCC" },
+    { "atLeastPct": 75, "notches": -14, "floor": null },
+    { "atLeastPct": 50, "notches": -12, "floor": null },
+    { "atLeastPct": 25, "notches": -8, "floor": null },
+    { "atLeastPct": 10, "notches": -5, "floor": null },
+    { "atLeastPct": 2, "notches": -3, "floor": null },
+    { "atLeastPct": 0, "notches": -1, "floor": null }
+  ]
+}
+```
+
+The first row whose `atLeastPct` the destroyed share meets applies, and only above zero. A `floor`
+caps the grade however high the anchor. Method 1.1.0 added the CCC and D floors; below 90% every
+grade is the one 1.0.0 gave.
 
 ---
 
@@ -278,14 +325,15 @@ reporting `0.210000` on both readings, and two distressed loans behind it. `grad
 score's memory of realised capital destruction, which no NAV reading carries.
 
 <Note>
-`trend` is `"stable"` until the API has seen a vault twice, and the previous NAV is only recorded by
-the detail route. A consumer polling the list alone will see `"stable"` forever. Poll
-`/api/vaults/:vaultId` for the vault in focus if the trend matters. All four rows in the capture
-above read `"stable"` for exactly this reason.
+`trend` is read from the book on every request, the same on the list and the detail route:
+`"deteriorating"` when any loan is overdue, impaired, defaultable or defaulted, or when claims exceed
+projected liquidity at redemption; `"stable"` otherwise. Nothing on the ledger says a facility is
+improving, so `"improving"` is never sent.
 </Note>
 
 `secondsToRedemption` is computed against the ledger close time and goes negative once the
-redemption date has passed.
+redemption date has passed. Both `redemptionAt` and `secondsToRedemption` are `null` for a vault
+with no redemption date.
 
 ---
 
@@ -483,6 +531,7 @@ curl -s http://localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955
   "ledgerIndex": 5263343,
   "schema": "orma.nav/1",
   "asOf": "2026-09-12T22:20:22Z",
+  "freshness": { "readAt": "2026-09-12T22:20:22Z", "readLedgerIndex": 5263343, "ageSeconds": 0, "stale": false },
   "instrument": {
     "kind": "vault-share",
     "vaultId": "5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5",
@@ -517,7 +566,8 @@ curl -s http://localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955
     "assetsTotal": "51000000",
     "lossUnrealized": "10000000",
     "unitsOutstanding": "51000000",
-    "recompute": "(assetsTotal - lossUnrealized) / unitsOutstanding",
+    "scale": 0,
+    "recompute": "(assetsTotal - lossUnrealized) / (unitsOutstanding / 10^scale)",
     "buildVersion": "3.4.0-rc5"
   }
 }
@@ -530,7 +580,9 @@ $$\text{NAV}_{\text{naive}} = \frac{A}{S} \qquad \text{NAV}_{\text{held}} = \fra
 Handing over only the honest number asks the consumer to take our word for it. Handing over both,
 with the gap named in basis points, lets them see what the obvious computation would have told them.
 `provenance` names the three ledger fields so they can recompute it without trusting us:
-$(51{,}000{,}000 - 10{,}000{,}000) / 51{,}000{,}000 = 0.803922$.
+$(51{,}000{,}000 - 10{,}000{,}000) / 51{,}000{,}000 = 0.803922$. `scale` is the vault's `Scale`: 0 for
+an XRP or MPT asset, 6 by default for an issued currency, whose vault mints $10^6$ share units per
+unit of asset. $S$ is then `unitsOutstanding` divided by $10^{\text{scale}}$.
 
 `assessment` is labelled `advisory: true` and can be `null`. The valuation is a measurement, the
 grade is an opinion, and the grade failing to compute must never take the valuation down with it.

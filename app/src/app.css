@@ -40,6 +40,7 @@
   --color-border-error: #B8321F;
   --color-brand-gold: #C9A45F;
   --shadow-rgb: 18 20 24;
+  --scroll-edge: rgb(18 20 24 / .16);
 
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px;
   --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-12: 48px; --space-14: 56px;
@@ -101,6 +102,7 @@
     --color-focus: #EFE8DA;
     --color-border-error: #F0595E;
     --shadow-rgb: 0 0 0;
+    --scroll-edge: rgb(239 232 218 / .12);
   }
 }
 
@@ -161,7 +163,8 @@ a, button, summary, [role="button"], [role="menuitem"]{ touch-action: manipulati
 button, summary, [role="button"], [role="menuitem"]{ -webkit-user-select: none; user-select: none; }
 
 :is(a, button, input, summary, [tabindex]):focus-visible{
-  outline: none;
+  /* Transparent, not none: forced-colors mode drops the shadow and paints this outline. */
+  outline: 2px solid transparent; outline-offset: 2px;
   box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-focus);
   border-radius: var(--radius-sm);
 }
@@ -276,6 +279,7 @@ main:focus{ outline: none; }
 .desk-ind{ position: absolute; left: 0; bottom: 0; width: 1px; height: 2px; background: var(--color-rule); transform-origin: 0 0; pointer-events: none; }
 .mast-right{ margin-left: auto; display: flex; align-items: center; gap: var(--space-5); min-width: 0; }
 .stamp{ font: 400 13px/1.5 var(--font-mono); color: var(--color-text-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.net-pill{ font: 500 12px/1.4 var(--font-sans); color: var(--color-watch); border: 1px solid currentColor; border-radius: var(--radius-full); padding: 2px var(--space-2); white-space: nowrap; }
 .stamp-state{ font: 500 13px/1.4 var(--font-sans); color: var(--color-watch); margin-left: var(--space-2); }
 .menu-btn, .menu-x{
   width: var(--size-control); height: var(--size-control); align-items: center; justify-content: center;
@@ -283,7 +287,12 @@ main:focus{ outline: none; }
 }
 .menu-btn{ display: none; margin-left: auto; margin-right: -10px; }
 .menu-x{ display: inline-flex; }
-@media (max-width: 1279px){ .mast-in{ gap: var(--space-6); } .mast-right{ gap: var(--space-4); } .mast .stamp{ display: none; } }
+@media (max-width: 1279px){ .mast-in{ gap: var(--space-6); } .mast-right{ gap: var(--space-4); } }
+/* The portfolio hero and the phone menu carry the stamp; the masthead keeps it only where it fits. */
+@media (max-width: 1439px){ .mast .stamp{ display: none; } }
+/* The masthead is as wide as .wrap at any viewport, and the facility picker needs the room: on its
+   desks the pill moves into the opinion's own heading line and Docs stays in the footer. */
+.mast-right[data-picker-desk] :is(.net-pill, .mast-docs){ display: none; }
 @media (max-width: 1099px){
   :root{ --masthead: 64px; }
   .desks, .mast-right{ display: none; }
@@ -385,6 +394,19 @@ main:focus{ outline: none; }
 .state-watch h2{ color: var(--color-watch); }
 .state .lnk{ margin-left: -2px; }
 .state .facts{ align-self: stretch; }
+/* The facilities on file, one tap from the empty desk instead of a count and a trip back. */
+.state-choices{ align-self: stretch; list-style: none; margin: var(--space-2) 0; padding: 0; }
+.state-choices a{
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4);
+  min-height: var(--size-control); padding: var(--space-3) var(--space-2); margin-inline: calc(-1 * var(--space-2));
+  border-top: 1px solid var(--color-line); border-radius: var(--radius-sm);
+  font: 500 15px/1.4 var(--font-sans); color: var(--color-text); text-decoration: none;
+}
+.state-choices li:last-child a{ border-bottom: 1px solid var(--color-line); }
+/* A transaction reference opens the public explorer: the record behind the figure, one tap away. */
+.tx-link{ color: inherit; text-decoration: underline; text-decoration-color: var(--color-line); text-underline-offset: 4px; }
+@media (hover: hover) and (pointer: fine){ .tx-link:hover{ text-decoration-color: currentColor; } }
+@media (hover: hover) and (pointer: fine){ .state-choices a:hover{ background: var(--color-bg-sunken); } }
 .state .facts > div{ display: flex; justify-content: space-between; gap: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--color-line); }
 .state .facts dt{ font: 500 13px/1.4 var(--font-sans); color: var(--color-text-3); }
 .state .facts dd{ font: 500 16px/1.5 var(--font-mono); }
@@ -394,6 +416,9 @@ main:focus{ outline: none; }
 .foot-in{ padding-block: var(--space-12) var(--space-16); row-gap: 14px; align-items: start; }
 .foot-brand{ grid-column: 1 / span 6; grid-row: 1; }
 .foot-lines{ grid-column: 1 / span 6; grid-row: 2; display: flex; flex-direction: column; gap: var(--space-1); font: 400 14px/1.5 var(--font-sans); color: var(--color-text-3); }
+/* Links inside the credit line are words in a sentence: a 44 px control box on each made the lines
+   uneven and broke the sentence apart. */
+.foot-lines .lnk{ display: inline; min-height: 0; padding: 0; white-space: normal; }
 .foot-nav{ grid-column: 7 / span 6; grid-row: 1 / span 2; display: flex; flex-wrap: wrap; justify-content: flex-end; align-content: flex-start; margin-right: -10px; }
 .foot-nav a, .foot-nav button{ display: inline-flex; align-items: center; min-height: var(--size-control); padding: 0 10px; font: 400 15px/1.4 var(--font-sans); color: var(--color-text-2); text-decoration: none; }
 .foot-nav button{ background: none; border: 0; cursor: pointer; }
@@ -559,7 +584,9 @@ main:focus{ outline: none; }
 /* NAV history: reported against held at every transaction, the turning points in the brand gold. */
 .op-nav{ padding-top: var(--space-16); display: flex; flex-direction: column; gap: var(--space-2); }
 .navc{ margin-top: var(--space-5); display: flex; flex-direction: column; gap: var(--space-5); }
-.navc svg{ display: block; max-width: 100%; overflow: visible; }
+/* The viewBox lets the chart scale down whole where its box is narrower than it was drawn for
+   (paper, or the moment before the resize observer answers) instead of being cut off. */
+.navc svg{ display: block; max-width: 100%; height: auto; overflow: visible; }
 .navc-grid{ stroke: var(--color-line); stroke-width: 1; }
 .navc-tick{ font: 400 12px var(--font-mono); fill: var(--color-text-3); }
 .navc-xl{ font: 500 12px var(--font-sans); fill: var(--color-text-2); }
@@ -627,7 +654,17 @@ main:focus{ outline: none; }
 
 /* Tables: hairlines between rows, figures in mono, never wider than their column. A wide
    one scrolls inside its own box, never the page. */
-.tbl-wrap{ max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
+.tbl-wrap{
+  max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain;
+  /* A table wider than the screen shows a soft edge on each side that still has columns. The two
+     covers scroll with the table and hide each edge once that end is reached, so a table that fits
+     shows none. */
+  background:
+    linear-gradient(to right, var(--color-bg) 40%, transparent) left center / 32px 100% no-repeat local,
+    linear-gradient(to left, var(--color-bg) 40%, transparent) right center / 32px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, var(--scroll-edge), transparent) left center / 14px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, var(--scroll-edge), transparent) right center / 14px 100% no-repeat scroll;
+}
 .op-tbl{ width: 100%; border-collapse: collapse; }
 .op-tbl th{ padding: 0 var(--space-4) 10px 0; text-align: left; font: 500 13px/1.4 var(--font-sans); color: var(--color-text-3); white-space: nowrap; }
 .op-tbl td{ padding: 14px var(--space-4) 14px 0; border-top: 1px solid var(--color-line); font: 400 14px/1.5 var(--font-sans); color: var(--color-text-2); vertical-align: baseline; }
@@ -852,16 +889,7 @@ main:focus{ outline: none; }
 .dlg-head{ gap: var(--space-3) !important; padding-right: var(--space-10); }
 .dlg-title{ font: 400 26px/1.25 var(--font-serif) !important; }
 .dlg-sub{ font: 400 14px/1.5 var(--font-sans) !important; color: var(--color-text-2) !important; }
-.wrows{ display: flex; flex-direction: column; border-bottom: 1px solid var(--color-line); }
-.wrow{ display: flex; align-items: center; gap: var(--space-4); min-height: 68px; padding: var(--space-3) 0; border-top: 1px solid var(--color-line); }
-.wrow-id{ display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
-.wname{ font: 500 15px/1.4 var(--font-sans); }
-.wnote{ font: 400 14px/1.5 var(--font-sans); color: var(--color-text-3); }
-.wstate{ font: 400 14px/1.5 var(--font-sans); color: var(--color-text-3); white-space: nowrap; }
-.wrow[data-here="true"] .wstate{ color: var(--color-ok); }
-.wqr{ display: flex; flex-direction: column; align-items: center; gap: var(--space-2); }
-.wqr img{ border-radius: var(--radius-sm); background: #fff; padding: var(--space-2); }
-.wpaste{ display: flex; flex-direction: column; gap: var(--space-4); border-top: 1px solid var(--color-rule); padding-top: var(--space-5); }
+.wpaste{ display: flex; flex-direction: column; gap: var(--space-4); }
 .field{ display: flex; flex-direction: column; gap: var(--space-2); }
 .field label{ font: 500 13px/1.4 var(--font-sans); }
 .field input, .field textarea{
@@ -899,8 +927,25 @@ main:focus{ outline: none; }
    PRINT — the opinion on paper
    ============================================================ */
 @media print{
+  /* Paper is light whatever the screen was: a dark-mode reader printed beige text on white. */
+  :root{
+    color-scheme: light;
+    --color-bg: #FFFFFF; --color-bg-raised: #FFFFFF; --color-bg-sunken: #F1F1EE;
+    --color-bg-inverse: #121418; --color-text: #121418; --color-text-2: #3A3F47; --color-text-3: #5A606A;
+    --color-text-inverse: #FFFFFF; --color-loss: #9E2A1A; --color-watch: #74500B; --color-ok: #24633F;
+    --color-line: #C9CCD1; --color-rule: #121418; --color-brand-gold: #C9A45F; --scroll-edge: transparent;
+  }
   .mast, .foot, .feedbar, .skip, .op-pick, .menu-btn{ display: none !important; }
   body{ background: #fff; color: #000; }
+  /* A table prints whole, not inside a scroller. */
+  .tbl-wrap{ overflow: visible; background: none; }
+  .op-tbl{ min-width: 0; }
+  /* Keep a heading with what follows it, and a row, a figure or a short exhibit in one piece. */
+  h1, h2, h3, .exh > summary{ break-after: avoid; }
+  tr, .op-glance > div, .navc svg, .state{ break-inside: avoid; }
+  .exh-chev{ display: none; }
+  /* The chart is drawn for the screen it was opened on; on paper it fills the page width instead. */
+  .navc svg{ width: 100%; }
   .op-letterhead{ display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font: 600 14px/1 var(--font-serif); }
   .op-lh-rule{ flex: 1; border-top: 1px solid #000; }
 }
@@ -918,8 +963,8 @@ main:focus{ outline: none; }
 .btn:active:not(:disabled), .picker-btn:active:not(:disabled), .waddr:active, .menu-btn:active, .menu-x:active, .dlg [data-slot="dialog-close"]:active{ transform: scale(.97); translate: none; transition-duration: 120ms; }
 /* Text controls dim at the touch and come back on release, as text buttons do on iOS: the
    tap highlight is off, so this is the only sign a tap landed. */
-.lnk, .desk, .menu-list a, .foot-nav a, .foot-nav button, .kf-head, .exh > summary, .lockup{ transition: opacity 160ms var(--ease-out); }
-.lnk:active, .desk:active, .menu-list a:active, .foot-nav a:active, .foot-nav button:active, .kf-head:active, .exh > summary:active, .lockup:active{ opacity: .6; transition-duration: 0ms; }
+.lnk, .desk, .menu-list a, .foot-nav a, .foot-nav button, .kf-head, .exh > summary, .lockup, .state-choices a, .tx-link{ transition: opacity 160ms var(--ease-out); }
+.lnk:active, .desk:active, .menu-list a:active, .foot-nav a:active, .foot-nav button:active, .kf-head:active, .exh > summary:active, .lockup:active, .state-choices a:active, .tx-link:active{ opacity: .6; transition-duration: 0ms; }
 .picker-btn .chev{ transition: transform 200ms var(--ease-out); }
 .frow::before{ transition: opacity 120ms ease-out; }
 @media (max-width: 1099px){
