@@ -74,7 +74,8 @@ function Desk() {
   const slow = API_MIXED_ORIGIN
     ? { slowAfter: SUSPECT_AFTER_FAILS, slowCapMs: SUSPECT_BACKOFF_MS }
     : undefined
-  const health = usePoll<Health>('/api/health', 5000, slow)
+  // At the desk's pace: every 5 s, one slow answer outlived the 6 s stale mark and flashed Withheld.
+  const health = usePoll<Health>('/api/health', POLL_MS, slow)
   // Only a vault id reaches a URL. Anything else in ?facility= is not on file: passed through,
   // ../health fetched /api/health and blanked the desk, and a 12-character reference polled forever.
   const ref = vaultId && /^[0-9a-f]{64}$/i.test(vaultId) ? vaultId : null
