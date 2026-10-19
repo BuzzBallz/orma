@@ -309,7 +309,7 @@ succeeds. A rater who could trap capital would be a worse problem than the one w
 
 ## Running it
 
-Node 24.13.0 (Node 20 or later works). The reader needs outbound access to Devnet and no keys: every
+Node 24.13.0 (Node 20.19 or later works). The reader needs outbound access to Devnet and no keys: every
 facility it serves is public ledger state.
 
 ```bash
