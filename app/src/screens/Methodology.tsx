@@ -1,9 +1,10 @@
 import { GRADE_LADDER, letterTone } from '../lib/grades'
 import { FACTORS } from '../lib/credit'
 import { Scale } from '../components/Scale'
+import type { MethodRules } from '../lib/types'
 
 /** Three blocks, one screen. Enough to read a score, not a specification. */
-export function Methodology() {
+export function Methodology({ rules }: { rules: MethodRules | null }) {
   const N = GRADE_LADDER.length
   return (
     <section className="wrap grid12 meth">
@@ -34,6 +35,33 @@ export function Methodology() {
             </tbody>
           </table>
         </div>
+
+        {/* Served by the scoring code itself, so the bands shown are the bands applied. Omitted
+            until received rather than copied here, where it could drift from them. */}
+        {rules && (
+          <>
+            <h2 className="t-heading-l">Capital already destroyed</h2>
+            <p className="t-body-l">
+              Before any other notch, a facility that has written off subscribed capital is marked
+              down by the share it lost. The first band met applies; a ceiling holds however strong
+              the rest of the facility is.
+            </p>
+            <div className="tbl-wrap fac-list">
+              <table className="op-tbl fit">
+                <thead><tr><th>Capital destroyed</th><th className="rt">Notches</th><th>At most</th></tr></thead>
+                <tbody>
+                  {rules.realisedLoss.map((b, i, all) => (
+                    <tr key={b.atLeastPct}>
+                      <td>{b.atLeastPct === 0 && i > 0 ? `under ${all[i - 1].atLeastPct}%` : `${b.atLeastPct}% or more`}</td>
+                      <td className="rt num">{b.notches}</td>
+                      <td className="op-says">{b.floor ?? 'no ceiling'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
 
         <h2 className="t-heading-l">Reported value against held value</h2>
         <p className="t-body-l">
