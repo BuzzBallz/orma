@@ -20,8 +20,8 @@
  * A lender who values the pledge naively is 19.61% over. The pointer is what closes that
  * gap, and a pledge with no divergence would prove nothing.
  *
- * Run: node src/demo/bake-metadata.mjs [--base http://localhost:8787] [--label "Name"]
- * Out: demo/metadata-vault.json  (TRACKED)
+ * Run: node src/demo/bake-metadata.mjs [--base https://ormaprotocol.com] [--label "Name"] [--ticker T] [--out demo/<name>.json]
+ * Out: demo/metadata-vault.json unless --out names another  (TRACKED)
  */
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { Client, signLoanSetByCounterparty } from 'xrpl'
@@ -30,13 +30,14 @@ import { buildShareMetadata, encodeShareMetadata, MPT_PLACEHOLDER } from '../met
 import { resolveFromIssuance, valuePledge } from '../nav.mjs'
 
 const WS = process.env.XRPL_WS ?? 'wss://s.devnet.rippletest.net:51233'
-const OUT = 'demo/metadata-vault.json'
 
 const arg = (n, d) => {
   const i = process.argv.indexOf('--' + n)
   return i > -1 && process.argv[i + 1] ? process.argv[i + 1] : d
 }
-const BASE = arg('base', process.env.PUBLIC_BASE ?? 'http://localhost:8787')
+// Public by default: the pointer can never be corrected, and Calder's was baked at localhost.
+const BASE = arg('base', process.env.PUBLIC_BASE ?? 'https://ormaprotocol.com')
+const OUT = arg('out', 'demo/metadata-vault.json')
 const LABEL = arg('label', 'Calder Structured Credit III')
 const TICKER = arg('ticker', 'ORMA-CSC3')
 const WINDOW = Number(arg('window', 3600))
