@@ -287,6 +287,9 @@ main:focus{ outline: none; }
 @media (max-width: 1279px){ .mast-in{ gap: var(--space-6); } .mast-right{ gap: var(--space-4); } }
 /* The portfolio hero and the phone menu carry the stamp; the masthead keeps it only where it fits. */
 @media (max-width: 1439px){ .mast .stamp{ display: none; } }
+/* The masthead is as wide as .wrap at any viewport, and the facility picker needs the room: on its
+   desks the pill moves into the opinion's own heading line and Docs stays in the footer. */
+.mast-right[data-picker-desk] :is(.net-pill, .mast-docs){ display: none; }
 @media (max-width: 1099px){
   :root{ --masthead: 64px; }
   .desks, .mast-right{ display: none; }

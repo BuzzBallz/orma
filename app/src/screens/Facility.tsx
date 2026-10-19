@@ -146,7 +146,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
         </div>
         <h1 className="t-display-l">{name}</h1>
         <p className="t-body-m dim">
-          {kind[0].toUpperCase() + kind.slice(1)} lending facility · {v.phase} · internal score {v.grade} · outlook {outlook}
+          {kind[0].toUpperCase() + kind.slice(1)} lending facility · {v.phase} · internal score {v.grade} · outlook {outlook} · test network
         </p>
         {picker && <div className="op-pick">{picker}</div>}
       </header>
