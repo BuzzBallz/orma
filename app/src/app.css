@@ -944,6 +944,8 @@ main:focus{ outline: none; }
   h1, h2, h3, .exh > summary{ break-after: avoid; }
   tr, .op-glance > div, .navc svg, .state{ break-inside: avoid; }
   .exh-chev{ display: none; }
+  /* An exhibit opened for the print would be captured at the start of its settle animation, empty. */
+  .exh[open] > .exh-body{ animation: none !important; }
   /* The chart is drawn for the screen it was opened on; on paper it fills the page width instead. */
   .navc svg{ width: 100%; }
   .op-letterhead{ display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font: 600 14px/1 var(--font-serif); }
