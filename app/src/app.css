@@ -276,6 +276,7 @@ main:focus{ outline: none; }
 .desk-ind{ position: absolute; left: 0; bottom: 0; width: 1px; height: 2px; background: var(--color-rule); transform-origin: 0 0; pointer-events: none; }
 .mast-right{ margin-left: auto; display: flex; align-items: center; gap: var(--space-5); min-width: 0; }
 .stamp{ font: 400 13px/1.5 var(--font-mono); color: var(--color-text-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.net-pill{ font: 500 12px/1.4 var(--font-sans); color: var(--color-watch); border: 1px solid currentColor; border-radius: var(--radius-full); padding: 2px var(--space-2); white-space: nowrap; }
 .stamp-state{ font: 500 13px/1.4 var(--font-sans); color: var(--color-watch); margin-left: var(--space-2); }
 .menu-btn, .menu-x{
   width: var(--size-control); height: var(--size-control); align-items: center; justify-content: center;
