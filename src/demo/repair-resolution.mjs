@@ -11,11 +11,11 @@
  * and it shows the loop failing when the loop works.
  *
  * Run this after restarting the API on a fresh bake:
- *   node src/demo/repair-resolution.mjs
+ *   node src/demo/repair-resolution.mjs [demo/<name>.json]
  */
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 
-const FILE = 'demo/metadata-vault.json'
+const FILE = process.argv[2] ?? 'demo/metadata-vault.json'
 const BASE = process.env.API_BASE ?? 'http://localhost:8787'
 
 if (!existsSync(FILE)) {
