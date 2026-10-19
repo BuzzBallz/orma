@@ -251,6 +251,11 @@ export function normaliseBroker(b) {
   }
 }
 
+// The next payment is always due within one interval, so "within the interval" flagged every
+// performing loan. Due soon is the last 10% of it, and never more than three days.
+const DUE_SOON_MAX_SECONDS = 72 * 3600
+const dueSoonWindow = (paymentInterval) => Math.min(DUE_SOON_MAX_SECONDS, paymentInterval / 10)
+
 /**
  * Normalise a Loan.
  *
@@ -272,7 +277,7 @@ export function normaliseLoan(l, closeTime) {
   else if (dueRipple === null) status = 'closed'
   else if (overdue && closeTime > dueRipple + grace) status = 'defaultable'
   else if (overdue) status = 'overdue'
-  else if (secondsUntilDue <= Number(l.PaymentInterval ?? 0)) status = 'due_soon'
+  else if (secondsUntilDue <= dueSoonWindow(Number(l.PaymentInterval ?? 0))) status = 'due_soon'
   else status = 'current'
 
   return {
