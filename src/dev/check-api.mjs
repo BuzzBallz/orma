@@ -1,6 +1,7 @@
 // Offline check of two api.mjs behaviours: HEAD answers like GET, and a vault not read yet is
 // "warming up" (503), not "no such vault" (404). No network, no ledger.
 //   node src/dev/check-api.mjs
+import { connect } from 'node:net'
 import { createApi } from '../api.mjs'
 
 const ID = 'AB'.repeat(32)
@@ -47,6 +48,15 @@ eq('a share id while a tracked vault is unread', (await call('GET', `/api/mpt/${
 reader.missing = new Set([ID])
 eq('a tracked vault the ledger says does not exist', (await call('GET', `/api/vaults/${ID}/nav`)).code, 'VAULT_NOT_FOUND')
 eq('and a share id once every tracked vault is read or missing', (await call('GET', `/api/mpt/${MPT}/nav`)).code, 'SHARE_NOT_TRACKED')
+
+// A request target the URL parser rejects is a 400, and the server is still up after it.
+const raw = await new Promise((resolve) => {
+  const s = connect(api.server.address().port, '127.0.0.1', () => s.write('GET //[ HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n'))
+  let got = ''
+  s.on('data', (c) => (got += c)).on('end', () => resolve(got.split(' ')[1]))
+})
+eq('a malformed request target', raw, '400')
+eq('and the server still answers', (await call('GET', '/api/health')).status, 200)
 
 await api.close()
 console.log(bad ? `\n  ${bad} FAILED` : '\n  all ok')

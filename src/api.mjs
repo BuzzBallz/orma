@@ -64,7 +64,15 @@ export function createApi(reader, opts = {}) {
     })
 
   const server = createServer(async (req, res) => {
-    const url = new URL(req.url, `http://localhost:${port}`)
+    // Outside the try below, a target such as "//[" threw from this async handler and took the
+    // process down with it.
+    let url
+    try {
+      url = new URL(req.url, `http://localhost:${port}`)
+    } catch {
+      res.writeHead(400, { 'Content-Type': 'application/json' })
+      return res.end(JSON.stringify({ error: { code: 'BAD_REQUEST', message: 'malformed request target', retryable: false } }))
+    }
     const method = req.method === 'HEAD' ? 'GET' : req.method
     const key = `${method} ${url.pathname}`
     res.setHeader('Access-Control-Allow-Origin', '*')
