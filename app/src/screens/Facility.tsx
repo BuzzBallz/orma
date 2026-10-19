@@ -3,6 +3,7 @@ import type { BrokerHistory, Collateral, Dimension, Gate, NavHistory, OracleCont
 import { GradeLetter } from '../components/GradeLetter'
 import { Scale } from '../components/Scale'
 import { Amount } from '../components/Amount'
+import { AmountAsset } from '../lib/asset'
 import { NavChart } from '../components/NavChart'
 import { Exhibit } from '../components/Exhibit'
 import { Mark } from '../components/Lockup'
@@ -128,7 +129,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
   const kind = v.vaultKind === 'ClosedEnded' ? 'closed-ended' : 'open-ended'
 
   return (
-    <>
+    <AmountAsset.Provider value={d.vault.asset}>
       {/* Letterhead, print only: the masthead is the first thing the print sheet drops. */}
       <div className="wrap op-letterhead" aria-hidden>
         <Mark size={18} />
@@ -452,6 +453,6 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
         </div>
         <p className="op-foot">This note does not announce a rating action.</p>
       </section>
-    </>
+    </AmountAsset.Provider>
   )
 }

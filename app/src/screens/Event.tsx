@@ -3,6 +3,7 @@ import type { VaultDetail } from '../lib/types'
 import { beatRows, nextBeat, type Beat } from '../lib/beats'
 import { duration, fmtIso, percent } from '../lib/format'
 import { Amount } from '../components/Amount'
+import { AmountAsset } from '../lib/asset'
 import { creditText, facilityName } from '../lib/credit'
 
 /** A calendar tone, in the colours this product has. */
@@ -78,7 +79,7 @@ export function Event({ d, picker }: { d: VaultDetail; picker?: ReactNode }) {
   const shortfall = Number(d.phaseInfo.projectedShortfall) > 0
 
   return (
-    <>
+    <AmountAsset.Provider value={d.vault.asset}>
       <header className="wrap ev-head">
         <div className="ev-head-row">
           <h1 className="t-display-l">Next Event</h1>
@@ -138,6 +139,6 @@ export function Event({ d, picker }: { d: VaultDetail; picker?: ReactNode }) {
           {d.phaseInfo.withdrawBlockedReason && <> Withdrawals are currently closed: {creditText(d.phaseInfo.withdrawBlockedReason)}.</>}
         </p>
       </section>
-    </>
+    </AmountAsset.Provider>
   )
 }

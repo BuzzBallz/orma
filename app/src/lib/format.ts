@@ -57,6 +57,9 @@ function unreadable(s: string | null | undefined): boolean {
   return !/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test((s ?? '').toString().trim())
 }
 
+/** An issued currency's or an MPT's own amount: already in its unit, so only checked. */
+export function inUnit(amount: string): string { return unreadable(amount) ? UNREADABLE : amount.trim() }
+
 /** [CONTRACT §6] drops -> XRP. "51000000" -> "51.000000" ; "1" -> "0.000001" */
 export function dropsToXrp(drops: string): string { return unreadable(drops) ? UNREADABLE : padDp(shift(drops, -6), 6) }
 
