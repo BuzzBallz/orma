@@ -285,7 +285,8 @@ above read `"stable"` for exactly this reason.
 </Note>
 
 `secondsToRedemption` is computed against the ledger close time and goes negative once the
-redemption date has passed.
+redemption date has passed. Both `redemptionAt` and `secondsToRedemption` are `null` for a vault
+with no redemption date.
 
 ---
 

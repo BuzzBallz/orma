@@ -49,11 +49,11 @@ function loanBeats(loans: Loan[]): Beat[] {
   })
 }
 
-function redemptionBeat(d: VaultDetail): Beat {
+function redemptionBeat(d: VaultDetail, inSeconds: number): Beat {
   const v = d.vault
-  const matured = v.secondsToRedemption <= 0
+  const matured = inSeconds <= 0
   return {
-    when: v.redemptionAt, inSeconds: v.secondsToRedemption,
+    when: v.redemptionAt, inSeconds,
     what: matured ? 'Matured' : 'Redemption date', who: facilityName(v),
     amount: d.phaseInfo.claimsAtRedemption,
     tone: Number(d.phaseInfo.projectedShortfall) > 0 ? '--bad' : '--fg-dim',
@@ -64,7 +64,9 @@ function redemptionBeat(d: VaultDetail): Beat {
 /** Everything on the facility's calendar, soonest first. */
 export function beatRows(d: VaultDetail): Beat[] {
   const v = d.vault
-  const scheduled: Beat[] = [redemptionBeat(d)]
+  // A vault with no redemption date has no redemption row: it has not matured, it never will.
+  const left = v.secondsToRedemption
+  const scheduled: Beat[] = left === null ? [] : [redemptionBeat(d, left)]
   // The last period has no boundary after it. A row with no date is not a calendar entry,
   // and sorted by its zero seconds it would head the list as the next event.
   if (d.phaseInfo.nextBoundaryAt) {
@@ -83,5 +85,6 @@ export function beatRows(d: VaultDetail): Beat[] {
  * overdue payment keeps its own row on the calendar.
  */
 export function nextBeat(d: VaultDetail): Beat | null {
-  return d.vault.secondsToRedemption <= 0 ? redemptionBeat(d) : beatRows(d)[0] ?? null
+  const left = d.vault.secondsToRedemption
+  return left !== null && left <= 0 ? redemptionBeat(d, left) : beatRows(d)[0] ?? null
 }

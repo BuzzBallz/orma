@@ -170,8 +170,9 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
               v={<><Amount drops={d.broker.coverAvailable} /> of <Amount drops={d.broker.coverRequired} /> required</>}
             />
             <Glance
-              k="Remaining Term" phrase={v.secondsToRedemption <= 0}
-              v={v.secondsToRedemption > 0 ? duration(v.secondsToRedemption) : `matured ${fmtIso(v.redemptionAt).slice(0, 10)}`}
+              k="Remaining Term" phrase={v.secondsToRedemption === null || v.secondsToRedemption <= 0}
+              v={v.secondsToRedemption === null ? 'no redemption date'
+                : v.secondsToRedemption > 0 ? duration(v.secondsToRedemption) : `matured ${fmtIso(v.redemptionAt).slice(0, 10)}`}
             />
             <Glance k="Exposures" v={`${v.loanCount} · ${v.distressedLoanCount} non-performing`} phrase moved={exposuresMoved} />
           </dl>
@@ -357,7 +358,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
             <p>
               <Amount drops={v.assetsAvailable} /> available of <Amount drops={v.assetsTotal} />.
               Redemption {fmtIso(v.redemptionAt)}
-              {v.secondsToRedemption > 0 ? `, in ${duration(v.secondsToRedemption)}` : ''}.
+              {v.secondsToRedemption !== null && v.secondsToRedemption > 0 ? `, in ${duration(v.secondsToRedemption)}` : ''}.
               {Number(redemptionShortfall) > 0
                 ? <> Claims exceed projected liquidity by <Amount drops={redemptionShortfall} />.</>
                 : ' Claims are covered by projected liquidity.'}

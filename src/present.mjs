@@ -218,7 +218,7 @@ export function presentRow(snap, opts = {}) {
     navCorrect: snap.navCorrect,
     navDivergenceBps: snap.navDivergenceBps,
     redemptionAt: vault.redemptionAt,
-    secondsToRedemption: vault.redemptionRipple === null ? 0 : Number(vault.redemptionRipple) - snap.closeTimeUsed,
+    secondsToRedemption: vault.redemptionRipple === null ? null : Number(vault.redemptionRipple) - snap.closeTimeUsed,
     loanCount: loans.length,
     distressedLoanCount: loans.filter((l) => DISTRESSED.has(l.status)).length,
     oraclePublished: Boolean(opts.oracle?.published),
