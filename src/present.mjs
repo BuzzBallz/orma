@@ -10,7 +10,7 @@
  *     promised it never has to handle an absent key
  */
 import { deriveScoreInputs, buildScore } from './score.mjs'
-import { str, num, Decimal } from './num.mjs'
+import { str, num, Decimal, amountText, amountStr } from './num.mjs'
 
 const EXPLORER = 'https://devnet.xrpl.org'
 const DISTRESSED = new Set(['overdue', 'impaired', 'defaultable', 'defaulted'])
@@ -31,7 +31,7 @@ function trendOf(prev, navCorrect) {
   return 'stable'
 }
 
-function buildAlerts({ recogLagSeconds, navDivergenceBps, coverShortfall, concentration, projectedShortfall, assetsAvailable, loans }) {
+function buildAlerts({ recogLagSeconds, navDivergenceBps, coverShortfall, concentration, projectedShortfall, assetsAvailable, loans, asset }) {
   const alerts = []
   const undeclared = loans.filter((l) => l.status === 'overdue' || l.status === 'defaultable').length
   if (recogLagSeconds > 0) {
@@ -57,7 +57,7 @@ function buildAlerts({ recogLagSeconds, navDivergenceBps, coverShortfall, concen
       code: 'COVER_SHORTFALL',
       severity: 'high',
       title: 'First-loss cover is below the broker’s own declared minimum',
-      detail: `Short by ${coverShortfall.toFixed(0)} drops.`,
+      detail: `Short by ${amountText(coverShortfall, asset, 6)}.`,
       sinceAt: null,
     })
   }
@@ -74,7 +74,7 @@ function buildAlerts({ recogLagSeconds, navDivergenceBps, coverShortfall, concen
     alerts.push({
       code: 'REDEMPTION_SHORTFALL',
       severity: 'critical',
-      title: `Projected shortfall of ${projectedShortfall.div(1e6).toFixed(2)} XRP at redemption`,
+      title: `Projected shortfall of ${amountText(projectedShortfall, asset)} at redemption`,
       detail: 'Claims exceed projected liquidity. Redemption is first-come-first-serve.',
       sinceAt: null,
     })
@@ -109,6 +109,8 @@ export function presentVault(snap, opts = {}) {
     assetsAvailable: vault.assetsAvailable,
     lossUnrealized: vault.lossUnrealized,
     sharesOutstanding: vault.sharesOutstanding,
+    scale: vault.scale,
+    asset: vault.asset,
     broker,
     loans,
     phase: vault.phase,
@@ -163,22 +165,23 @@ export function presentVault(snap, opts = {}) {
       coverRateMinimum: broker.coverRateMinimum,
       coverRateLiquidation: broker.coverRateLiquidation,
       managementFeeRate: broker.managementFeeRate,
-      coverRequired: bx.coverRequired.toFixed(0),
-      coverShortfall: bx.coverShortfall.toFixed(0),
-      maxLiquidatableNow: bx.maxLiquidatableNow.toFixed(0),
+      coverRequired: amountStr(bx.coverRequired, vault.asset),
+      coverShortfall: amountStr(bx.coverShortfall, vault.asset),
+      maxLiquidatableNow: amountStr(bx.maxLiquidatableNow, vault.asset),
       strandedCoverFraction: bx.strandedCoverFraction.toFixed(4),
     },
     score,
     loans: presentedLoans,
     phaseInfo: {
       ...snap.phaseInfo,
-      claimsAtRedemption: cliff.claims.toFixed(0),
-      liquidityAtRedemption: cliff.liquidityAtRedemption.toFixed(0),
-      projectedShortfall: cliff.projectedShortfall.toFixed(0),
+      claimsAtRedemption: amountStr(cliff.claims, vault.asset),
+      liquidityAtRedemption: amountStr(cliff.liquidityAtRedemption, vault.asset),
+      projectedShortfall: amountStr(cliff.projectedShortfall, vault.asset),
       shortfallPct: cliff.shortfallPct.toFixed(2),
     },
     oracle: opts.oracle ?? null,
     alerts: buildAlerts({
+      asset: vault.asset,
       recogLagSeconds: scoreArgs.recogLagSeconds,
       navDivergenceBps: snap.navDivergenceBps,
       coverShortfall: bx.coverShortfall,
@@ -196,7 +199,7 @@ export function presentRow(snap, opts = {}) {
   const broker = snap.brokers[0] ?? { debtTotal: num(0), coverAvailable: num(0), coverRateMinimum: 0, coverRateLiquidation: 0 }
   const { scoreArgs } = deriveScoreInputs({
     assetsTotal: vault.assetsTotal, assetsAvailable: vault.assetsAvailable,
-    lossUnrealized: vault.lossUnrealized, sharesOutstanding: vault.sharesOutstanding,
+    lossUnrealized: vault.lossUnrealized, sharesOutstanding: vault.sharesOutstanding, scale: vault.scale, asset: vault.asset,
     broker, loans, phase: vault.phase,
   })
   const score = buildScore(scoreArgs)

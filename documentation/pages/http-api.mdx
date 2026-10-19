@@ -524,7 +524,8 @@ curl -s http://localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955
     "assetsTotal": "51000000",
     "lossUnrealized": "10000000",
     "unitsOutstanding": "51000000",
-    "recompute": "(assetsTotal - lossUnrealized) / unitsOutstanding",
+    "scale": 0,
+    "recompute": "(assetsTotal - lossUnrealized) / (unitsOutstanding / 10^scale)",
     "buildVersion": "3.4.0-rc5"
   }
 }
@@ -537,7 +538,9 @@ $$\text{NAV}_{\text{naive}} = \frac{A}{S} \qquad \text{NAV}_{\text{held}} = \fra
 Handing over only the honest number asks the consumer to take our word for it. Handing over both,
 with the gap named in basis points, lets them see what the obvious computation would have told them.
 `provenance` names the three ledger fields so they can recompute it without trusting us:
-$(51{,}000{,}000 - 10{,}000{,}000) / 51{,}000{,}000 = 0.803922$.
+$(51{,}000{,}000 - 10{,}000{,}000) / 51{,}000{,}000 = 0.803922$. `scale` is the vault's `Scale`: 0 for
+an XRP or MPT asset, 6 by default for an issued currency, whose vault mints $10^6$ share units per
+unit of asset. $S$ is then `unitsOutstanding` divided by $10^{\text{scale}}$.
 
 `assessment` is labelled `advisory: true` and can be `null`. The valuation is a measurement, the
 grade is an opinion, and the grade failing to compute must never take the valuation down with it.

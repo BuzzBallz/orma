@@ -18,7 +18,7 @@
  */
 import { lookup } from 'node:dns/promises'
 import { BlockList, isIP } from 'node:net'
-import { num } from './num.mjs'
+import { num, wholeShares, amountStr } from './num.mjs'
 import { parseShareMetadata, navPointerFrom, xls89Report } from './metadata.mjs'
 import { logger } from './log.mjs'
 
@@ -114,10 +114,11 @@ export function presentNav(snap, opts = {}) {
     provenance: {
       network: opts.network ?? 'devnet',
       source: opts.source ?? 'devnet',
-      assetsTotal: v.assetsTotal.toFixed(0),
-      lossUnrealized: v.lossUnrealized.toFixed(0),
+      assetsTotal: amountStr(v.assetsTotal, v.asset),
+      lossUnrealized: amountStr(v.lossUnrealized, v.asset),
       unitsOutstanding: v.sharesOutstanding.toFixed(0),
-      recompute: '(assetsTotal - lossUnrealized) / unitsOutstanding',
+      scale: v.scale ?? 0,
+      recompute: '(assetsTotal - lossUnrealized) / (unitsOutstanding / 10^scale)',
       buildVersion: opts.buildVersion ?? null,
     },
   }
@@ -144,14 +145,19 @@ export function valuePledge(nav, units) {
       unpriced: 'the document at the pointer carries no unitValue, so this pledge cannot be valued',
     }
   }
+  // The unit value is per whole share; a pledge counts raw share units. A document without a
+  // scale is an XRP or MPT vault (Scale 0), whose amounts are integers.
+  const scale = Number(nav.provenance?.scale ?? 0)
   const u = num(units)
-  const held = u.times(num(uv.held))
-  const reported = u.times(num(uv.reported))
+  const whole = wholeShares(u, scale)
+  const held = whole.times(num(uv.held))
+  const reported = whole.times(num(uv.reported))
+  const fmt = (d) => (scale ? d.toFixed() : d.toFixed(0))
   return {
     units: u.toFixed(0),
-    valueHeld: held.toFixed(0),
-    valueReported: reported.toFixed(0),
-    overstatement: reported.minus(held).toFixed(0),
+    valueHeld: fmt(held),
+    valueReported: fmt(reported),
+    overstatement: fmt(reported.minus(held)),
   }
 }
 

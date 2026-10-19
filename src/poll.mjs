@@ -12,7 +12,7 @@
  * guesswork and is trivial at the loan counts this protocol produces.
  */
 import { Xrpl, sleep, normaliseVault, normaliseBroker, normaliseLoan, PHASE } from './xrpl.mjs'
-import { num, str, ratio, bps, Decimal } from './num.mjs'
+import { num, str, ratio, bps, Decimal, wholeShares } from './num.mjs'
 import { logger } from './log.mjs'
 
 const log = logger('poll')
@@ -92,7 +92,8 @@ export class Reader {
    * shares faster than it removes assets.
    */
   static nav(vault) {
-    const { assetsTotal, lossUnrealized, sharesOutstanding: s } = vault
+    const { assetsTotal, lossUnrealized } = vault
+    const s = wholeShares(vault.sharesOutstanding, vault.scale)
     const naive = s.isZero() ? new Decimal(0) : assetsTotal.div(s)
     const correct = s.isZero() ? new Decimal(0) : assetsTotal.minus(lossUnrealized).div(s)
     return {
