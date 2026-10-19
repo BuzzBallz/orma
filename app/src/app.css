@@ -161,7 +161,8 @@ a, button, summary, [role="button"], [role="menuitem"]{ touch-action: manipulati
 button, summary, [role="button"], [role="menuitem"]{ -webkit-user-select: none; user-select: none; }
 
 :is(a, button, input, summary, [tabindex]):focus-visible{
-  outline: none;
+  /* Transparent, not none: forced-colors mode drops the shadow and paints this outline. */
+  outline: 2px solid transparent; outline-offset: 2px;
   box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-focus);
   border-radius: var(--radius-sm);
 }
