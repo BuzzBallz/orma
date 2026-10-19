@@ -109,6 +109,7 @@ export function presentVault(snap, opts = {}) {
     assetsAvailable: vault.assetsAvailable,
     lossUnrealized: vault.lossUnrealized,
     sharesOutstanding: vault.sharesOutstanding,
+    scale: vault.scale,
     broker,
     loans,
     phase: vault.phase,
@@ -196,7 +197,7 @@ export function presentRow(snap, opts = {}) {
   const broker = snap.brokers[0] ?? { debtTotal: num(0), coverAvailable: num(0), coverRateMinimum: 0, coverRateLiquidation: 0 }
   const { scoreArgs } = deriveScoreInputs({
     assetsTotal: vault.assetsTotal, assetsAvailable: vault.assetsAvailable,
-    lossUnrealized: vault.lossUnrealized, sharesOutstanding: vault.sharesOutstanding,
+    lossUnrealized: vault.lossUnrealized, sharesOutstanding: vault.sharesOutstanding, scale: vault.scale,
     broker, loans, phase: vault.phase,
   })
   const score = buildScore(scoreArgs)

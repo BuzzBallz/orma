@@ -14,6 +14,7 @@
  * to "how did you choose your weights": we do not weight, we notch.
  */
 import Decimal from 'decimal.js'
+import { wholeShares } from './num.mjs'
 
 Decimal.set({ precision: 40, toExpNeg: -9e15, toExpPos: 9e15 })
 
@@ -109,7 +110,7 @@ const PERFORMING = new Set(['current', 'due_soon'])
 const DISTRESSED = new Set(['overdue', 'impaired', 'defaultable'])
 
 /**
- * @param {{assetsTotal:any, assetsAvailable:any, lossUnrealized:any, sharesOutstanding:any,
+ * @param {{assetsTotal:any, assetsAvailable:any, lossUnrealized:any, sharesOutstanding:any, scale?:number,
  *          broker:{debtTotal:any, coverAvailable:any, coverRateMinimum:number, coverRateLiquidation:number},
  *          loans:Array<{status:string, principalOutstanding:any, totalValueOutstanding:any, secondsUntilDue:number}>,
  *          phase:string}} o
@@ -176,7 +177,7 @@ export function deriveScoreInputs(o) {
   // recover; it must NOT be counted here, or an honest manager who writes down early
   // would be punished for the disclosure. Only a write-off, which removes the asset
   // from AssetsTotal outright, is permanent destruction.
-  const shares = D(o.sharesOutstanding)
+  const shares = wholeShares(o.sharesOutstanding, o.scale)
   const realisedLossPct = shares.isZero() || assetsTotal.gte(shares)
     ? D(0)
     : shares.minus(assetsTotal).div(shares).times(100)

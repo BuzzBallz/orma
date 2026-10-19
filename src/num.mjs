@@ -44,6 +44,17 @@ export function num(v) {
 }
 
 /**
+ * Shares in whole units. A vault mints 10^Scale share units per unit of asset at a unit value of
+ * one (XLS-65): Scale is 0 for XRP and MPT assets, 6 by default for an issued currency, so dividing
+ * assets by raw shares would value a healthy USD vault at 0.000001.
+ * @param {unknown} shares @param {number} [scale]
+ * @returns {Dec}
+ */
+export function wholeShares(shares, scale = 0) {
+  return num(shares).div(new Decimal(10).pow(scale))
+}
+
+/**
  * Serialise for the API. Always a plain decimal string, never scientific notation,
  * never a JS number.
  * @param {Dec|string|number|undefined|null} v

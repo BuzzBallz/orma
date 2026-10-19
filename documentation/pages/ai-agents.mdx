@@ -145,7 +145,8 @@ rather than trust:
   "assetsTotal": "51000000",
   "lossUnrealized": "10000000",
   "unitsOutstanding": "51000000",
-  "recompute": "(assetsTotal - lossUnrealized) / unitsOutstanding",
+  "scale": 0,
+  "recompute": "(assetsTotal - lossUnrealized) / (unitsOutstanding / 10^scale)",
   "buildVersion": "3.4.0-rc5"
 }
 ```
@@ -157,7 +158,7 @@ import Decimal from 'decimal.js'
 Decimal.set({ precision: 40 })
 
 const p = nav.provenance
-const check = new Decimal(p.assetsTotal).minus(p.lossUnrealized).div(p.unitsOutstanding)
+const check = new Decimal(p.assetsTotal).minus(p.lossUnrealized).div(new Decimal(p.unitsOutstanding).div(new Decimal(10).pow(p.scale ?? 0)))
 if (check.toFixed(6) !== nav.unitValue.held) {
   throw new Error(`stated ${nav.unitValue.held}, recomputes to ${check.toFixed(6)}`)
 }

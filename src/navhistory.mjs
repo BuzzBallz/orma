@@ -12,7 +12,7 @@
  * evidence/devnet-tx, each point saying which of the two it came from, and the response
  * saying whether the series reaches from the vault's creation to its last change.
  */
-import { num, rippleToIso } from './num.mjs'
+import { num, rippleToIso, wholeShares } from './num.mjs'
 import { FLAG } from './history.mjs'
 import { readHistory, creates } from './archive.mjs'
 
@@ -58,8 +58,8 @@ export function navPoints(vault, txs) {
       at: entry.close_time_iso ?? rippleToIso(tx.date),
       hash: entry.hash ?? tx.hash ?? null,
       kind: kindOf(tx),
-      navNaive: assets.div(shares).toFixed(6),
-      navCorrect: assets.minus(loss).div(shares).toFixed(6),
+      navNaive: assets.div(wholeShares(shares, vault.scale)).toFixed(6),
+      navCorrect: assets.minus(loss).div(wholeShares(shares, vault.scale)).toFixed(6),
       assetsTotal: assets.toFixed(0),
       lossUnrealized: loss.toFixed(0),
       sharesOutstanding: shares.toFixed(0),
