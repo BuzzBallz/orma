@@ -25,7 +25,8 @@
     "check:ssrf": "node src/dev/check-ssrf.mjs",
     "check:figures": "node src/dev/check-figures.mjs",
     "check:iou": "node src/dev/check-iou.mjs",
-    "check:freshness": "node src/dev/check-freshness.mjs"
+    "check:freshness": "node src/dev/check-freshness.mjs",
+    "check:method": "node src/dev/check-method.mjs"
   },
   "dependencies": {
     "decimal.js": "10.6.0",

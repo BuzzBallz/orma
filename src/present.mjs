@@ -39,12 +39,14 @@ export function setLabel(vaultId, label) { labels.set(vaultId, label) }
  * Trend needs history, which we only have once the reader has ticked twice.
  * Until then "stable" is the honest answer, not a guess.
  */
-function trendOf(prev, navCorrect) {
-  if (!prev) return 'stable'
-  const a = num(prev), b = num(navCorrect)
-  if (b.lt(a)) return 'deteriorating'
-  if (b.gt(a)) return 'improving'
-  return 'stable'
+/**
+ * The outlook, from the state of the book alone: a non-performing exposure, or claims the
+ * redemption date cannot meet, is deteriorating. Comparing the NAV with the last one this process
+ * served said "stable" after every restart, and of a facility with every loan in default.
+ * Nothing on the ledger says a facility is improving, so this never claims it.
+ */
+function trendOf(loans, shortfallPct) {
+  return loans.some((l) => DISTRESSED.has(l.status)) || num(shortfallPct).gt(0) ? 'deteriorating' : 'stable'
 }
 
 function buildAlerts({ recogLagSeconds, navDivergenceBps, coverShortfall, concentration, projectedShortfall, assetsAvailable, loans, asset }) {
@@ -110,7 +112,7 @@ function buildAlerts({ recogLagSeconds, navDivergenceBps, coverShortfall, concen
 /**
  * Full detail payload for GET /api/vaults/:vaultId.
  * @param {object} snap reader snapshot
- * @param {{prevNavCorrect?:string, oracle?:object|null}} [opts]
+ * @param {{oracle?:object|null, closeTime?:number|null}} [opts]
  */
 export function presentVault(snap, opts = {}) {
   const { vault, loans } = snap
@@ -229,7 +231,7 @@ export function presentRow(snap, opts = {}) {
     phase: vault.phase,
     grade: score.grade,
     gradeNumeric: score.gradeNumeric,
-    trend: trendOf(opts.prevNavCorrect, snap.navCorrect),
+    trend: trendOf(loans, scoreArgs.shortfallPct),
     assetsTotal: str(vault.assetsTotal),
     assetsAvailable: str(vault.assetsAvailable),
     lossUnrealized: str(vault.lossUnrealized),

@@ -4,7 +4,7 @@ import { API_MIXED_ORIGIN, SUSPECT_AFTER_FAILS, SUSPECT_BACKOFF_MS } from './lib
 import { usePoll } from './lib/usePoll'
 import { facilityName } from './lib/credit'
 import { follow, useRoute, type RoutePath } from './lib/useRoute'
-import type { BrokerHistory, Collateral, Gate, Health, IndexerRace, NavHistory, OracleContest, Resolution, VaultDetail as Detail, VaultsResponse } from './lib/types'
+import type { BrokerHistory, Collateral, Gate, Health, IndexerRace, MethodRules, NavHistory, OracleContest, Resolution, VaultDetail as Detail, VaultsResponse } from './lib/types'
 import { HeaderBar } from './components/HeaderBar'
 import { Footer } from './components/Footer'
 import { StaleBar } from './components/StaleBar'
@@ -130,6 +130,8 @@ function Desk() {
   const gate = usePoll<Gate>(path === '/facility' && vaultId ? `/api/vaults/${vaultId}/gate` : null, 30000)
 
   const race = usePoll<IndexerRace>(path === '/evidence' ? '/api/indexer-race' : null, 30000)
+  // The rules change with a release, not with the ledger.
+  const method = usePoll<MethodRules>(path === '/methodology' ? '/api/methodology' : null, 300000)
 
   // The contestability capture. A fixed historical artifact like the race capture, and on
   // the facility desk because that is where the oracle object it argues about lives.
@@ -181,7 +183,7 @@ function Desk() {
       return <Evidence d={race.data} />
     }
 
-    if (path === '/methodology') return <Methodology />
+    if (path === '/methodology') return <Methodology rules={method.data} />
 
     if (path === '/') {
       // With nothing received the same page is drawn, reading em-dash; the masthead

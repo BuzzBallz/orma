@@ -10,11 +10,11 @@ import { readFileSync, existsSync } from 'node:fs'
 import { isValidClassicAddress } from 'xrpl'
 import { presentVault, presentRow, setLabel } from './present.mjs'
 import { findShareEscrows, presentCollateral } from './collateral.mjs'
-import { readBrokerHistory, analyseOrdering, reputation, recommendOrder } from './history.mjs'
+import { readBrokerHistory, analyseOrdering, reputation, recommendOrder, CONDUCT } from './history.mjs'
 import { fetchNavHistory } from './navhistory.mjs'
 import { presentNav, resolveFromIssuance, valuePledge } from './nav.mjs'
 import { gateStatus, isNamedIn } from './credentials.mjs'
-import { deriveScoreInputs, buildScore } from './score.mjs'
+import { deriveScoreInputs, buildScore, LADDER, METHOD_VERSION, REALISED_LOSS_BANDS } from './score.mjs'
 import { logger } from './log.mjs'
 
 const log = logger('api')
@@ -34,8 +34,6 @@ const CONTRACT_VERSION = '1.0.0'
 export function createApi(reader, opts = {}) {
   const port = opts.port ?? Number(process.env.PORT ?? 8787)
   const source = opts.source ?? 'devnet'
-  /** previous navCorrect per vault, so `trend` is real rather than guessed */
-  const prevNav = new Map()
   /** history is many round trips; 15s is well inside a 4s UI poll */
   const historyCache = new Map()
   /** a domain changes when someone edits it, not every four seconds */
@@ -69,7 +67,6 @@ export function createApi(reader, opts = {}) {
 
   const rowFor = (snap) =>
     presentRow(snap, {
-      prevNavCorrect: prevNav.get(snap.vaultId),
       oracle: opts.oracleFor?.(snap.vaultId) ?? null,
       closeTime: reader.closeTime,
     })
@@ -126,6 +123,12 @@ export function createApi(reader, opts = {}) {
     try {
       if (key === 'GET /api/health') return send(200, health())
 
+      // The rules a grade is built from, so the methodology page shows the bands the code applies
+      // rather than a copy that can drift from them.
+      if (key === 'GET /api/methodology') {
+        return send(200, { methodVersion: METHOD_VERSION, ladder: LADDER, realisedLoss: REALISED_LOSS_BANDS, managerConduct: CONDUCT })
+      }
+
       if (key === 'GET /api/vaults') {
         const vaults = reader.all().map(rowFor)
         // Worst first. NOT by divergence: divergence is only non-zero once a loss has
@@ -140,11 +143,9 @@ export function createApi(reader, opts = {}) {
         const snap = reader.get(m[1].toUpperCase()) ?? reader.get(m[1])
         if (!snap) return absent('VAULT_NOT_FOUND', 'No vault with that id', m[1])
         const detail = presentVault(snap, {
-          prevNavCorrect: prevNav.get(snap.vaultId),
           oracle: opts.oracleFor?.(snap.vaultId) ?? null,
           closeTime: reader.closeTime,
         })
-        prevNav.set(snap.vaultId, snap.navCorrect)
         return send(200, stamp(detail))
       }
 

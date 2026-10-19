@@ -296,6 +296,16 @@ export function recommendOrder(loans, broker) {
  * Reputation. Ordinal and rule-based like the vault score: a broker is graded on what
  * they did, not on a weighted opinion of it.
  */
+/**
+ * Manager conduct is a points assessment, apart from the internal score and unlike it: it starts at
+ * 100 and deducts for each finding, then reads a letter off the total. Published by
+ * GET /api/methodology, so the deductions shown are the ones applied.
+ */
+export const CONDUCT = {
+  deductions: { orderingSelfServing: 35, orderingMixed: 15, perDefaultWithoutImpairment: 20, perCoverWithdrawal: 10 },
+  grades: [{ atLeast: 90, grade: 'A' }, { atLeast: 75, grade: 'B' }, { atLeast: 55, grade: 'C' }, { atLeast: 35, grade: 'D' }, { atLeast: 0, grade: 'E' }],
+}
+
 export function reputation(events, ordering, broker, window = null, asset = null) {
   const defaults = events.filter((e) => e.kind === 'default')
   const impairs = events.filter((e) => e.kind === 'impair')
@@ -338,23 +348,23 @@ export function reputation(events, ordering, broker, window = null, asset = null
 
   if (ordering.applicable) {
     const f = Number(ordering.fairness)
-    if (f < 0.25) { score -= 35; findings.push({ code: 'ORDERING_SELF_SERVING', detail: `Declared losses in an order close to the one that minimises their own first-loss contribution (sequence score ${ordering.fairness}). The choice cost investors ${amountText(ordering.costToDepositors, asset, 6)} against the fair order.` }) }
-    else if (f < 0.75) { score -= 15; findings.push({ code: 'ORDERING_MIXED', detail: `The sequence sits between the fair and the self-serving one (sequence score ${ordering.fairness}).` }) }
+    if (f < 0.25) { score -= CONDUCT.deductions.orderingSelfServing; findings.push({ code: 'ORDERING_SELF_SERVING', detail: `Declared losses in an order close to the one that minimises their own first-loss contribution (sequence score ${ordering.fairness}). The choice cost investors ${amountText(ordering.costToDepositors, asset, 6)} against the fair order.` }) }
+    else if (f < 0.75) { score -= CONDUCT.deductions.orderingMixed; findings.push({ code: 'ORDERING_MIXED', detail: `The sequence sits between the fair and the self-serving one (sequence score ${ordering.fairness}).` }) }
     else findings.push({ code: 'ORDERING_FAIR', detail: `Declared in an order close to the one that maximises first-loss capital applied on investors' behalf (sequence score ${ordering.fairness}).` })
   }
 
   if (undeclaredDefaults > 0) {
-    score -= 20 * undeclaredDefaults
+    score -= CONDUCT.deductions.perDefaultWithoutImpairment * undeclaredDefaults
     findings.push({ code: 'DEFAULT_WITHOUT_IMPAIRMENT', detail: `${undeclaredDefaults} exposure${undeclaredDefaults === 1 ? ' was' : 's were'} written off with no prior warning, so the loss was never signalled before it was taken.` })
   }
   if (withdrawals.length > 0) {
-    score -= 10 * withdrawals.length
+    score -= CONDUCT.deductions.perCoverWithdrawal * withdrawals.length
     findings.push({ code: 'COVER_WITHDRAWN', detail: `${withdrawals.length} withdrawal${withdrawals.length === 1 ? '' : 's'} of first-loss capital on record. Cover taken out ahead of a deteriorating book is the shape that preceded the losses at Maple in 2022.` })
   }
   if (defaults.length === 0) findings.push({ code: 'NO_DEFAULTS', detail: 'No defaults declared in the retained history.' })
 
   score = Math.max(0, Math.min(100, score))
-  const grade = score >= 90 ? 'A' : score >= 75 ? 'B' : score >= 55 ? 'C' : score >= 35 ? 'D' : 'E'
+  const grade = CONDUCT.grades.find((g) => score >= g.atLeast).grade
 
   return {
     grade,

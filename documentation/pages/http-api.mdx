@@ -173,6 +173,7 @@ fields may be added, nothing may ever be renamed, retyped or removed.
 | method and path | answers |
 |---|---|
 | `GET /api/health` | is the reader connected, and how old is the data |
+| `GET /api/methodology` | which notches a destroyed share of capital costs, and under which method version |
 | `GET /api/vaults` | which facilities are tracked, worst first |
 | `GET /api/vaults/:vaultId` | everything about one facility |
 | `GET /api/vaults/:vaultId/nav` | what is one unit actually worth |
@@ -228,6 +229,34 @@ snapshot, which can be behind the envelope's `ledgerIndex` when that vault's las
 `asOf` and `ledgerIndex` are the snapshot's own.
 
 `buildVersion` is reported, never asserted. Devnet moves.
+
+---
+
+## GET /api/methodology
+
+The table the score applies for capital already destroyed, served from the code that applies it.
+No parameters, no ledger read.
+
+```json
+{
+  "methodVersion": "1.1.0",
+  "ladder": ["AAA", "AA+", "AA", "...", "C", "D"],
+  "realisedLoss": [
+    { "atLeastPct": 100, "notches": -14, "floor": "D" },
+    { "atLeastPct": 90, "notches": -14, "floor": "CCC" },
+    { "atLeastPct": 75, "notches": -14, "floor": null },
+    { "atLeastPct": 50, "notches": -12, "floor": null },
+    { "atLeastPct": 25, "notches": -8, "floor": null },
+    { "atLeastPct": 10, "notches": -5, "floor": null },
+    { "atLeastPct": 2, "notches": -3, "floor": null },
+    { "atLeastPct": 0, "notches": -1, "floor": null }
+  ]
+}
+```
+
+The first row whose `atLeastPct` the destroyed share meets applies, and only above zero. A `floor`
+caps the grade however high the anchor. Method 1.1.0 added the CCC and D floors; below 90% every
+grade is the one 1.0.0 gave.
 
 ---
 
@@ -295,10 +324,10 @@ reporting `0.210000` on both readings, and two distressed loans behind it. `grad
 score's memory of realised capital destruction, which no NAV reading carries.
 
 <Note>
-`trend` is `"stable"` until the API has seen a vault twice, and the previous NAV is only recorded by
-the detail route. A consumer polling the list alone will see `"stable"` forever. Poll
-`/api/vaults/:vaultId` for the vault in focus if the trend matters. All four rows in the capture
-above read `"stable"` for exactly this reason.
+`trend` is read from the book on every request, the same on the list and the detail route:
+`"deteriorating"` when any loan is overdue, impaired, defaultable or defaulted, or when claims exceed
+projected liquidity at redemption; `"stable"` otherwise. Nothing on the ledger says a facility is
+improving, so `"improving"` is never sent.
 </Note>
 
 `secondsToRedemption` is computed against the ledger close time and goes negative once the

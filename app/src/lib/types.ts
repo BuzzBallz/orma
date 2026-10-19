@@ -5,6 +5,16 @@ export type LoanStatus =
   | 'current' | 'due_soon' | 'overdue' | 'impaired' | 'defaultable' | 'defaulted' | 'closed'
 export type DimKey = 'LIQUIDITY' | 'COVER' | 'CONCENT' | 'RECOG' | 'DEADLINE' | 'HEADLINE'
 
+/** GET /api/methodology: the table the score applies for capital already destroyed. */
+export interface MethodRules {
+  methodVersion: string; ladder: string[]
+  realisedLoss: { atLeastPct: number; notches: number; floor: string | null }[]
+  managerConduct: {
+    deductions: { orderingSelfServing: number; orderingMixed: number; perDefaultWithoutImpairment: number; perCoverWithdrawal: number }
+    grades: { atLeast: number; grade: string }[]
+  }
+}
+
 export interface Health {
   ok: boolean; contractVersion: string; source: 'fixtures' | 'devnet'
   network: string; ledgerIndex: number; serverTime: string; buildVersion: string

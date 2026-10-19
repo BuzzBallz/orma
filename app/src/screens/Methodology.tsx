@@ -1,9 +1,10 @@
 import { GRADE_LADDER, letterTone } from '../lib/grades'
 import { FACTORS } from '../lib/credit'
 import { Scale } from '../components/Scale'
+import type { MethodRules } from '../lib/types'
 
 /** Three blocks, one screen. Enough to read a score, not a specification. */
-export function Methodology() {
+export function Methodology({ rules }: { rules: MethodRules | null }) {
   const N = GRADE_LADDER.length
   return (
     <section className="wrap grid12 meth">
@@ -34,6 +35,54 @@ export function Methodology() {
             </tbody>
           </table>
         </div>
+
+        {/* Served by the scoring code itself, so the bands shown are the bands applied. Omitted
+            until received rather than copied here, where it could drift from them. */}
+        {rules && (
+          <>
+            <h2 className="t-heading-l">Capital already destroyed</h2>
+            <p className="t-body-l">
+              Before any other notch, a facility that has written off subscribed capital is marked
+              down by the share it lost. The first band met applies; a ceiling holds however strong
+              the rest of the facility is.
+            </p>
+            <div className="tbl-wrap fac-list">
+              <table className="op-tbl fit">
+                <thead><tr><th>Capital destroyed</th><th className="rt">Notches</th><th>At most</th></tr></thead>
+                <tbody>
+                  {rules.realisedLoss.map((b, i, all) => (
+                    <tr key={b.atLeastPct}>
+                      <td>{b.atLeastPct === 0 && i > 0 ? `under ${all[i - 1].atLeastPct}%` : `${b.atLeastPct}% or more`}</td>
+                      <td className="rt num">{b.notches}</td>
+                      <td className="op-says">{b.floor ?? 'no ceiling'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <h2 className="t-heading-l">Manager conduct</h2>
+            <p className="t-body-l">
+              The manager's record is assessed apart from the internal score, and it is the one
+              place points are used: it starts at 100, loses points for each finding below, and
+              reads a letter off what is left.
+            </p>
+            <div className="tbl-wrap fac-list">
+              <table className="op-tbl fit">
+                <thead><tr><th>Finding</th><th className="rt">Points</th></tr></thead>
+                <tbody>
+                  <tr><td>Losses declared in the order that spares the manager's own first-loss capital</td><td className="rt num">-{rules.managerConduct.deductions.orderingSelfServing}</td></tr>
+                  <tr><td>Losses declared in an order between the fair one and that one</td><td className="rt num">-{rules.managerConduct.deductions.orderingMixed}</td></tr>
+                  <tr><td>Each exposure written off with no prior warning</td><td className="rt num">-{rules.managerConduct.deductions.perDefaultWithoutImpairment}</td></tr>
+                  <tr><td>Each withdrawal of first-loss capital</td><td className="rt num">-{rules.managerConduct.deductions.perCoverWithdrawal}</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="t-body-l dim">
+              {rules.managerConduct.grades.map((g, i, all) => g.atLeast > 0 || i === 0 ? `${g.grade} from ${g.atLeast}` : `${g.grade} below ${all[i - 1].atLeast}`).join(', ')}.
+            </p>
+          </>
+        )}
 
         <h2 className="t-heading-l">Reported value against held value</h2>
         <p className="t-body-l">
