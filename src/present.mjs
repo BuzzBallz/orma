@@ -116,7 +116,8 @@ export function presentVault(snap, opts = {}) {
   const score = buildScore(scoreArgs)
   score.computedAt = snap.readAt
 
-  const debtTotal = num(broker.debtTotal)
+  // Each loan against its own broker's debt: with two brokers, the first one's would be wrong.
+  const debtOf = (l) => num((snap.brokers.find((b) => b.loanBrokerId === l.loanBrokerId) ?? broker).debtTotal)
   const presentedLoans = loans.map((l) => ({
     loanId: l.loanId,
     borrower: l.borrower,
@@ -133,7 +134,7 @@ export function presentVault(snap, opts = {}) {
     nextPaymentDueAt: l.nextPaymentDueAt,
     secondsUntilDue: l.secondsUntilDue,
     secondsUntilDefaultable: l.secondsUntilDefaultable,
-    shareOfDebtTotal: debtTotal.isZero() ? '0.0000' : num(l.principalOutstanding).div(debtTotal).toFixed(4),
+    shareOfDebtTotal: debtOf(l).isZero() ? '0.0000' : num(l.principalOutstanding).div(debtOf(l)).toFixed(4),
     impairable: l.status === 'overdue' || l.status === 'defaultable',
     explorerUrl: `${EXPLORER}/transactions/${l.loanId}`,
   }))
