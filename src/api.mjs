@@ -122,7 +122,7 @@ export function createApi(reader, opts = {}) {
         const snap = reader.get(m[1].toUpperCase()) ?? reader.get(m[1])
         if (!snap) return absent('VAULT_NOT_FOUND', 'No vault with that id', m[1])
         const detail = presentVault(snap, {
-              oracle: opts.oracleFor?.(snap.vaultId) ?? null,
+          oracle: opts.oracleFor?.(snap.vaultId) ?? null,
         })
         return send(200, stamp(detail))
       }
