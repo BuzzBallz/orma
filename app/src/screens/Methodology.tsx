@@ -60,6 +60,27 @@ export function Methodology({ rules }: { rules: MethodRules | null }) {
                 </tbody>
               </table>
             </div>
+
+            <h2 className="t-heading-l">Manager conduct</h2>
+            <p className="t-body-l">
+              The manager's record is assessed apart from the internal score, and it is the one
+              place points are used: it starts at 100, loses points for each finding below, and
+              reads a letter off what is left.
+            </p>
+            <div className="tbl-wrap fac-list">
+              <table className="op-tbl fit">
+                <thead><tr><th>Finding</th><th className="rt">Points</th></tr></thead>
+                <tbody>
+                  <tr><td>Losses declared in the order that spares the manager's own first-loss capital</td><td className="rt num">-{rules.managerConduct.deductions.orderingSelfServing}</td></tr>
+                  <tr><td>Losses declared in an order between the fair one and that one</td><td className="rt num">-{rules.managerConduct.deductions.orderingMixed}</td></tr>
+                  <tr><td>Each exposure written off with no prior warning</td><td className="rt num">-{rules.managerConduct.deductions.perDefaultWithoutImpairment}</td></tr>
+                  <tr><td>Each withdrawal of first-loss capital</td><td className="rt num">-{rules.managerConduct.deductions.perCoverWithdrawal}</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="t-body-l dim">
+              {rules.managerConduct.grades.map((g, i, all) => g.atLeast > 0 || i === 0 ? `${g.grade} from ${g.atLeast}` : `${g.grade} below ${all[i - 1].atLeast}`).join(', ')}.
+            </p>
           </>
         )}
 

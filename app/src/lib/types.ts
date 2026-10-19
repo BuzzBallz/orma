@@ -9,6 +9,10 @@ export type DimKey = 'LIQUIDITY' | 'COVER' | 'CONCENT' | 'RECOG' | 'DEADLINE' | 
 export interface MethodRules {
   methodVersion: string; ladder: string[]
   realisedLoss: { atLeastPct: number; notches: number; floor: string | null }[]
+  managerConduct: {
+    deductions: { orderingSelfServing: number; orderingMixed: number; perDefaultWithoutImpairment: number; perCoverWithdrawal: number }
+    grades: { atLeast: number; grade: string }[]
+  }
 }
 
 export interface Health {
