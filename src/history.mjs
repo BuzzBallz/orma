@@ -244,6 +244,11 @@ export function analyseOrdering(events, broker, window = null) {
   const desc = [...asc].reverse()
   const best = coverForOrder(asc, startingDebt, broker.coverRateMinimum, broker.coverRateLiquidation, startingCover)
   const worst = coverForOrder(desc, startingDebt, broker.coverRateMinimum, broker.coverRateLiquidation, startingCover)
+  // The verdict compares orders, so the chosen one goes through the same back-to-back model as
+  // the other two. The ledger's own total includes whatever happened between the defaults (a loan
+  // repaid, a new one written), and set against the model it graded a depositor-optimal order as
+  // self-serving. actualCoverPaid still reports what the ledger took.
+  const chosen = coverForOrder(principals, startingDebt, broker.coverRateMinimum, broker.coverRateLiquidation, startingCover)
   const span = best.minus(worst)
 
   return {
@@ -253,9 +258,9 @@ export function analyseOrdering(events, broker, window = null) {
     bestPossible: best.toFixed(0),
     worstPossible: worst.toFixed(0),
     // What the chosen sequence cost depositors relative to the LP-optimal one.
-    costToDepositors: best.minus(actual).toFixed(0),
+    costToDepositors: best.minus(chosen).toFixed(0),
     spread: span.toFixed(0),
-    fairness: span.isZero() ? '1.0000' : actual.minus(worst).div(span).toFixed(4),
+    fairness: span.isZero() ? '1.0000' : chosen.minus(worst).div(span).toFixed(4),
     observedOrder: defaults.map((d) => ({
       loanId: d.loanId, at: d.at, hash: d.hash,
       principal: d.principal.toFixed(0),

@@ -157,7 +157,12 @@ export function deriveScoreInputs(o) {
     ? D(0)
     : Decimal.max(0, coverAvailable.minus(maxLiquidatableNow)).div(coverAvailable)
 
-  const largest = o.loans.reduce((m, l) => Decimal.max(m, D(l.principalOutstanding)), D(0))
+  // Concentration is a share of THIS broker's debt, so only its own loans count. A second broker's
+  // loans divided by the first one's debt read as 500%.
+  // shortcut: cover and recovery below are the first broker's alone, which understates both when a
+  // vault has two; score each broker and keep the worst once a vault with two is tracked.
+  const ownLoans = o.broker.loanBrokerId ? o.loans.filter((l) => l.loanBrokerId === o.broker.loanBrokerId) : o.loans
+  const largest = ownLoans.reduce((m, l) => Decimal.max(m, D(l.principalOutstanding)), D(0))
   const concentration = debtTotal.isZero() ? D(0) : largest.div(debtTotal)
   const recogLagSeconds = Math.max(
     0,

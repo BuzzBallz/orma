@@ -49,7 +49,7 @@ function trendOf(loans, shortfallPct) {
   return loans.some((l) => DISTRESSED.has(l.status)) || num(shortfallPct).gt(0) ? 'deteriorating' : 'stable'
 }
 
-function buildAlerts({ recogLagSeconds, navDivergenceBps, coverShortfall, concentration, projectedShortfall, assetsAvailable, loans, asset }) {
+function buildAlerts({ recogLagSeconds, navDivergenceBps, coverShortfall, concentration, projectedShortfall, assetsAvailable, assetsTotal, loans, asset }) {
   const alerts = []
   const undeclared = loans.filter((l) => l.status === 'overdue' || l.status === 'defaultable').length
   if (recogLagSeconds > 0) {
@@ -97,7 +97,8 @@ function buildAlerts({ recogLagSeconds, navDivergenceBps, coverShortfall, concen
       sinceAt: null,
     })
   }
-  if (assetsAvailable.isZero()) {
+  // An empty vault holds no cash because it holds nothing: there is no withdrawal to fail.
+  if (assetsAvailable.isZero() && assetsTotal.gt(0)) {
     alerts.push({
       code: 'LIQUIDITY_EXHAUSTED',
       severity: 'critical',
@@ -136,7 +137,8 @@ export function presentVault(snap, opts = {}) {
   const score = buildScore(scoreArgs)
   score.computedAt = snap.readAt
 
-  const debtTotal = num(broker.debtTotal)
+  // Each loan against its own broker's debt: with two brokers, the first one's would be wrong.
+  const debtOf = (l) => num((snap.brokers.find((b) => b.loanBrokerId === l.loanBrokerId) ?? broker).debtTotal)
   const presentedLoans = loans.map((l) => ({
     loanId: l.loanId,
     borrower: l.borrower,
@@ -153,7 +155,7 @@ export function presentVault(snap, opts = {}) {
     nextPaymentDueAt: l.nextPaymentDueAt,
     secondsUntilDue: l.secondsUntilDue,
     secondsUntilDefaultable: l.secondsUntilDefaultable,
-    shareOfDebtTotal: debtTotal.isZero() ? '0.0000' : num(l.principalOutstanding).div(debtTotal).toFixed(4),
+    shareOfDebtTotal: debtOf(l).isZero() ? '0.0000' : num(l.principalOutstanding).div(debtOf(l)).toFixed(4),
     impairable: l.status === 'overdue' || l.status === 'defaultable',
     // The transaction that last touched the loan: the explorer resolves transactions, and a loan's
     // object index is not one.
@@ -208,6 +210,7 @@ export function presentVault(snap, opts = {}) {
       concentration: scoreArgs.concentration,
       projectedShortfall: cliff.projectedShortfall,
       assetsAvailable: num(vault.assetsAvailable),
+      assetsTotal: num(vault.assetsTotal),
       loans,
     }),
   }

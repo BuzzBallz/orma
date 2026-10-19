@@ -29,7 +29,9 @@
     "check:freshness": "node src/dev/check-freshness.mjs",
     "check:method": "node src/dev/check-method.mjs",
     "check:mcp": "node src/dev/check-mcp.mjs",
-    "check:openapi": "node src/dev/check-openapi.mjs"
+    "check:openapi": "node src/dev/check-openapi.mjs",
+    "check:conduct": "node src/dev/check-conduct.mjs",
+    "check:reader-edges": "node src/dev/check-reader-edges.mjs"
   },
   "dependencies": {
     "decimal.js": "10.6.0",
