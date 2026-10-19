@@ -11,6 +11,7 @@
     "check:reader": "node src/dev/check-reader.mjs",
     "check:score": "node src/dev/check-score.mjs",
     "start": "node src/index.mjs",
+    "mcp": "node src/mcp.mjs",
     "check:contract": "node src/dev/check-contract.mjs",
     "check:oracle": "node src/dev/check-oracle.mjs",
     "check:collateral": "node src/dev/check-collateral.mjs",
@@ -20,7 +21,9 @@
     "check:evidence:self-test": "node src/dev/check-evidence.mjs --self-test",
     "check:api": "node src/dev/check-api.mjs",
     "check:navhistory": "node src/dev/check-navhistory.mjs",
-    "check:archive": "node src/dev/check-archive.mjs"
+    "check:archive": "node src/dev/check-archive.mjs",
+    "check:mcp": "node src/dev/check-mcp.mjs",
+    "check:openapi": "node src/dev/check-openapi.mjs"
   },
   "dependencies": {
     "decimal.js": "10.6.0",
