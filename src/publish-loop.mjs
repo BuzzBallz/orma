@@ -95,6 +95,9 @@ export class PublishLoop {
 
   /** Attach to the reader. Fire-and-forget so a slow publish cannot stall a read. */
   attach() {
+    // Document ids in the reader's own order, before any read: assigned on first publish, they
+    // followed whichever vault read succeeded first and swapped between restarts.
+    for (const id of this.reader.vaultIds) this.publisher.docIdFor(id)
     this.reader.onSnapshot = (snap) => {
       this.onSnapshot(snap).catch((e) => log.warn('onSnapshot failed', { err: String(e).slice(0, 80) }))
     }
