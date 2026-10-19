@@ -73,8 +73,11 @@ function Desk() {
     ? { slowAfter: SUSPECT_AFTER_FAILS, slowCapMs: SUSPECT_BACKOFF_MS }
     : undefined
   const health = usePoll<Health>('/api/health', 5000, slow)
+  // Only a vault id reaches a URL. Anything else in ?facility= is not on file: passed through,
+  // ../health fetched /api/health and blanked the desk, and a 12-character reference polled forever.
+  const ref = vaultId && /^[0-9a-f]{64}$/i.test(vaultId) ? vaultId : null
   const vaults = usePoll<VaultsResponse>('/api/vaults', path === '/' ? POLL_MS : 15000, slow)
-  const detail = usePoll<Detail>(vaultId ? `/api/vaults/${vaultId}` : null, POLL_MS, slow)
+  const detail = usePoll<Detail>(ref ? `/api/vaults/${ref}` : null, POLL_MS, slow)
 
   const rows = vaults.data?.vaults ?? []
 
@@ -104,8 +107,8 @@ function Desk() {
   // chosen, and slowly: a manager's track record is history, not a live figure. A 404
   // here (no manager, no pledges) is a normal state, so usePoll keeps data null and the
   // exhibits omit themselves rather than rendering an error into a credit opinion.
-  const histPath = path === '/facility' && vaultId ? `/api/vaults/${vaultId}/broker-history` : null
-  const collPath = path === '/facility' && vaultId ? `/api/vaults/${vaultId}/collateral` : null
+  const histPath = path === '/facility' && ref ? `/api/vaults/${ref}/broker-history` : null
+  const collPath = path === '/facility' && ref ? `/api/vaults/${ref}/collateral` : null
   const history = usePoll<BrokerHistory>(histPath, 20000)
   // Exhibit 5 is keyed on the SHARE token, not on the vault: it is the lookup a holder
   // has. It needs the detail payload to know the share id, so it starts one poll behind
@@ -118,9 +121,9 @@ function Desk() {
   const collateral = usePoll<Collateral>(collPath, 20000)
   // The NAV at each transaction that modified the vault. Ledger history, so slow; an older
   // server without the route answers 404 and the desk simply omits the chart.
-  const navHist = usePoll<NavHistory>(path === '/facility' && vaultId ? `/api/vaults/${vaultId}/nav-history` : null, 30000)
+  const navHist = usePoll<NavHistory>(path === '/facility' && ref ? `/api/vaults/${ref}/nav-history` : null, 30000)
   // An admission rule changes when its owner edits it, not every four seconds.
-  const gate = usePoll<Gate>(path === '/facility' && vaultId ? `/api/vaults/${vaultId}/gate` : null, 30000)
+  const gate = usePoll<Gate>(path === '/facility' && ref ? `/api/vaults/${ref}/gate` : null, 30000)
 
   const race = usePoll<IndexerRace>(path === '/evidence' ? '/api/indexer-race' : null, 30000)
 
@@ -133,7 +136,7 @@ function Desk() {
   // capture. Only the DATE: staleness still comes from `primary`, because a capture is a
   // fixed historical artifact and "stale" means a live figure stopped arriving.
   const stamp = path === '/' ? vaults.data : path === '/evidence' ? race.data : detail.data
-  const notFound = detail.code === 'VAULT_NOT_FOUND'
+  const notFound = detail.code === 'VAULT_NOT_FOUND' || (vaultId !== null && ref === null)
   // usePoll keeps the last good payload across a path change, so `detail.data` can still be
   // the previous facility's while this one is in flight. A desk draws a payload only when
   // it names the facility in the address bar, never one facility's figures under another's.
@@ -141,7 +144,7 @@ function Desk() {
     ? detail.data : null
   // A facility still in flight: after a click its frame is held invisible for a moment
   // (app.css, .enter[data-wait]), so a quick answer enters once instead of replacing it mid-rise.
-  const waiting = (path === '/facility' || path === '/event') && !!vaultId && !own
+  const waiting = (path === '/facility' || path === '/event') && !!ref && !own
 
   const wasWithheld = useRef(false)
   useEffect(() => {
