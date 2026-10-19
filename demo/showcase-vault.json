@@ -1,0 +1,64 @@
+{
+  "bakedAt": "2026-10-19T21:31:58Z",
+  "bakedDuring": "XRPL Lending Protocol Hackathon, Paris, 12-13 September 2026",
+  "network": "devnet",
+  "buildVersion": "3.4.1",
+  "label": "Halden Structured Credit IV",
+  "ticker": "ORMA-HSC4",
+  "vaultId": "DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245",
+  "loanBrokerId": "3A87743DC5EEEBD4A527543D73E5CBDCB7B0201113084A47E1C4FE5D0B480AF6",
+  "loanId": "E5AE574EEE5892562725C3BF8C83B331A3512291000DC47B83C3C6D23A219C9B",
+  "shareMptId": "000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797",
+  "owner": "r4nBvMQHt9ow7tXZqtgxwo4jXf4BvnD8hC",
+  "impairHash": "EC385DAF2DF412F86F06648B7855AEFDB1A1B8596048DA33C33B0A09FB2D08E5",
+  "metadata": {
+    "ticker": "ORMA-HSC4",
+    "name": "Halden Structured Credit IV",
+    "icon": "https://ormaprotocol.com/assets/mark.svg",
+    "asset_class": "rwa",
+    "issuer_name": "Orma",
+    "desc": "Redeemable claim on a closed-ended private credit facility. Valuation is net of recognised loss.",
+    "orma": {
+      "v": 1,
+      "instrument": "vault-share",
+      "nav_url": "https://ormaprotocol.com/api/mpt/{mpt_issuance_id}/nav",
+      "nav_url_param": "{mpt_issuance_id}",
+      "nav_basis": "assets net of recognised loss, divided by units outstanding",
+      "doc": "https://ormaprotocol.com/docs/nav-pointer"
+    }
+  },
+  "metadataHex": "7B227469636B6572223A224F524D412D48534334222C226E616D65223A2248616C64656E205374727563747572656420437265646974204956222C2269636F6E223A2268747470733A2F2F6F726D6170726F746F636F6C2E636F6D2F6173736574732F6D61726B2E737667222C2261737365745F636C617373223A22727761222C226973737565725F6E616D65223A224F726D61222C2264657363223A2252656465656D61626C6520636C61696D206F6E206120636C6F7365642D656E64656420707269766174652063726564697420666163696C6974792E2056616C756174696F6E206973206E6574206F66207265636F676E69736564206C6F73732E222C226F726D61223A7B2276223A312C22696E737472756D656E74223A227661756C742D7368617265222C226E61765F75726C223A2268747470733A2F2F6F726D6170726F746F636F6C2E636F6D2F6170692F6D70742F7B6D70745F69737375616E63655F69647D2F6E6176222C226E61765F75726C5F706172616D223A227B6D70745F69737375616E63655F69647D222C226E61765F6261736973223A22617373657473206E6574206F66207265636F676E69736564206C6F73732C206469766964656420627920756E697473206F75747374616E64696E67222C22646F63223A2268747470733A2F2F6F726D6170726F746F636F6C2E636F6D2F646F63732F6E61762D706F696E746572227D7D",
+  "navTemplate": "https://ormaprotocol.com/api/mpt/{mpt_issuance_id}/nav",
+  "resolution": {
+    "steps": [
+      {
+        "step": "read MPTokenIssuance",
+        "ok": true,
+        "detail": "issuer r3XEmxGd7F51niRp94hcEcuuU7HJU47C2R, 51000000 units outstanding"
+      },
+      {
+        "step": "decode metadata",
+        "ok": true,
+        "detail": "valid JSON"
+      },
+      {
+        "step": "XLS-89 conformance",
+        "ok": true,
+        "detail": "asset_class rwa"
+      },
+      {
+        "step": "find valuation pointer",
+        "ok": true,
+        "detail": "https://ormaprotocol.com/api/mpt/000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797/nav"
+      },
+      {
+        "step": "follow pointer",
+        "ok": false,
+        "detail": "answered, but not JSON"
+      }
+    ],
+    "resolved": true,
+    "navUrl": "https://ormaprotocol.com/api/mpt/000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797/nav"
+  },
+  "pledgeExample": null
+}

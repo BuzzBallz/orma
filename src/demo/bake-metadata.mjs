@@ -21,10 +21,11 @@
  * gap, and a pledge with no divergence would prove nothing.
  *
  * Run: node src/demo/bake-metadata.mjs [--base https://ormaprotocol.com] [--label "Name"] [--ticker T] [--out demo/<name>.json]
+ *      OWNER_SEED=<seed> keeps the facility manageable after the bake (node --env-file=<file> ...)
  * Out: demo/metadata-vault.json unless --out names another  (TRACKED)
  */
 import { mkdirSync, writeFileSync } from 'node:fs'
-import { Client, signLoanSetByCounterparty } from 'xrpl'
+import { Client, Wallet, signLoanSetByCounterparty } from 'xrpl'
 import { Xrpl } from '../xrpl.mjs'
 import { buildShareMetadata, encodeShareMetadata, MPT_PLACEHOLDER } from '../metadata.mjs'
 import { resolveFromIssuance, valuePledge } from '../nav.mjs'
@@ -83,7 +84,8 @@ console.log(`  metadata ${Buffer.byteLength(JSON.stringify(meta), 'utf8')} bytes
 console.log(`  pointer  ${navTemplate}\n`)
 
 console.log('  funding')
-const { wallet: owner } = await c.fundWallet()
+// A faucet owner's keys die with this process; OWNER_SEED names an owner someone keeps.
+const { wallet: owner } = await c.fundWallet(process.env.OWNER_SEED ? Wallet.fromSeed(process.env.OWNER_SEED) : undefined)
 const { wallet: borrower } = await c.fundWallet()
 
 const now = await closeTime()
