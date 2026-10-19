@@ -12,7 +12,7 @@
  * evidence/devnet-tx, each point saying which of the two it came from, and the response
  * saying whether the series reaches from the vault's creation to its last change.
  */
-import { num, rippleToIso, wholeShares } from './num.mjs'
+import { num, rippleToIso, wholeShares, amountStr } from './num.mjs'
 import { FLAG } from './history.mjs'
 import { readHistory, creates } from './archive.mjs'
 
@@ -60,8 +60,8 @@ export function navPoints(vault, txs) {
       kind: kindOf(tx),
       navNaive: assets.div(wholeShares(shares, vault.scale)).toFixed(6),
       navCorrect: assets.minus(loss).div(wholeShares(shares, vault.scale)).toFixed(6),
-      assetsTotal: assets.toFixed(0),
-      lossUnrealized: loss.toFixed(0),
+      assetsTotal: amountStr(assets, vault.asset),
+      lossUnrealized: amountStr(loss, vault.asset),
       sharesOutstanding: shares.toFixed(0),
       // "archive" when Devnet no longer returned this transaction and the captured copy stood in.
       source: entry.source ?? 'live',

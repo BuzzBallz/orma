@@ -4,7 +4,8 @@
 //   node src/dev/check-iou.mjs
 import { Reader } from '../poll.mjs'
 import { deriveScoreInputs, buildScore } from '../score.mjs'
-import { valuePledge } from '../nav.mjs'
+import { valuePledge, presentNav } from '../nav.mjs'
+import { presentCollateral } from '../collateral.mjs'
 import { navPoints } from '../navhistory.mjs'
 import { amountText, num } from '../num.mjs'
 
@@ -44,6 +45,19 @@ eq('the NAV history of a USD vault', navPoints(vault, [tx]).map((p) => p.navCorr
 
 eq('an alert amount in USD', amountText('12.5', USD), '12.50 USD')
 eq('an alert amount in XRP', amountText('200000', null, 6), '0.200000 XRP')
+
+// Amounts in an issued currency keep their decimals; whole units are for drops and MPTs.
+const lossy = { ...usd, assetsTotal: num('1.5'), lossUnrealized: num('0.4'), sharesOutstanding: num('1500000'), asset: USD, vaultId: 'V'.repeat(64) }
+const doc = presentNav({ vault: lossy, ...Reader.nav(lossy) })
+const p = doc.provenance
+const recomputed = num(p.assetsTotal).minus(p.lossUnrealized).div(num(p.unitsOutstanding).div(10 ** p.scale)).toFixed(6)
+eq('the nav provenance of a USD vault recomputes to its own unit value', [p.assetsTotal, p.lossUnrealized, recomputed], ['1.5', '0.4', doc.unitValue.held])
+
+const pledged = presentCollateral([{ escrowId: 'E', pledgor: 'rPledgor', shares: num('2000000') }], { navNaive: '1.000000', navCorrect: '0.900000', vault: { ...usd, asset: USD, shareMptId: 'CD'.repeat(24) } })
+eq('2,000,000 escrowed share units of a USD vault are 2 shares, worth 1.8 USD held', [pledged.pledges[0].valueCorrect, pledged.totalValueCorrect], ['1.8', '1.8'])
+
+const atMinimum = deriveScoreInputs({ ...usd, asset: USD, broker: { debtTotal: '40.5', coverAvailable: '4.05', coverRateMinimum: 10000, coverRateLiquidation: 10000 }, loans: [], phase: 'Open' })
+eq('a USD broker exactly at its minimum cover is not short', [atMinimum.broker.coverRequired.toFixed(), atMinimum.broker.coverShortfall.toFixed()], ['4.05', '0'])
 
 console.log(bad ? `\n  ${bad} FAILED` : '\n  all ok')
 process.exitCode = bad ? 1 : 0

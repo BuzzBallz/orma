@@ -55,6 +55,15 @@ export function wholeShares(shares, scale = 0) {
 }
 
 /**
+ * An amount as the API serves it: whole drops or MPT units, or an issued currency with its own
+ * decimals. Rounding an IOU to a whole unit turned 1.5 USD into "2".
+ * @param {unknown} v @param {{kind:string}|null|undefined} asset
+ */
+export function amountStr(v, asset) {
+  return asset?.kind === 'IOU' ? num(v).toFixed() : num(v).toFixed(0)
+}
+
+/**
  * An amount in a vault's asset, for a sentence: XRP from drops, an issued currency as it is, an
  * MPT in whole units. No asset is XRP.
  * @param {unknown} v @param {{kind:string, currency:string|null}|null|undefined} asset @param {number} [dp]

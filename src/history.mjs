@@ -202,6 +202,8 @@ const INCOMPLETE = 'the retained record does not reach back to the broker’s cr
 /**
  * Total cover consumed for a given ordering of principals.
  * Mirrors the ledger exactly: ceil at each step, base is the remaining book.
+ * shortcut: rounds to whole drops for every asset; an issued-currency broker's cover would be
+ * rounded to whole units here. Thread the vault's asset in when an IOU broker is tracked.
  */
 export function coverForOrder(principals, startingDebt, cmin, cliq, coverAvailable) {
   const c = num(cmin).div(100000).times(num(cliq).div(100000))

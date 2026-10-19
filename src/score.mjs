@@ -110,7 +110,7 @@ const PERFORMING = new Set(['current', 'due_soon'])
 const DISTRESSED = new Set(['overdue', 'impaired', 'defaultable'])
 
 /**
- * @param {{assetsTotal:any, assetsAvailable:any, lossUnrealized:any, sharesOutstanding:any, scale?:number,
+ * @param {{assetsTotal:any, assetsAvailable:any, lossUnrealized:any, sharesOutstanding:any, scale?:number, asset?:{kind:string},
  *          broker:{debtTotal:any, coverAvailable:any, coverRateMinimum:number, coverRateLiquidation:number},
  *          loans:Array<{status:string, principalOutstanding:any, totalValueOutstanding:any, secondsUntilDue:number}>,
  *          phase:string}} o
@@ -127,8 +127,10 @@ export function deriveScoreInputs(o) {
   // The DOUBLE PRODUCT. Both rates are 1e-5 units so BOTH are divided by 1e5.
   // Verified on-chain: cover consumed == ceil(DebtTotal * cmin * cliq), keyed to the
   // broker's TOTAL debt at that instant, not to the defaulting loan's principal.
-  const maxLiquidatableNow = debtTotal.times(cmin).times(cliq).ceil()
-  const coverRequired = debtTotal.times(cmin).ceil()
+  // Rounded up to the drop (or MPT unit) as the ledger does; an issued currency has no such unit.
+  const toUnit = (d) => (o.asset?.kind === 'IOU' ? d : d.ceil())
+  const maxLiquidatableNow = toUnit(debtTotal.times(cmin).times(cliq))
+  const coverRequired = toUnit(debtTotal.times(cmin))
   const coverShortfall = Decimal.max(0, coverRequired.minus(coverAvailable))
   const strandedCoverFraction = coverAvailable.isZero()
     ? D(0)

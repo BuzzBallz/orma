@@ -10,7 +10,7 @@
  *     promised it never has to handle an absent key
  */
 import { deriveScoreInputs, buildScore } from './score.mjs'
-import { str, num, Decimal, amountText } from './num.mjs'
+import { str, num, Decimal, amountText, amountStr } from './num.mjs'
 
 const EXPLORER = 'https://devnet.xrpl.org'
 const DISTRESSED = new Set(['overdue', 'impaired', 'defaultable', 'defaulted'])
@@ -110,6 +110,7 @@ export function presentVault(snap, opts = {}) {
     lossUnrealized: vault.lossUnrealized,
     sharesOutstanding: vault.sharesOutstanding,
     scale: vault.scale,
+    asset: vault.asset,
     broker,
     loans,
     phase: vault.phase,
@@ -164,18 +165,18 @@ export function presentVault(snap, opts = {}) {
       coverRateMinimum: broker.coverRateMinimum,
       coverRateLiquidation: broker.coverRateLiquidation,
       managementFeeRate: broker.managementFeeRate,
-      coverRequired: bx.coverRequired.toFixed(0),
-      coverShortfall: bx.coverShortfall.toFixed(0),
-      maxLiquidatableNow: bx.maxLiquidatableNow.toFixed(0),
+      coverRequired: amountStr(bx.coverRequired, vault.asset),
+      coverShortfall: amountStr(bx.coverShortfall, vault.asset),
+      maxLiquidatableNow: amountStr(bx.maxLiquidatableNow, vault.asset),
       strandedCoverFraction: bx.strandedCoverFraction.toFixed(4),
     },
     score,
     loans: presentedLoans,
     phaseInfo: {
       ...snap.phaseInfo,
-      claimsAtRedemption: cliff.claims.toFixed(0),
-      liquidityAtRedemption: cliff.liquidityAtRedemption.toFixed(0),
-      projectedShortfall: cliff.projectedShortfall.toFixed(0),
+      claimsAtRedemption: amountStr(cliff.claims, vault.asset),
+      liquidityAtRedemption: amountStr(cliff.liquidityAtRedemption, vault.asset),
+      projectedShortfall: amountStr(cliff.projectedShortfall, vault.asset),
       shortfallPct: cliff.shortfallPct.toFixed(2),
     },
     oracle: opts.oracle ?? null,
@@ -198,7 +199,7 @@ export function presentRow(snap, opts = {}) {
   const broker = snap.brokers[0] ?? { debtTotal: num(0), coverAvailable: num(0), coverRateMinimum: 0, coverRateLiquidation: 0 }
   const { scoreArgs } = deriveScoreInputs({
     assetsTotal: vault.assetsTotal, assetsAvailable: vault.assetsAvailable,
-    lossUnrealized: vault.lossUnrealized, sharesOutstanding: vault.sharesOutstanding, scale: vault.scale,
+    lossUnrealized: vault.lossUnrealized, sharesOutstanding: vault.sharesOutstanding, scale: vault.scale, asset: vault.asset,
     broker, loans, phase: vault.phase,
   })
   const score = buildScore(scoreArgs)

@@ -16,7 +16,7 @@
  * be rewritten (Appendix D1), so the contract at the end of it is effectively permanent.
  * Fields may be added. Nothing here may ever be renamed, retyped or removed.
  */
-import { num, wholeShares } from './num.mjs'
+import { num, wholeShares, amountStr } from './num.mjs'
 import { parseShareMetadata, navPointerFrom, xls89Report } from './metadata.mjs'
 import { logger } from './log.mjs'
 
@@ -84,8 +84,8 @@ export function presentNav(snap, opts = {}) {
     provenance: {
       network: opts.network ?? 'devnet',
       source: opts.source ?? 'devnet',
-      assetsTotal: v.assetsTotal.toFixed(0),
-      lossUnrealized: v.lossUnrealized.toFixed(0),
+      assetsTotal: amountStr(v.assetsTotal, v.asset),
+      lossUnrealized: amountStr(v.lossUnrealized, v.asset),
       unitsOutstanding: v.sharesOutstanding.toFixed(0),
       scale: v.scale ?? 0,
       recompute: '(assetsTotal - lossUnrealized) / (unitsOutstanding / 10^scale)',
