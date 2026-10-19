@@ -284,7 +284,9 @@ main:focus{ outline: none; }
 }
 .menu-btn{ display: none; margin-left: auto; margin-right: -10px; }
 .menu-x{ display: inline-flex; }
-@media (max-width: 1279px){ .mast-in{ gap: var(--space-6); } .mast-right{ gap: var(--space-4); } .mast .stamp{ display: none; } }
+@media (max-width: 1279px){ .mast-in{ gap: var(--space-6); } .mast-right{ gap: var(--space-4); } }
+/* The portfolio hero and the phone menu carry the stamp; the masthead keeps it only where it fits. */
+@media (max-width: 1439px){ .mast .stamp{ display: none; } }
 @media (max-width: 1099px){
   :root{ --masthead: 64px; }
   .desks, .mast-right{ display: none; }
