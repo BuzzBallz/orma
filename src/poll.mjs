@@ -66,11 +66,10 @@ export class Reader {
           const l = await this.xrpl.loan({ loan_broker_id: b.loanBrokerId, loan_seq: seq })
           loans.push(normaliseLoan({ ...l, index: l.index ?? l.LedgerIndex }, closeTime))
         } catch (e) {
-          // A deleted (fully repaid) loan is expected to be missing. Not an error.
+          // A deleted (fully repaid) loan is expected to be missing. Not an error. Any other failure
+          // fails the vault's read: a snapshot missing a loan grades the facility as if it never lent.
           const code = e?.data?.error
-          if (code !== 'entryNotFound' && code !== 'objectNotFound') {
-            log.debug('loan read failed', { broker: b.loanBrokerId?.slice(0, 12), seq, err: code ?? String(e).slice(0, 60) })
-          }
+          if (code !== 'entryNotFound' && code !== 'objectNotFound') throw e
         }
       }
     }
@@ -119,7 +118,13 @@ export class Reader {
 
   /** One full pass over every tracked vault. */
   async tick() {
-    const closeTime = await this.xrpl.closeTime()
+    let closeTime
+    try {
+      closeTime = await this.xrpl.closeTime()
+    } catch (e) {
+      this.degraded = true
+      throw e
+    }
     this.closeTime = closeTime
     this.ledgerIndex = this.xrpl.lastLedger
     this.serverTime = new Date((closeTime + 946684800) * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z')
@@ -131,6 +136,9 @@ export class Reader {
         const snap = {
           vaultId: id,
           readAt: this.serverTime,
+          // Wall clock as well as ledger time: when the ledger cannot be read at all, the ledger
+          // clock stops too, and only this one says how old the snapshot has become.
+          readMs: Date.now(),
           closeTimeUsed: closeTime,
           ledgerIndex: this.ledgerIndex,
           vault,
@@ -181,10 +189,7 @@ export class Reader {
     const loop = async () => {
       while (this._running) {
         const t0 = Date.now()
-        try { await this.tick() } catch (e) {
-          this.degraded = true
-          log.error('tick failed', { err: String(e).slice(0, 120) })
-        }
+        try { await this.tick() } catch (e) { log.error('tick failed', { err: String(e).slice(0, 120) }) }
         await sleep(Math.max(0, POLL_MS - (Date.now() - t0)))
       }
     }

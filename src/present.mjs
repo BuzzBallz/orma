@@ -24,11 +24,13 @@ export const STALE_AFTER_SECONDS = 30
 /**
  * How old a snapshot is. When a vault's read fails the reader keeps its last good snapshot; it
  * must then be served with the ledger it came from, not as the reading of the latest tick.
- * @param {{readAt:string, ledgerIndex:number, closeTimeUsed:number}} snap
+ * @param {{readAt:string, readMs?:number, ledgerIndex:number, closeTimeUsed:number}} snap
  * @param {number|null|undefined} closeTime the reader's latest validated close time
  */
 export function freshness(snap, closeTime) {
-  const ageSeconds = closeTime == null ? 0 : Math.max(0, closeTime - snap.closeTimeUsed)
+  const ledgerAge = closeTime == null ? 0 : closeTime - snap.closeTimeUsed
+  const wallAge = snap.readMs ? Math.floor((Date.now() - snap.readMs) / 1000) : 0
+  const ageSeconds = Math.max(0, ledgerAge, wallAge)
   return { readAt: snap.readAt, readLedgerIndex: snap.ledgerIndex, ageSeconds, stale: ageSeconds > STALE_AFTER_SECONDS }
 }
 export function setLabel(vaultId, label) { labels.set(vaultId, label) }

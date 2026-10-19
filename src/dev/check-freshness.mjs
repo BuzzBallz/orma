@@ -4,6 +4,7 @@
 //   node src/dev/check-freshness.mjs
 import { Reader } from '../poll.mjs'
 import { createApi } from '../api.mjs'
+import { Xrpl } from '../xrpl.mjs'
 
 let bad = 0
 const eq = (name, got, want) => {
@@ -46,6 +47,45 @@ failing = false
 await reader.tick()
 eq('one good pass later, the snapshot is fresh', (await get(`/api/vaults/${ID}/nav`)).freshness.stale, false)
 eq('and health is ok again', (await get('/api/health')).ok, true)
+
+// The ledger itself unreadable: no vault read even starts, so the ledger clock stops with it.
+// A minute later by the wall clock, the figures must say they are a minute old.
+const workingCloseTime = xrpl.closeTime
+xrpl.closeTime = async () => { throw new Error('timeout') }
+await reader.tick().catch(() => {})
+const realNow = Date.now
+Date.now = () => realNow() + 60_000
+const unread = await get(`/api/vaults/${ID}/nav`)
+eq('a ledger unreadable for a minute leaves the figures stale', [unread.freshness.stale, unread.freshness.ageSeconds >= 60], [true, true])
+eq('and health not ok', (await get('/api/health')).ok, false)
+Date.now = realNow
+xrpl.closeTime = workingCloseTime
+
+// A socket that will not come back: each request tries once to reconnect, so the tick fails
+// within seconds instead of waiting on an endless reconnect while health says ok.
+const down = new Xrpl('wss://unused.invalid')
+down.client = { isConnected: () => false, connect: async () => { throw new Error('ECONNREFUSED') }, request: async () => { throw new Error('NotConnectedError') }, on() {} }
+const t0 = Date.now()
+const outcome = await Promise.race([new Reader([ID], down).tick().then(() => 'settled', () => 'threw'), new Promise((r) => setTimeout(() => r('pending'), 8000))])
+eq('a dead socket fails the tick within seconds', [outcome, Date.now() - t0 < 8000], ['threw', true])
+
+// A loan that cannot be read fails the vault's read: the last good snapshot stays, marked degraded,
+// rather than a snapshot that lost a loan and grades the facility as if it never lent it.
+let loanFails = false
+const withLoan = {
+  ...xrpl,
+  async accountObjects() { return [{ index: 'B'.repeat(64), VaultID: ID, LoanSequence: 2, Owner: 'rOwner', Account: 'rBroker', DebtTotal: '1000000', CoverAvailable: '0' }] },
+  async loan() {
+    if (loanFails) throw Object.assign(new Error('timeout'), { data: { error: 'timeout' } })
+    return { index: 'C'.repeat(64), Flags: 0, NextPaymentDueDate: 900000000, PaymentInterval: 2592000, PrincipalOutstanding: '1000000', TotalValueOutstanding: '1000000' }
+  },
+}
+const lender = new Reader([ID], withLoan)
+await lender.tick()
+loanFails = true
+await lender.tick()
+eq('a loan read that fails keeps the last snapshot with its loan', lender.get(ID).loans.length, 1)
+eq('and marks the reader degraded', lender.degraded, true)
 
 await api.close()
 console.log(bad ? `\n  ${bad} FAILED` : '\n  all ok')

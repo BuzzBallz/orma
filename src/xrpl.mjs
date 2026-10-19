@@ -74,12 +74,16 @@ export class Xrpl {
     this.connected = false
   }
 
-  /** One request with bounded retries. Reconnects if the socket dropped underneath us. */
+  /**
+   * One request with bounded retries. Reconnects if the socket dropped underneath us, once per
+   * attempt: connect() retries forever, and a request that waited on it never failed, so a tick
+   * stayed pending and the reader never said it was degraded.
+   */
   async req(payload, attempts = 3) {
     let lastErr
     for (let i = 0; i < attempts; i++) {
       try {
-        if (!this.client.isConnected()) await this.connect()
+        if (!this.client.isConnected()) { await this.client.connect(); this.connected = true }
         return await this.client.request(payload)
       } catch (e) {
         lastErr = e
