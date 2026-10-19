@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { compact, dropsToXrp, trimZeros } from '../lib/format'
+import { UNREADABLE, compact, dropsToXrp, trimZeros } from '../lib/format'
 
 /** The unit follows the figure, held to it by a no-break space. Marked for the vocabulary audit. */
 const Unit = () => <span data-vocab-exempt>{'\u00a0'}XRP</span>
@@ -12,9 +12,11 @@ const Unit = () => <span data-vocab-exempt>{'\u00a0'}XRP</span>
  * compact form but zeros, so a reader without a pointer still has every digit.
  */
 export function Amount({ drops }: { drops: string }) {
-  const full = trimZeros(dropsToXrp(drops))
-  const c = compact(full)
   const [whole, setWhole] = useState(false)
+  const xrp = dropsToXrp(drops)
+  if (xrp === UNREADABLE) return <>{xrp}</>
+  const full = trimZeros(xrp)
+  const c = compact(full)
   if (!c) return <>{full}<Unit /></>
 
   return (
