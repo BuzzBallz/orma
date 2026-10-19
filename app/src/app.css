@@ -963,8 +963,6 @@ main:focus{ outline: none; }
 .btn:active:not(:disabled), .picker-btn:active:not(:disabled), .waddr:active, .menu-btn:active, .menu-x:active, .dlg [data-slot="dialog-close"]:active{ transform: scale(.97); translate: none; transition-duration: 120ms; }
 /* Text controls dim at the touch and come back on release, as text buttons do on iOS: the
    tap highlight is off, so this is the only sign a tap landed. */
-.lnk, .desk, .menu-list a, .foot-nav a, .foot-nav button, .kf-head, .exh > summary, .lockup{ transition: opacity 160ms var(--ease-out); }
-.lnk:active, .desk:active, .menu-list a:active, .foot-nav a:active, .foot-nav button:active, .kf-head:active, .exh > summary:active, .lockup:active{ opacity: .6; transition-duration: 0ms; }
 .lnk, .desk, .menu-list a, .foot-nav a, .foot-nav button, .kf-head, .exh > summary, .lockup, .state-choices a, .tx-link{ transition: opacity 160ms var(--ease-out); }
 .lnk:active, .desk:active, .menu-list a:active, .foot-nav a:active, .foot-nav button:active, .kf-head:active, .exh > summary:active, .lockup:active, .state-choices a:active, .tx-link:active{ opacity: .6; transition-duration: 0ms; }
 .picker-btn .chev{ transition: transform 200ms var(--ease-out); }
