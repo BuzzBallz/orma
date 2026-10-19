@@ -182,7 +182,7 @@ export function createApi(reader, opts = {}) {
             source: e.source,
           })),
           ordering,
-          reputation: reputation(events, ordering, broker, window),
+          reputation: reputation(events, ordering, broker, window, snap.vault.asset),
           recommendation: recommendOrder(snap.loans, broker),
           window,
         }

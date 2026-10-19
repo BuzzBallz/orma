@@ -10,7 +10,7 @@
  *     promised it never has to handle an absent key
  */
 import { deriveScoreInputs, buildScore } from './score.mjs'
-import { str, num, Decimal } from './num.mjs'
+import { str, num, Decimal, amountText } from './num.mjs'
 
 const EXPLORER = 'https://devnet.xrpl.org'
 const DISTRESSED = new Set(['overdue', 'impaired', 'defaultable', 'defaulted'])
@@ -31,7 +31,7 @@ function trendOf(prev, navCorrect) {
   return 'stable'
 }
 
-function buildAlerts({ recogLagSeconds, navDivergenceBps, coverShortfall, concentration, projectedShortfall, assetsAvailable, loans }) {
+function buildAlerts({ recogLagSeconds, navDivergenceBps, coverShortfall, concentration, projectedShortfall, assetsAvailable, loans, asset }) {
   const alerts = []
   const undeclared = loans.filter((l) => l.status === 'overdue' || l.status === 'defaultable').length
   if (recogLagSeconds > 0) {
@@ -57,7 +57,7 @@ function buildAlerts({ recogLagSeconds, navDivergenceBps, coverShortfall, concen
       code: 'COVER_SHORTFALL',
       severity: 'high',
       title: 'First-loss cover is below the broker’s own declared minimum',
-      detail: `Short by ${coverShortfall.toFixed(0)} drops.`,
+      detail: `Short by ${amountText(coverShortfall, asset, 6)}.`,
       sinceAt: null,
     })
   }
@@ -74,7 +74,7 @@ function buildAlerts({ recogLagSeconds, navDivergenceBps, coverShortfall, concen
     alerts.push({
       code: 'REDEMPTION_SHORTFALL',
       severity: 'critical',
-      title: `Projected shortfall of ${projectedShortfall.div(1e6).toFixed(2)} XRP at redemption`,
+      title: `Projected shortfall of ${amountText(projectedShortfall, asset)} at redemption`,
       detail: 'Claims exceed projected liquidity. Redemption is first-come-first-serve.',
       sinceAt: null,
     })
@@ -180,6 +180,7 @@ export function presentVault(snap, opts = {}) {
     },
     oracle: opts.oracle ?? null,
     alerts: buildAlerts({
+      asset: vault.asset,
       recogLagSeconds: scoreArgs.recogLagSeconds,
       navDivergenceBps: snap.navDivergenceBps,
       coverShortfall: bx.coverShortfall,

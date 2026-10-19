@@ -6,7 +6,7 @@ import { Reader } from '../poll.mjs'
 import { deriveScoreInputs, buildScore } from '../score.mjs'
 import { valuePledge } from '../nav.mjs'
 import { navPoints } from '../navhistory.mjs'
-import { num } from '../num.mjs'
+import { amountText, num } from '../num.mjs'
 
 let bad = 0
 const eq = (name, got, want) => {
@@ -15,6 +15,7 @@ const eq = (name, got, want) => {
   console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${name}${ok ? '' : `\n         got  ${JSON.stringify(got)}\n         want ${JSON.stringify(want)}`}`)
 }
 
+const USD = { kind: 'IOU', currency: 'USD', issuer: 'rIssuer', mptIssuanceId: null }
 const usd = { assetsTotal: num('10000'), assetsAvailable: num('10000'), lossUnrealized: num('0'), sharesOutstanding: num('10000000000'), scale: 6 }
 const xrp = { assetsTotal: num('51000000'), assetsAvailable: num('51000000'), lossUnrealized: num('10000000'), sharesOutstanding: num('51000000'), scale: 0 }
 const broker = { debtTotal: 0, coverAvailable: 0, coverRateMinimum: 0, coverRateLiquidation: 0 }
@@ -40,6 +41,9 @@ const tx = {
   ] },
 }
 eq('the NAV history of a USD vault', navPoints(vault, [tx]).map((p) => p.navCorrect), ['1.000000'])
+
+eq('an alert amount in USD', amountText('12.5', USD), '12.50 USD')
+eq('an alert amount in XRP', amountText('200000', null, 6), '0.200000 XRP')
 
 console.log(bad ? `\n  ${bad} FAILED` : '\n  all ok')
 process.exitCode = bad ? 1 : 0

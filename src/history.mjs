@@ -37,7 +37,7 @@
  * difference is depositor money. Nothing about that required privileged access:
  * it is all public ledger state.
  */
-import { num, Decimal } from './num.mjs'
+import { num, Decimal, amountText } from './num.mjs'
 import { logger } from './log.mjs'
 import { readHistory, creates } from './archive.mjs'
 
@@ -294,7 +294,7 @@ export function recommendOrder(loans, broker) {
  * Reputation. Ordinal and rule-based like the vault score: a broker is graded on what
  * they did, not on a weighted opinion of it.
  */
-export function reputation(events, ordering, broker, window = null) {
+export function reputation(events, ordering, broker, window = null, asset = null) {
   const defaults = events.filter((e) => e.kind === 'default')
   const impairs = events.filter((e) => e.kind === 'impair')
   const withdrawals = events.filter((e) => e.kind === 'cover_withdraw')
@@ -336,7 +336,7 @@ export function reputation(events, ordering, broker, window = null) {
 
   if (ordering.applicable) {
     const f = Number(ordering.fairness)
-    if (f < 0.25) { score -= 35; findings.push({ code: 'ORDERING_SELF_SERVING', detail: `Declared losses in an order close to the one that minimises their own first-loss contribution (sequence score ${ordering.fairness}). The choice cost investors ${(Number(ordering.costToDepositors) / 1e6).toFixed(6)} XRP against the fair order.` }) }
+    if (f < 0.25) { score -= 35; findings.push({ code: 'ORDERING_SELF_SERVING', detail: `Declared losses in an order close to the one that minimises their own first-loss contribution (sequence score ${ordering.fairness}). The choice cost investors ${amountText(ordering.costToDepositors, asset, 6)} against the fair order.` }) }
     else if (f < 0.75) { score -= 15; findings.push({ code: 'ORDERING_MIXED', detail: `The sequence sits between the fair and the self-serving one (sequence score ${ordering.fairness}).` }) }
     else findings.push({ code: 'ORDERING_FAIR', detail: `Declared in an order close to the one that maximises first-loss capital applied on investors' behalf (sequence score ${ordering.fairness}).` })
   }

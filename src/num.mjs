@@ -55,6 +55,18 @@ export function wholeShares(shares, scale = 0) {
 }
 
 /**
+ * An amount in a vault's asset, for a sentence: XRP from drops, an issued currency as it is, an
+ * MPT in whole units. No asset is XRP.
+ * @param {unknown} v @param {{kind:string, currency:string|null}|null|undefined} asset @param {number} [dp]
+ */
+export function amountText(v, asset, dp = 2) {
+  const d = num(v)
+  if (!asset || asset.kind === 'XRP') return `${d.div(1e6).toFixed(dp)} XRP`
+  if (asset.kind === 'IOU') return `${d.toFixed(dp)} ${asset.currency}`
+  return `${d.toFixed(0)} units`
+}
+
+/**
  * Serialise for the API. Always a plain decimal string, never scientific notation,
  * never a JS number.
  * @param {Dec|string|number|undefined|null} v
