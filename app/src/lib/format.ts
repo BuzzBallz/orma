@@ -51,8 +51,17 @@ function padDp(s: string, dp: number): string {
   return sign + (digits.slice(0, cut) || '0') + (dp ? '.' + digits.slice(cut) : '')
 }
 
+/** A figure that is not a number is shown as a dash, never as a zero: zero is a figure. */
+export const UNREADABLE = '—'
+function unreadable(s: string | null | undefined): boolean {
+  return !/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test((s ?? '').toString().trim())
+}
+
+/** An issued currency's or an MPT's own amount: already in its unit, so only checked. */
+export function inUnit(amount: string): string { return unreadable(amount) ? UNREADABLE : amount.trim() }
+
 /** [CONTRACT §6] drops -> XRP. "51000000" -> "51.000000" ; "1" -> "0.000001" */
-export function dropsToXrp(drops: string): string { return padDp(shift(drops, -6), 6) }
+export function dropsToXrp(drops: string): string { return unreadable(drops) ? UNREADABLE : padDp(shift(drops, -6), 6) }
 
 /** "10.000000" -> "10", "0.500000" -> "0.5": the padding after the point is not a figure. */
 export function trimZeros(full: string): string {
@@ -83,7 +92,7 @@ export function compact(full: string): { mantissa: string; exp: number } | null 
 export function axisLabel(v: number, dp = 2): string { return padDp(String(v), dp) }
 
 /** [CONTRACT §6] ratio string -> percent, 2dp. "0.8039" -> "80.39%" */
-export function ratioToPct(r: string): string { return padDp(shift(r, 2), 2) + '%' }
+export function ratioToPct(r: string): string { return unreadable(r) ? UNREADABLE : padDp(shift(r, 2), 2) + '%' }
 
 /** [CONTRACT §6] 1e-5 rate -> percent, 3dp. 10000 -> "10.000%" ; 1000 -> "1.000%" */
 export function rateToPct(rate: number): string { return padDp(shift(String(rate), -3), 3) + '%' }
@@ -101,6 +110,9 @@ export function duration(absSeconds: number): string {
 
 /** A boundary already behind us. NOT contract §6 — do not use it for loan due dates. */
 export function formatElapsed(seconds: number): string { return 'passed ' + duration(seconds) + ' ago' }
+
+/** a percentage already, as the API sends shortfallPct -> 2dp. "12.5" -> "12.50%" */
+export function percent(p: string): string { return unreadable(p) ? UNREADABLE : padDp(p, 2) + '%' }
 
 /** integer basis points -> percent, 2dp. 1961 -> "19.61%" */
 export function bpsToPct(bps: number): string { return padDp(shift(String(bps), -2), 2) + '%' }

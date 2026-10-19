@@ -50,11 +50,15 @@ export class Reader {
 
   /** Read one vault completely: vault, its brokers, and every loan under them. */
   async readVault(vaultId, closeTime) {
-    const raw = await this.xrpl.vaultInfo(vaultId)
+    // Every read of the pass on the ledger the pass took its close time from: asked for "validated"
+    // one by one, a vault read before an impairment and its loan read after it graded a state that
+    // never existed on any ledger.
+    const at = this.ledgerIndex ?? 'validated'
+    const raw = await this.xrpl.vaultInfo(vaultId, at)
     const vault = normaliseVault({ ...raw, index: raw.index ?? vaultId }, closeTime)
 
     // brokers that point at this vault
-    const owned = await this.xrpl.accountObjects(vault.owner, 'loan_broker')
+    const owned = await this.xrpl.accountObjects(vault.owner, 'loan_broker', at)
     const brokers = owned
       .filter((b) => b.VaultID === vaultId)
       .map((b) => normaliseBroker({ ...b, index: b.index ?? b.LedgerIndex }))
@@ -63,7 +67,7 @@ export class Reader {
     for (const b of brokers) {
       for (let seq = 1; seq < b.loanSequence; seq++) {
         try {
-          const l = await this.xrpl.loan({ loan_broker_id: b.loanBrokerId, loan_seq: seq })
+          const l = await this.xrpl.loan({ loan_broker_id: b.loanBrokerId, loan_seq: seq }, at)
           loans.push(normaliseLoan({ ...l, index: l.index ?? l.LedgerIndex }, closeTime))
         } catch (e) {
           // A deleted (fully repaid) loan is expected to be missing. Not an error.

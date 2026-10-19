@@ -22,7 +22,7 @@ export interface VaultRow {
   grade: string; gradeNumeric: number; trend: Trend
   assetsTotal: string; assetsAvailable: string; lossUnrealized: string
   navNaive: string; navCorrect: string; navDivergenceBps: number
-  redemptionAt: string; secondsToRedemption: number
+  redemptionAt: string | null; secondsToRedemption: number | null
   loanCount: number; distressedLoanCount: number; oraclePublished: boolean
 }
 
@@ -41,7 +41,7 @@ export interface Broker {
 }
 
 export interface Dimension {
-  key: DimKey; label: string; value: string; unit: string
+  key: DimKey; label: string; value: string; unit: 'ratio' | 'seconds' | 'percent' | 'grade'
   grade: string; notches: number; explain: string; worseIsHigher: boolean
 }
 

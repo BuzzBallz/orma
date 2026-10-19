@@ -105,22 +105,22 @@ export class Xrpl {
    * Read a Vault plus its share issuance.
    * NOTE: the parameter is `vault_id`, NOT `vault` as XLS-65 section 3.9.1 states.
    */
-  async vaultInfo(vaultId) {
-    const r = await this.req({ command: 'vault_info', vault_id: vaultId })
+  async vaultInfo(vaultId, ledgerIndex = 'validated') {
+    const r = await this.req({ command: 'vault_info', vault_id: vaultId, ledger_index: ledgerIndex })
     return r.result.vault
   }
 
   /** Read a LoanBroker by its object index, or by {owner, seq}. */
   async loanBroker(ref) {
     const param = typeof ref === 'string' ? ref : { loan_broker: ref }
-    const r = await this.req(typeof ref === 'string' ? { command: 'ledger_entry', index: ref } : { command: 'ledger_entry', ...param })
+    const r = await this.req(typeof ref === 'string' ? { command: 'ledger_entry', index: ref, ledger_index: 'validated' } : { command: 'ledger_entry', ...param, ledger_index: 'validated' })
     return r.result.node
   }
 
   /** Read a Loan by object index, or by {loan_broker_id, loan_seq}. */
-  async loan(ref) {
+  async loan(ref, ledgerIndex = 'validated') {
     const r = await this.req(
-      typeof ref === 'string' ? { command: 'ledger_entry', index: ref } : { command: 'ledger_entry', loan: ref },
+      typeof ref === 'string' ? { command: 'ledger_entry', index: ref, ledger_index: ledgerIndex } : { command: 'ledger_entry', loan: ref, ledger_index: ledgerIndex },
     )
     return r.result.node
   }
@@ -133,7 +133,7 @@ export class Xrpl {
    * need to value it has to be reachable from here.
    */
   async mptIssuance(issuanceId) {
-    const r = await this.req({ command: 'ledger_entry', mpt_issuance: String(issuanceId).toUpperCase() })
+    const r = await this.req({ command: 'ledger_entry', mpt_issuance: String(issuanceId).toUpperCase(), ledger_index: 'validated' })
     return r.result.node
   }
 
@@ -170,8 +170,8 @@ export class Xrpl {
   }
 
   /** Objects owned by an account, optionally filtered. Used to discover a vault's brokers. */
-  async accountObjects(account, type) {
-    const r = await this.req({ command: 'account_objects', account, type, limit: 400 })
+  async accountObjects(account, type, ledgerIndex = 'validated') {
+    const r = await this.req({ command: 'account_objects', account, type, limit: 400, ledger_index: ledgerIndex })
     return r.result.account_objects ?? []
   }
 }
@@ -251,6 +251,11 @@ export function normaliseBroker(b) {
   }
 }
 
+// The next payment is always due within one interval, so "within the interval" flagged every
+// performing loan. Due soon is the last 10% of it, and never more than three days.
+const DUE_SOON_MAX_SECONDS = 72 * 3600
+const dueSoonWindow = (paymentInterval) => Math.min(DUE_SOON_MAX_SECONDS, paymentInterval / 10)
+
 /**
  * Normalise a Loan.
  *
@@ -272,7 +277,7 @@ export function normaliseLoan(l, closeTime) {
   else if (dueRipple === null) status = 'closed'
   else if (overdue && closeTime > dueRipple + grace) status = 'defaultable'
   else if (overdue) status = 'overdue'
-  else if (secondsUntilDue <= Number(l.PaymentInterval ?? 0)) status = 'due_soon'
+  else if (secondsUntilDue <= dueSoonWindow(Number(l.PaymentInterval ?? 0))) status = 'due_soon'
   else status = 'current'
 
   return {

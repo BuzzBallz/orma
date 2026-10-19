@@ -22,7 +22,8 @@
     "check:api": "node src/dev/check-api.mjs",
     "check:navhistory": "node src/dev/check-navhistory.mjs",
     "check:archive": "node src/dev/check-archive.mjs",
-    "check:ssrf": "node src/dev/check-ssrf.mjs"
+    "check:ssrf": "node src/dev/check-ssrf.mjs",
+    "check:figures": "node src/dev/check-figures.mjs"
   },
   "dependencies": {
     "decimal.js": "10.6.0",

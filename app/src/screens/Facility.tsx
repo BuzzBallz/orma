@@ -3,13 +3,14 @@ import type { BrokerHistory, Collateral, Dimension, Gate, NavHistory, OracleCont
 import { GradeLetter } from '../components/GradeLetter'
 import { Scale } from '../components/Scale'
 import { Amount } from '../components/Amount'
+import { AmountAsset } from '../lib/asset'
 import { NavChart } from '../components/NavChart'
 import { Exhibit } from '../components/Exhibit'
 import { Mark } from '../components/Lockup'
 import { gradeIndex } from '../lib/grades'
 import { nextBeat } from '../lib/beats'
 import { useFlash } from '../lib/useFlash'
-import { bpsToPct, duration, fmtIso, ratioToPct, rateToPct } from '../lib/format'
+import { bpsToPct, duration, fmtIso, percent, ratioToPct, rateToPct } from '../lib/format'
 import { creditText, facilityName, facilityRef, factorRows, outlookOf, sentence, splitFactors } from '../lib/credit'
 import { ManagerConduct, PledgedCollateral } from './FacilityExhibits'
 import { PledgeResolution } from './PledgeResolution'
@@ -128,7 +129,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
   const kind = v.vaultKind === 'ClosedEnded' ? 'closed-ended' : 'open-ended'
 
   return (
-    <>
+    <AmountAsset.Provider value={d.vault.asset}>
       {/* Letterhead, print only: the masthead is the first thing the print sheet drops. */}
       <div className="wrap op-letterhead" aria-hidden>
         <Mark size={18} />
@@ -170,8 +171,9 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
               v={<><Amount drops={d.broker.coverAvailable} /> of <Amount drops={d.broker.coverRequired} /> required</>}
             />
             <Glance
-              k="Remaining Term" phrase={v.secondsToRedemption <= 0}
-              v={v.secondsToRedemption > 0 ? duration(v.secondsToRedemption) : `matured ${fmtIso(v.redemptionAt).slice(0, 10)}`}
+              k="Remaining Term" phrase={v.secondsToRedemption === null || v.secondsToRedemption <= 0}
+              v={v.secondsToRedemption === null ? 'no redemption date'
+                : v.secondsToRedemption > 0 ? duration(v.secondsToRedemption) : `matured ${fmtIso(v.redemptionAt).slice(0, 10)}`}
             />
             <Glance k="Exposures" v={`${v.loanCount} · ${v.distressedLoanCount} non-performing`} phrase moved={exposuresMoved} />
           </dl>
@@ -198,8 +200,10 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
             <p>
               {name} is a {kind} lending facility carrying {v.loanCount} exposure{v.loanCount === 1 ? '' : 's'},
               of which {v.distressedLoanCount} {v.distressedLoanCount === 1 ? 'is' : 'are'}{' '}
-              non-performing. It is in its {v.phase.toLowerCase()} period, with redemption
-              scheduled for {fmtIso(v.redemptionAt)}.
+              non-performing. It is in its {v.phase.toLowerCase()} period,{' '}
+              {v.redemptionAt === null ? 'with no redemption date'
+                : v.secondsToRedemption !== null && v.secondsToRedemption > 0 ? `with redemption scheduled for ${fmtIso(v.redemptionAt)}`
+                : `its redemption date, ${fmtIso(v.redemptionAt)}, behind it`}.
             </p>
             {hasGap ? (
               <p>
@@ -357,7 +361,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
             <p>
               <Amount drops={v.assetsAvailable} /> available of <Amount drops={v.assetsTotal} />.
               Redemption {fmtIso(v.redemptionAt)}
-              {v.secondsToRedemption > 0 ? `, in ${duration(v.secondsToRedemption)}` : ''}.
+              {v.secondsToRedemption !== null && v.secondsToRedemption > 0 ? `, in ${duration(v.secondsToRedemption)}` : ''}.
               {Number(redemptionShortfall) > 0
                 ? <> Claims exceed projected liquidity by <Amount drops={redemptionShortfall} />.</>
                 : ' Claims are covered by projected liquidity.'}
@@ -408,7 +412,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
                   {d.score.dimensions.map(dim => (
                     <tr key={dim.key}>
                       <td><b>{creditText(dim.label)}</b></td>
-                      <td className="rt num">{dim.value}{dim.unit === 'pct' ? '%' : dim.unit && dim.unit !== 'none' ? ` ${dim.unit}` : ''}</td>
+                      <td className="rt num">{dim.value}{dim.unit === 'percent' ? '%' : ` ${dim.unit}`}</td>
                       <td className="rt"><GradeLetter grade={dim.grade} size="sm" /></td>
                       <td className="op-says">{sentence(creditText(dim.explain))}</td>
                     </tr>
@@ -443,7 +447,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
                   <tr><td>Largest exposure</td><td className="rt num">{largest ? ratioToPct(largest.shareOfDebtTotal) : 'n.a.'}</td><td className="op-says">share of drawn debt</td></tr>
                   <tr><td>Exposures</td><td className="rt num">{v.loanCount}</td><td className="op-says">{v.distressedLoanCount} non-performing, {overdue} past due</td></tr>
                   <tr><td>Claims at redemption</td><td className="rt num"><Amount drops={d.phaseInfo.claimsAtRedemption} /></td><td className="op-says">against <Amount drops={d.phaseInfo.liquidityAtRedemption} /> liquidity</td></tr>
-                  <tr><td>Projected shortfall</td><td className="rt num"><Amount drops={redemptionShortfall} /></td><td className="op-says">{ratioToPct(d.phaseInfo.shortfallPct)} of claims</td></tr>
+                  <tr><td>Projected shortfall</td><td className="rt num"><Amount drops={redemptionShortfall} /></td><td className="op-says">{percent(d.phaseInfo.shortfallPct)} of claims</td></tr>
                 </tbody>
               </table>
             </div>
@@ -451,6 +455,6 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
         </div>
         <p className="op-foot">This note does not announce a rating action.</p>
       </section>
-    </>
+    </AmountAsset.Provider>
   )
 }
