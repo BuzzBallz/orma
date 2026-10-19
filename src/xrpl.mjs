@@ -277,6 +277,7 @@ export function normaliseLoan(l, closeTime) {
 
   return {
     loanId: l.index ?? l.LedgerIndex ?? null,
+    previousTxnId: l.PreviousTxnID ?? null,
     borrower: l.Borrower,
     loanBrokerId: l.LoanBrokerID,
     status,
