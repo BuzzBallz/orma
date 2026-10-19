@@ -61,7 +61,7 @@ export function buildShareMetadata(o) {
     // --- XLS-89, in the order rippled names them -----------------------------
     ticker: o.ticker,
     name: o.name,
-    icon: o.icon ?? 'https://orma.credit/mark.svg',
+    icon: o.icon ?? 'https://ormaprotocol.com/assets/mark.svg',
     asset_class: 'rwa',
     issuer_name: o.issuerName ?? 'Orma',
     desc: o.desc ?? 'Redeemable claim on a closed-ended private credit facility.',
@@ -88,7 +88,7 @@ export function buildShareMetadata(o) {
       // Says what the endpoint returns without having to call it, so a consumer can
       // decide whether it is worth a request.
       nav_basis: 'assets net of recognised loss, divided by units outstanding',
-      doc: 'https://orma.credit/nav',
+      doc: 'https://ormaprotocol.com/docs/nav-pointer',
     },
   }
   return meta
