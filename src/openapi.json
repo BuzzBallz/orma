@@ -338,6 +338,9 @@
           },
           "503": {
             "$ref": "#/components/responses/Error"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
           }
         }
       }
@@ -415,6 +418,12 @@
                 }
               }
             }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
         }
       }
@@ -521,7 +530,7 @@
         "description": "Value a pledge of this many share units.",
         "schema": {
           "type": "string",
-          "pattern": "^[0-9]+$"
+          "pattern": "^[0-9]{1,30}$"
         }
       }
     },
@@ -560,7 +569,9 @@
                   "SHARE_NOT_TRACKED",
                   "BAD_REQUEST",
                   "BAD_ACCOUNTS",
-                  "BAD_HAIRCUT"
+                  "BAD_HAIRCUT",
+                  "BAD_UNITS",
+                  "BUSY"
                 ]
               },
               "message": {
