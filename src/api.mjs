@@ -18,6 +18,13 @@ import { deriveScoreInputs, buildScore } from './score.mjs'
 import { logger } from './log.mjs'
 
 const log = logger('api')
+/** A pledge is a whole number of share units. Scientific notation would make Decimal write out every digit. */
+const UNITS = /^[0-9]{1,30}$/
+/**
+ * Collateral and resolve walk the ledger (and resolve, a URL) on the reader's own connection, with
+ * no cache. Past this many at once a caller is told to retry, so a flood cannot starve the poll.
+ */
+const MAX_LEDGER_WALKS = 4
 const CONTRACT_VERSION = '1.0.0'
 
 /**
@@ -33,6 +40,7 @@ export function createApi(reader, opts = {}) {
   const historyCache = new Map()
   /** a domain changes when someone edits it, not every four seconds */
   const gateCache = new Map()
+  let ledgerWalks = 0
 
   const stamp = (body) => ({
     serverTime: reader.serverTime ?? new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
@@ -157,8 +165,14 @@ export function createApi(reader, opts = {}) {
         if (!Number.isFinite(haircut) || haircut < 0 || haircut > 100) {
           return fail(400, 'BAD_HAIRCUT', 'haircut: a percentage from 0 to 100', false)
         }
-        const escrows = await findShareEscrows(reader.xrpl, shareMptId, accounts)
-        return send(200, stamp(presentCollateral(escrows, snap, haircut)))
+        if (ledgerWalks >= MAX_LEDGER_WALKS) return fail(503, 'BUSY', 'Too many ledger reads in flight; retry shortly', true)
+        ledgerWalks++
+        try {
+          const escrows = await findShareEscrows(reader.xrpl, shareMptId, accounts)
+          return send(200, stamp(presentCollateral(escrows, snap, haircut)))
+        } finally {
+          ledgerWalks--
+        }
       }
 
       // Broker track record: what they actually did, what the fair sequence would have
@@ -289,6 +303,8 @@ export function createApi(reader, opts = {}) {
       // decimal arithmetic to use this.
       const vm = url.pathname.match(/^\/api\/mpt\/([A-Fa-f0-9]{48})\/nav$/)
       if (vm && method === 'GET') {
+        const units = url.searchParams.get('units')
+        if (units && !UNITS.test(units)) return fail(400, 'BAD_UNITS', 'units: a whole number of share units, at most 30 digits', false)
         const snap = reader.getByShareMpt(vm[1])
         if (!snap) return absent('SHARE_NOT_TRACKED', 'No facility on this service issues that share token')
         let score = null
@@ -300,7 +316,6 @@ export function createApi(reader, opts = {}) {
           buildVersion: reader.xrpl?.buildVersion ?? null,
           asOf: reader.serverTime ?? null, ledgerIndex: reader.ledgerIndex ?? null,
         })
-        const units = url.searchParams.get('units')
         if (units) body.pledge = valuePledge(body, units)
         return send(200, stamp(body), { cors: true })
       }
@@ -314,11 +329,18 @@ export function createApi(reader, opts = {}) {
       // a useful answer to give a lender and a far better one than an exception.
       const rm = url.pathname.match(/^\/api\/mpt\/([A-Fa-f0-9]{48})\/resolve$/)
       if (rm && method === 'GET') {
-        const resolve = url.searchParams.get('resolve') !== 'false'
-        const out = await resolveFromIssuance(reader.xrpl, rm[1].toUpperCase(), { resolve })
         const units = url.searchParams.get('units')
-        if (units && out.nav) out.pledge = valuePledge(out.nav, units)
-        return send(200, stamp(out), { cors: true })
+        if (units && !UNITS.test(units)) return fail(400, 'BAD_UNITS', 'units: a whole number of share units, at most 30 digits', false)
+        if (ledgerWalks >= MAX_LEDGER_WALKS) return fail(503, 'BUSY', 'Too many ledger reads in flight; retry shortly', true)
+        ledgerWalks++
+        try {
+          const resolve = url.searchParams.get('resolve') !== 'false'
+          const out = await resolveFromIssuance(reader.xrpl, rm[1].toUpperCase(), { resolve })
+          if (units && out.nav) out.pledge = valuePledge(out.nav, units)
+          return send(200, stamp(out), { cors: true })
+        } finally {
+          ledgerWalks--
+        }
       }
 
       // Demo 1. `demo/` is TRACKED and `fixtures/` is not, so the tracked capture must be

@@ -72,6 +72,16 @@ eq('an account that is not an address', (await call('GET', `/api/vaults/${ID}/co
 eq('a negative haircut', (await call('GET', `/api/vaults/${ID}/collateral?haircut=-1`)).code, 'BAD_HAIRCUT')
 eq('a haircut that is not a number', (await call('GET', `/api/vaults/${ID}/collateral?haircut=abc`)).code, 'BAD_HAIRCUT')
 
+// A pledge in scientific notation would have Decimal write out every digit: refused before any work.
+eq('units in scientific notation, on the share valuation', (await call('GET', `/api/mpt/${MPT}/nav?units=1e9999999`)).code, 'BAD_UNITS')
+eq('and on the diagnostic', (await call('GET', `/api/mpt/${MPT}/resolve?units=1e9999999`)).code, 'BAD_UNITS')
+
+// Five resolves at once against a slow ledger: four run, the fifth is told to retry.
+reader.xrpl = { mptIssuance: () => new Promise((_, reject) => setTimeout(() => reject(new Error('slow')), 300)) }
+const burst = await Promise.all(Array.from({ length: 5 }, () => call('GET', `/api/mpt/${MPT}/resolve`)))
+eq('a burst of ledger walks is capped', burst.map((r) => r.status).sort(), [200, 200, 200, 200, 503])
+eq('and the cap lets go once they finish', (await call('GET', `/api/mpt/${MPT}/resolve`)).status, 200)
+
 await api.close()
 console.log(bad ? `\n  ${bad} FAILED` : '\n  all ok')
 process.exitCode = bad ? 1 : 0  // not process.exit(): on Windows it aborts while the closed sockets are still closing
