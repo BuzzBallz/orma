@@ -136,6 +136,9 @@ function Desk() {
   const contest = usePoll<OracleContest>(path === '/facility' ? '/api/oracle-aggregate' : null, 60000)
 
   const primary = path === '/' ? vaults : detail
+  // The figures can also be old while the page is current: the service answered, but its last
+  // read of this facility failed and it is serving the one before.
+  const readStale = path !== '/' && Boolean(detail.data?.vault.freshness?.stale)
   // The verification screen is not scoped to a facility, so it dates itself from its own
   // capture. Only the DATE: staleness still comes from `primary`, because a capture is a
   // fixed historical artifact and "stale" means a live figure stopped arriving.
@@ -271,7 +274,7 @@ function Desk() {
         onSelect={select}
       />
 
-      {primary.stale && path !== '/evidence' && <StaleBar ageMs={primary.ageMs} />}
+      {(primary.stale || readStale) && path !== '/evidence' && <StaleBar ageMs={Math.max(primary.ageMs, (detail.data?.vault.freshness?.ageSeconds ?? 0) * 1000)} />}
 
       <main id="main" className="page" tabIndex={-1}>
         <div key={path} className={'view' + (quiet.current ? '' : ' enter')} data-wait={waiting || undefined}>{body()}</div>
