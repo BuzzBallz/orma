@@ -75,9 +75,12 @@ export function createApi(reader, opts = {}) {
     }
     const method = req.method === 'HEAD' ? 'GET' : req.method
     const key = `${method} ${url.pathname}`
-    res.setHeader('Access-Control-Allow-Origin', '*')
-    res.setHeader('Access-Control-Allow-Headers', '*')
-    res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,POST,OPTIONS')
+    // Reads are open to any origin. Writes are not: no POST is ever allowed cross-origin.
+    if (req.method !== 'POST') {
+      res.setHeader('Access-Control-Allow-Origin', '*')
+      res.setHeader('Access-Control-Allow-Headers', '*')
+      res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,OPTIONS')
+    }
     res.setHeader('Cache-Control', 'no-store')
     if (req.method === 'OPTIONS') return res.writeHead(204).end()
 
@@ -86,7 +89,6 @@ export function createApi(reader, opts = {}) {
       // Only the two valuation routes opt in. They exist to be called by a party with no
       // relationship to us -- that is the entire point of putting the URL in a token --
       // and they serve read-only public ledger state, so there is nothing to protect.
-      // The rest of the API stays same-origin.
       if (o.cors) {
         headers['Access-Control-Allow-Origin'] = '*'
         headers['Cache-Control'] = 'public, max-age=4'
@@ -348,6 +350,9 @@ export function createApi(reader, opts = {}) {
       // Operator routes. Bound to loopback unless a key is set: an endpoint that can
       // default a loan should not be reachable from venue wifi in a room of hackers.
       if (url.pathname.startsWith('/api/demo/') && req.method === 'POST') {
+        // A browser always sends Origin on a POST, an operator's script never does. Without this,
+        // any page open on the presenter's machine could post here from loopback.
+        if (req.headers.origin) return fail(403, 'FORBIDDEN', 'operator routes refuse browser requests', false)
         const allowed = req.socket.remoteAddress?.includes('127.0.0.1')
           || req.socket.remoteAddress === '::1'
           || (process.env.DEMO_KEY && req.headers['x-demo-key'] === process.env.DEMO_KEY)

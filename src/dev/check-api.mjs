@@ -58,6 +58,12 @@ const raw = await new Promise((resolve) => {
 eq('a malformed request target', raw, '400')
 eq('and the server still answers', (await call('GET', '/api/health')).status, 200)
 
+// Operator routes: a browser's POST carries Origin and is refused before anything runs.
+const post = async (headers) => (await fetch(base + '/api/demo/default', { method: 'POST', headers, body: 'x' })).status
+eq('an operator POST from a page', await post({ origin: 'https://evil.example', 'content-type': 'text/plain' }), 403)
+eq('an operator POST from a script, no such action', await post({}), 404)
+eq('a preflight no longer offers POST', (await fetch(base + '/api/health', { method: 'OPTIONS' })).headers.get('access-control-allow-methods'), 'GET,HEAD,OPTIONS')
+
 await api.close()
 console.log(bad ? `\n  ${bad} FAILED` : '\n  all ok')
 process.exitCode = bad ? 1 : 0  // not process.exit(): on Windows it aborts while the closed sockets are still closing
