@@ -27,7 +27,8 @@ export function PledgeResolution({ r }: { r: Resolution | null }) {
 
   const nav = r.nav
   const conf = r.metadata?.conformance
-  const pledge = nav?.pledge ?? r.pledge
+  // The pledge this server valued, never one the third-party document claims for itself.
+  const pledge = r.pledge
 
   return (
     <Exhibit title="Exhibit 5 · What a second lender can establish alone">
@@ -95,10 +96,11 @@ export function PledgeResolution({ r }: { r: Resolution | null }) {
         </>
       )}
 
-      {nav && (
+      {/* The document came from a URL the share's issuer chose: only what it actually carries is drawn. */}
+      {nav?.provenance && (
         <p className="caption">
-          Recompute: <b className="num">({dropsToXrp(nav.provenance.assetsTotal)} − {dropsToXrp(nav.provenance.lossUnrealized)}) ÷ {dropsToXrp(nav.provenance.unitsOutstanding)} = {nav.unitValue.held}</b>,
-          ledger <b className="num">{nav.ledgerIndex ?? '—'}</b>.
+          Recompute: <b className="num">({dropsToXrp(nav.provenance.assetsTotal)} − {dropsToXrp(nav.provenance.lossUnrealized)}) ÷ {dropsToXrp(nav.provenance.unitsOutstanding)} = {String(nav.unitValue.held)}</b>,
+          ledger <b className="num">{String(nav.ledgerIndex ?? '—')}</b>.
         </p>
       )}
     </Exhibit>
