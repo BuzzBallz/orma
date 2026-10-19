@@ -72,6 +72,9 @@ function Note({ heading, watch, said, facts, choices, onBack }: {
   )
 }
 
+// One empty list, so an effect that depends on the rows does not re-run on every render before they arrive.
+const NO_ROWS: VaultRow[] = []
+
 function Desk() {
   const { path, vaultId, navigate } = useRoute()
 
@@ -108,7 +111,7 @@ function Desk() {
   const vaults = usePoll<VaultsResponse>('/api/vaults', path === '/' ? POLL_MS : 15000, slow)
   const detail = usePoll<Detail>(ref ? `/api/vaults/${ref}` : null, POLL_MS, slow)
 
-  const rows = vaults.data?.vaults ?? []
+  const rows = vaults.data?.vaults ?? NO_ROWS
 
   // The keys still work for anyone who finds them; they are not advertised as a feature.
   useEffect(() => {
