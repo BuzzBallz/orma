@@ -59,6 +59,8 @@ function Desk() {
   const go = useCallback((p: RoutePath, id?: string | null) => {
     quiet.current = false
     navigate(p, id)
+    // The new desk is where a keyboard or screen-reader user now is; focus stayed on the old link.
+    document.getElementById('main')?.focus({ preventScroll: true })
   }, [navigate])
   // Back and forward are the browser's own navigation, often a key or an edge swipe that
   // already animates: the desk they land on stays still. Capture phase, so this runs before
