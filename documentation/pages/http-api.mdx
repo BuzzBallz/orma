@@ -122,7 +122,12 @@ distressed loans and reports par.
 | `NO_BROKER` | 404 | false | the vault has no `LoanBroker`, so there is no conduct to reconstruct |
 | `SHARE_NOT_TRACKED` | 404 | false | no facility on this service issues that MPT, once every tracked facility has been read or found not to exist |
 | `NOT_FOUND` | 404 | false | no route matched, or the demo capture file is missing |
-| `FORBIDDEN` | 403 | false | an operator `POST` from something other than loopback |
+| `FORBIDDEN` | 403 | false | an operator `POST` from something other than loopback, or from a browser page |
+| `BAD_REQUEST` | 400 | false | a request target the URL parser rejects |
+| `BAD_ACCOUNTS` | 400 | false | collateral `accounts` names more than 10 accounts, or one that is not a classic address |
+| `BAD_HAIRCUT` | 400 | false | collateral `haircut` is not a number from 0 to 100 |
+| `BAD_UNITS` | 400 | false | `units` on an MPT route is not a whole number of at most 30 digits |
+| `BUSY` | 503 | true | four collateral or resolve requests are already reading the ledger; retry shortly |
 | `INTERNAL` | 500 | true | anything unhandled |
 
 Every route that answers `GET` also answers `HEAD`, with the same status and headers and no body, so a
@@ -132,11 +137,12 @@ A vault id must match `[A-Fa-f0-9]{64}` and an MPT issuance id `[A-Fa-f0-9]{48}`
 accepted and upper-cased before lookup. A path that matches no pattern returns
 `{"error":{"code":"NOT_FOUND","message":"No route GET /api/nope","retryable":false}}`.
 
-### 6. CORS, and which two routes are deliberately public
+### 6. CORS, and which three routes are deliberately public
 
-Every response carries `Access-Control-Allow-Origin: *`, `Access-Control-Allow-Headers: *` and
-`Access-Control-Allow-Methods: GET,POST,OPTIONS`, set unconditionally at the top of the request
-handler so the local demo frontend works from any origin. `OPTIONS` returns `204`.
+Every `GET`, `HEAD` and `OPTIONS` response carries `Access-Control-Allow-Origin: *`,
+`Access-Control-Allow-Headers: *` and `Access-Control-Allow-Methods: GET,HEAD,OPTIONS`, so the
+frontend works from any origin. `OPTIONS` returns `204`. A `POST` gets none of them, and an operator
+`POST` that carries an `Origin` header, which a browser always sends, is refused `403` before it runs.
 
 The meaningful distinction is caching, and it is opt-in per route. The default is
 `Cache-Control: no-store`. Three routes pass `{ cors: true }` and get `Cache-Control: public,

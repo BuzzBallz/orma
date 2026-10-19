@@ -7,6 +7,7 @@
  */
 import { createServer } from 'node:http'
 import { readFileSync, existsSync } from 'node:fs'
+import { isValidClassicAddress } from 'xrpl'
 import { presentVault, presentRow, setLabel } from './present.mjs'
 import { findShareEscrows, presentCollateral } from './collateral.mjs'
 import { readBrokerHistory, analyseOrdering, reputation, recommendOrder } from './history.mjs'
@@ -17,6 +18,13 @@ import { deriveScoreInputs, buildScore } from './score.mjs'
 import { logger } from './log.mjs'
 
 const log = logger('api')
+/** A pledge is a whole number of share units. Scientific notation would make Decimal write out every digit. */
+const UNITS = /^[0-9]{1,30}$/
+/**
+ * Collateral and resolve walk the ledger (and resolve, a URL) on the reader's own connection, with
+ * no cache. Past this many at once a caller is told to retry, so a flood cannot starve the poll.
+ */
+const MAX_LEDGER_WALKS = 4
 const CONTRACT_VERSION = '1.0.0'
 
 /**
@@ -32,6 +40,7 @@ export function createApi(reader, opts = {}) {
   const historyCache = new Map()
   /** a domain changes when someone edits it, not every four seconds */
   const gateCache = new Map()
+  let ledgerWalks = 0
 
   const stamp = (body) => ({
     serverTime: reader.serverTime ?? new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
@@ -64,12 +73,23 @@ export function createApi(reader, opts = {}) {
     })
 
   const server = createServer(async (req, res) => {
-    const url = new URL(req.url, `http://localhost:${port}`)
+    // Outside the try below, a target such as "//[" threw from this async handler and took the
+    // process down with it.
+    let url
+    try {
+      url = new URL(req.url, `http://localhost:${port}`)
+    } catch {
+      res.writeHead(400, { 'Content-Type': 'application/json' })
+      return res.end(JSON.stringify({ error: { code: 'BAD_REQUEST', message: 'malformed request target', retryable: false } }))
+    }
     const method = req.method === 'HEAD' ? 'GET' : req.method
     const key = `${method} ${url.pathname}`
-    res.setHeader('Access-Control-Allow-Origin', '*')
-    res.setHeader('Access-Control-Allow-Headers', '*')
-    res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,POST,OPTIONS')
+    // Reads are open to any origin. Writes are not: no POST is ever allowed cross-origin.
+    if (req.method !== 'POST') {
+      res.setHeader('Access-Control-Allow-Origin', '*')
+      res.setHeader('Access-Control-Allow-Headers', '*')
+      res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,OPTIONS')
+    }
     res.setHeader('Cache-Control', 'no-store')
     if (req.method === 'OPTIONS') return res.writeHead(204).end()
 
@@ -78,7 +98,6 @@ export function createApi(reader, opts = {}) {
       // Only the two valuation routes opt in. They exist to be called by a party with no
       // relationship to us -- that is the entire point of putting the URL in a token --
       // and they serve read-only public ledger state, so there is nothing to protect.
-      // The rest of the API stays same-origin.
       if (o.cors) {
         headers['Access-Control-Allow-Origin'] = '*'
         headers['Cache-Control'] = 'public, max-age=4'
@@ -136,14 +155,24 @@ export function createApi(reader, opts = {}) {
         if (!shareMptId) return fail(404, 'NO_SHARE_MPT', 'vault has no share issuance', false)
         // No reverse index exists from an MPT issuance to the escrows holding it, so a
         // lender must be told which accounts to look at. Reported as a feedback item.
-        const accounts = [
-          ...(url.searchParams.get('accounts')?.split(',').filter(Boolean) ?? []),
-          ...(opts.watchAccounts ?? []),
-          snap.vault.owner,
-        ]
+        // Each account costs a ledger round trip, so a caller names at most ten, and real ones.
+        const asked = url.searchParams.get('accounts')?.split(',').filter(Boolean) ?? []
+        if (asked.length > 10 || !asked.every(isValidClassicAddress)) {
+          return fail(400, 'BAD_ACCOUNTS', 'accounts: at most 10 classic addresses, comma-separated', false)
+        }
+        const accounts = [...asked, ...(opts.watchAccounts ?? []), snap.vault.owner]
         const haircut = Number(url.searchParams.get('haircut') ?? 0)
-        const escrows = await findShareEscrows(reader.xrpl, shareMptId, accounts)
-        return send(200, stamp(presentCollateral(escrows, snap, haircut)))
+        if (!Number.isFinite(haircut) || haircut < 0 || haircut > 100) {
+          return fail(400, 'BAD_HAIRCUT', 'haircut: a percentage from 0 to 100', false)
+        }
+        if (ledgerWalks >= MAX_LEDGER_WALKS) return fail(503, 'BUSY', 'Too many ledger reads in flight; retry shortly', true)
+        ledgerWalks++
+        try {
+          const escrows = await findShareEscrows(reader.xrpl, shareMptId, accounts)
+          return send(200, stamp(presentCollateral(escrows, snap, haircut)))
+        } finally {
+          ledgerWalks--
+        }
       }
 
       // Broker track record: what they actually did, what the fair sequence would have
@@ -274,6 +303,8 @@ export function createApi(reader, opts = {}) {
       // decimal arithmetic to use this.
       const vm = url.pathname.match(/^\/api\/mpt\/([A-Fa-f0-9]{48})\/nav$/)
       if (vm && method === 'GET') {
+        const units = url.searchParams.get('units')
+        if (units && !UNITS.test(units)) return fail(400, 'BAD_UNITS', 'units: a whole number of share units, at most 30 digits', false)
         const snap = reader.getByShareMpt(vm[1])
         if (!snap) return absent('SHARE_NOT_TRACKED', 'No facility on this service issues that share token')
         let score = null
@@ -285,7 +316,6 @@ export function createApi(reader, opts = {}) {
           buildVersion: reader.xrpl?.buildVersion ?? null,
           asOf: reader.serverTime ?? null, ledgerIndex: reader.ledgerIndex ?? null,
         })
-        const units = url.searchParams.get('units')
         if (units) body.pledge = valuePledge(body, units)
         return send(200, stamp(body), { cors: true })
       }
@@ -299,11 +329,18 @@ export function createApi(reader, opts = {}) {
       // a useful answer to give a lender and a far better one than an exception.
       const rm = url.pathname.match(/^\/api\/mpt\/([A-Fa-f0-9]{48})\/resolve$/)
       if (rm && method === 'GET') {
-        const resolve = url.searchParams.get('resolve') !== 'false'
-        const out = await resolveFromIssuance(reader.xrpl, rm[1].toUpperCase(), { resolve })
         const units = url.searchParams.get('units')
-        if (units && out.nav) out.pledge = valuePledge(out.nav, units)
-        return send(200, stamp(out), { cors: true })
+        if (units && !UNITS.test(units)) return fail(400, 'BAD_UNITS', 'units: a whole number of share units, at most 30 digits', false)
+        if (ledgerWalks >= MAX_LEDGER_WALKS) return fail(503, 'BUSY', 'Too many ledger reads in flight; retry shortly', true)
+        ledgerWalks++
+        try {
+          const resolve = url.searchParams.get('resolve') !== 'false'
+          const out = await resolveFromIssuance(reader.xrpl, rm[1].toUpperCase(), { resolve })
+          if (units && out.nav) out.pledge = valuePledge(out.nav, units)
+          return send(200, stamp(out), { cors: true })
+        } finally {
+          ledgerWalks--
+        }
       }
 
       // Demo 1. `demo/` is TRACKED and `fixtures/` is not, so the tracked capture must be
@@ -340,6 +377,9 @@ export function createApi(reader, opts = {}) {
       // Operator routes. Bound to loopback unless a key is set: an endpoint that can
       // default a loan should not be reachable from venue wifi in a room of hackers.
       if (url.pathname.startsWith('/api/demo/') && req.method === 'POST') {
+        // A browser always sends Origin on a POST, an operator's script never does. Without this,
+        // any page open on the presenter's machine could post here from loopback.
+        if (req.headers.origin) return fail(403, 'FORBIDDEN', 'operator routes refuse browser requests', false)
         const allowed = req.socket.remoteAddress?.includes('127.0.0.1')
           || req.socket.remoteAddress === '::1'
           || (process.env.DEMO_KEY && req.headers['x-demo-key'] === process.env.DEMO_KEY)
