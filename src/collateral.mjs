@@ -18,7 +18,7 @@
  * reality, and the impairment that caused it emitted PreviousFields:{} so a
  * metadata-diffing indexer never saw it.
  */
-import { num, str, Decimal } from './num.mjs'
+import { num, str, Decimal, rippleToIso } from './num.mjs'
 import { logger } from './log.mjs'
 
 const log = logger('collateral')
@@ -62,8 +62,9 @@ export async function findShareEscrows(xrpl, shareMptId, accounts) {
         pledgor: o.Account,
         beneficiary: o.Destination ?? null,
         shares: num(amt.value),
-        finishAfter: o.FinishAfter ?? null,
-        cancelAfter: o.CancelAfter ?? null,
+        // ISO like every other time on the API: a Ripple-epoch integer read as Unix time is 30 years early.
+        finishAfter: rippleToIso(o.FinishAfter),
+        cancelAfter: rippleToIso(o.CancelAfter),
         condition: o.Condition ?? null,
         // Same reasoning as the oracle object: the explorer resolves transactions, not
         // bare ledger indexes. For an escrow that has not been finished or cancelled this
