@@ -25,6 +25,7 @@ const UNITS = /^[0-9]{1,30}$/
  * no cache. Past this many at once a caller is told to retry, so a flood cannot starve the poll.
  */
 const MAX_LEDGER_WALKS = 4
+const OPENAPI = JSON.parse(readFileSync(new URL('./openapi.json', import.meta.url), 'utf8'))
 const CONTRACT_VERSION = '1.0.0'
 
 /**
@@ -128,6 +129,8 @@ export function createApi(reader, opts = {}) {
       if (key === 'GET /api/methodology') {
         return send(200, { methodVersion: METHOD_VERSION, ladder: LADDER, realisedLoss: REALISED_LOSS_BANDS, managerConduct: CONDUCT })
       }
+      // The machine-readable contract, for a client or an agent that should not have to read prose.
+      if (key === 'GET /api/openapi.json') return send(200, OPENAPI, { cors: true })
 
       if (key === 'GET /api/vaults') {
         const vaults = reader.all().map(rowFor)

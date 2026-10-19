@@ -363,6 +363,7 @@ GET  /api/mpt/:mptIssuanceId/resolve      # CORS-open
 GET  /api/indexer-race                    # captures from the event
 GET  /api/oracle-aggregate
 GET  /api/demo/state
+GET  /api/openapi.json                    # OpenAPI 3.1; src/mcp.mjs serves the same readings as MCP tools
 ```
 
 ### Deploying

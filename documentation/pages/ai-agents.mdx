@@ -254,6 +254,36 @@ wider API, which has no such write-once constraint. See [the NAV pointer](/nav-p
   discovery needs a list of accounts to look at. That is reported as a protocol feedback item,
   not solved here.
 
+### As an MCP server
+
+`src/mcp.mjs` exposes the same readings as MCP tools over stdio, so an agent reads a facility
+without integration code. It holds no key and signs nothing: each tool is one `GET` against
+`ORMA_API`, and an argument that is not a 64- or 48-hex id, or a count of units, is refused before a
+request is made. No dependency: the server speaks JSON-RPC itself.
+
+```json
+{
+  "mcpServers": {
+    "orma": {
+      "command": "node",
+      "args": ["/path/to/orma/src/mcp.mjs"],
+      "env": { "ORMA_API": "https://orma-api.onrender.com" }
+    }
+  }
+}
+```
+
+| tool | route |
+|---|---|
+| `list_facilities` | `GET /api/vaults` |
+| `get_valuation` | `GET /api/vaults/:vaultId/nav` |
+| `get_valuation_by_share` | `GET /api/mpt/:mptId/nav?units=` |
+| `get_facility` | `GET /api/vaults/:vaultId` |
+| `get_manager_conduct` | `GET /api/vaults/:vaultId/broker-history` |
+
+A client that prefers to generate its own: `GET /api/openapi.json` is the OpenAPI 3.1 description
+of every route.
+
 ---
 
 ## Part 2: building on Orma with a coding assistant
