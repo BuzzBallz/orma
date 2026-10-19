@@ -3,8 +3,9 @@ import './app.css'
 import { API_MIXED_ORIGIN, SUSPECT_AFTER_FAILS, SUSPECT_BACKOFF_MS } from './lib/api'
 import { usePoll } from './lib/usePoll'
 import { facilityName } from './lib/credit'
-import { DESKS, follow, useRoute, type RoutePath } from './lib/useRoute'
-import type { BrokerHistory, Collateral, Gate, Health, IndexerRace, MethodRules, NavHistory, OracleContest, Resolution, VaultDetail as Detail, VaultsResponse } from './lib/types'
+import { DESKS, follow, hrefFor, useRoute, type RoutePath } from './lib/useRoute'
+import type { BrokerHistory, Collateral, Gate, Health, IndexerRace, MethodRules, NavHistory, OracleContest, Resolution, VaultDetail as Detail, VaultRow, VaultsResponse } from './lib/types'
+import { GradeLetter } from './components/GradeLetter'
 import { HeaderBar } from './components/HeaderBar'
 import { Footer } from './components/Footer'
 import { StaleBar } from './components/StaleBar'
@@ -34,15 +35,29 @@ function waitingWords(code: string | null): string {
   return 'This facility is on file. No figure is shown until one is received.'
 }
 
-function Note({ heading, watch, said, facts, onBack }: {
+function Note({ heading, watch, said, facts, choices, onBack }: {
   heading: string; watch?: boolean; said: ReactNode
   facts: [string, ReactNode][]
+  /** Facilities to open straight from the note, on the desk it stands on. */
+  choices?: { desk: RoutePath; rows: VaultRow[]; onChoose: (vaultId: string) => void }
   onBack: () => void
 }) {
   return (
     <div className={'state' + (watch ? ' state-watch' : '')}>
       <h2 className="t-heading-s">{heading}</h2>
       <p className="t-body-s dim">{said}</p>
+      {choices && choices.rows.length > 0 && (
+        <ul className="state-choices">
+          {choices.rows.map(v => (
+            <li key={v.vaultId}>
+              <a href={hrefFor(choices.desk, v.vaultId)} onClick={e => follow(e, () => choices.onChoose(v.vaultId))}>
+                <span>{facilityName(v)}</span>
+                <GradeLetter grade={v.grade} size="sm" />
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
       <a className="lnk" href="/" onClick={e => follow(e, onBack)}>
         <ArrowLeft size={16} strokeWidth={1.75} aria-hidden /> Portfolio
       </a>
@@ -215,9 +230,10 @@ function Desk() {
           <Note
             heading="No facility selected"
             said={path === '/facility'
-              ? <>A credit opinion covers one facility. Choose one from the portfolio.</>
-              : <>The calendar covers one facility. Choose one from the portfolio.</>}
-            facts={rows.length ? [['Facilities on File', String(rows.length)]] : []}
+              ? <>A credit opinion covers one facility. Choose one, weakest first.</>
+              : <>The calendar covers one facility. Choose one, weakest first.</>}
+            facts={[]}
+            choices={{ desk: path, rows, onChoose: id => go(path, id) }}
             onBack={back}
           />
         </Placeholder>

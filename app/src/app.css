@@ -394,6 +394,16 @@ main:focus{ outline: none; }
 .state-watch h2{ color: var(--color-watch); }
 .state .lnk{ margin-left: -2px; }
 .state .facts{ align-self: stretch; }
+/* The facilities on file, one tap from the empty desk instead of a count and a trip back. */
+.state-choices{ align-self: stretch; list-style: none; margin: var(--space-2) 0; padding: 0; }
+.state-choices a{
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4);
+  min-height: var(--size-control); padding: var(--space-3) var(--space-2); margin-inline: calc(-1 * var(--space-2));
+  border-top: 1px solid var(--color-line); border-radius: var(--radius-sm);
+  font: 500 15px/1.4 var(--font-sans); color: var(--color-text); text-decoration: none;
+}
+.state-choices li:last-child a{ border-bottom: 1px solid var(--color-line); }
+@media (hover: hover) and (pointer: fine){ .state-choices a:hover{ background: var(--color-bg-sunken); } }
 .state .facts > div{ display: flex; justify-content: space-between; gap: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--color-line); }
 .state .facts dt{ font: 500 13px/1.4 var(--font-sans); color: var(--color-text-3); }
 .state .facts dd{ font: 500 16px/1.5 var(--font-mono); }
