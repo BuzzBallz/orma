@@ -48,7 +48,8 @@ function KeyFigures({ v, asOf, onOpen }: {
           <dd>{v && i >= 0 ? <><GradeLetter grade={v.grade} size="sm" /> · {i + 1} of {GRADE_LADDER.length}</> : '—'}</dd>
         </div>
       </dl>
-      <span className="kf-stamp t-fig-s mute">As of {asOf ? fmtIso(asOf) : '—'}</span>
+      {/* This facility's own reading: when its last read failed, that is older than the book's stamp. */}
+      <span className="kf-stamp t-fig-s mute">As of {fmtIso(v?.freshness?.readAt ?? asOf)}{v?.freshness?.stale ? ', last received' : ''}</span>
     </section>
   )
 }
@@ -68,7 +69,10 @@ function Row({ v, onOpen }: { v: VaultRow; onOpen: (vaultId: string) => void }) 
         <span className="frow-grade"><GradeLetter grade={v.grade} size="xl" /></span>
         <span className="frow-id">
           <span className="frow-name">{facilityName(v)}</span>
-          <span className="frow-meta">{n} exposure{n === 1 ? '' : 's'} · {v.distressedLoanCount} non-performing</span>
+          <span className="frow-meta">
+            {n} exposure{n === 1 ? '' : 's'} · {v.distressedLoanCount} non-performing
+            {v.freshness?.stale && <> · as of {fmtIso(v.freshness.readAt)}</>}
+          </span>
         </span>
         <span className="frow-rh">
           <span className="rep">{v.navNaive}</span><span className="vs">vs</span><span className="held">{v.navCorrect}</span>

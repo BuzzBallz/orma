@@ -82,7 +82,7 @@ export function Event({ d, picker }: { d: VaultDetail; picker?: ReactNode }) {
       <header className="wrap ev-head">
         <div className="ev-head-row">
           <h1 className="t-display-l">Next Event</h1>
-          <span className="t-fig-s mute">Figures Received {fmtIso(d.serverTime)}</span>
+          <span className="t-fig-s mute">Figures Received {fmtIso(d.vault.freshness?.readAt ?? d.serverTime)}</span>
         </div>
         <p className="t-heading-m dim">{facilityName(v)}</p>
         {picker && <div className="op-pick">{picker}</div>}

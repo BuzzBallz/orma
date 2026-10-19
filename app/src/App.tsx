@@ -136,9 +136,6 @@ function Desk() {
   const contest = usePoll<OracleContest>(path === '/facility' ? '/api/oracle-aggregate' : null, 60000)
 
   const primary = path === '/' ? vaults : detail
-  // The figures can also be old while the page is current: the service answered, but its last
-  // read of this facility failed and it is serving the one before.
-  const readStale = path !== '/' && Boolean(detail.data?.vault.freshness?.stale)
   // The verification screen is not scoped to a facility, so it dates itself from its own
   // capture. Only the DATE: staleness still comes from `primary`, because a capture is a
   // fixed historical artifact and "stale" means a live figure stopped arriving.
@@ -149,6 +146,15 @@ function Desk() {
   // it names the facility in the address bar, never one facility's figures under another's.
   const own = detail.data && vaultId && detail.data.vault.vaultId.toUpperCase() === vaultId.toUpperCase()
     ? detail.data : null
+  // The figures can also be old while the page is current: the service answered, but its last
+  // read of a facility failed and it is serving the one before. On the book, any facility.
+  const readAge = path === '/'
+    ? Math.max(0, ...rows.map(r => (r.freshness?.stale ? r.freshness.ageSeconds : 0)))
+    : own?.vault.freshness?.stale ? own.vault.freshness.ageSeconds : 0
+  // Only a desk showing live figures gets the age bar: on Methodology, or on a facility desk with
+  // no facility, the last poll's age is no figure's age.
+  const live = path === '/' || ((path === '/facility' || path === '/event') && own !== null)
+  const ageBar = live && ((path === '/' ? vaults.stale : detail.stale) || readAge > 0)
   // A facility still in flight: after a click its frame is held invisible for a moment
   // (app.css, .enter[data-wait]), so a quick answer enters once instead of replacing it mid-rise.
   const waiting = (path === '/facility' || path === '/event') && !!vaultId && !own
@@ -274,7 +280,7 @@ function Desk() {
         onSelect={select}
       />
 
-      {(primary.stale || readStale) && path !== '/evidence' && <StaleBar ageMs={Math.max(primary.ageMs, (detail.data?.vault.freshness?.ageSeconds ?? 0) * 1000)} />}
+      {ageBar && <StaleBar ageMs={Math.max(primary.ageMs, readAge * 1000)} />}
 
       <main id="main" className="page" tabIndex={-1}>
         <div key={path} className={'view' + (quiet.current ? '' : ' enter')} data-wait={waiting || undefined}>{body()}</div>

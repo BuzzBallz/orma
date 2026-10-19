@@ -141,7 +141,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
         <div className="op-kind">
           <span className="t-label-s mute">Credit Opinion</span>
           <span className="t-fig-s mute">
-            {d.serverTime ? <>Figures Received {fmtIso(d.serverTime)}</> : <>Figures Withheld</>}
+            {d.serverTime ? <>Figures Received {fmtIso(d.vault.freshness?.readAt ?? d.serverTime)}</> : <>Figures Withheld</>}
           </span>
         </div>
         <h1 className="t-display-l">{name}</h1>
