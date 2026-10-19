@@ -319,7 +319,26 @@ function Desk() {
   )
 }
 
+/**
+ * On paper every exhibit is open: a folded one would print as its title alone. The ones opened for
+ * printing fold again afterwards, so the screen comes back as the reader left it.
+ */
+function usePrintOpensExhibits() {
+  useEffect(() => {
+    let opened: HTMLDetailsElement[] = []
+    const before = () => {
+      opened = [...document.querySelectorAll('details:not([open])')] as HTMLDetailsElement[]
+      opened.forEach(d => { d.open = true })
+    }
+    const after = () => { opened.forEach(d => { d.open = false }); opened = [] }
+    addEventListener('beforeprint', before)
+    addEventListener('afterprint', after)
+    return () => { removeEventListener('beforeprint', before); removeEventListener('afterprint', after) }
+  }, [])
+}
+
 export default function App() {
+  usePrintOpensExhibits()
   return (
     <WalletProvider>
       <Desk />

@@ -927,8 +927,25 @@ main:focus{ outline: none; }
    PRINT — the opinion on paper
    ============================================================ */
 @media print{
+  /* Paper is light whatever the screen was: a dark-mode reader printed beige text on white. */
+  :root{
+    color-scheme: light;
+    --color-bg: #FFFFFF; --color-bg-raised: #FFFFFF; --color-bg-sunken: #F1F1EE;
+    --color-bg-inverse: #121418; --color-text: #121418; --color-text-2: #3A3F47; --color-text-3: #5A606A;
+    --color-text-inverse: #FFFFFF; --color-loss: #9E2A1A; --color-watch: #74500B; --color-ok: #24633F;
+    --color-line: #C9CCD1; --color-rule: #121418; --color-brand-gold: #C9A45F; --scroll-edge: transparent;
+  }
   .mast, .foot, .feedbar, .skip, .op-pick, .menu-btn{ display: none !important; }
   body{ background: #fff; color: #000; }
+  /* A table prints whole, not inside a scroller. */
+  .tbl-wrap{ overflow: visible; background: none; }
+  .op-tbl{ min-width: 0; }
+  /* Keep a heading with what follows it, and a row, a figure or a short exhibit in one piece. */
+  h1, h2, h3, .exh > summary{ break-after: avoid; }
+  tr, .op-glance > div, .navc svg, .state{ break-inside: avoid; }
+  .exh-chev{ display: none; }
+  /* The chart is drawn for the screen it was opened on; on paper it fills the page width instead. */
+  .navc svg{ width: 100%; }
   .op-letterhead{ display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font: 600 14px/1 var(--font-serif); }
   .op-lh-rule{ flex: 1; border-top: 1px solid #000; }
 }
