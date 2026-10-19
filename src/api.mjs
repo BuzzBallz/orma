@@ -17,6 +17,7 @@ import { deriveScoreInputs, buildScore } from './score.mjs'
 import { logger } from './log.mjs'
 
 const log = logger('api')
+const OPENAPI = JSON.parse(readFileSync(new URL('./openapi.json', import.meta.url), 'utf8'))
 const CONTRACT_VERSION = '1.0.0'
 
 /**
@@ -104,6 +105,9 @@ export function createApi(reader, opts = {}) {
 
     try {
       if (key === 'GET /api/health') return send(200, health())
+
+      // The machine-readable contract, for a client or an agent that should not have to read prose.
+      if (key === 'GET /api/openapi.json') return send(200, OPENAPI, { cors: true })
 
       if (key === 'GET /api/vaults') {
         const vaults = reader.all().map(rowFor)
