@@ -262,7 +262,7 @@ function Desk() {
         vaults={rows}
         activeVaultId={vaultId}
         path={path}
-        asOf={stamp?.serverTime ?? null}
+        asOf={(path === '/evidence' ? race.data?.capturedAt : stamp?.serverTime) ?? null}
         withheld={health.fails > 0 || health.stale}
         slide={!quiet.current}
         onNavigate={go}
