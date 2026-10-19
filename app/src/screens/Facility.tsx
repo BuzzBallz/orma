@@ -200,8 +200,10 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
             <p>
               {name} is a {kind} lending facility carrying {v.loanCount} exposure{v.loanCount === 1 ? '' : 's'},
               of which {v.distressedLoanCount} {v.distressedLoanCount === 1 ? 'is' : 'are'}{' '}
-              non-performing. It is in its {v.phase.toLowerCase()} period, with redemption
-              scheduled for {fmtIso(v.redemptionAt)}.
+              non-performing. It is in its {v.phase.toLowerCase()} period,{' '}
+              {v.redemptionAt === null ? 'with no redemption date'
+                : v.secondsToRedemption !== null && v.secondsToRedemption > 0 ? `with redemption scheduled for ${fmtIso(v.redemptionAt)}`
+                : `its redemption date, ${fmtIso(v.redemptionAt)}, behind it`}.
             </p>
             {hasGap ? (
               <p>
