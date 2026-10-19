@@ -403,6 +403,9 @@ main:focus{ outline: none; }
 .foot-in{ padding-block: var(--space-12) var(--space-16); row-gap: 14px; align-items: start; }
 .foot-brand{ grid-column: 1 / span 6; grid-row: 1; }
 .foot-lines{ grid-column: 1 / span 6; grid-row: 2; display: flex; flex-direction: column; gap: var(--space-1); font: 400 14px/1.5 var(--font-sans); color: var(--color-text-3); }
+/* Links inside the credit line are words in a sentence: a 44 px control box on each made the lines
+   uneven and broke the sentence apart. */
+.foot-lines .lnk{ display: inline; min-height: 0; padding: 0; white-space: normal; }
 .foot-nav{ grid-column: 7 / span 6; grid-row: 1 / span 2; display: flex; flex-wrap: wrap; justify-content: flex-end; align-content: flex-start; margin-right: -10px; }
 .foot-nav a, .foot-nav button{ display: inline-flex; align-items: center; min-height: var(--size-control); padding: 0 10px; font: 400 15px/1.4 var(--font-sans); color: var(--color-text-2); text-decoration: none; }
 .foot-nav button{ background: none; border: 0; cursor: pointer; }
