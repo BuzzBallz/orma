@@ -10,23 +10,18 @@ import { useWallet } from '../lib/wallet'
 import { shortAddress } from '../lib/xrpl-address'
 
 /**
- * Top right, and deliberately quiet. Nothing on these pages is behind it: signing in
- * records who is reading, and every figure is shown either way. The dialog it opens lives
- * with the masthead, so the phone menu can close itself and still open it.
+ * Top right, and deliberately quiet. Nothing on these pages is behind it: viewing an
+ * account only shows its reference, and every figure is shown either way. The dialog it opens
+ * lives with the masthead, so the phone menu can close itself and still open it.
  */
 export function SignInButton({ onOpen }: { onOpen: () => void }) {
-  const { state, disconnect, prefetch } = useWallet()
+  const { state, disconnect } = useWallet()
   const [copied, setCopied] = useState(false)
 
   if (state.status !== 'connected') {
     return (
-      <button
-        type="button" className="lnk lnk-plain"
-        onMouseEnter={prefetch}
-        onFocus={prefetch}
-        onClick={() => { prefetch(); onOpen() }}
-      >
-        Sign In
+      <button type="button" className="lnk lnk-plain" onClick={onOpen}>
+        View an Account
       </button>
     )
   }
@@ -34,7 +29,7 @@ export function SignInButton({ onOpen }: { onOpen: () => void }) {
   const label = shortAddress(state.address)
   return (
     <span className="wallet" data-picker onKeyDown={e => e.stopPropagation()}>
-      <span className="wpill">{state.via === 'read-only' ? 'View only' : 'Signed in'}</span>
+      <span className="wpill">View only</span>
 
       <DropdownMenu>
         <Tooltip>
@@ -46,7 +41,7 @@ export function SignInButton({ onOpen }: { onOpen: () => void }) {
 
         <DropdownMenuContent align="end" sideOffset={6} data-picker className="picker-list wallet-menu">
           <DropdownMenuLabel className="picker-head">
-            {state.via === 'read-only' ? 'View only' : 'Session'}
+            View only
           </DropdownMenuLabel>
           <DropdownMenuSeparator className="picker-sep" />
           <DropdownMenuItem
@@ -61,7 +56,7 @@ export function SignInButton({ onOpen }: { onOpen: () => void }) {
             Copy reference
           </DropdownMenuItem>
           <DropdownMenuItem data-danger onSelect={disconnect}>
-            <LogOut size={14} strokeWidth={1.75} /> Sign out
+            <LogOut size={14} strokeWidth={1.75} /> Stop viewing
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
