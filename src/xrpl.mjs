@@ -105,8 +105,8 @@ export class Xrpl {
    * Read a Vault plus its share issuance.
    * NOTE: the parameter is `vault_id`, NOT `vault` as XLS-65 section 3.9.1 states.
    */
-  async vaultInfo(vaultId) {
-    const r = await this.req({ command: 'vault_info', vault_id: vaultId, ledger_index: 'validated' })
+  async vaultInfo(vaultId, ledgerIndex = 'validated') {
+    const r = await this.req({ command: 'vault_info', vault_id: vaultId, ledger_index: ledgerIndex })
     return r.result.vault
   }
 
@@ -118,9 +118,9 @@ export class Xrpl {
   }
 
   /** Read a Loan by object index, or by {loan_broker_id, loan_seq}. */
-  async loan(ref) {
+  async loan(ref, ledgerIndex = 'validated') {
     const r = await this.req(
-      typeof ref === 'string' ? { command: 'ledger_entry', index: ref, ledger_index: 'validated' } : { command: 'ledger_entry', loan: ref, ledger_index: 'validated' },
+      typeof ref === 'string' ? { command: 'ledger_entry', index: ref, ledger_index: ledgerIndex } : { command: 'ledger_entry', loan: ref, ledger_index: ledgerIndex },
     )
     return r.result.node
   }
@@ -170,8 +170,8 @@ export class Xrpl {
   }
 
   /** Objects owned by an account, optionally filtered. Used to discover a vault's brokers. */
-  async accountObjects(account, type) {
-    const r = await this.req({ command: 'account_objects', account, type, limit: 400, ledger_index: 'validated' })
+  async accountObjects(account, type, ledgerIndex = 'validated') {
+    const r = await this.req({ command: 'account_objects', account, type, limit: 400, ledger_index: ledgerIndex })
     return r.result.account_objects ?? []
   }
 }
