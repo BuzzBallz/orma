@@ -248,11 +248,11 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
           <section className="op-sec op-outlook">
             <h2 className="t-heading-m">Outlook</h2>
             <p className="dim">
-              The outlook is {outlook}, taken from the direction of the measured factors
-              rather than from any view of the obligors.
-              {v.trend === 'deteriorating' && <> The factors are moving against the facility.</>}
+              The outlook is {outlook}, taken from the state of the book rather than from any
+              view of the obligors.
+              {v.trend === 'deteriorating' && <> At least one exposure is non-performing, or claims exceed liquidity at redemption.</>}
               {v.trend === 'improving' && <> The factors are moving in the facility's favour.</>}
-              {v.trend === 'stable' && <> The factors are holding.</>}
+              {v.trend === 'stable' && <> No exposure is non-performing and claims are met at redemption.</>}
             </p>
             <p className="dim">
               {d.phaseInfo.canWithdraw

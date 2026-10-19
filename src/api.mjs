@@ -26,8 +26,6 @@ const CONTRACT_VERSION = '1.0.0'
 export function createApi(reader, opts = {}) {
   const port = opts.port ?? Number(process.env.PORT ?? 8787)
   const source = opts.source ?? 'devnet'
-  /** previous navCorrect per vault, so `trend` is real rather than guessed */
-  const prevNav = new Map()
   /** history is many round trips; 15s is well inside a 4s UI poll */
   const historyCache = new Map()
   /** a domain changes when someone edits it, not every four seconds */
@@ -59,7 +57,6 @@ export function createApi(reader, opts = {}) {
 
   const rowFor = (snap) =>
     presentRow(snap, {
-      prevNavCorrect: prevNav.get(snap.vaultId),
       oracle: opts.oracleFor?.(snap.vaultId) ?? null,
     })
 
@@ -119,10 +116,8 @@ export function createApi(reader, opts = {}) {
         const snap = reader.get(m[1].toUpperCase()) ?? reader.get(m[1])
         if (!snap) return absent('VAULT_NOT_FOUND', 'No vault with that id', m[1])
         const detail = presentVault(snap, {
-          prevNavCorrect: prevNav.get(snap.vaultId),
-          oracle: opts.oracleFor?.(snap.vaultId) ?? null,
+              oracle: opts.oracleFor?.(snap.vaultId) ?? null,
         })
-        prevNav.set(snap.vaultId, snap.navCorrect)
         return send(200, stamp(detail))
       }
 
