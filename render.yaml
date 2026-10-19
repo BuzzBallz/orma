@@ -13,7 +13,7 @@ services:
     runtime: docker
     dockerfilePath: ./Dockerfile
     plan: free
-    # Paris. Change it if the judges are somewhere else; it only affects latency.
+    # Closest region to Paris. It only affects latency.
     region: frankfurt
     autoDeploy: true
     # Answers 200 before the first ledger read lands, so a deploy is not held up by the
