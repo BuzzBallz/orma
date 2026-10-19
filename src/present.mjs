@@ -155,7 +155,9 @@ export function presentVault(snap, opts = {}) {
     secondsUntilDefaultable: l.secondsUntilDefaultable,
     shareOfDebtTotal: debtTotal.isZero() ? '0.0000' : num(l.principalOutstanding).div(debtTotal).toFixed(4),
     impairable: l.status === 'overdue' || l.status === 'defaultable',
-    explorerUrl: `${EXPLORER}/transactions/${l.loanId}`,
+    // The transaction that last touched the loan: the explorer resolves transactions, and a loan's
+    // object index is not one.
+    explorerUrl: l.previousTxnId ? `${EXPLORER}/transactions/${l.previousTxnId}` : `${EXPLORER}/accounts/${l.borrower}`,
   }))
 
   const row = presentRow(snap, opts)

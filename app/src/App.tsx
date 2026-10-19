@@ -3,7 +3,7 @@ import './app.css'
 import { API_MIXED_ORIGIN, SUSPECT_AFTER_FAILS, SUSPECT_BACKOFF_MS } from './lib/api'
 import { usePoll } from './lib/usePoll'
 import { facilityName } from './lib/credit'
-import { follow, useRoute, type RoutePath } from './lib/useRoute'
+import { DESKS, follow, useRoute, type RoutePath } from './lib/useRoute'
 import type { BrokerHistory, Collateral, Gate, Health, IndexerRace, MethodRules, NavHistory, OracleContest, Resolution, VaultDetail as Detail, VaultsResponse } from './lib/types'
 import { HeaderBar } from './components/HeaderBar'
 import { Footer } from './components/Footer'
@@ -75,6 +75,10 @@ function Desk() {
     addEventListener('popstate', still, true)
     return () => removeEventListener('popstate', still, true)
   }, [])
+  // One title per desk, so a tab, a history entry and a screen reader say where the reader is.
+  useEffect(() => {
+    document.title = `${DESKS.find(([p]) => p === path)?.[1] ?? 'Portfolio'} · Orma`
+  }, [path])
 
   const slow = API_MIXED_ORIGIN
     ? { slowAfter: SUSPECT_AFTER_FAILS, slowCapMs: SUSPECT_BACKOFF_MS }

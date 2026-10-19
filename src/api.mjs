@@ -3,7 +3,7 @@
  * never changes a URL: only `health.source` flips from "fixtures" to "devnet".
  *
  * Zero dependencies on purpose. An HTTP framework is one more thing to fail at
- * 02:00, and this serves eight routes.
+ * 02:00, and this serves a dozen routes.
  */
 import { createServer } from 'node:http'
 import { readFileSync, existsSync } from 'node:fs'

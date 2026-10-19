@@ -27,8 +27,8 @@ measures both, publishes them, and enforces on them. One asymmetry, two levers, 
 | Flavour | **Loaded**: XLS-65 and XLS-66, plus XLS-47 Price Oracle, XLS-70 Credentials, XLS-80 Permissioned Domains, XLS-85 Token Escrow and XLS-33 MPT shares |
 | Network | XRPL **Devnet**, `wss://s.devnet.rippletest.net:51233`, `network_id` **2** |
 | Explorer, faucet | https://devnet.xrpl.org · https://faucet.devnet.rippletest.net/accounts |
-| `rippled` | **3.4.0-rc5** |
-| Libraries | `xrpl` **5.2.0** with `ripple-binary-codec` **2.11.0**, `decimal.js` **10.6.0**; frontend React 19, Vite |
+| `rippled` | **3.4.0-rc5** during the event; Devnet has run **3.4.1** since |
+| Libraries | `xrpl` **5.3.0** with `ripple-binary-codec` **2.11.0**, `decimal.js` **10.6.0**; frontend React 19, Vite |
 | Runtime | Node **24.13.0** |
 | Team | **BuzzBallz** |
 

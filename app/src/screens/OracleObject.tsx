@@ -1,5 +1,5 @@
 import type { Oracle, OracleContest } from '../lib/types'
-import { short, fmtIso } from '../lib/format'
+import { short, fmtIso, fixed } from '../lib/format'
 import { Exhibit } from '../components/Exhibit'
 
 /**
@@ -95,7 +95,7 @@ export function OracleObject({ o, contest }: { o: Oracle | null; contest?: Oracl
                 <td><b>Median, computed by rippled</b></td>
                 <td className="rt num">{contest.aggregate.median}</td>
                 <td className="op-says">
-                  standard deviation {Number(contest.aggregate.standardDeviation).toFixed(6)}
+                  standard deviation {contest.aggregate.standardDeviation === null ? '—' : fixed(contest.aggregate.standardDeviation, 6)}
                   {contest.aggregate.size ? <> across {contest.aggregate.size} publishers</> : null}
                 </td>
               </tr>
