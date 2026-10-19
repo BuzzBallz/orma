@@ -43,8 +43,8 @@ export function usePoll<T>(path: string | null, intervalMs: number, opts?: {
   const [state, setState] = useState<Omit<Poll<T>, 'stale' | 'ageMs'> & { path: string | null }>({
     data: null, error: null, code: null, fails: 0, receivedAt: 0, waiting: false, path: null,
   })
-  // A tick purely to re-render so `stale`/`ageMs` stay live between polls.
-  const [, setBeat] = useState(0)
+  // The clock the age is read against, ticked so `stale`/`ageMs` stay live between polls.
+  const [now, setNow] = useState(() => performance.now())
 
   useEffect(() => {
     // `cancelled` is per effect run, deliberately NOT a ref. A ref is shared across runs:
@@ -86,11 +86,12 @@ export function usePoll<T>(path: string | null, intervalMs: number, opts?: {
 
   // 1Hz heartbeat so the stale bar's numbers move without a new payload.
   useEffect(() => {
-    const id = setInterval(() => setBeat(b => b + 1), 1000)
+    const id = setInterval(() => setNow(performance.now()), 1000)
     return () => clearInterval(id)
   }, [])
 
-  const ageMs = state.receivedAt === 0 ? 0 : performance.now() - state.receivedAt
+  // The clock can lag a fresh payload by up to a tick; that payload is simply new.
+  const ageMs = state.receivedAt === 0 ? 0 : Math.max(0, now - state.receivedAt)
   const mine = state.path === path
   return {
     data: state.data, receivedAt: state.receivedAt, ageMs, stale: state.receivedAt !== 0 && ageMs > STALE_AFTER_MS,

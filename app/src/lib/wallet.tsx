@@ -1,6 +1,7 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { shortAddress, validateClassicAddress } from './xrpl-address'
+import { WalletContext } from './useWallet'
 
 /**
  * Viewing an account: a reference the reader typed, kept in this browser and shown in the
@@ -13,13 +14,11 @@ export type WalletState =
 
 const STORE_KEY = 'vfo.wallet'
 
-interface Wallet {
+export interface Wallet {
   state: WalletState
   connectReadOnly: (raw: string) => Promise<boolean>
   disconnect: () => void
 }
-
-const Ctx = createContext<Wallet | null>(null)
 
 function remember(address: string | null) {
   try {
@@ -61,11 +60,5 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const value = useMemo<Wallet>(() => ({ state, connectReadOnly, disconnect }), [state, connectReadOnly, disconnect])
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>
-}
-
-export function useWallet(): Wallet {
-  const v = useContext(Ctx)
-  if (!v) throw new Error('useWallet outside WalletProvider')
-  return v
+  return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>
 }

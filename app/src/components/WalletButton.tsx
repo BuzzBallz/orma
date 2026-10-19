@@ -6,7 +6,7 @@ import {
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { toast } from 'sonner'
-import { useWallet } from '../lib/wallet'
+import { useWallet } from '../lib/useWallet'
 import { shortAddress } from '../lib/xrpl-address'
 
 /**

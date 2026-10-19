@@ -940,10 +940,14 @@ main:focus{ outline: none; }
   /* A table prints whole, not inside a scroller. */
   .tbl-wrap{ overflow: visible; background: none; }
   .op-tbl{ min-width: 0; }
+  /* With no scroller, a long reference (a pointer URL, a hash) wraps instead of running off the page. */
+  .op-tbl td{ overflow-wrap: anywhere; }
   /* Keep a heading with what follows it, and a row, a figure or a short exhibit in one piece. */
   h1, h2, h3, .exh > summary{ break-after: avoid; }
   tr, .op-glance > div, .navc svg, .state{ break-inside: avoid; }
   .exh-chev{ display: none; }
+  /* An exhibit opened for the print would be captured at the start of its settle animation, empty. */
+  .exh[open] > .exh-body{ animation: none !important; }
   /* The chart is drawn for the screen it was opened on; on paper it fills the page width instead. */
   .navc svg{ width: 100%; }
   .op-letterhead{ display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font: 600 14px/1 var(--font-serif); }

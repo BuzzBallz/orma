@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import './app.css'
 import { API_MIXED_ORIGIN, SUSPECT_AFTER_FAILS, SUSPECT_BACKOFF_MS } from './lib/api'
 import { usePoll } from './lib/usePoll'
@@ -72,14 +72,17 @@ function Note({ heading, watch, said, facts, choices, onBack }: {
   )
 }
 
+// One empty list, so an effect that depends on the rows does not re-run on every render before they arrive.
+const NO_ROWS: VaultRow[] = []
+
 function Desk() {
   const { path, vaultId, navigate } = useRoute()
 
   // A desk rises into place when a reader clicks to it, but not on the first paint and
   // not when the keyboard took them there: a shortcut is used too often to be animated.
-  const quiet = useRef(true)
+  const [quiet, setQuiet] = useState(true)
   const go = useCallback((p: RoutePath, id?: string | null) => {
-    quiet.current = false
+    setQuiet(false)
     navigate(p, id)
     // The new desk is where a keyboard or screen-reader user now is; focus stayed on the old link.
     document.getElementById('main')?.focus({ preventScroll: true })
@@ -88,7 +91,7 @@ function Desk() {
   // already animates: the desk they land on stays still. Capture phase, so this runs before
   // the router's own listener, whose state update React renders before the next listener.
   useEffect(() => {
-    const still = () => { quiet.current = true }
+    const still = () => setQuiet(true)
     addEventListener('popstate', still, true)
     return () => removeEventListener('popstate', still, true)
   }, [])
@@ -108,7 +111,7 @@ function Desk() {
   const vaults = usePoll<VaultsResponse>('/api/vaults', path === '/' ? POLL_MS : 15000, slow)
   const detail = usePoll<Detail>(ref ? `/api/vaults/${ref}` : null, POLL_MS, slow)
 
-  const rows = vaults.data?.vaults ?? []
+  const rows = vaults.data?.vaults ?? NO_ROWS
 
   // The keys still work for anyone who finds them; they are not advertised as a feature.
   useEffect(() => {
@@ -118,7 +121,7 @@ function Desk() {
       if (e.metaKey || e.ctrlKey || e.altKey) return
       const n = Number(e.key)
       if (n >= 1 && n <= 5 && rows[n - 1]) {
-        quiet.current = true
+        setQuiet(true)
         navigate(path === '/' ? '/facility' : path, rows[n - 1].vaultId)
         return
       }
@@ -126,7 +129,7 @@ function Desk() {
         p: '/', f: '/facility', e: '/event', m: '/methodology', v: '/evidence',
       }
       const r = routes[e.key.toLowerCase()]
-      if (r) { quiet.current = true; navigate(r) }
+      if (r) { setQuiet(true); navigate(r) }
     }
     addEventListener('keydown', onKey)
     return () => removeEventListener('keydown', onKey)
@@ -303,7 +306,7 @@ function Desk() {
         path={path}
         asOf={(path === '/evidence' ? race.data?.capturedAt : stamp?.serverTime) ?? null}
         withheld={health.fails > 0 || health.stale}
-        slide={!quiet.current}
+        slide={!quiet}
         onNavigate={go}
         onSelect={select}
       />
@@ -311,7 +314,7 @@ function Desk() {
       {ageBar && <StaleBar ageMs={Math.max(primary.ageMs, readAge * 1000)} />}
 
       <main id="main" className="page" tabIndex={-1}>
-        <div key={path} className={'view' + (quiet.current ? '' : ' enter')} data-wait={waiting || undefined}>{body()}</div>
+        <div key={path} className={'view' + (quiet ? '' : ' enter')} data-wait={waiting || undefined}>{body()}</div>
       </main>
 
       <Footer vaultId={vaultId} onNavigate={go} />
