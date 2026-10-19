@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { VaultDetail } from '../lib/types'
 import { beatRows, nextBeat, type Beat } from '../lib/beats'
-import { duration, fmtIso, ratioToPct } from '../lib/format'
+import { duration, fmtIso, percent } from '../lib/format'
 import { Amount } from '../components/Amount'
 import { creditText, facilityName } from '../lib/credit'
 
@@ -132,7 +132,7 @@ export function Event({ d, picker }: { d: VaultDetail; picker?: ReactNode }) {
           liquidity of <Amount drops={d.phaseInfo.liquidityAtRedemption} />.
           {shortfall
             ? <> <span className="loss">That is a shortfall of <Amount drops={d.phaseInfo.projectedShortfall} />, or{' '}
-                {ratioToPct(d.phaseInfo.shortfallPct)} of claims.</span> Redemption is served in the
+                {percent(d.phaseInfo.shortfallPct)} of claims.</span> Redemption is served in the
                 order requests arrive, so the shortfall falls on whoever asks last.</>
             : <> <span className="ok strong">Claims are covered.</span></>}
           {d.phaseInfo.withdrawBlockedReason && <> Withdrawals are currently closed: {creditText(d.phaseInfo.withdrawBlockedReason)}.</>}

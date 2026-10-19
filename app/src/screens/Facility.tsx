@@ -9,7 +9,7 @@ import { Mark } from '../components/Lockup'
 import { gradeIndex } from '../lib/grades'
 import { nextBeat } from '../lib/beats'
 import { useFlash } from '../lib/useFlash'
-import { bpsToPct, duration, fmtIso, ratioToPct, rateToPct } from '../lib/format'
+import { bpsToPct, duration, fmtIso, percent, ratioToPct, rateToPct } from '../lib/format'
 import { creditText, facilityName, facilityRef, factorRows, outlookOf, sentence, splitFactors } from '../lib/credit'
 import { ManagerConduct, PledgedCollateral } from './FacilityExhibits'
 import { PledgeResolution } from './PledgeResolution'
@@ -444,7 +444,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
                   <tr><td>Largest exposure</td><td className="rt num">{largest ? ratioToPct(largest.shareOfDebtTotal) : 'n.a.'}</td><td className="op-says">share of drawn debt</td></tr>
                   <tr><td>Exposures</td><td className="rt num">{v.loanCount}</td><td className="op-says">{v.distressedLoanCount} non-performing, {overdue} past due</td></tr>
                   <tr><td>Claims at redemption</td><td className="rt num"><Amount drops={d.phaseInfo.claimsAtRedemption} /></td><td className="op-says">against <Amount drops={d.phaseInfo.liquidityAtRedemption} /> liquidity</td></tr>
-                  <tr><td>Projected shortfall</td><td className="rt num"><Amount drops={redemptionShortfall} /></td><td className="op-says">{ratioToPct(d.phaseInfo.shortfallPct)} of claims</td></tr>
+                  <tr><td>Projected shortfall</td><td className="rt num"><Amount drops={redemptionShortfall} /></td><td className="op-says">{percent(d.phaseInfo.shortfallPct)} of claims</td></tr>
                 </tbody>
               </table>
             </div>
