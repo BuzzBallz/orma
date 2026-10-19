@@ -135,7 +135,7 @@ accepted and upper-cased before lookup. A path that matches no pattern returns
 ### 6. CORS, and which three routes are deliberately public
 
 Every response carries `Access-Control-Allow-Origin: *`, `Access-Control-Allow-Headers: *` and
-`Access-Control-Allow-Methods: GET,HEAD,POST,OPTIONS`, set unconditionally at the top of the request
+`Access-Control-Allow-Methods: GET,POST,OPTIONS`, set unconditionally at the top of the request
 handler so the local demo frontend works from any origin. `OPTIONS` returns `204`.
 
 The meaningful distinction is caching, and it is opt-in per route. The default is
