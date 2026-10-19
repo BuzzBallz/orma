@@ -1,4 +1,4 @@
-export type Phase = 'Subscription' | 'Investment' | 'Redemption'
+export type Phase = 'Subscription' | 'Investment' | 'Redemption' | 'Open'
 export type Trend = 'improving' | 'stable' | 'deteriorating'
 export type Severity = 'info' | 'medium' | 'high' | 'critical'
 export type LoanStatus =
@@ -83,7 +83,8 @@ export interface Oracle {
   /** The OracleSet that last wrote this object. The explorer has no route for a bare index. */
   lastPublishTx: string | null
   explorerUrl: string
-  dimensionsOnChain: { key: string; value: string; raw: string; scale: number }[]
+  /** raw is null when the object carries the pair without a price. */
+  dimensionsOnChain: { key: string; value: string; raw: string | null; scale: number }[]
   aggregate: OracleAggregate | null           // NULL with fewer than two publishers
 }
 
