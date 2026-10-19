@@ -9,7 +9,7 @@ import { createServer } from 'node:http'
 import { readFileSync, existsSync } from 'node:fs'
 import { presentVault, presentRow, setLabel } from './present.mjs'
 import { findShareEscrows, presentCollateral } from './collateral.mjs'
-import { readBrokerHistory, analyseOrdering, reputation, recommendOrder } from './history.mjs'
+import { readBrokerHistory, analyseOrdering, reputation, recommendOrder, CONDUCT } from './history.mjs'
 import { fetchNavHistory } from './navhistory.mjs'
 import { presentNav, resolveFromIssuance, valuePledge } from './nav.mjs'
 import { gateStatus, isNamedIn } from './credentials.mjs'
@@ -105,7 +105,7 @@ export function createApi(reader, opts = {}) {
       // The rules a grade is built from, so the methodology page shows the bands the code applies
       // rather than a copy that can drift from them.
       if (key === 'GET /api/methodology') {
-        return send(200, { methodVersion: METHOD_VERSION, ladder: LADDER, realisedLoss: REALISED_LOSS_BANDS })
+        return send(200, { methodVersion: METHOD_VERSION, ladder: LADDER, realisedLoss: REALISED_LOSS_BANDS, managerConduct: CONDUCT })
       }
 
       if (key === 'GET /api/vaults') {

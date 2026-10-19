@@ -3,6 +3,7 @@
 //   node src/dev/check-method.mjs
 import { buildScore, METHOD_VERSION, REALISED_LOSS_BANDS } from '../score.mjs'
 import { createApi } from '../api.mjs'
+import { CONDUCT } from '../history.mjs'
 
 let bad = 0
 const eq = (name, got, want) => {
@@ -26,6 +27,7 @@ const api = createApi({ snapshots: new Map(), all: () => [], serverTime: null },
 await api.listen()
 const served = await (await fetch(`http://127.0.0.1:${api.server.address().port}/api/methodology`)).json()
 eq('/api/methodology serves the table the score applies', [served.methodVersion, served.realisedLoss], [METHOD_VERSION, REALISED_LOSS_BANDS])
+eq('and the deductions manager conduct applies', served.managerConduct, CONDUCT)
 await api.close()
 
 console.log(bad ? `\n  ${bad} FAILED` : '\n  all ok')
