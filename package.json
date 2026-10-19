@@ -21,7 +21,8 @@
     "check:api": "node src/dev/check-api.mjs",
     "check:navhistory": "node src/dev/check-navhistory.mjs",
     "check:archive": "node src/dev/check-archive.mjs",
-    "check:conduct": "node src/dev/check-conduct.mjs"
+    "check:conduct": "node src/dev/check-conduct.mjs",
+    "check:reader-edges": "node src/dev/check-reader-edges.mjs"
   },
   "dependencies": {
     "decimal.js": "10.6.0",
