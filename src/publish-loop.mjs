@@ -52,6 +52,8 @@ export class PublishLoop {
   async onSnapshot(snap) {
     const vaultId = snap.vaultId
     if (this.inflight.has(vaultId)) return
+    // No shares, no unit value: the reader's 0 is a placeholder, and published it reads as a total loss.
+    if (snap.vault.sharesOutstanding.isZero()) return
     let detail
     try {
       detail = presentVault(snap, { oracle: this.oracleCache.get(vaultId) ?? null })

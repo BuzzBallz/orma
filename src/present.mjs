@@ -31,7 +31,7 @@ function trendOf(prev, navCorrect) {
   return 'stable'
 }
 
-function buildAlerts({ recogLagSeconds, navDivergenceBps, coverShortfall, concentration, projectedShortfall, assetsAvailable, loans }) {
+function buildAlerts({ recogLagSeconds, navDivergenceBps, coverShortfall, concentration, projectedShortfall, assetsAvailable, assetsTotal, loans }) {
   const alerts = []
   const undeclared = loans.filter((l) => l.status === 'overdue' || l.status === 'defaultable').length
   if (recogLagSeconds > 0) {
@@ -79,7 +79,8 @@ function buildAlerts({ recogLagSeconds, navDivergenceBps, coverShortfall, concen
       sinceAt: null,
     })
   }
-  if (assetsAvailable.isZero()) {
+  // An empty vault holds no cash because it holds nothing: there is no withdrawal to fail.
+  if (assetsAvailable.isZero() && assetsTotal.gt(0)) {
     alerts.push({
       code: 'LIQUIDITY_EXHAUSTED',
       severity: 'critical',
@@ -186,6 +187,7 @@ export function presentVault(snap, opts = {}) {
       concentration: scoreArgs.concentration,
       projectedShortfall: cliff.projectedShortfall,
       assetsAvailable: num(vault.assetsAvailable),
+      assetsTotal: num(vault.assetsTotal),
       loans,
     }),
   }
