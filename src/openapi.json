@@ -6,148 +6,868 @@
     "summary": "Read-only credit readings of XRP Ledger lending vaults (XLS-65, XLS-66) on Devnet.",
     "description": "Every amount is a decimal string, in drops for an XRP vault: never parse one into a float. Every 200 carries serverTime and ledgerIndex. The prose reference, with captures, is documentation/pages/http-api.mdx. Nothing here signs or moves anything."
   },
-  "servers": [{ "url": "https://orma-api.onrender.com" }, { "url": "http://localhost:8787" }],
+  "servers": [
+    {
+      "url": "https://orma-api.onrender.com"
+    },
+    {
+      "url": "http://localhost:8787"
+    }
+  ],
   "paths": {
     "/api/health": {
       "get": {
         "summary": "Is the reader connected, and how old is the data",
-        "responses": { "200": { "description": "Always 200; ok is false until the first pass and while the reader is degraded.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Health" } } } } }
+        "responses": {
+          "200": {
+            "description": "Always 200; ok is false until the first pass and while the reader is degraded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/methodology": {
+      "get": {
+        "summary": "The notches a destroyed share of capital costs, and the manager-conduct deductions, under the current method version",
+        "responses": {
+          "200": {
+            "description": "methodVersion, ladder, realisedLoss bands, managerConduct deductions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "methodVersion",
+                    "ladder",
+                    "realisedLoss"
+                  ],
+                  "properties": {
+                    "methodVersion": {
+                      "type": "string"
+                    },
+                    "ladder": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "realisedLoss": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "atLeastPct": {
+                            "type": "number"
+                          },
+                          "notches": {
+                            "type": "integer"
+                          },
+                          "floor": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "managerConduct": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/vaults": {
       "get": {
         "summary": "Every tracked facility, worst grade first",
-        "responses": { "200": { "description": "One row per facility.", "content": { "application/json": { "schema": { "type": "object", "required": ["vaults"], "properties": { "serverTime": { "type": "string" }, "ledgerIndex": { "type": "integer" }, "vaults": { "type": "array", "items": { "$ref": "#/components/schemas/VaultRow" } } } } } } } }
+        "responses": {
+          "200": {
+            "description": "One row per facility.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "vaults"
+                  ],
+                  "properties": {
+                    "serverTime": {
+                      "type": "string"
+                    },
+                    "ledgerIndex": {
+                      "type": "integer"
+                    },
+                    "vaults": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/VaultRow"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/vaults/{vaultId}": {
-      "parameters": [{ "$ref": "#/components/parameters/vaultId" }],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/vaultId"
+        }
+      ],
       "get": {
         "summary": "Everything about one facility: vault, broker, loans, score, alerts, oracle",
-        "responses": { "200": { "description": "The facility detail.", "content": { "application/json": { "schema": { "type": "object" } } } }, "404": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } }
+        "responses": {
+          "200": {
+            "description": "The facility detail.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     },
     "/api/vaults/{vaultId}/nav": {
-      "parameters": [{ "$ref": "#/components/parameters/vaultId" }],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/vaultId"
+        }
+      ],
       "get": {
         "summary": "What one unit is actually worth (orma.nav/1, CORS-open)",
-        "responses": { "200": { "description": "The valuation document.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NavDocument" } } } }, "404": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } }
+        "responses": {
+          "200": {
+            "description": "The valuation document.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NavDocument"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     },
     "/api/vaults/{vaultId}/nav-history": {
-      "parameters": [{ "$ref": "#/components/parameters/vaultId" }],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/vaultId"
+        }
+      ],
       "get": {
         "summary": "The unit value after each transaction that changed the vault",
-        "responses": { "200": { "description": "points, truncated and window.", "content": { "application/json": { "schema": { "type": "object" } } } }, "404": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } }
+        "responses": {
+          "200": {
+            "description": "points, truncated and window.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     },
     "/api/vaults/{vaultId}/gate": {
-      "parameters": [{ "$ref": "#/components/parameters/vaultId" }],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/vaultId"
+        }
+      ],
       "get": {
         "summary": "Is this facility gated, and by whom",
-        "responses": { "200": { "description": "The permissioned domain, if any.", "content": { "application/json": { "schema": { "type": "object" } } } }, "404": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } }
+        "responses": {
+          "200": {
+            "description": "The permissioned domain, if any.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     },
     "/api/vaults/{vaultId}/collateral": {
       "parameters": [
-        { "$ref": "#/components/parameters/vaultId" },
-        { "name": "accounts", "in": "query", "description": "At most 10 classic addresses, comma-separated, to scan for escrowed shares.", "schema": { "type": "string" } },
-        { "name": "haircut", "in": "query", "description": "A percentage from 0 to 100, applied to the held value.", "schema": { "type": "number", "minimum": 0, "maximum": 100 } }
+        {
+          "$ref": "#/components/parameters/vaultId"
+        },
+        {
+          "name": "accounts",
+          "in": "query",
+          "description": "At most 10 classic addresses, comma-separated, to scan for escrowed shares.",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "haircut",
+          "in": "query",
+          "description": "A percentage from 0 to 100, applied to the held value.",
+          "schema": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          }
+        }
       ],
       "get": {
         "summary": "What the pledged shares are worth to a lender",
-        "responses": { "200": { "description": "Escrowed shares, valued both ways.", "content": { "application/json": { "schema": { "type": "object" } } } }, "400": { "$ref": "#/components/responses/Error" }, "404": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } }
+        "responses": {
+          "200": {
+            "description": "Escrowed shares, valued both ways.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     },
     "/api/vaults/{vaultId}/broker-history": {
-      "parameters": [{ "$ref": "#/components/parameters/vaultId" }],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/vaultId"
+        }
+      ],
       "get": {
         "summary": "What the manager actually did: events, ordering, conduct grade",
-        "responses": { "200": { "description": "The reconstructed record.", "content": { "application/json": { "schema": { "type": "object" } } } }, "404": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } }
+        "responses": {
+          "200": {
+            "description": "The reconstructed record.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     },
     "/api/mpt/{mptId}/nav": {
       "parameters": [
-        { "$ref": "#/components/parameters/mptId" },
-        { "$ref": "#/components/parameters/units" }
+        {
+          "$ref": "#/components/parameters/mptId"
+        },
+        {
+          "$ref": "#/components/parameters/units"
+        }
       ],
       "get": {
         "summary": "The same valuation, keyed by the share token (CORS-open)",
-        "responses": { "200": { "description": "The valuation document, with pledge when units is given.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NavDocument" } } } }, "404": { "$ref": "#/components/responses/Error" }, "503": { "$ref": "#/components/responses/Error" } }
+        "responses": {
+          "200": {
+            "description": "The valuation document, with pledge when units is given.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NavDocument"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     },
     "/api/mpt/{mptId}/resolve": {
       "parameters": [
-        { "$ref": "#/components/parameters/mptId" },
-        { "$ref": "#/components/parameters/units" },
-        { "name": "resolve", "in": "query", "description": "false stops before following the pointer.", "schema": { "type": "string", "enum": ["true", "false"] } }
+        {
+          "$ref": "#/components/parameters/mptId"
+        },
+        {
+          "$ref": "#/components/parameters/units"
+        },
+        {
+          "name": "resolve",
+          "in": "query",
+          "description": "false stops before following the pointer.",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "true",
+              "false"
+            ]
+          }
+        }
       ],
       "get": {
         "summary": "Can a stranger get from the token to a valuation: every step, failures included (CORS-open)",
-        "responses": { "200": { "description": "steps, metadata and nav (null when not resolved).", "content": { "application/json": { "schema": { "type": "object", "required": ["issuanceId", "resolved", "steps"], "properties": { "issuanceId": { "type": "string" }, "resolved": { "type": "boolean" }, "steps": { "type": "array", "items": { "type": "object", "properties": { "step": { "type": "string" }, "ok": { "type": "boolean" }, "detail": { "type": "string" } } } }, "nav": { "oneOf": [{ "$ref": "#/components/schemas/NavDocument" }, { "type": "null" }] } } } } } } }
+        "responses": {
+          "200": {
+            "description": "steps, metadata and nav (null when not resolved).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "issuanceId",
+                    "resolved",
+                    "steps"
+                  ],
+                  "properties": {
+                    "issuanceId": {
+                      "type": "string"
+                    },
+                    "resolved": {
+                      "type": "boolean"
+                    },
+                    "steps": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "step": {
+                            "type": "string"
+                          },
+                          "ok": {
+                            "type": "boolean"
+                          },
+                          "detail": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "nav": {
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/NavDocument"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/indexer-race": {
-      "get": { "summary": "Capture: the first impairment is invisible to metadata diffing", "responses": { "200": { "description": "A fixed capture.", "content": { "application/json": { "schema": { "type": "object" } } } }, "404": { "$ref": "#/components/responses/Error" } } }
+      "get": {
+        "summary": "Capture: the first impairment is invisible to metadata diffing",
+        "responses": {
+          "200": {
+            "description": "A fixed capture.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     },
     "/api/oracle-aggregate": {
-      "get": { "summary": "Capture: a second publisher contests a reading, and the median the ledger reports", "responses": { "200": { "description": "A fixed capture.", "content": { "application/json": { "schema": { "type": "object" } } } }, "404": { "$ref": "#/components/responses/Error" } } }
+      "get": {
+        "summary": "Capture: a second publisher contests a reading, and the median the ledger reports",
+        "responses": {
+          "200": {
+            "description": "A fixed capture.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     },
     "/api/demo/state": {
-      "get": { "summary": "Which facilities are baked and live", "responses": { "200": { "description": "Baked facilities.", "content": { "application/json": { "schema": { "type": "object" } } } } } }
+      "get": {
+        "summary": "Which facilities are baked and live",
+        "responses": {
+          "200": {
+            "description": "Baked facilities.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "/api/openapi.json": {
-      "get": { "summary": "This document", "responses": { "200": { "description": "OpenAPI 3.1.", "content": { "application/json": { "schema": { "type": "object" } } } } } }
+      "get": {
+        "summary": "This document",
+        "responses": {
+          "200": {
+            "description": "OpenAPI 3.1.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "parameters": {
-      "vaultId": { "name": "vaultId", "in": "path", "required": true, "schema": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" } },
-      "mptId": { "name": "mptId", "in": "path", "required": true, "description": "The share's MPT issuance id.", "schema": { "type": "string", "pattern": "^[A-Fa-f0-9]{48}$" } },
-      "units": { "name": "units", "in": "query", "description": "Value a pledge of this many share units.", "schema": { "type": "string", "pattern": "^[0-9]+$" } }
+      "vaultId": {
+        "name": "vaultId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[A-Fa-f0-9]{64}$"
+        }
+      },
+      "mptId": {
+        "name": "mptId",
+        "in": "path",
+        "required": true,
+        "description": "The share's MPT issuance id.",
+        "schema": {
+          "type": "string",
+          "pattern": "^[A-Fa-f0-9]{48}$"
+        }
+      },
+      "units": {
+        "name": "units",
+        "in": "query",
+        "description": "Value a pledge of this many share units.",
+        "schema": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        }
+      }
     },
     "responses": {
-      "Error": { "description": "An error envelope.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+      "Error": {
+        "description": "An error envelope.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
     },
     "schemas": {
       "Error": {
-        "type": "object", "required": ["error"],
-        "properties": { "error": { "type": "object", "required": ["code", "message", "retryable"], "properties": {
-          "code": { "type": "string", "examples": ["WARMING_UP", "VAULT_NOT_FOUND", "SHARE_NOT_TRACKED", "BAD_REQUEST", "BAD_ACCOUNTS", "BAD_HAIRCUT"] },
-          "message": { "type": "string" }, "retryable": { "type": "boolean" } } } }
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message",
+              "retryable"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "examples": [
+                  "WARMING_UP",
+                  "VAULT_NOT_FOUND",
+                  "SHARE_NOT_TRACKED",
+                  "BAD_REQUEST",
+                  "BAD_ACCOUNTS",
+                  "BAD_HAIRCUT"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "retryable": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
       },
       "Health": {
-        "type": "object", "required": ["ok", "source", "network", "ledgerIndex", "serverTime"],
+        "type": "object",
+        "required": [
+          "ok",
+          "source",
+          "network",
+          "ledgerIndex",
+          "serverTime"
+        ],
         "properties": {
-          "ok": { "type": "boolean" }, "contractVersion": { "type": "string" }, "source": { "type": "string" }, "network": { "type": "string" },
-          "ledgerIndex": { "type": "integer" }, "serverTime": { "type": "string" }, "buildVersion": { "type": ["string", "null"] },
-          "degraded": { "type": "boolean" }, "lastLedgerAgeSeconds": { "type": ["integer", "null"] }
+          "ok": {
+            "type": "boolean"
+          },
+          "contractVersion": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "network": {
+            "type": "string"
+          },
+          "ledgerIndex": {
+            "type": "integer"
+          },
+          "serverTime": {
+            "type": "string"
+          },
+          "buildVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "degraded": {
+            "type": "boolean"
+          },
+          "lastLedgerAgeSeconds": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
         }
       },
       "VaultRow": {
-        "type": "object", "required": ["vaultId", "grade", "gradeNumeric", "navNaive", "navCorrect", "navDivergenceBps"],
+        "type": "object",
+        "required": [
+          "vaultId",
+          "grade",
+          "gradeNumeric",
+          "navNaive",
+          "navCorrect",
+          "navDivergenceBps"
+        ],
         "properties": {
-          "vaultId": { "type": "string" }, "label": { "type": ["string", "null"] }, "owner": { "type": "string" }, "phase": { "type": "string" },
-          "grade": { "type": "string" }, "gradeNumeric": { "type": "integer" }, "trend": { "type": "string", "enum": ["improving", "stable", "deteriorating"] },
-          "assetsTotal": { "type": "string" }, "assetsAvailable": { "type": "string" }, "lossUnrealized": { "type": "string" },
-          "navNaive": { "type": "string", "description": "Reported unit value: assets over units." },
-          "navCorrect": { "type": "string", "description": "Held unit value: assets net of recognised loss over units." },
-          "navDivergenceBps": { "type": "integer" },
-          "redemptionAt": { "type": ["string", "null"] }, "loanCount": { "type": "integer" }, "distressedLoanCount": { "type": "integer" }
+          "vaultId": {
+            "type": "string"
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "owner": {
+            "type": "string"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "grade": {
+            "type": "string"
+          },
+          "gradeNumeric": {
+            "type": "integer"
+          },
+          "trend": {
+            "type": "string",
+            "enum": [
+              "improving",
+              "stable",
+              "deteriorating"
+            ]
+          },
+          "assetsTotal": {
+            "type": "string"
+          },
+          "assetsAvailable": {
+            "type": "string"
+          },
+          "lossUnrealized": {
+            "type": "string"
+          },
+          "navNaive": {
+            "type": "string",
+            "description": "Reported unit value: assets over units."
+          },
+          "navCorrect": {
+            "type": "string",
+            "description": "Held unit value: assets net of recognised loss over units."
+          },
+          "navDivergenceBps": {
+            "type": "integer"
+          },
+          "redemptionAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "loanCount": {
+            "type": "integer"
+          },
+          "distressedLoanCount": {
+            "type": "integer"
+          },
+          "freshness": {
+            "$ref": "#/components/schemas/Freshness"
+          }
         }
       },
       "NavDocument": {
-        "type": "object", "required": ["schema", "instrument", "unitValue", "provenance"],
+        "type": "object",
+        "required": [
+          "schema",
+          "instrument",
+          "unitValue",
+          "provenance"
+        ],
         "description": "orma.nav/1. Permanent: fields may be added, none renamed, retyped or removed.",
         "properties": {
-          "schema": { "const": "orma.nav/1" },
-          "asOf": { "type": ["string", "null"] }, "ledgerIndex": { "type": ["integer", "null"] },
-          "instrument": { "type": "object", "properties": { "kind": { "type": "string" }, "vaultId": { "type": "string" }, "shareMptId": { "type": ["string", "null"] }, "unitsOutstanding": { "type": "string" }, "asset": { "type": "object" }, "vaultKind": { "type": "string" }, "phase": { "type": "string" }, "redemptionAt": { "type": ["string", "null"] } } },
-          "unitValue": { "type": "object", "required": ["held", "reported", "divergenceBps"], "properties": { "held": { "type": "string" }, "reported": { "type": "string" }, "divergenceBps": { "type": "integer" }, "basis": { "type": "string" } } },
-          "valuation": { "type": "object" },
-          "assessment": { "type": ["object", "null"], "properties": { "grade": { "type": "string" }, "gradeNumeric": { "type": "integer" }, "methodVersion": { "type": "string" }, "advisory": { "const": true } } },
-          "provenance": { "type": "object", "properties": { "assetsTotal": { "type": "string" }, "lossUnrealized": { "type": "string" }, "unitsOutstanding": { "type": "string" }, "recompute": { "type": "string" } } },
-          "pledge": { "type": "object", "properties": { "units": { "type": "string" }, "valueHeld": { "type": ["string", "null"] }, "valueReported": { "type": ["string", "null"] }, "overstatement": { "type": ["string", "null"] } } }
+          "schema": {
+            "const": "orma.nav/1"
+          },
+          "asOf": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ledgerIndex": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "instrument": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "vaultId": {
+                "type": "string"
+              },
+              "shareMptId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "unitsOutstanding": {
+                "type": "string"
+              },
+              "asset": {
+                "type": "object"
+              },
+              "vaultKind": {
+                "type": "string"
+              },
+              "phase": {
+                "type": "string"
+              },
+              "redemptionAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "unitValue": {
+            "type": "object",
+            "required": [
+              "held",
+              "reported",
+              "divergenceBps"
+            ],
+            "properties": {
+              "held": {
+                "type": "string"
+              },
+              "reported": {
+                "type": "string"
+              },
+              "divergenceBps": {
+                "type": "integer"
+              },
+              "basis": {
+                "type": "string"
+              }
+            }
+          },
+          "valuation": {
+            "type": "object"
+          },
+          "assessment": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "grade": {
+                "type": "string"
+              },
+              "gradeNumeric": {
+                "type": "integer"
+              },
+              "methodVersion": {
+                "type": "string"
+              },
+              "advisory": {
+                "const": true
+              }
+            }
+          },
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "assetsTotal": {
+                "type": "string"
+              },
+              "lossUnrealized": {
+                "type": "string"
+              },
+              "unitsOutstanding": {
+                "type": "string"
+              },
+              "recompute": {
+                "type": "string"
+              },
+              "scale": {
+                "type": "integer",
+                "description": "The vault's Scale: units per whole share is 10^scale."
+              }
+            }
+          },
+          "pledge": {
+            "type": "object",
+            "properties": {
+              "units": {
+                "type": "string"
+              },
+              "valueHeld": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "valueReported": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "overstatement": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "freshness": {
+            "$ref": "#/components/schemas/Freshness"
+          }
+        }
+      },
+      "Freshness": {
+        "type": "object",
+        "description": "How old this facility's own reading is: a failed read keeps the last good one.",
+        "properties": {
+          "readAt": {
+            "type": "string"
+          },
+          "readLedgerIndex": {
+            "type": "integer"
+          },
+          "ageSeconds": {
+            "type": "integer"
+          },
+          "stale": {
+            "type": "boolean"
+          }
         }
       }
     }
