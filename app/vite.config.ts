@@ -12,8 +12,10 @@ import { defineConfig } from 'vite'
  * correct on exactly one deploy and stale on all the others. VITE_SITE_ORIGIN wins if it
  * is set. The production deployment is announced at one address, which Vercel's own
  * production hostname is not (it names the project's first domain), so production stamps
- * that address. Any other deploy uses its own hostname, and a local build falls back to
- * the dev server so the tag is never left holding an unreplaced token.
+ * that address. A preview stamps the project's production hostname rather than its own:
+ * previews sit behind Vercel's deployment protection, where a scraper fetching og:image gets
+ * a 401, and the card is the same file on both. A local build falls back to the dev server
+ * so the tag is never left holding an unreplaced token.
  */
 const PRODUCTION_ORIGIN = 'https://ormaprotocol.com'
 

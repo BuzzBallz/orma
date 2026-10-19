@@ -40,7 +40,9 @@ export function NavChart({ points }: { points: NavPoint[] }) {
   let lo = Math.min(...all), hi = Math.max(...all)
   if (hi - lo < 0.02) { const mid = (hi + lo) / 2; lo = mid - 0.05; hi = mid + 0.05 }
   else { const pad = (hi - lo) * 0.18; lo = Math.max(0, lo - pad); hi += pad }
-  const step = STEPS.find(s => (hi - lo) / s <= 6) ?? 1
+  // Past the table, a power of ten that still gives six ticks: a fixed fallback of 1 drew one
+  // tick per unit, millions of them for a NAV in the millions, and froze the tab.
+  const step = STEPS.find(s => (hi - lo) / s <= 6) ?? 10 ** Math.ceil(Math.log10((hi - lo) / 6))
   const ticks: number[] = []
   for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) ticks.push(Math.round(t / step) * step)
 

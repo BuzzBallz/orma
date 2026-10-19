@@ -38,7 +38,7 @@ export async function validateClassicAddress(raw: string): Promise<AddressCheck>
 
   const bytes = decodeBase58(address)
   if (!bytes || bytes.length !== 25 || bytes[0] !== 0x00) {
-    return { ok: false, reason: 'not a valid XRPL base58 address' }
+    return { ok: false, reason: 'not a valid account reference' }
   }
   const body = bytes.slice(0, 21)
   const h1 = new Uint8Array(await crypto.subtle.digest('SHA-256', body))

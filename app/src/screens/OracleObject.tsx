@@ -48,7 +48,7 @@ export function OracleObject({ o, contest }: { o: Oracle | null; contest?: Oracl
             <tr key={d.key}>
               <td><b>{d.key}</b></td>
               <td className="rt num">{d.value}</td>
-              <td className="op-says orc-raw">0x{d.raw} · scale {d.scale}</td>
+              <td className="op-says orc-raw">{d.raw ? `0x${d.raw}` : '—'} · scale {d.scale}</td>
             </tr>
           ))}
         </tbody>
