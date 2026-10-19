@@ -28,7 +28,7 @@ measures both, publishes them, and enforces on them. One asymmetry, two levers, 
 | Network | XRPL **Devnet**, `wss://s.devnet.rippletest.net:51233`, `network_id` **2** |
 | Explorer, faucet | https://devnet.xrpl.org · https://faucet.devnet.rippletest.net/accounts |
 | `rippled` | **3.4.0-rc5** |
-| Libraries | `xrpl` **5.2.0** with `ripple-binary-codec` **2.11.0**, `decimal.js` **10.6.0**; frontend `xrpl-connect` **0.8.2**, React 19, Vite |
+| Libraries | `xrpl` **5.2.0** with `ripple-binary-codec` **2.11.0**, `decimal.js` **10.6.0**; frontend React 19, Vite |
 | Runtime | Node **24.13.0** |
 | Team | **BuzzBallz** |
 
@@ -394,7 +394,6 @@ sets the Vite build and the single-page rewrite.
 | Variable | Value |
 |---|---|
 | `VITE_API_BASE` | The backend's public URL. It must be `https://`: an https page cannot call http. |
-| `VITE_XRPL_NETWORK` | `devnet` |
 | `VITE_DOCS_URL` | Optional. Defaults to https://buzzballz.github.io/orma/. |
 
 `VITE_` variables are inlined into the bundle at build time, so changing one needs a redeploy, and no

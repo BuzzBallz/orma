@@ -858,15 +858,6 @@ main:focus{ outline: none; }
 .dlg-head{ gap: var(--space-3) !important; padding-right: var(--space-10); }
 .dlg-title{ font: 400 26px/1.25 var(--font-serif) !important; }
 .dlg-sub{ font: 400 14px/1.5 var(--font-sans) !important; color: var(--color-text-2) !important; }
-.wrows{ display: flex; flex-direction: column; border-bottom: 1px solid var(--color-line); }
-.wrow{ display: flex; align-items: center; gap: var(--space-4); min-height: 68px; padding: var(--space-3) 0; border-top: 1px solid var(--color-line); }
-.wrow-id{ display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
-.wname{ font: 500 15px/1.4 var(--font-sans); }
-.wnote{ font: 400 14px/1.5 var(--font-sans); color: var(--color-text-3); }
-.wstate{ font: 400 14px/1.5 var(--font-sans); color: var(--color-text-3); white-space: nowrap; }
-.wrow[data-here="true"] .wstate{ color: var(--color-ok); }
-.wqr{ display: flex; flex-direction: column; align-items: center; gap: var(--space-2); }
-.wqr img{ border-radius: var(--radius-sm); background: #fff; padding: var(--space-2); }
 .wpaste{ display: flex; flex-direction: column; gap: var(--space-4); border-top: 1px solid var(--color-rule); padding-top: var(--space-5); }
 .field{ display: flex; flex-direction: column; gap: var(--space-2); }
 .field label{ font: 500 13px/1.4 var(--font-sans); }
