@@ -115,3 +115,6 @@ export function fmtIso(s: string | null | undefined): string {
 export function short(hex: string | null | undefined, n = 8): string {
   return hex ? hex.slice(0, n) + '…' : '—'
 }
+
+/** A decimal string to `dp` places, rounded half-up, without passing through a float. */
+export function fixed(s: string, dp: number): string { return padDp(s, dp) }
