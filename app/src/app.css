@@ -940,6 +940,8 @@ main:focus{ outline: none; }
   /* A table prints whole, not inside a scroller. */
   .tbl-wrap{ overflow: visible; background: none; }
   .op-tbl{ min-width: 0; }
+  /* With no scroller, a long reference (a pointer URL, a hash) wraps instead of running off the page. */
+  .op-tbl td{ overflow-wrap: anywhere; }
   /* Keep a heading with what follows it, and a row, a figure or a short exhibit in one piece. */
   h1, h2, h3, .exh > summary{ break-after: avoid; }
   tr, .op-glance > div, .navc svg, .state{ break-inside: avoid; }
