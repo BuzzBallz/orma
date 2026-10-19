@@ -9,9 +9,12 @@ export interface Poll<T> {
   ageMs: number           // age of the last good payload, from performance.now()
   fails: number           // consecutive failures
   receivedAt: number      // performance.now() of the last good payload, 0 before the first
+  waiting: boolean        // the request in flight has taken longer than WAITING_AFTER_MS
 }
 
 const STALE_AFTER_MS = 6000
+/** A request this slow is a service waking up, and the page says so instead of drawing nothing. */
+const WAITING_AFTER_MS = 3000
 
 /**
  * A failing poll backs off exponentially instead of hammering, capped at 5s — long enough
@@ -36,7 +39,7 @@ export function usePoll<T>(path: string | null, intervalMs: number, opts?: {
   const slowAfter = opts?.slowAfter ?? Infinity
   const slowCapMs = opts?.slowCapMs ?? BACKOFF_CAP_MS
   const [state, setState] = useState<Omit<Poll<T>, 'stale' | 'ageMs'>>({
-    data: null, error: null, code: null, fails: 0, receivedAt: 0,
+    data: null, error: null, code: null, fails: 0, receivedAt: 0, waiting: false,
   })
   // A tick purely to re-render so `stale`/`ageMs` stay live between polls.
   const [, setBeat] = useState(0)
@@ -54,18 +57,20 @@ export function usePoll<T>(path: string | null, intervalMs: number, opts?: {
     async function cycle() {
       if (cancelled) return
       if (path === null) { timer = setTimeout(cycle, intervalMs); return }
+      const slow = setTimeout(() => { if (!cancelled) setState(s => ({ ...s, waiting: true })) }, WAITING_AFTER_MS)
       try {
         const data = await getJson<T>(path)
         if (cancelled) return
         fails = 0
-        setState({ data, error: null, code: null, fails: 0, receivedAt: performance.now() })
+        setState({ data, error: null, code: null, fails: 0, receivedAt: performance.now(), waiting: false })
       } catch (e) {
         if (cancelled) return
         const f = e instanceof ApiFailure ? e : null
         fails += 1
         // keep data: last good payload stays on screen
-        setState(s => ({ ...s, error: f?.message ?? 'network error', code: f?.code ?? null, fails: s.fails + 1 }))
+        setState(s => ({ ...s, error: f?.message ?? 'network error', code: f?.code ?? null, fails: s.fails + 1, waiting: false }))
       } finally {
+        clearTimeout(slow)
         // whatever the outcome, schedule the next poll. The loop must be unkillable —
         // it just slows down while nobody is answering.
         if (!cancelled) timer = setTimeout(cycle, nextDelay(intervalMs, fails, fails >= slowAfter ? slowCapMs : BACKOFF_CAP_MS))

@@ -34,8 +34,12 @@ export class ApiFailure extends Error {
   }
 }
 
-/** Single fetch with a hard 2500ms abort. Throws ApiFailure on anything that is not a 2xx JSON body. */
-export async function getJson<T>(path: string, timeoutMs = 2500): Promise<T> {
+/**
+ * Single fetch with a hard abort. 30s, not less: the API sleeps when idle and takes about 22s to
+ * wake, and a shorter abort turned every wake into a run of failures. Throws ApiFailure on anything
+ * that is not a 2xx JSON body.
+ */
+export async function getJson<T>(path: string, timeoutMs = 30_000): Promise<T> {
   const ctl = new AbortController()
   const timer = setTimeout(() => ctl.abort(), timeoutMs)
   try {

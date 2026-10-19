@@ -27,6 +27,13 @@ const POLL_MS = 3000
  * missing, in the same language as the rest of the service — never a spinner, never a
  * placeholder figure.
  */
+/** Why no figure is shown yet, in the reader's words. Every case retries on its own. */
+function waitingWords(code: string | null): string {
+  if (code === 'WARMING_UP') return 'The service has just started and has not read this facility yet. The figures appear on their own.'
+  if (code === 'TIMEOUT' || code === null) return 'The service is not answering. It sleeps when idle and takes about half a minute to wake. The figures appear on their own.'
+  return 'This facility is on file. No figure is shown until one is received.'
+}
+
 function Note({ heading, watch, said, facts, onBack }: {
   heading: string; watch?: boolean; said: ReactNode
   facts: [string, ReactNode][]
@@ -173,6 +180,7 @@ function Desk() {
       return (
         <Portfolio
           vaults={rows} received={vaults.data !== null} asOf={vaults.data?.serverTime ?? null}
+          pending={vaults.fails > 0 || vaults.waiting ? waitingWords(vaults.code) : null}
           onOpen={id => go('/facility', id)} onNavigate={go}
         />
       )
@@ -215,7 +223,7 @@ function Desk() {
       const known = rows.find(r => r.vaultId === vaultId)
       return (
         <Placeholder name={known ? facilityName(known) : undefined} picker={picker}>
-          {detail.fails > 0 && <p className="t-body-m dim">This facility is on file. No figure is shown until one is received.</p>}
+          {(detail.fails > 0 || detail.waiting) && <p className="t-body-m dim">{waitingWords(detail.code)}</p>}
         </Placeholder>
       )
     }

@@ -88,10 +88,12 @@ function Row({ v, onOpen }: { v: VaultRow; onOpen: (vaultId: string) => void }) 
  * The portfolio. What the service is, in one line; the widest gap on file; then every
  * facility, weakest internal score first — a credit committee reads the worst name first.
  */
-export function Portfolio({ vaults, received, asOf, onOpen, onNavigate }: {
+export function Portfolio({ vaults, received, pending, asOf, onOpen, onNavigate }: {
   vaults: VaultRow[]
   /** Whether the list has been received at all. Empty and not yet received are different facts. */
   received: boolean
+  /** Why nothing has been received yet, when the service is slow or not answering. */
+  pending: string | null
   asOf: string | null
   onOpen: (vaultId: string) => void
   onNavigate: (path: RoutePath) => void
@@ -139,7 +141,7 @@ export function Portfolio({ vaults, received, asOf, onOpen, onNavigate }: {
         </div>
         {n > 0
           ? <ul className="book-list">{vaults.map(v => <Row key={v.vaultId} v={v} onOpen={onOpen} />)}</ul>
-          : <p className="book-empty">{received ? 'No facility is on file yet.' : 'No figure is shown until one is received.'}</p>}
+          : <p className="book-empty">{received ? 'No facility is on file yet.' : pending ?? 'No figure is shown until one is received.'}</p>}
         <p className="quote t-quote">A zero gap is not safety. It means the two figures agree.</p>
       </section>
     </>
