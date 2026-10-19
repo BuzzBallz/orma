@@ -106,21 +106,21 @@ export class Xrpl {
    * NOTE: the parameter is `vault_id`, NOT `vault` as XLS-65 section 3.9.1 states.
    */
   async vaultInfo(vaultId) {
-    const r = await this.req({ command: 'vault_info', vault_id: vaultId })
+    const r = await this.req({ command: 'vault_info', vault_id: vaultId, ledger_index: 'validated' })
     return r.result.vault
   }
 
   /** Read a LoanBroker by its object index, or by {owner, seq}. */
   async loanBroker(ref) {
     const param = typeof ref === 'string' ? ref : { loan_broker: ref }
-    const r = await this.req(typeof ref === 'string' ? { command: 'ledger_entry', index: ref } : { command: 'ledger_entry', ...param })
+    const r = await this.req(typeof ref === 'string' ? { command: 'ledger_entry', index: ref, ledger_index: 'validated' } : { command: 'ledger_entry', ...param, ledger_index: 'validated' })
     return r.result.node
   }
 
   /** Read a Loan by object index, or by {loan_broker_id, loan_seq}. */
   async loan(ref) {
     const r = await this.req(
-      typeof ref === 'string' ? { command: 'ledger_entry', index: ref } : { command: 'ledger_entry', loan: ref },
+      typeof ref === 'string' ? { command: 'ledger_entry', index: ref, ledger_index: 'validated' } : { command: 'ledger_entry', loan: ref, ledger_index: 'validated' },
     )
     return r.result.node
   }
@@ -133,7 +133,7 @@ export class Xrpl {
    * need to value it has to be reachable from here.
    */
   async mptIssuance(issuanceId) {
-    const r = await this.req({ command: 'ledger_entry', mpt_issuance: String(issuanceId).toUpperCase() })
+    const r = await this.req({ command: 'ledger_entry', mpt_issuance: String(issuanceId).toUpperCase(), ledger_index: 'validated' })
     return r.result.node
   }
 
@@ -171,7 +171,7 @@ export class Xrpl {
 
   /** Objects owned by an account, optionally filtered. Used to discover a vault's brokers. */
   async accountObjects(account, type) {
-    const r = await this.req({ command: 'account_objects', account, type, limit: 400 })
+    const r = await this.req({ command: 'account_objects', account, type, limit: 400, ledger_index: 'validated' })
     return r.result.account_objects ?? []
   }
 }
