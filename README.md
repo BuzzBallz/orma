@@ -29,7 +29,7 @@ measures both, publishes them, and enforces on them. One asymmetry, two levers, 
 | Explorer, faucet | https://devnet.xrpl.org · https://faucet.devnet.rippletest.net/accounts |
 | `rippled` | **3.4.0-rc5** during the event; Devnet has run **3.4.1** since |
 | Libraries | `xrpl` **5.3.0** with `ripple-binary-codec` **2.11.0**, `decimal.js` **10.6.0**; frontend React 19, Vite |
-| Runtime | Node **24.13.0** |
+| Runtime | Node **26.12.0** |
 | Team | **BuzzBallz** |
 
 The brief pins `xrpl.js@5.2.0-beta.0`. Stable `5.2.0` was published on 11 September 2026 at 22:20 UTC, before
@@ -309,7 +309,7 @@ succeeds. A rater who could trap capital would be a worse problem than the one w
 
 ## Running it
 
-Node 24.13.0 (Node 20.19 or later works). The reader needs outbound access to Devnet and no keys: every
+Node 26.12.0 (Node 20.19 or later works). The reader needs outbound access to Devnet and no keys: every
 facility it serves is public ledger state.
 
 ```bash
