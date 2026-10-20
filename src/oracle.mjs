@@ -104,16 +104,17 @@ export class OraclePublisher {
   /**
    * @param {import('xrpl').Client} client
    * @param {import('xrpl').Wallet} wallet
-   * @param {{provider?:string, assetClass?:string}} [opts]
+   * @param {{provider?:string, assetClass?:string, docIds?:Record<string, number>}} [opts]
    */
   constructor(client, wallet, opts = {}) {
     this.client = client
     this.wallet = wallet
     this.provider = opts.provider ?? 'BuzzBallz Vault Solvency'
     this.assetClass = opts.assetClass ?? 'risk'
-    /** @type {Map<string, number>} vaultId -> OracleDocumentID */
-    this.docIds = new Map()
-    this._nextDocId = 1
+    /** @type {Map<string, number>} vaultId -> OracleDocumentID. Pinned ids come first, and new ones start
+     *  above them, so a restart or a retired vault never moves a document to another vault. */
+    this.docIds = new Map(Object.entries(opts.docIds ?? {}))
+    this._nextDocId = Math.max(0, ...this.docIds.values()) + 1
     /** last LastUpdateTime per docId, to enforce invariant 2 without a round trip */
     this._lastUpdate = new Map()
     /** one in-flight publish per document, so two ticks cannot race the timestamp */
