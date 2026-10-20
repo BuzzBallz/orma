@@ -12,7 +12,9 @@ Every response body on this page was captured from the running service against X
 `/api/demo/state` capture, which is from ledger `5263439` a few minutes later, and the two history
 routes, captured on 2026-10-13 (server build `3.4.1`, ledgers `6091723` and `6091724`) once their
 responses stated the window they cover, and `/api/oracle-aggregate`, documented that day from ledger
-`6092503`. Responses are trimmed for length where noted, never rewritten.
+`6092503`. The Halden Structured Credit IV captures were taken on 2026-10-20 (server build `3.4.1`,
+ledgers `6273933` and `6273934`, and `6274019` for its `/gate`). Responses are trimmed for length
+where noted, never rewritten.
 
 <Warning>
 This runs on Devnet, not Mainnet. XLS-65 vaults and XLS-66 lending are not amended into Mainnet, so
@@ -347,31 +349,31 @@ loan, the phase and redemption cliff, the on-chain oracle, and the alerts.
 | `vaultId` | path | yes | 64 hex characters, case insensitive |
 
 ```bash
-curl -s http://localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5
+curl -s http://localhost:8787/api/vaults/DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245
 ```
 
 ```jsonc
 {
-  "serverTime": "2026-09-12T22:20:22Z",
-  "ledgerIndex": 5263343,
+  "serverTime": "2026-10-20T14:59:02Z",
+  "ledgerIndex": 6273933,
   "vault": {
     // every field from the list row, plus:
-    "vaultId": "5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5",
-    "label": "Calder Structured Credit III",
-    "shareMptId": "000000014D667775372D5B78E07FFF294678C7F9CE82AFBC",
+    "vaultId": "DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245",
+    "label": "Halden Structured Credit IV",
+    "shareMptId": "000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797",
     "sharesOutstanding": "51000000",
     "scale": 0,
     "withdrawalPolicy": "FirstComeFirstServe",
     "isPrivate": false,
     "domainId": null,
-    "subscriptionAt": "2026-09-12T21:11:47Z",
+    "subscriptionAt": "2026-10-19T21:29:17Z",
     "leVersion": "CashBasis",
-    "explorerUrl": "https://devnet.xrpl.org/accounts/r3hE8HanpccSZdgmeHCfYFEkwxFjdDmmvt"
+    "explorerUrl": "https://devnet.xrpl.org/accounts/r3XEmxGd7F51niRp94hcEcuuU7HJU47C2R"
   },
   "broker": {
-    "loanBrokerId": "1C160EFFCA8208DFD8CE9B065A3C3C41CCA80758FBC3099BE27AACFBD1478173",
-    "owner": "rGMo2ke9of3GEqJwWAzDmFjrm6SwYowTsB",
-    "pseudoAccount": "rUUomEsKraSfCYppP9nZx7k7aAzEe7CY3B",
+    "loanBrokerId": "3A87743DC5EEEBD4A527543D73E5CBDCB7B0201113084A47E1C4FE5D0B480AF6",
+    "owner": "r4nBvMQHt9ow7tXZqtgxwo4jXf4BvnD8hC",
+    "pseudoAccount": "rBwamjB23wtYBhQukfyf2ZYMnVKoE4pkBF",
     "debtTotal": "10000000",
     "debtMaximum": "45000000",
     "coverAvailable": "5000000",
@@ -386,8 +388,8 @@ curl -s http://localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955
   "score": {
     "grade": "AA",
     "gradeNumeric": 89,
-    "computedAt": "2026-09-12T22:20:21Z",
-    "methodVersion": "1.0.0",
+    "computedAt": "2026-10-20T14:59:02Z",
+    "methodVersion": "1.1.0",
     // array order is LIQUIDITY, COVER, CONCENT, RECOG, DEADLINE, HEADLINE.
     // Only the third is shown here.
     "dimensions": [
@@ -405,13 +407,13 @@ curl -s http://localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955
     "notchTrace": [
       { "from": "AAA", "rule": "anchor on DEADLINE (can claims be met at redemption)", "delta": 0, "to": "AAA" },
       { "from": "AAA", "rule": "single loan >= 75% of broker debt (cover is keyed to total debt, not loan size)", "delta": -1, "to": "AA+" },
-      { "from": "AA+", "rule": "liquidatable cover < 5% of recognised loss", "delta": -1, "to": "AA" }
+      { "from": "AA+", "rule": "liquidatable cover < 5% of the exposure it must absorb", "delta": -1, "to": "AA" }
     ]
   },
   "loans": [
     {
-      "loanId": "D6979E3A3FD90234A8BE80FCB37589204C691D0AC1C741C4A780D02D5073F252",
-      "borrower": "raxskEENwfnRay2VaQroMoV4XYFUurggL5",
+      "loanId": "E5AE574EEE5892562725C3BF8C83B331A3512291000DC47B83C3C6D23A219C9B",
+      "borrower": "r3uqZG6ziKiVsQ4aiuJPwwcAAxTRAsyTwc",
       "status": "impaired",
       "principalOutstanding": "10000000",
       "totalValueOutstanding": "10000039",
@@ -422,21 +424,21 @@ curl -s http://localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955
       "paymentInterval": 60,
       "gracePeriod": 60,
       "paymentRemaining": 3,
-      "nextPaymentDueAt": "2026-09-12T21:13:10Z",
-      "secondsUntilDue": -4031,
-      "secondsUntilDefaultable": -3971,
+      "nextPaymentDueAt": "2026-10-19T21:30:40Z",
+      "secondsUntilDue": -62902,
+      "secondsUntilDefaultable": -62842,
       "shareOfDebtTotal": "1.0000",
       "impairable": false,
-      "explorerUrl": "https://devnet.xrpl.org/transactions/D6979E3A3FD90234A8BE80FCB37589204C691D0AC1C741C4A780D02D5073F252"
+      "explorerUrl": "https://devnet.xrpl.org/transactions/EC385DAF2DF412F86F06648B7855AEFDB1A1B8596048DA33C33B0A09FB2D08E5"
     }
   ],
   "phaseInfo": {
-    "phase": "Investment",
+    "phase": "Redemption",
     "canDeposit": false,
-    "canWithdraw": false,
-    "withdrawBlockedReason": "tecTOO_SOON",
-    "nextBoundaryAt": "2026-09-13T15:11:47Z",
-    "secondsToNextBoundary": 60686,
+    "canWithdraw": true,
+    "withdrawBlockedReason": null,
+    "nextBoundaryAt": null,
+    "secondsToNextBoundary": 0,
     "claimsAtRedemption": "41000000",
     "liquidityAtRedemption": "41100000",
     "projectedShortfall": "0",
@@ -444,13 +446,13 @@ curl -s http://localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955
   },
   "oracle": {
     "published": true,
-    "oracleDocumentId": 3,
-    "publisher": "rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B",
-    "objectIndex": "03C7B0E151129510F11FF92CCE8FBB3E7AD3C55B25EDA6EB414324E3E995078A",
-    "baseAssetHex": "5763707D11EA19D1B5FF04E4EBA4F9336057955C",
-    "lastUpdateAt": "2026-09-12T22:20:02Z",
-    "ageSeconds": 11,
-    "stale": false,
+    "oracleDocumentId": 5,
+    "publisher": "rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H",
+    "objectIndex": "02B6D31C8D7D8405A9274C092F5837EC6160C65B7983BA98FF8220289820650D",
+    "baseAssetHex": "DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06C",
+    "lastUpdateAt": "2026-10-20T14:58:00Z",
+    "ageSeconds": 73,
+    "stale": true,
     "dimensionsOnChain": [
       { "key": "CNC", "raw": "2710",  "value": "1.0000",   "scale": 4 },
       { "key": "COV", "raw": "64",    "value": "0.0100",   "scale": 4 },
@@ -487,16 +489,17 @@ Things in there that are easy to misread:
   Writing `"100"` into that field means 256, not one hundred. Full detail in
   [/mathematics](/mathematics#8-publication-as-an-oracle-object).
 - `oracle.publisher` and `oracle.oracleDocumentId` name the account and document the answering
-  reader publishes to. This capture is from the event, when that was `rpVg1…`, whose objects stopped
-  updating on 13 September; the deployed reader publishes from `rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H`.
-  Document id 3 is Calder on both accounts. The full mapping is in
+  reader publishes to. This capture is from the deployed reader, `rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H`;
+  during the event it was `rpVg1…`, whose objects stopped updating on 13 September. Document id 5 is
+  Halden. The full mapping is in
   [the quickstart](/quickstart#reading-the-objects-already-on-devnet).
 - `coverRateMinimum` and `coverRateLiquidation` are in units of $10^{-5}$. A stated `10000` is
   $0.10$. **Both** are divided by $10^{5}$, which is why `maxLiquidatableNow` is
   $\lceil 10{,}000{,}000 \times 0.10 \times 0.10 \rceil = 100{,}000$ drops against a
   `coverAvailable` of `"5000000"`. `strandedCoverFraction: "0.9800"` is the 98% of posted cover that
   cannot be reached at the current book size.
-- `canWithdraw: false` with `withdrawBlockedReason: "tecTOO_SOON"` is **not an error**.
+- `canWithdraw` is `true` here because the vault is in Redemption. During the Investment phase it
+  reads `false` with `withdrawBlockedReason: "tecTOO_SOON"`, which is **not an error**.
   `VaultWithdraw` returns `tecTOO_SOON` for the entire Investment phase of a closed-ended vault
   regardless of liquidity. It is a phase predicate, verified on Devnet with 80 XRP of
   `AssetsAvailable` sitting in the vault.
@@ -522,25 +525,25 @@ metadata points at, keyed by vault id.
 Sends `Cache-Control: public, max-age=4`.
 
 ```bash
-curl -s http://localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5/nav
+curl -s http://localhost:8787/api/vaults/DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245/nav
 ```
 
 ```json
 {
-  "serverTime": "2026-09-12T22:20:22Z",
-  "ledgerIndex": 5263343,
+  "serverTime": "2026-10-20T14:59:02Z",
+  "ledgerIndex": 6273933,
   "schema": "orma.nav/1",
-  "asOf": "2026-09-12T22:20:22Z",
-  "freshness": { "readAt": "2026-09-12T22:20:22Z", "readLedgerIndex": 5263343, "ageSeconds": 0, "stale": false },
+  "asOf": "2026-10-20T14:59:02Z",
+  "freshness": { "readAt": "2026-10-20T14:59:02Z", "readLedgerIndex": 6273933, "ageSeconds": 1, "stale": false },
   "instrument": {
     "kind": "vault-share",
-    "vaultId": "5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5",
-    "shareMptId": "000000014D667775372D5B78E07FFF294678C7F9CE82AFBC",
+    "vaultId": "DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245",
+    "shareMptId": "000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797",
     "unitsOutstanding": "51000000",
     "asset": { "kind": "XRP", "currency": "XRP", "issuer": null, "mptIssuanceId": null },
     "vaultKind": "ClosedEnded",
-    "phase": "Investment",
-    "redemptionAt": "2026-09-13T15:11:47Z"
+    "phase": "Redemption",
+    "redemptionAt": "2026-10-19T22:29:17Z"
   },
   "unitValue": {
     "held": "0.803922",
@@ -557,7 +560,7 @@ curl -s http://localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955
   "assessment": {
     "grade": "AA",
     "gradeNumeric": 89,
-    "methodVersion": "1.0.0",
+    "methodVersion": "1.1.0",
     "advisory": true
   },
   "provenance": {
@@ -568,7 +571,7 @@ curl -s http://localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955
     "unitsOutstanding": "51000000",
     "scale": 0,
     "recompute": "(assetsTotal - lossUnrealized) / (unitsOutstanding / 10^scale)",
-    "buildVersion": "3.4.0-rc5"
+    "buildVersion": "3.4.1"
   }
 }
 ```
@@ -749,7 +752,7 @@ An ungated facility answers with the same shape and a populated `note`:
 
 ```json
 {
-  "vaultId": "5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5",
+  "vaultId": "DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245",
   "gated": false,
   "private": false,
   "domainId": null,
@@ -789,14 +792,14 @@ before lending against a pledge.
 | `haircut` | query | no | `0` | the lender's own discount, in percent |
 
 ```bash
-curl -s "http://localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5/collateral?haircut=20"
+curl -s "http://localhost:8787/api/vaults/DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245/collateral?haircut=20"
 ```
 
 ```json
 {
-  "serverTime": "2026-09-12T22:20:22Z",
-  "ledgerIndex": 5263343,
-  "shareMptId": "000000014D667775372D5B78E07FFF294678C7F9CE82AFBC",
+  "serverTime": "2026-10-20T14:59:10Z",
+  "ledgerIndex": 6273934,
+  "shareMptId": "000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797",
   "navNaive": "1.000000",
   "navCorrect": "0.803922",
   "pledgeCount": 0,
@@ -810,7 +813,7 @@ curl -s "http://localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F933605795
 ```
 
 `haircut` is echoed per pledge as `haircutPct`, never at the top level, so this capture is byte for
-byte the same with and without `?haircut=20`: no pledge was standing against Calder at that ledger.
+byte the same with and without `?haircut=20`: no pledge was standing against Halden at that ledger.
 
 Each element of `pledges`, when there are any, carries `escrowId`, `pledgor`, `beneficiary`,
 `shares`, `valueNaive`, `valueCorrect`, `overstatement`, `overstatementPct`, `haircutPct`,
@@ -1012,7 +1015,7 @@ Sends `Cache-Control: public, max-age=4`. Returns `SHARE_NOT_TRACKED` (404) if n
 issues that token.
 
 ```bash
-curl -s "http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav?units=1000000"
+curl -s "http://localhost:8787/api/mpt/000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797/nav?units=1000000"
 ```
 
 The body is identical to `/api/vaults/:vaultId/nav` above, `schema: "orma.nav/1"`, plus one block
@@ -1051,42 +1054,42 @@ whole loop a second broker runs and reports every step, including the failures.
 | `units` | query | no | | value a pledge against whatever was resolved |
 
 ```bash
-curl -s http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/resolve
+curl -s "http://localhost:8787/api/mpt/000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797/resolve?units=1000000"
 ```
 
 ```jsonc
 {
-  "serverTime": "2026-09-12T22:20:22Z",
-  "ledgerIndex": 5263343,
-  "issuanceId": "000000014D667775372D5B78E07FFF294678C7F9CE82AFBC",
-  "issuer": "r3hE8HanpccSZdgmeHCfYFEkwxFjdDmmvt",
+  "serverTime": "2026-10-20T14:59:10Z",
+  "ledgerIndex": 6273934,
+  "issuanceId": "000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797",
+  "issuer": "r3XEmxGd7F51niRp94hcEcuuU7HJU47C2R",
   "unitsOutstanding": "51000000",
   "resolved": true,
-  "navUrl": "http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav",
+  "navUrl": "https://ormaprotocol.com/api/mpt/000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797/nav",
   "steps": [
-    { "step": "read MPTokenIssuance", "ok": true, "detail": "issuer r3hE8HanpccSZdgmeHCfYFEkwxFjdDmmvt, 51000000 units outstanding" },
+    { "step": "read MPTokenIssuance", "ok": true, "detail": "issuer r3XEmxGd7F51niRp94hcEcuuU7HJU47C2R, 51000000 units outstanding" },
     { "step": "decode metadata", "ok": true, "detail": "valid JSON" },
     { "step": "XLS-89 conformance", "ok": true, "detail": "asset_class rwa" },
-    { "step": "find valuation pointer", "ok": true, "detail": "http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav" },
+    { "step": "find valuation pointer", "ok": true, "detail": "https://ormaprotocol.com/api/mpt/000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797/nav" },
     { "step": "follow pointer", "ok": true, "detail": "unit value 0.803922" }
   ],
   "metadata": {
     "present": true,
     // `meta` is the decoded MPTokenMetadata verbatim. The `icon` field is elided here for
-    // width; the full 502-byte object is on /nav-pointer.
+    // width; the full 525-byte object is on /nav-pointer.
     "meta": {
-      "ticker": "ORMA-CSC3",
-      "name": "Calder Structured Credit III",
+      "ticker": "ORMA-HSC4",
+      "name": "Halden Structured Credit IV",
       "asset_class": "rwa",
       "issuer_name": "Orma",
       "desc": "Redeemable claim on a closed-ended private credit facility. Valuation is net of recognised loss.",
       "orma": {
         "v": 1,
         "instrument": "vault-share",
-        "nav_url": "http://localhost:8787/api/mpt/{mpt_issuance_id}/nav",
+        "nav_url": "https://ormaprotocol.com/api/mpt/{mpt_issuance_id}/nav",
         "nav_url_param": "{mpt_issuance_id}",
         "nav_basis": "assets net of recognised loss, divided by units outstanding",
-        "doc": "https://orma.credit/nav"
+        "doc": "https://ormaprotocol.com/docs/nav-pointer"
       }
     },
     "conformance": {
@@ -1097,7 +1100,13 @@ curl -s http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE
       "taxonomyNote": "No XLS-89 asset_class describes a yield-bearing pooled claim; rwa is the closest. See orma.instrument."
     }
   },
-  "nav": { /* the full orma.nav/1 document from the route above */ }
+  "nav": { /* the full orma.nav/1 document from the route above */ },
+  "pledge": {
+    "units": "1000000",
+    "valueHeld": "803922",
+    "valueReported": "1000000",
+    "overstatement": "196078"
+  }
 }
 ```
 

@@ -112,7 +112,7 @@ Only the broker owner can declare a default, and the broker owner is always the 
 
 **Conduct E.** And read the second finding: neither loan was ever flagged. The first thing an investor learned was that the money was gone.
 
-**Picker → Calder Structured Credit III.**
+**Picker → Halden Structured Credit IV.**
 
 Same tool, same exhibit, a different manager. // Conduct **A**: no loss written off at all, and the one distressed exposure flagged and left flagged. // **That** is what a new investor wants to see before they subscribe.
 
@@ -134,11 +134,11 @@ Same tool, same exhibit, a different manager. // Conduct **A**: no loss written 
 - **0.196078 XRP** kept off the second lender's book
 
 ### notes
-Stay on Calder. Scroll to Exhibit 5.
+Stay on Halden. Scroll to Exhibit 5.
 
 An investor pledges their units to a second lender. That lender holds a token and nothing else. // They read the token's own metadata, follow the pointer it declares, and price the pledge. Five steps, and not one of them needs a relationship with the facility. // Priced naively: **one point zero zero**. Priced on what the instrument points to: **zero point eight zero**. // **Zero point one nine of overstatement, kept out of the second lender's book.**
 
-*The pointer on the wall is our own endpoint on this laptop, and steps four and five say so in green. Volunteer it before it is asked: "in production that URL is whatever the issuer wrote into the token. The point is the lender learns where to look from the token, not from us."*
+*The pointer on the wall is our own public endpoint, `ormaprotocol.com`, and steps four and five resolve through it in green. Volunteer it before it is asked: "in production that URL is whatever the issuer wrote into the token. The point is the lender learns where to look from the token, not from us."*
 
 *`[+]` at 5:00 only: on Kestrel that same exhibit stops at step two: no metadata, nothing readable. That is every vault today.*
 

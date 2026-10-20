@@ -4,7 +4,8 @@ description: "Four worked cases against three of the four live Devnet facilities
 ---
 
 Every ledger figure on this page was read from the running API at ledger `5263343`,
-`2026-09-12T22:20:22Z`, against Devnet `rippled 3.4.0-rc5`. Nothing here is a projection.
+`2026-09-12T22:20:22Z`, against Devnet `rippled 3.4.0-rc5`, except Halden Structured Credit IV,
+read at ledger `6273933`, `2026-10-20T14:59:02Z`, against `rippled 3.4.1`. Nothing here is a projection.
 The two haircut figures in case 2 are arithmetic on that reading rather than a captured
 response body, and case 2 says so where they appear.
 
@@ -27,12 +28,12 @@ hash below resolves on `devnet.xrpl.org`.
 
 ## 1. An LP choosing between two facilities
 
-Two closed-ended XRP facilities, both in the Investment phase, both scored by the same
+Two closed-ended XRP facilities, both scored by the same
 code path with no weights applied anywhere.
 
-| | Kestrel Bridge Financing II | Calder Structured Credit III |
+| | Kestrel Bridge Financing II | Halden Structured Credit IV |
 |---|---|---|
-| `vaultId` | `24EAA01A...E5810089` | `5763707D...A96CB0E5` |
+| `vaultId` | `24EAA01A...E5810089` | `DAB9E1EE...A602B245` |
 | Vault grade | **B** (26 / 100) | **AA** (89 / 100) |
 | Conduct grade | **E** (25 / 100) | **A** (100 / 100) |
 | `assetsTotal` | `10500000` drops | `51000000` drops |
@@ -45,7 +46,7 @@ code path with no weights applied anywhere.
 
 The two columns disagree with each other in exactly the way that matters.
 
-Kestrel reports **zero** NAV divergence. Calder reports 19.61%. A screener that ranks by
+Kestrel reports **zero** NAV divergence. Halden reports 19.61%. A screener that ranks by
 divergence puts Kestrel on top. Kestrel is the worse facility by a wide margin, and the
 reason is mechanical: divergence only becomes non-zero once a manager has **declared** a
 loss. Kestrel's manager never declared one. They went straight to default, at which point
@@ -94,10 +95,10 @@ which notches the composite down 14 steps from its AAA anchor to **B**. Without 
 the vault scores AAA, because after a write-off the asset is gone, the provision is
 released and every current-exposure factor reads clean.
 
-### What Calder's manager actually did
+### What Halden's manager actually did
 
 One loan, 10 XRP, went past due. The manager impaired it
-(`BD18EFB94490CA540E7A9C249971740C1228D1FBC3ED97C9BA9F4908F52D5F4F`), which moved
+(`EC385DAF2DF412F86F06648B7855AEFDB1A1B8596048DA33C33B0A09FB2D08E5`), which moved
 `LossUnrealized` from `0` to `10000000` and took the honest unit value from 1.000000 down
 to 0.803922. No default has been declared. The ordering rule needs two defaults before it
 applies, no exposure was written off without warning, and no first-loss capital has been
@@ -109,18 +110,18 @@ The vault itself is graded **AA**, not AAA, and the notch trace says why:
 "notchTrace": [
   { "from": "AAA", "rule": "anchor on DEADLINE (can claims be met at redemption)", "delta": 0, "to": "AAA" },
   { "from": "AAA", "rule": "single loan >= 75% of broker debt (cover is keyed to total debt, not loan size)", "delta": -1, "to": "AA+" },
-  { "from": "AA+", "rule": "liquidatable cover < 5% of recognised loss", "delta": -1, "to": "AA" }
+  { "from": "AA+", "rule": "liquidatable cover < 5% of the exposure it must absorb", "delta": -1, "to": "AA" }
 ]
 ```
 
 Both notches are about structure, not about the disclosure. Disclosing the loss cost
-Calder 1961 bp on its published unit value and cost its conduct grade nothing.
+Halden 1961 bp on its published unit value and cost its conduct grade nothing.
 
 ### Who this is for
 
 An LP with capital to allocate and no way to tell a manager who has taken a loss from a
 manager who has hidden one. `AssetsTotal` is the field every generic tool reads, and it
-answers neither question. Calder reads `51000000` against 51,000,000 units outstanding, a
+answers neither question. Halden reads `51000000` against 51,000,000 units outstanding, a
 naive unit value of exactly `1.000000`, with the 10 XRP loss its manager has already
 recognised nowhere in the number. Kestrel reads a divergence of zero because its manager
 skipped the recognition step altogether. On conduct, which is the record of what each
@@ -147,7 +148,7 @@ before the retention window is not visible and is not claimed to be.
 
 ## 2. A second broker asked to lend against pledged units
 
-An LP holds units of Calder's share token and wants to borrow against them from a
+An LP holds units of Halden's share token and wants to borrow against them from a
 different broker. The units are escrowed on-ledger: XLS-85 `TokenEscrow` accepts MPT
 amounts, and vault shares are MPTs, so `EscrowCreate` with
 `Amount: { mpt_issuance_id, value }` returns `tesSUCCESS`. The pledge is then a public
@@ -157,22 +158,22 @@ The second broker starts from the only identifier they have, the issuance id, an
 resolution loop. Every step is on the ledger or on a URL the ledger names:
 
 ```bash
-curl -s "localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/resolve?units=1000000"
+curl -s "localhost:8787/api/mpt/000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797/resolve?units=1000000"
 ```
 
 ```json
 "steps": [
-  { "step": "read MPTokenIssuance", "ok": true, "detail": "issuer r3hE8HanpccSZdgmeHCfYFEkwxFjdDmmvt, 51000000 units outstanding" },
+  { "step": "read MPTokenIssuance", "ok": true, "detail": "issuer r3XEmxGd7F51niRp94hcEcuuU7HJU47C2R, 51000000 units outstanding" },
   { "step": "decode metadata", "ok": true, "detail": "valid JSON" },
   { "step": "XLS-89 conformance", "ok": true, "detail": "asset_class rwa" },
-  { "step": "find valuation pointer", "ok": true, "detail": "http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav" },
+  { "step": "find valuation pointer", "ok": true, "detail": "https://ormaprotocol.com/api/mpt/000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797/nav" },
   { "step": "follow pointer", "ok": true, "detail": "unit value 0.803922" }
 ]
 ```
 
 Nothing in that loop required the borrower's cooperation, and nothing required a
 relationship with Orma. The pointer template
-`http://localhost:8787/api/mpt/{mpt_issuance_id}/nav` was written into `MPTokenMetadata`
+`https://ormaprotocol.com/api/mpt/{mpt_issuance_id}/nav` was written into `MPTokenMetadata`
 at `VaultCreate`. The broker substitutes the token's own id and follows it.
 
 ### The number
@@ -205,7 +206,7 @@ At $h = 0.20$ on this pledge, `maxLendable` is `643138` drops. A lender applying
 value. The haircut was consumed entirely by the misstatement before it absorbed a single
 tick of volatility.
 
-No escrow of Calder units was outstanding at the capture above, so `/collateral` returned
+No escrow of Halden units was outstanding at the capture above, so `/collateral` returned
 `pledgeCount: 0`. Those last two figures are the arithmetic the route performs on the
 valuation, not a captured response body.
 
@@ -217,7 +218,7 @@ diagnostic rather than to the valuation, returned a perfectly good HTTP 200 with
 
 ```bash
 # a lender's own escrows, valued both ways, with their policy discount applied to the honest value
-curl -s "localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5/collateral?haircut=20&accounts=rEXAMPLE" \
+curl -s "localhost:8787/api/vaults/DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245/collateral?haircut=20&accounts=rEXAMPLE" \
   | jq '{navNaive, navCorrect, totalOverstatement, totalOverstatementPct, pledges}'
 ```
 
@@ -249,7 +250,7 @@ Being measured looks adversarial and is not. The chain is short:
 4. Units that are usable elsewhere are worth more to hold.
 5. A facility whose units are worth more to hold raises capital more easily.
 
-Calder's manager did step 1 by writing 502 bytes of JSON into `MPTokenMetadata` at
+Halden's manager did step 1 by writing 525 bytes of JSON into `MPTokenMetadata` at
 `VaultCreate`. Five XLS-89 fields so explorers will list the token, then one namespaced
 block that does the work:
 
@@ -257,25 +258,25 @@ block that does the work:
 "orma": {
   "v": 1,
   "instrument": "vault-share",
-  "nav_url": "http://localhost:8787/api/mpt/{mpt_issuance_id}/nav",
+  "nav_url": "https://ormaprotocol.com/api/mpt/{mpt_issuance_id}/nav",
   "nav_url_param": "{mpt_issuance_id}",
   "nav_basis": "assets net of recognised loss, divided by units outstanding",
-  "doc": "https://orma.credit/nav"
+  "doc": "https://ormaprotocol.com/docs/nav-pointer"
 }
 ```
 
 <Warning>
 This is write-once, permanently: no transaction and no key can update it, including the
 manager's and including ours. That is why the field holds a **pointer** and never a number,
-and it is why the hackathon build shipped a `localhost` URL into the metadata of a live
-Devnet token, which we cannot correct and are stating rather than hiding. The full object,
+and why the host it names, `ormaprotocol.com`, has to stay served for the life of the vault.
+The full object,
 the three transactions that establish the immutability, and the 1024-byte ceiling are on
 [the NAV pointer page](/nav-pointer).
 </Warning>
 
 ### The grade is the asset, not the threat
 
-Calder's manager holds a conduct score of **100 / 100, grade A**, earned by impairing a
+Halden's manager holds a conduct score of **100 / 100, grade A**, earned by impairing a
 loan rather than sitting on it. That grade has three properties an honest manager wants:
 
 - **It is not self-reported.** It is rebuilt from transaction hashes anyone can fetch. A
@@ -295,7 +296,7 @@ loan rather than sitting on it. That grade has three properties an honest manage
 The measurement also hands the manager something they can use. When two or more distressed
 exposures are outstanding, `recommendation` in the broker-history response names the
 declaration order that applies the most first-loss capital on the investors' behalf, with
-`coverIfFair`, `coverIfSelfServing` and `atStakeForDepositors`. On Calder it currently
+`coverIfFair`, `coverIfSelfServing` and `atStakeForDepositors`. On Halden it currently
 returns `applicable: false, reason: "fewer than two distressed loans"`, which is the right
 answer rather than a fabricated one.
 
@@ -410,7 +411,8 @@ issuer, and every deposit is then checked against it by consensus.
   is not a fixed number of days (about a month on 13 October 2026).
 - The credential bar is a fixed threshold, `ORMA-IG` at BBB- or better. Nothing
   automatically reissues or revokes when a grade moves.
-- The pointer written into Calder's metadata is a `localhost` URL and cannot be changed.
+- The pointer written into Halden's metadata names `ormaprotocol.com` and cannot be changed, so
+  the valuation is only reachable while that host is served.
 - Grades are advisory. `assessment.advisory` is `true` on every valuation response. The
   only thing that binds is the domain in case 4.
 

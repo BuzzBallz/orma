@@ -15,7 +15,7 @@
  */
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 
-const FILE = process.argv[2] ?? 'demo/metadata-vault.json'
+const FILE = process.argv[2] ?? 'demo/showcase-vault.json'
 const BASE = process.env.API_BASE ?? 'http://localhost:8787'
 
 if (!existsSync(FILE)) {

@@ -79,5 +79,7 @@
     "reported": "1.000000",
     "divergenceBps": 1961,
     "basis": "assets net of recognised loss, divided by units outstanding"
-  }
+  },
+  "oracleDocumentId": 3,
+  "retired": true
 }

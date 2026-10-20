@@ -2,7 +2,7 @@
   "capturedFrom": "https://s.devnet.rippletest.net:51234",
   "server": "3.4.1",
   "complete_ledgers": "5193077-6086200",
-  "count": 50,
+  "count": 57,
   "missing": [
     [
       "864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835",
@@ -38,7 +38,7 @@
     ]
   ],
   "coverage": {
-    "capturedAt": "2026-10-13T14:20:11Z",
+    "capturedAt": "2026-10-20T15:11:30Z",
     "capturedFrom": "https://s.devnet.rippletest.net:51234",
     "server": "3.4.1",
     "method": "account_tx with ledger_index_min and ledger_index_max -1, every page; then tx, in API v1 JSON and with binary: true, for each hash not already captured",
@@ -48,7 +48,7 @@
         "pseudoAccount": {
           "account": "rMFuftAjmzbCHvbfm5whSJqcARyHCdavHx",
           "ledgerMin": 5193077,
-          "ledgerMax": 6091491,
+          "ledgerMax": 6274145,
           "transactions": [
             "3FC79BF77240B0D52148428DABEAC0A5F4971957ABEC1D429ABDF297470F2461",
             "7FC5C01BD735E9A41A0AC6ACFA4B6994B1347A8FA06DAEF8012A62B0E1DF98AF",
@@ -58,7 +58,7 @@
         "owner": {
           "account": "rGFFSqqY1R3764FKF7crU5F6bYh9qaD45S",
           "ledgerMin": 5193077,
-          "ledgerMax": 6091491,
+          "ledgerMax": 6274145,
           "transactions": [
             "935F87258B0E618CDE854A42822D6D1E5802786AB73989D9F128D3A211DDB3BF",
             "4C425830675B021EB8A74904783D1DBDE516C74534C76E84A2899695DF3D87F9",
@@ -74,7 +74,7 @@
         "pseudoAccount": {
           "account": "rfN71PmswUhMAyxWi4jX9KYQnLvr1x5i51",
           "ledgerMin": 5193077,
-          "ledgerMax": 6091492,
+          "ledgerMax": 6274146,
           "transactions": [
             "D07C59257F0C568DAF401C4253E8609C206B900F838289E9B45B418F7DE4807C",
             "3ACF03E8E5E68CD30814694CC7CD5C4BBE67E2EA396EF61EA8C756063892AA8C",
@@ -86,7 +86,7 @@
         "owner": {
           "account": "rH7LXexgwZVNcH2ARsi22FjNqHJFFjhevA",
           "ledgerMin": 5193077,
-          "ledgerMax": 6091492,
+          "ledgerMax": 6274146,
           "transactions": [
             "3A53805C9CDC8A6768D17E1A8345E90BF9472CDFB925AD1178829B7D0BF9927F",
             "D07C59257F0C568DAF401C4253E8609C206B900F838289E9B45B418F7DE4807C",
@@ -106,7 +106,7 @@
         "pseudoAccount": {
           "account": "r3hE8HanpccSZdgmeHCfYFEkwxFjdDmmvt",
           "ledgerMin": 5193077,
-          "ledgerMax": 6091492,
+          "ledgerMax": 6274146,
           "transactions": [
             "1819ECF651E1CFFA424E8F5890AF73FFCC61C552C22E580AE2DBE9CF9CDDC69E",
             "49CE7BCBD34636EE1B6AACB62EB441C0FC6BC82862E7BA947D6290C31401A9F8",
@@ -118,7 +118,7 @@
         "owner": {
           "account": "rGMo2ke9of3GEqJwWAzDmFjrm6SwYowTsB",
           "ledgerMin": 5193077,
-          "ledgerMax": 6091492,
+          "ledgerMax": 6274146,
           "transactions": [
             "600E28FA8EF94EC7B35B53FBE86468A25726FAEC8F39CB4419D6CFF56D90558F",
             "1819ECF651E1CFFA424E8F5890AF73FFCC61C552C22E580AE2DBE9CF9CDDC69E",
@@ -138,7 +138,7 @@
         "pseudoAccount": {
           "account": "rP3Z27Qb2HXg8ArLZ6VQkkjwYCWpmadN49",
           "ledgerMin": 5193077,
-          "ledgerMax": 6091493,
+          "ledgerMax": 6274146,
           "transactions": [
             "0AD99C9FC08A84FE743061488024FFFE7ED8ECBD034A73F007444523B283A258",
             "68D3787A20E1DB97EF6B55AAADBF4EF284727D159F7C65C09223FFD61A5B96DD",
@@ -152,7 +152,7 @@
         "owner": {
           "account": "rD26gw5goDqU784caePMoA82givcJBjStk",
           "ledgerMin": 5193077,
-          "ledgerMax": 6091493,
+          "ledgerMax": 6274146,
           "transactions": [
             "5029C0002DA5D1B6C2D38F7C8F3B7839FF91029536155DF0413AB511E776E97F",
             "0AD99C9FC08A84FE743061488024FFFE7ED8ECBD034A73F007444523B283A258",
@@ -166,6 +166,38 @@
           ],
           "loanBrokerIds": [
             "8DB104980C31CBE9F196508E7D748E8C31FB783CD4E0A3620AE0B476CBDEA3FA"
+          ]
+        }
+      },
+      "DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245": {
+        "label": "Halden Structured Credit IV",
+        "pseudoAccount": {
+          "account": "r3XEmxGd7F51niRp94hcEcuuU7HJU47C2R",
+          "ledgerMin": 5193077,
+          "ledgerMax": 6274146,
+          "transactions": [
+            "1A226B33CD370E82683A39F58FF8465A16FD1DED99C87EC65B00E8BA2B7B4CF5",
+            "22233F6BBEAC488A871ABBC35410F55D81A72D964E3FA4A4C970A9D7C22F17A2",
+            "904C06FDF6E60F881C74AE5F996AA7458C8DBAFCBBD41D9E83A9EF49FC582AD0",
+            "D8301546882B271F9B2200771ABD6E3320EC4233026983B4BF5B1FAFA87CD10F",
+            "EC385DAF2DF412F86F06648B7855AEFDB1A1B8596048DA33C33B0A09FB2D08E5"
+          ]
+        },
+        "owner": {
+          "account": "r4nBvMQHt9ow7tXZqtgxwo4jXf4BvnD8hC",
+          "ledgerMin": 5642942,
+          "ledgerMax": 6274147,
+          "transactions": [
+            "52C9BD0CF28EBA59E150A316C20815CB3C8065077FCCE008D6C12F3F739C3BF9",
+            "1A226B33CD370E82683A39F58FF8465A16FD1DED99C87EC65B00E8BA2B7B4CF5",
+            "22233F6BBEAC488A871ABBC35410F55D81A72D964E3FA4A4C970A9D7C22F17A2",
+            "904C06FDF6E60F881C74AE5F996AA7458C8DBAFCBBD41D9E83A9EF49FC582AD0",
+            "A075625DAA314EEC6D8B1C032753E15CAF9A7F45364F1D27F60B5296F257D309",
+            "D8301546882B271F9B2200771ABD6E3320EC4233026983B4BF5B1FAFA87CD10F",
+            "EC385DAF2DF412F86F06648B7855AEFDB1A1B8596048DA33C33B0A09FB2D08E5"
+          ],
+          "loanBrokerIds": [
+            "3A87743DC5EEEBD4A527543D73E5CBDCB7B0201113084A47E1C4FE5D0B480AF6"
           ]
         }
       }

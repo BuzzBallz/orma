@@ -98,5 +98,6 @@
     "ungradedRefused": true,
     "entryClosedAfterRevocation": true,
     "exitStayedOpen": true
-  }
+  },
+  "oracleDocumentId": 1
 }

@@ -66,7 +66,7 @@ const conduct = async (xrpl, opts = {}, broker = kestrel, vaultId = KESTREL) => 
 }
 
 console.log('\n  the archive')
-eq('every declared transaction loads, for all eight accounts', [arc.accounts.size, [...arc.accounts.values()].every((c) => c.intact)], [8, true])
+eq('every declared transaction loads, for all ten accounts', [arc.accounts.size, [...arc.accounts.values()].every((c) => c.intact)], [10, true])
 eq('its capture time is the one the manifest declares', arc.capturedAt, COVERAGE.capturedAt)
 
 console.log('\n  merge')

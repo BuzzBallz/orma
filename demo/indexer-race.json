@@ -44,5 +44,6 @@
     },
     "divergenceBps": 1961
   },
-  "verdict": "PreviousFields is empty. An indexer diffing metadata sees no change on this vault."
+  "verdict": "PreviousFields is empty. An indexer diffing metadata sees no change on this vault.",
+  "oracleDocumentId": 2
 }

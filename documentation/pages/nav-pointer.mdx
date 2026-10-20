@@ -63,7 +63,7 @@ So a self-referential URL is impossible. What we write instead is a template wit
 placeholder:
 
 ```
-http://localhost:8787/api/mpt/{mpt_issuance_id}/nav
+https://ormaprotocol.com/api/mpt/{mpt_issuance_id}/nav
 ```
 
 The reader supplies the missing half. Anyone reading this metadata got to it by holding
@@ -77,29 +77,29 @@ this page can still see which substring is meant to be replaced.
 ## The metadata we actually write
 
 XLS-89 fields first, in the order rippled names them, then one namespaced block of our
-own. This is the exact object on the ledger for Calder Structured Credit III, copied from
-`demo/metadata-vault.json`:
+own. This is the exact object on the ledger for Halden Structured Credit IV, copied from
+`demo/showcase-vault.json`:
 
 ```json
 {
-  "ticker": "ORMA-CSC3",
-  "name": "Calder Structured Credit III",
-  "icon": "http://localhost:8787/assets/mark.svg",
+  "ticker": "ORMA-HSC4",
+  "name": "Halden Structured Credit IV",
+  "icon": "https://ormaprotocol.com/assets/mark.svg",
   "asset_class": "rwa",
   "issuer_name": "Orma",
   "desc": "Redeemable claim on a closed-ended private credit facility. Valuation is net of recognised loss.",
   "orma": {
     "v": 1,
     "instrument": "vault-share",
-    "nav_url": "http://localhost:8787/api/mpt/{mpt_issuance_id}/nav",
+    "nav_url": "https://ormaprotocol.com/api/mpt/{mpt_issuance_id}/nav",
     "nav_url_param": "{mpt_issuance_id}",
     "nav_basis": "assets net of recognised loss, divided by units outstanding",
-    "doc": "https://orma.credit/nav"
+    "doc": "https://ormaprotocol.com/docs/nav-pointer"
   }
 }
 ```
 
-502 bytes of UTF-8, 1004 hex characters on the wire, against a ledger ceiling of 1024
+525 bytes of UTF-8, 1050 hex characters on the wire, against a ledger ceiling of 1024
 bytes. `encodeShareMetadata()` throws rather than submit a blob over that ceiling, because
 over the ceiling is a malformed transaction and just under it is a permanent record you
 cannot trim later.
@@ -124,8 +124,8 @@ import { buildShareMetadata, encodeShareMetadata, MPT_PLACEHOLDER } from '../met
 
 const navTemplate = `${BASE.replace(/\/+$/, '')}/api/mpt/${MPT_PLACEHOLDER}/nav`
 const meta = buildShareMetadata({
-  ticker: 'ORMA-CSC3',
-  name: 'Calder Structured Credit III',
+  ticker: 'ORMA-HSC4',
+  name: 'Halden Structured Credit IV',
   navUrl: navTemplate,
   icon: `${BASE.replace(/\/+$/, '')}/assets/mark.svg`,
   issuerName: 'Orma',
@@ -153,7 +153,7 @@ anyone hands them.
 ```js
 import { Client } from 'xrpl'
 
-const ISSUANCE = '000000014D667775372D5B78E07FFF294678C7F9CE82AFBC'
+const ISSUANCE = '000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797'
 
 const c = new Client('wss://s.devnet.rippletest.net:51233')
 await c.connect()
@@ -190,34 +190,34 @@ desk, and a much better one than an exception.
 ### Running it through the API
 
 ```bash
-curl -s "http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/resolve"
+curl -s "https://ormaprotocol.com/api/mpt/000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797/resolve"
 ```
 
 Captured response, trimmed to the loop itself:
 
 ```json
 {
-  "serverTime": "2026-09-12T22:20:22Z",
-  "ledgerIndex": 5263343,
-  "issuanceId": "000000014D667775372D5B78E07FFF294678C7F9CE82AFBC",
-  "issuer": "r3hE8HanpccSZdgmeHCfYFEkwxFjdDmmvt",
+  "serverTime": "2026-10-20T14:59:10Z",
+  "ledgerIndex": 6273934,
+  "issuanceId": "000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797",
+  "issuer": "r3XEmxGd7F51niRp94hcEcuuU7HJU47C2R",
   "unitsOutstanding": "51000000",
   "resolved": true,
-  "navUrl": "http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav",
+  "navUrl": "https://ormaprotocol.com/api/mpt/000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797/nav",
   "steps": [
     { "step": "read MPTokenIssuance", "ok": true,
-      "detail": "issuer r3hE8HanpccSZdgmeHCfYFEkwxFjdDmmvt, 51000000 units outstanding" },
+      "detail": "issuer r3XEmxGd7F51niRp94hcEcuuU7HJU47C2R, 51000000 units outstanding" },
     { "step": "decode metadata", "ok": true, "detail": "valid JSON" },
     { "step": "XLS-89 conformance", "ok": true, "detail": "asset_class rwa" },
     { "step": "find valuation pointer", "ok": true,
-      "detail": "http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav" },
+      "detail": "https://ormaprotocol.com/api/mpt/000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797/nav" },
     { "step": "follow pointer", "ok": true, "detail": "unit value 0.803922" }
   ]
 }
 ```
 
 Five steps, all green. The issuer on that first line,
-`r3hE8HanpccSZdgmeHCfYFEkwxFjdDmmvt`, is the vault pseudo-account: the same account whose
+`r3XEmxGd7F51niRp94hcEcuuU7HJU47C2R`, is the vault pseudo-account: the same account whose
 `lsfDisableMaster` flag makes the metadata permanent.
 
 The valuation document that comes back is the one described in
@@ -240,8 +240,8 @@ valuation and its provenance:
     "assetsTotal": "51000000",
     "lossUnrealized": "10000000",
     "unitsOutstanding": "51000000",
-    "recompute": "(assetsTotal - lossUnrealized) / unitsOutstanding",
-    "buildVersion": "3.4.0-rc5"
+    "recompute": "(assetsTotal - lossUnrealized) / (unitsOutstanding / 10^scale)",
+    "buildVersion": "3.4.1"
   }
 }
 ```
@@ -276,7 +276,7 @@ volatility in a number that is correct. It does not absorb a number that is wron
 
 <Note>
 The impairment on this facility is transaction
-`BD18EFB94490CA540E7A9C249971740C1228D1FBC3ED97C9BA9F4908F52D5F4F` on Devnet.
+`EC385DAF2DF412F86F06648B7855AEFDB1A1B8596048DA33C33B0A09FB2D08E5` on Devnet.
 `PreviousFields` records only fields the object already had, and a healthy vault carries no
 `LossUnrealized`, so the impairment that creates it emits an empty `PreviousFields` and an
 indexer that diffs metadata sees no change at all. That behaviour is captured on a separate
@@ -337,17 +337,13 @@ runs against `wss://s.devnet.rippletest.net:51233`, rippled 3.4.0-rc5, with `xrp
 Node 24.13.0. Nothing about the mechanism depends on Devnet, but nothing about it has been
 exercised under Mainnet load either.
 
-**The base URL in the baked facility is `http://localhost:8787`.** That is what a hackathon
-demo can honestly commit to. The field is permanent, so in production the base must be a
-hostname you are willing to keep serving for the full life of the vault, on https. Writing
-a host you might move off is the one mistake this design cannot recover from.
-
-**The `icon` in that blob does not resolve.** `http://localhost:8787/assets/mark.svg` is
-written into the permanent metadata, and the reader serves thirteen JSON routes and no static
-files, so that URL is a 404 today. Nothing in the resolution loop reads `icon`. It is an XLS-89
-discoverability field for explorers, and `resolveFromIssuance()` never fetches it, so the
-valuation path is unaffected. It is stated here because it is the same permanence
-trap as the base URL, caught one field later, and it cannot be corrected on this facility.
+**The base URL is permanent.** The field cannot be corrected, so the base must be a hostname
+you are willing to keep serving for the full life of the vault, on https. Writing a host you
+might move off is the one mistake this design cannot recover from. The first facility baked
+this way, Calder Structured Credit III, made it: its pointer names `http://localhost:8787` and
+its `doc` a domain that no longer answers. Calder is retired from the portfolio for that
+reason, and its record stays in `demo/metadata-vault.json`. Halden carries the same figures
+behind a pointer to `ormaprotocol.com`.
 
 **The pointer is a pointer.** It moves the trust question from "do you believe this number"
 to "do you believe this host", and `provenance` is what shrinks that second question: the
@@ -367,12 +363,9 @@ readable by everyone, so a lender can see whose valuation they are being asked t
 before they accept it, and a competing valuation of the same vault is one `vault_info` call
 away.
 
-**The capture in `demo/metadata-vault.json` shows step 5 failing with HTTP 404.** That is
-the bake script, not a bug: it writes the new facility to `demo/` and the API reads that
-directory at startup, so the first run resolves the pointer correctly and finds a service
-that has not yet been restarted. The ledger half of the loop, which is the half that had to
-be proven, closes in that same capture. The sample above is the same facility after the
-restart.
+**The capture in `demo/showcase-vault.json` resolves all five steps through the public
+site.** It was taken after the deployed service had loaded the new record, at
+`resolution.verifiedAt`.
 
 ## The facility
 
@@ -380,15 +373,15 @@ Everything on this page is one live Devnet facility:
 
 | | |
 |---|---|
-| label | Calder Structured Credit III |
-| ticker | ORMA-CSC3 |
-| vault | `5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5` |
-| loan broker | `1C160EFFCA8208DFD8CE9B065A3C3C41CCA80758FBC3099BE27AACFBD1478173` |
-| share issuance | `000000014D667775372D5B78E07FFF294678C7F9CE82AFBC` |
-| share issuer (vault pseudo-account) | `r3hE8HanpccSZdgmeHCfYFEkwxFjdDmmvt` |
-| vault owner | `rGMo2ke9of3GEqJwWAzDmFjrm6SwYowTsB` |
-| impairment | `BD18EFB94490CA540E7A9C249971740C1228D1FBC3ED97C9BA9F4908F52D5F4F` |
+| label | Halden Structured Credit IV |
+| ticker | ORMA-HSC4 |
+| vault | `DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245` |
+| loan broker | `3A87743DC5EEEBD4A527543D73E5CBDCB7B0201113084A47E1C4FE5D0B480AF6` |
+| share issuance | `000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797` |
+| share issuer (vault pseudo-account) | `r3XEmxGd7F51niRp94hcEcuuU7HJU47C2R` |
+| vault owner | `r4nBvMQHt9ow7tXZqtgxwo4jXf4BvnD8hC` |
+| impairment | `EC385DAF2DF412F86F06648B7855AEFDB1A1B8596048DA33C33B0A09FB2D08E5` |
 
-Rebuild it from scratch with `node src/demo/bake-metadata.mjs`, which funds two wallets,
+Bake another from scratch with `node src/demo/bake-metadata.mjs --label "Name" --ticker T --out demo/<name>.json`, which funds two wallets,
 creates the vault with the metadata attached, deposits 51 XRP, originates and impairs a 10
 XRP loan, then runs the resolution loop and prints every step.

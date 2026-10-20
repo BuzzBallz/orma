@@ -57,5 +57,10 @@ new PublishLoop({ vaultIds: ['V1', 'V2'], onSnapshot: null }, ids).attach()
 ids.docIdFor('V2')
 eq('document ids follow the reader, not the first read', [ids.docIdFor('V1'), ids.docIdFor('V2')], [1, 2])
 
+// Pinned ids hold whatever the reader serves; V2's 3 stays reserved after V2 is retired.
+const pinned = new OraclePublisher(client, { address: 'rPub' }, { docIds: { V1: 1, V2: 3, V3: 4 } })
+new PublishLoop({ vaultIds: ['V3', 'V1', 'V4'], onSnapshot: null }, pinned).attach()
+eq('pinned document ids survive a retired vault, new ones go above', ['V1', 'V3', 'V4'].map((v) => pinned.docIdFor(v)), [1, 4, 5])
+
 console.log(bad ? `\n  ${bad} FAILED` : '\n  all ok')
 process.exitCode = bad ? 1 : 0

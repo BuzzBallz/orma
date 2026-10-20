@@ -75,7 +75,7 @@ static nav(vault) {
 }
 ```
 
-**Measured on Devnet.** Calder Structured Credit III, holding $A = 51{,}000{,}000$ drops,
+**Measured on Devnet.** Halden Structured Credit IV, holding $A = 51{,}000{,}000$ drops,
 $L = 10{,}000{,}000$, $S = 51{,}000{,}000$: naive $1.000000$, held $0.803922$, $\delta = 1961$ bp.
 
 <Note>
@@ -361,10 +361,10 @@ danger, the most damaged facility sorted last. That was observed on Devnet, not 
 
 ### A full worked grade
 
-Calder Structured Credit III at ledger 5263343, from the captured `GET /api/vaults/{id}` response:
+Halden Structured Credit IV at ledger 6273933, from the captured `GET /api/vaults/{id}` response:
 $A = 51{,}000{,}000$, $A_v = 41{,}000{,}000$, $L = 10{,}000{,}000$, $S = 51{,}000{,}000$,
 $D = 10{,}000{,}000$, $C = 5{,}000{,}000$, $c_{\min} = c_{\text{liq}} = 10000$, one impaired loan of
-$p = 10{,}000{,}000$, phase Investment.
+$p = 10{,}000{,}000$, phase Redemption.
 
 | step | value | grade |
 |---|---|---|
@@ -503,11 +503,12 @@ Each of these corrupts data silently rather than erroring.
    so reusing a document id for a different set of assets accumulates stale pairs until the series
    passes the ledger's ceiling and `OracleSet` returns `tecARRAY_TOO_LARGE`. Recovery is either
    listing every stale pair with no price, or `OracleDelete` then recreate, which is what this
-   publisher does because it does not know what the stale pairs were. Document ids come from a counter, in
-   the order the publisher first meets each vault (`docIdFor` in `src/oracle.mjs`), never from a hash of
-   the vault id, because the id is a `UInt32` scoped to (account, id) and a collision would silently
-   overwrite another vault's scores. The counter lives in memory, so a restart that meets the vaults in a
-   different order assigns different ids. `BaseAsset` identifies the vault; the document id does not.
+   publisher does because it does not know what the stale pairs were. Document ids are pinned in each
+   facility's record under `demo/` (`oracleDocumentId`), and a vault without one is numbered above them
+   (`docIdFor` in `src/oracle.mjs`), never from a hash of the vault id, because the id is a `UInt32`
+   scoped to (account, id) and a collision would silently overwrite another vault's scores. A retired
+   facility keeps its id reserved, so a restart never moves a document to another vault. `BaseAsset`
+   still identifies the vault on its own.
 2. `LastUpdateTime` must **strictly increase**. Equal or lower gives `tecINVALID_UPDATE_TIME`, burning
    a fee and a sequence number.
 3. A `LastUpdateTime` in the **future bricks** the object until wall clock catches up. Never add a
@@ -520,9 +521,9 @@ Each of these corrupts data silently rather than erroring.
 ### Read back from the ledger
 
 Decoded from the Oracle object
-`03C7B0E151129510F11FF92CCE8FBB3E7AD3C55B25EDA6EB414324E3E995078A`, document id 3, for Calder
-Structured Credit III, as the event publisher `rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B` left it on
-13 September 2026:
+`02B6D31C8D7D8405A9274C092F5837EC6160C65B7983BA98FF8220289820650D`, document id 5, for Halden
+Structured Credit IV, as the deployed publisher `rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H` held it at
+ledger 6273933 on 20 October 2026:
 
 | code | raw | scale | decoded | check |
 |---|---|---|---|---|
@@ -554,7 +555,7 @@ Start from the valuation document, which names the ledger state it was computed 
 that you do not have to trust it. The `provenance` block exists for this.
 
 ```bash
-curl -s http://localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5/nav
+curl -s http://localhost:8787/api/vaults/DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245/nav
 ```
 
 ```json
@@ -570,8 +571,9 @@ curl -s http://localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955
   "assetsTotal": "51000000",
   "lossUnrealized": "10000000",
   "unitsOutstanding": "51000000",
-  "recompute": "(assetsTotal - lossUnrealized) / unitsOutstanding",
-  "buildVersion": "3.4.0-rc5"
+  "scale": 0,
+  "recompute": "(assetsTotal - lossUnrealized) / (unitsOutstanding / 10^scale)",
+  "buildVersion": "3.4.1"
 }
 ```
 
@@ -606,7 +608,7 @@ await client.connect()
 // the parameter is vault_id, NOT vault as XLS-65 section 3.9.1 states
 const r = await client.request({
   command: 'vault_info',
-  vault_id: '5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5',
+  vault_id: 'DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245',
 })
 console.log(r.result.vault.AssetsTotal, r.result.vault.LossUnrealized)
 await client.disconnect()

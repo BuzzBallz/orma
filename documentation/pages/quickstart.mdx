@@ -116,7 +116,7 @@ The four facilities it picks up:
 |---|---|---|---|
 | `demo/indexer-race.json` | Meridian Trade Finance I | `864C5A2D…E37E8C835` | The first impairment of a healthy vault, with `PreviousFields: {}` |
 | `demo/ordering-vault.json` | Kestrel Bridge Financing II | `24EAA01A…1E5810089` | Two defaults declared largest first, conduct grade E |
-| `demo/metadata-vault.json` | Calder Structured Credit III | `5763707D…2A96CB0E5` | A share token whose own metadata points at its valuation |
+| `demo/showcase-vault.json` | Halden Structured Credit IV | `DAB9E1EE…5A602B245` | A share token whose own metadata points at its valuation |
 | `demo/gate-vault.json` | Thorne Senior Secured I | `4A5A8E37…5B00190DF5` | XLS-70 credential plus permissioned domain, entry refused on-ledger |
 
 Explicit arguments win outright over the baked set:
@@ -182,16 +182,18 @@ The scores of the four baked facilities sit on two publisher accounts.
 its objects were last updated between 14:20 and 14:21 UTC on 13 September 2026.
 `rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H` is the deployed reader behind
 `orma-api.onrender.com`, which publishes while the service runs. The free tier can sleep when idle,
-so read `LastUpdateTime` before using a value. The reader numbers documents in the order it first
-publishes them (`docIdFor` in `src/oracle.mjs`), so the ids are not fixed. On 13 October 2026 both
-accounts used the same ones:
+so read `LastUpdateTime` before using a value. Each facility's document id is pinned in its record
+under `demo/` (`oracleDocumentId`, read by `docIdFor` in `src/oracle.mjs`), so a restart or a retired
+vault never moves a document to another vault. Ids 1 to 4 are the same on both accounts; 5 exists
+only on the deployed publisher:
 
 | `oracle_document_id` | Facility | Vault id |
 |---|---|---|
 | 1 | Thorne Senior Secured I | `4A5A8E37…5B00190DF5` |
 | 2 | Meridian Trade Finance I | `864C5A2D…E37E8C835` |
-| 3 | Calder Structured Credit III | `5763707D…2A96CB0E5` |
+| 3 | Calder Structured Credit III, retired: reserved, no longer updated | `5763707D…2A96CB0E5` |
 | 4 | Kestrel Bridge Financing II | `24EAA01A…1E5810089` |
+| 5 | Halden Structured Credit IV | `DAB9E1EE…5A602B245` |
 
 Kestrel, from the deployed publisher:
 
@@ -261,11 +263,11 @@ curl -s http://localhost:8787/api/vaults \
 ```
 B	26	0.210000	0.210000	0bp	Kestrel Bridge Financing II
 AA	89	1.000000	0.803922	1961bp	Meridian Trade Finance I
-AA	89	1.000000	0.803922	1961bp	Calder Structured Credit III
+AA	89	1.000000	0.803922	1961bp	Halden Structured Credit IV
 AAA	100	1.000000	1.000000	0bp	Thorne Senior Secured I
 ```
 
-Two things to read off that table. Meridian and Calder both report a unit value of `1.000000` and
+Two things to read off that table. Meridian and Halden both report a unit value of `1.000000` and
 hold `0.803922`: 1961 basis points of divergence that an indexer diffing transaction metadata
 never sees, because a healthy vault carries no `LossUnrealized` and `PreviousFields` only records
 fields the object already had. Kestrel shows zero divergence and still grades **B**, because its
@@ -277,7 +279,7 @@ to diverge from. The score's memory term is what catches it. Full method at
 vault units as collateral, and it needs nothing from us but a URL the token itself carries.
 
 ```bash
-curl -s "http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav?units=1000000" \
+curl -s "http://localhost:8787/api/mpt/000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797/nav?units=1000000" \
   | jq '{unitValue, pledge}'
 ```
 
@@ -336,7 +338,7 @@ the result does not reproduce. None of them takes a key: they fund everything th
 |---|---|---|---|
 | `capture-impair.mjs` | 51 XRP in, 10 lent, 10 impaired. Captures the empty `PreviousFields`. | `demo/indexer-race.json` | ~3 min |
 | `bake-ordering.mjs` | Two loans of 30 and 10 XRP, both defaulted largest first, no impairment. | `demo/ordering-vault.json` | ~3 min |
-| `bake-metadata.mjs` | Same shape as the impair capture plus an MPT share metadata pointer, then resolves it. | `demo/metadata-vault.json` | ~3 min |
+| `bake-metadata.mjs` | Same shape as the impair capture plus an MPT share metadata pointer, then resolves it. Refuses to overwrite a record: name a new one with `--out`. | `--out demo/<name>.json` | ~3 min |
 | `bake-gate.mjs` | Credential, domain, private vault, two LPs depositing in one wave, then revocation. | `demo/gate-vault.json` | ~1 min |
 | `rebake-all.mjs` | All four, sequentially, with an 18 hour redemption horizon (`--hours 18`). | all of the above | the sum of the four |
 
