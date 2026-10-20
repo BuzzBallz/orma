@@ -1,4 +1,4 @@
-export const API_BASE = (import.meta.env.VITE_API_BASE ?? 'http://localhost:8787').replace(/\/+$/, '')
+export const API_BASE = (import.meta.env?.VITE_API_BASE ?? 'http://localhost:8787').replace(/\/+$/, '')
 
 /**
  * A deployed preview reaching an http base from an https page is a configuration we should

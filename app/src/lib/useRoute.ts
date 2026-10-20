@@ -12,7 +12,7 @@ export const DESKS: [RoutePath, string][] = [
 ]
 
 /** Protocol documentation. Overridable so a preview build can point at its own copy. */
-export const DOCS_URL: string = import.meta.env.VITE_DOCS_URL ?? 'https://buzzballz.github.io/orma/'
+export const DOCS_URL: string = import.meta.env?.VITE_DOCS_URL ?? 'https://buzzballz.github.io/orma/'
 
 /** Older links keep working; the address bar is rewritten to the current wording. */
 const MOVED: Record<string, RoutePath> = {
