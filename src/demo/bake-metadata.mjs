@@ -24,7 +24,7 @@
  *      OWNER_SEED=<seed> keeps the facility manageable after the bake (node --env-file=<file> ...)
  * Out: demo/metadata-vault.json unless --out names another  (TRACKED)
  */
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { Client, Wallet, signLoanSetByCounterparty } from 'xrpl'
 import { Xrpl } from '../xrpl.mjs'
 import { buildShareMetadata, encodeShareMetadata, MPT_PLACEHOLDER } from '../metadata.mjs'
@@ -51,6 +51,9 @@ const must = (r, what) => {
   console.log(`    ok    ${what.padEnd(30)} ${r.result.hash.slice(0, 24)}...`)
   return r
 }
+
+// A bake is a new facility; its record must not replace another's.
+if (existsSync(OUT)) { console.error(`  ${OUT} already holds a facility. Name a new file with --out.`); process.exit(1) }
 
 const c = new Client(WS, { connectionTimeout: 20000 })
 await c.connect()
