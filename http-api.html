@@ -73,7 +73,7 @@ nav{position:static;height:auto;border-right:0;border-bottom:1px solid var(--lin
     <h1>API reference</h1>
     <p class="lede">The thirteen routes Orma serves, the question each one answers, its parameters, and a real Devnet response.</p>
     <p>Orma exposes thirteen <code>GET</code> routes over plain HTTP. The server is <code>src/api.mjs</code>: <code>node:http</code>, no framework, no middleware stack. The default listen address is <code>http://localhost:8787</code>, overridable with <code>PORT</code>.</p>
-<p>Every response body on this page was captured from the running service against XRPL Devnet on 2026-09-12, server build <code>3.4.0-rc5</code>. All of them were taken at ledger <code>5263343</code> except the <code>/api/demo/state</code> capture, which is from ledger <code>5263439</code> a few minutes later, and the two history routes, captured on 2026-10-13 (server build <code>3.4.1</code>, ledgers <code>6091723</code> and <code>6091724</code>) once their responses stated the window they cover, and <code>/api/oracle-aggregate</code>, documented that day from ledger <code>6092503</code>. Responses are trimmed for length where noted, never rewritten.</p>
+<p>Every response body on this page was captured from the running service against XRPL Devnet on 2026-09-12, server build <code>3.4.0-rc5</code>. All of them were taken at ledger <code>5263343</code> except the <code>/api/demo/state</code> capture, which is from ledger <code>5263439</code> a few minutes later, and the two history routes, captured on 2026-10-13 (server build <code>3.4.1</code>, ledgers <code>6091723</code> and <code>6091724</code>) once their responses stated the window they cover, and <code>/api/oracle-aggregate</code>, documented that day from ledger <code>6092503</code>. The Halden Structured Credit IV captures were taken on 2026-10-20 (server build <code>3.4.1</code>, ledgers <code>6273933</code> and <code>6273934</code>, and <code>6274019</code> for its <code>/gate</code>). Responses are trimmed for length where noted, never rewritten.</p>
 <div class="callout warning"><span class="ck">Warning</span><div><p>This runs on Devnet, not Mainnet. XLS-65 vaults and XLS-66 lending are not amended into Mainnet, so</p><p>there is no production deployment to point at. <code>network</code> is hard-coded to <code>"devnet"</code> in</p><p><code>src/api.mjs</code>, and <code>health.source</code> reports where the data came from: <code>"devnet"</code> for live reads,</p><p><code>"fixtures"</code> for the recorded ring.</p></div></div>
 <h2 id="rules-that-bind-every-response">Rules that bind every response</h2>
 <p>These are contract-level, not per-route. They are what makes the responses safe to consume.</p>
@@ -109,22 +109,22 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
     "retryable": false
   }
 }</code></pre>
-<div class="tw"><table><thead><tr><th>code</th><th>status</th><th>retryable</th><th>raised when</th></tr></thead><tbody><tr><td><code>WARMING_UP</code></td><td>503</td><td>true</td><td>the reader has not read that vault yet, so it is unknown rather than absent. Vault and MPT routes answer this until the reader's first pass over the facilities ends (it reads them one by one, a few seconds after a start). After it, a vault route answers it for a facility the reader tracks but has not managed to read, and an MPT route while any tracked facility is in that state</td></tr><tr><td><code>VAULT_NOT_FOUND</code></td><td>404</td><td>false</td><td>the id is well formed, the reader has finished a pass, and it either does not track that vault or the ledger answered that it does not exist</td></tr><tr><td><code>NO_SHARE_MPT</code></td><td>404</td><td>false</td><td>the vault has no share issuance, so there is nothing to value</td></tr><tr><td><code>NO_BROKER</code></td><td>404</td><td>false</td><td>the vault has no <code>LoanBroker</code>, so there is no conduct to reconstruct</td></tr><tr><td><code>SHARE_NOT_TRACKED</code></td><td>404</td><td>false</td><td>no facility on this service issues that MPT, once every tracked facility has been read or found not to exist</td></tr><tr><td><code>NOT_FOUND</code></td><td>404</td><td>false</td><td>no route matched, or the demo capture file is missing</td></tr><tr><td><code>FORBIDDEN</code></td><td>403</td><td>false</td><td>an operator <code>POST</code> from something other than loopback</td></tr><tr><td><code>INTERNAL</code></td><td>500</td><td>true</td><td>anything unhandled</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>code</th><th>status</th><th>retryable</th><th>raised when</th></tr></thead><tbody><tr><td><code>WARMING_UP</code></td><td>503</td><td>true</td><td>the reader has not read that vault yet, so it is unknown rather than absent. Vault and MPT routes answer this until the reader's first pass over the facilities ends (it reads them one by one, a few seconds after a start). After it, a vault route answers it for a facility the reader tracks but has not managed to read, and an MPT route while any tracked facility is in that state</td></tr><tr><td><code>VAULT_NOT_FOUND</code></td><td>404</td><td>false</td><td>the id is well formed, the reader has finished a pass, and it either does not track that vault or the ledger answered that it does not exist</td></tr><tr><td><code>NO_SHARE_MPT</code></td><td>404</td><td>false</td><td>the vault has no share issuance, so there is nothing to value</td></tr><tr><td><code>NO_BROKER</code></td><td>404</td><td>false</td><td>the vault has no <code>LoanBroker</code>, so there is no conduct to reconstruct</td></tr><tr><td><code>SHARE_NOT_TRACKED</code></td><td>404</td><td>false</td><td>no facility on this service issues that MPT, once every tracked facility has been read or found not to exist</td></tr><tr><td><code>NOT_FOUND</code></td><td>404</td><td>false</td><td>no route matched, or the demo capture file is missing</td></tr><tr><td><code>FORBIDDEN</code></td><td>403</td><td>false</td><td>an operator <code>POST</code> from something other than loopback, or from a browser page</td></tr><tr><td><code>BAD_REQUEST</code></td><td>400</td><td>false</td><td>a request target the URL parser rejects</td></tr><tr><td><code>BAD_ACCOUNTS</code></td><td>400</td><td>false</td><td>collateral <code>accounts</code> names more than 10 accounts, or one that is not a classic address</td></tr><tr><td><code>BAD_HAIRCUT</code></td><td>400</td><td>false</td><td>collateral <code>haircut</code> is not a number from 0 to 100</td></tr><tr><td><code>BAD_UNITS</code></td><td>400</td><td>false</td><td><code>units</code> on an MPT route is not a whole number of at most 30 digits</td></tr><tr><td><code>BUSY</code></td><td>503</td><td>true</td><td>four collateral or resolve requests are already reading the ledger; retry shortly</td></tr><tr><td><code>INTERNAL</code></td><td>500</td><td>true</td><td>anything unhandled</td></tr></tbody></table></div>
 <p>Every route that answers <code>GET</code> also answers <code>HEAD</code>, with the same status and headers and no body, so a link checker sees the status a reader would.</p>
 <p>A vault id must match <code>[A-Fa-f0-9]{64}</code> and an MPT issuance id <code>[A-Fa-f0-9]{48}</code>. Lowercase hex is accepted and upper-cased before lookup. A path that matches no pattern returns <code>{"error":{"code":"NOT_FOUND","message":"No route GET /api/nope","retryable":false}}</code>.</p>
-<h3 id="6-cors-and-which-two-routes-are-deliberately-public">6. CORS, and which two routes are deliberately public</h3>
-<p>Every response carries <code>Access-Control-Allow-Origin: *</code>, <code>Access-Control-Allow-Headers: *</code> and <code>Access-Control-Allow-Methods: GET,POST,OPTIONS</code>, set unconditionally at the top of the request handler so the local demo frontend works from any origin. <code>OPTIONS</code> returns <code>204</code>.</p>
+<h3 id="6-cors-and-which-three-routes-are-deliberately-public">6. CORS, and which three routes are deliberately public</h3>
+<p>Every <code>GET</code>, <code>HEAD</code> and <code>OPTIONS</code> response carries <code>Access-Control-Allow-Origin: *</code>, <code>Access-Control-Allow-Headers: *</code> and <code>Access-Control-Allow-Methods: GET,HEAD,OPTIONS</code>, so the frontend works from any origin. <code>OPTIONS</code> returns <code>204</code>. A <code>POST</code> gets none of them, and an operator <code>POST</code> that carries an <code>Origin</code> header, which a browser always sends, is refused <code>403</code> before it runs.</p>
 <p>The meaningful distinction is caching, and it is opt-in per route. The default is <code>Cache-Control: no-store</code>. Three routes pass <code>{ cors: true }</code> and get <code>Cache-Control: public, max-age=4</code> instead:</p>
 <ul><li><code>GET /api/vaults/:vaultId/nav</code></li><li><code>GET /api/mpt/:mptId/nav</code></li><li><code>GET /api/mpt/:mptId/resolve</code></li></ul>
 <p>The first two exist to be called by a party with no relationship to us. That is the entire point of writing a URL into a token: a second broker handed vault shares as collateral holds an MPT issuance id and nothing else, has no access to the facility's reporting, and has no reason to ask us for permission first. Both serve read-only public ledger state, so there is nothing to protect, and <code>max-age=4</code> matches <code>POLL_MS</code>, the reader's 4000 ms poll interval in <code>src/poll.mjs</code>, so a cache cannot serve a figure older than one reader tick. <code>GET /api/mpt/:mptId/resolve</code> carries the flag as well, because it is the diagnostic a lender runs against those same two routes.</p>
 <div class="callout warning"><span class="ck">Warning</span><div><p>The metadata that carries the NAV URL is written into the <code>MPTokenIssuance</code> at creation and can</p><p>never be rewritten. The contract at the end of those two routes is therefore effectively permanent:</p><p>fields may be added, nothing may ever be renamed, retyped or removed.</p></div></div>
 <hr>
 <h2 id="route-index">Route index</h2>
-<div class="tw"><table><thead><tr><th>method and path</th><th>answers</th></tr></thead><tbody><tr><td><code>GET /api/health</code></td><td>is the reader connected, and how old is the data</td></tr><tr><td><code>GET /api/vaults</code></td><td>which facilities are tracked, worst first</td></tr><tr><td><code>GET /api/vaults/:vaultId</code></td><td>everything about one facility</td></tr><tr><td><code>GET /api/vaults/:vaultId/nav</code></td><td>what is one unit actually worth</td></tr><tr><td><code>GET /api/vaults/:vaultId/nav-history</code></td><td>what was one unit worth after each transaction that changed the vault</td></tr><tr><td><code>GET /api/vaults/:vaultId/gate</code></td><td>is this facility gated, and by whom</td></tr><tr><td><code>GET /api/vaults/:vaultId/collateral</code></td><td>what are the pledged shares worth to a lender</td></tr><tr><td><code>GET /api/vaults/:vaultId/broker-history</code></td><td>what did this manager actually do</td></tr><tr><td><code>GET /api/mpt/:mptId/nav</code></td><td>the same valuation, keyed by the token</td></tr><tr><td><code>GET /api/mpt/:mptId/resolve</code></td><td>can a stranger get from the token to a valuation</td></tr><tr><td><code>GET /api/indexer-race</code></td><td>proof the first impairment is invisible to metadata diffing</td></tr><tr><td><code>GET /api/oracle-aggregate</code></td><td>can a second publisher contest a reading, and what median does the ledger report</td></tr><tr><td><code>GET /api/demo/state</code></td><td>which facilities are baked and live</td></tr></tbody></table></div>
+<div class="tw"><table><thead><tr><th>method and path</th><th>answers</th></tr></thead><tbody><tr><td><code>GET /api/health</code></td><td>is the reader connected, and how old is the data</td></tr><tr><td><code>GET /api/methodology</code></td><td>which notches a destroyed share of capital costs, and under which method version</td></tr><tr><td><code>GET /api/vaults</code></td><td>which facilities are tracked, worst first</td></tr><tr><td><code>GET /api/vaults/:vaultId</code></td><td>everything about one facility</td></tr><tr><td><code>GET /api/vaults/:vaultId/nav</code></td><td>what is one unit actually worth</td></tr><tr><td><code>GET /api/vaults/:vaultId/nav-history</code></td><td>what was one unit worth after each transaction that changed the vault</td></tr><tr><td><code>GET /api/vaults/:vaultId/gate</code></td><td>is this facility gated, and by whom</td></tr><tr><td><code>GET /api/vaults/:vaultId/collateral</code></td><td>what are the pledged shares worth to a lender</td></tr><tr><td><code>GET /api/vaults/:vaultId/broker-history</code></td><td>what did this manager actually do</td></tr><tr><td><code>GET /api/mpt/:mptId/nav</code></td><td>the same valuation, keyed by the token</td></tr><tr><td><code>GET /api/mpt/:mptId/resolve</code></td><td>can a stranger get from the token to a valuation</td></tr><tr><td><code>GET /api/indexer-race</code></td><td>proof the first impairment is invisible to metadata diffing</td></tr><tr><td><code>GET /api/oracle-aggregate</code></td><td>can a second publisher contest a reading, and what median does the ledger report</td></tr><tr><td><code>GET /api/demo/state</code></td><td>which facilities are baked and live</td></tr><tr><td><code>GET /api/openapi.json</code></td><td>the OpenAPI 3.1 description of these routes</td></tr></tbody></table></div>
 <hr>
 <h2 id="get-api-health">GET /api/health</h2>
 <p>Is the reader up, which ledger is it on, and is it currently degraded. No parameters.</p>
-<p><code>ok</code> is <code>false</code> until the first poll tick completes. The API starts listening before the reader connects, which is honest rather than pretending to be ready.</p>
+<p><code>ok</code> is <code>false</code> until the first poll tick completes, and again whenever the last pass failed to read a vault. The API starts listening before the reader connects, which is honest rather than pretending to be ready.</p>
 <pre class="code" data-lang="bash"><code>curl -s http://localhost:8787/api/health</code></pre>
 <pre class="code" data-lang="json"><code>{
   "ok": true,
@@ -136,7 +136,28 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
   "buildVersion": "3.4.0-rc5"
 }</code></pre>
 <p>Two fields appear only while upstream is unhappy: <code>degraded: true</code> and <code>lastLedgerAgeSeconds: &lt;number&gt;</code>. They are additive, and <code>source</code> never flips automatically. On a failed read the reader keeps the last good snapshot rather than blanking, so a consumer should show stale data with an age banner rather than an empty screen.</p>
+<p>Each vault row, each vault detail and each <code>orma.nav/1</code> document carries the age of its own snapshot, which can be behind the envelope's <code>ledgerIndex</code> when that vault's last read failed:</p>
+<pre class="code" data-lang="json"><code>"freshness": { "readAt": "2026-09-12T22:20:22Z", "readLedgerIndex": 5263343, "ageSeconds": 0, "stale": false }</code></pre>
+<p><code>ageSeconds</code> is in ledger time; <code>stale</code> turns true past 30 seconds. In an <code>orma.nav/1</code> document, <code>asOf</code> and <code>ledgerIndex</code> are the snapshot's own.</p>
 <p><code>buildVersion</code> is reported, never asserted. Devnet moves.</p>
+<hr>
+<h2 id="get-api-methodology">GET /api/methodology</h2>
+<p>The table the score applies for capital already destroyed, served from the code that applies it. No parameters, no ledger read.</p>
+<pre class="code" data-lang="json"><code>{
+  "methodVersion": "1.1.0",
+  "ladder": ["AAA", "AA+", "AA", "...", "C", "D"],
+  "realisedLoss": [
+    { "atLeastPct": 100, "notches": -14, "floor": "D" },
+    { "atLeastPct": 90, "notches": -14, "floor": "CCC" },
+    { "atLeastPct": 75, "notches": -14, "floor": null },
+    { "atLeastPct": 50, "notches": -12, "floor": null },
+    { "atLeastPct": 25, "notches": -8, "floor": null },
+    { "atLeastPct": 10, "notches": -5, "floor": null },
+    { "atLeastPct": 2, "notches": -3, "floor": null },
+    { "atLeastPct": 0, "notches": -1, "floor": null }
+  ]
+}</code></pre>
+<p>The first row whose <code>atLeastPct</code> the destroyed share meets applies, and only above zero. A <code>floor</code> caps the grade however high the anchor. Method 1.1.0 added the CCC and D floors; below 90% every grade is the one 1.0.0 gave.</p>
 <hr>
 <h2 id="get-api-vaults">GET /api/vaults</h2>
 <p>Which facilities are tracked, and which one needs attention first. No parameters.</p>
@@ -189,34 +210,34 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
   ]
 }</code></pre>
 <p>Kestrel shows the case the whole system exists to catch: <code>lossUnrealized: "0"</code>, divergence zero, NAV reporting <code>0.210000</code> on both readings, and two distressed loans behind it. <code>gradeNumeric: 26</code> is the score's memory of realised capital destruction, which no NAV reading carries.</p>
-<div class="callout note"><span class="ck">Note</span><div><p><code>trend</code> is <code>"stable"</code> until the API has seen a vault twice, and the previous NAV is only recorded by</p><p>the detail route. A consumer polling the list alone will see <code>"stable"</code> forever. Poll</p><p><code>/api/vaults/:vaultId</code> for the vault in focus if the trend matters. All four rows in the capture</p><p>above read <code>"stable"</code> for exactly this reason.</p></div></div>
-<p><code>secondsToRedemption</code> is computed against the ledger close time and goes negative once the redemption date has passed.</p>
+<div class="callout note"><span class="ck">Note</span><div><p><code>trend</code> is read from the book on every request, the same on the list and the detail route:</p><p><code>"deteriorating"</code> when any loan is overdue, impaired, defaultable or defaulted, or when claims exceed</p><p>projected liquidity at redemption; <code>"stable"</code> otherwise. Nothing on the ledger says a facility is</p><p>improving, so <code>"improving"</code> is never sent.</p></div></div>
+<p><code>secondsToRedemption</code> is computed against the ledger close time and goes negative once the redemption date has passed. Both <code>redemptionAt</code> and <code>secondsToRedemption</code> are <code>null</code> for a vault with no redemption date.</p>
 <hr>
 <h2 id="get-api-vaults-vaultid">GET /api/vaults/:vaultId</h2>
 <p>Everything about one facility: the vault, its broker, the score with its full notch trace, every loan, the phase and redemption cliff, the on-chain oracle, and the alerts.</p>
 <div class="tw"><table><thead><tr><th>parameter</th><th>in</th><th>required</th><th>notes</th></tr></thead><tbody><tr><td><code>vaultId</code></td><td>path</td><td>yes</td><td>64 hex characters, case insensitive</td></tr></tbody></table></div>
-<pre class="code" data-lang="bash"><code>curl -s http://localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5</code></pre>
+<pre class="code" data-lang="bash"><code>curl -s http://localhost:8787/api/vaults/DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245</code></pre>
 <pre class="code" data-lang="jsonc"><code>{
-  "serverTime": "2026-09-12T22:20:22Z",
-  "ledgerIndex": 5263343,
+  "serverTime": "2026-10-20T14:59:02Z",
+  "ledgerIndex": 6273933,
   "vault": {
     // every field from the list row, plus:
-    "vaultId": "5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5",
-    "label": "Calder Structured Credit III",
-    "shareMptId": "000000014D667775372D5B78E07FFF294678C7F9CE82AFBC",
+    "vaultId": "DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245",
+    "label": "Halden Structured Credit IV",
+    "shareMptId": "000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797",
     "sharesOutstanding": "51000000",
     "scale": 0,
     "withdrawalPolicy": "FirstComeFirstServe",
     "isPrivate": false,
     "domainId": null,
-    "subscriptionAt": "2026-09-12T21:11:47Z",
+    "subscriptionAt": "2026-10-19T21:29:17Z",
     "leVersion": "CashBasis",
-    "explorerUrl": "https://devnet.xrpl.org/accounts/r3hE8HanpccSZdgmeHCfYFEkwxFjdDmmvt"
+    "explorerUrl": "https://devnet.xrpl.org/accounts/r3XEmxGd7F51niRp94hcEcuuU7HJU47C2R"
   },
   "broker": {
-    "loanBrokerId": "1C160EFFCA8208DFD8CE9B065A3C3C41CCA80758FBC3099BE27AACFBD1478173",
-    "owner": "rGMo2ke9of3GEqJwWAzDmFjrm6SwYowTsB",
-    "pseudoAccount": "rUUomEsKraSfCYppP9nZx7k7aAzEe7CY3B",
+    "loanBrokerId": "3A87743DC5EEEBD4A527543D73E5CBDCB7B0201113084A47E1C4FE5D0B480AF6",
+    "owner": "r4nBvMQHt9ow7tXZqtgxwo4jXf4BvnD8hC",
+    "pseudoAccount": "rBwamjB23wtYBhQukfyf2ZYMnVKoE4pkBF",
     "debtTotal": "10000000",
     "debtMaximum": "45000000",
     "coverAvailable": "5000000",
@@ -231,8 +252,8 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
   "score": {
     "grade": "AA",
     "gradeNumeric": 89,
-    "computedAt": "2026-09-12T22:20:21Z",
-    "methodVersion": "1.0.0",
+    "computedAt": "2026-10-20T14:59:02Z",
+    "methodVersion": "1.1.0",
     // array order is LIQUIDITY, COVER, CONCENT, RECOG, DEADLINE, HEADLINE.
     // Only the third is shown here.
     "dimensions": [
@@ -250,13 +271,13 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
     "notchTrace": [
       { "from": "AAA", "rule": "anchor on DEADLINE (can claims be met at redemption)", "delta": 0, "to": "AAA" },
       { "from": "AAA", "rule": "single loan &gt;= 75% of broker debt (cover is keyed to total debt, not loan size)", "delta": -1, "to": "AA+" },
-      { "from": "AA+", "rule": "liquidatable cover &lt; 5% of recognised loss", "delta": -1, "to": "AA" }
+      { "from": "AA+", "rule": "liquidatable cover &lt; 5% of the exposure it must absorb", "delta": -1, "to": "AA" }
     ]
   },
   "loans": [
     {
-      "loanId": "D6979E3A3FD90234A8BE80FCB37589204C691D0AC1C741C4A780D02D5073F252",
-      "borrower": "raxskEENwfnRay2VaQroMoV4XYFUurggL5",
+      "loanId": "E5AE574EEE5892562725C3BF8C83B331A3512291000DC47B83C3C6D23A219C9B",
+      "borrower": "r3uqZG6ziKiVsQ4aiuJPwwcAAxTRAsyTwc",
       "status": "impaired",
       "principalOutstanding": "10000000",
       "totalValueOutstanding": "10000039",
@@ -267,21 +288,21 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
       "paymentInterval": 60,
       "gracePeriod": 60,
       "paymentRemaining": 3,
-      "nextPaymentDueAt": "2026-09-12T21:13:10Z",
-      "secondsUntilDue": -4031,
-      "secondsUntilDefaultable": -3971,
+      "nextPaymentDueAt": "2026-10-19T21:30:40Z",
+      "secondsUntilDue": -62902,
+      "secondsUntilDefaultable": -62842,
       "shareOfDebtTotal": "1.0000",
       "impairable": false,
-      "explorerUrl": "https://devnet.xrpl.org/transactions/D6979E3A3FD90234A8BE80FCB37589204C691D0AC1C741C4A780D02D5073F252"
+      "explorerUrl": "https://devnet.xrpl.org/transactions/EC385DAF2DF412F86F06648B7855AEFDB1A1B8596048DA33C33B0A09FB2D08E5"
     }
   ],
   "phaseInfo": {
-    "phase": "Investment",
+    "phase": "Redemption",
     "canDeposit": false,
-    "canWithdraw": false,
-    "withdrawBlockedReason": "tecTOO_SOON",
-    "nextBoundaryAt": "2026-09-13T15:11:47Z",
-    "secondsToNextBoundary": 60686,
+    "canWithdraw": true,
+    "withdrawBlockedReason": null,
+    "nextBoundaryAt": null,
+    "secondsToNextBoundary": 0,
     "claimsAtRedemption": "41000000",
     "liquidityAtRedemption": "41100000",
     "projectedShortfall": "0",
@@ -289,13 +310,13 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
   },
   "oracle": {
     "published": true,
-    "oracleDocumentId": 3,
-    "publisher": "rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B",
-    "objectIndex": "03C7B0E151129510F11FF92CCE8FBB3E7AD3C55B25EDA6EB414324E3E995078A",
-    "baseAssetHex": "5763707D11EA19D1B5FF04E4EBA4F9336057955C",
-    "lastUpdateAt": "2026-09-12T22:20:02Z",
-    "ageSeconds": 11,
-    "stale": false,
+    "oracleDocumentId": 5,
+    "publisher": "rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H",
+    "objectIndex": "02B6D31C8D7D8405A9274C092F5837EC6160C65B7983BA98FF8220289820650D",
+    "baseAssetHex": "DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06C",
+    "lastUpdateAt": "2026-10-20T14:58:00Z",
+    "ageSeconds": 73,
+    "stale": true,
     "dimensionsOnChain": [
       { "key": "CNC", "raw": "2710",  "value": "1.0000",   "scale": 4 },
       { "key": "COV", "raw": "64",    "value": "0.0100",   "scale": 4 },
@@ -327,11 +348,11 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
 <ul><li><code>oracle.dimensionsOnChain[].raw</code> is <b>hexadecimal</b>, because <code>AssetPrice</code> on an XLS-47 <code>PriceData</code></li></ul>
 <p>  is a <code>UInt64</code> serialised as hex. <code>c4452</code> is 803922, which at <code>scale: 6</code> decodes to <code>0.803922</code>.   Writing <code>"100"</code> into that field means 256, not one hundred. Full detail in   <a href="mathematics.html#8-publication-as-an-oracle-object">/mathematics</a>.</p>
 <ul><li><code>oracle.publisher</code> and <code>oracle.oracleDocumentId</code> name the account and document the answering</li></ul>
-<p>  reader publishes to. This capture is from the event, when that was <code>rpVg1…</code>, whose objects stopped   updating on 13 September; the deployed reader publishes from <code>rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H</code>.   Document id 3 is Calder on both accounts. The full mapping is in   <a href="quickstart.html#reading-the-objects-already-on-devnet">the quickstart</a>.</p>
+<p>  reader publishes to. This capture is from the deployed reader, <code>rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H</code>;   during the event it was <code>rpVg1…</code>, whose objects stopped updating on 13 September. Document id 5 is   Halden. The full mapping is in   <a href="quickstart.html#reading-the-objects-already-on-devnet">the quickstart</a>.</p>
 <ul><li><code>coverRateMinimum</code> and <code>coverRateLiquidation</code> are in units of $10^{-5}$. A stated <code>10000</code> is</li></ul>
 <p>  $0.10$. <b>Both</b> are divided by $10^{5}$, which is why <code>maxLiquidatableNow</code> is   $\lceil 10{,}000{,}000 \times 0.10 \times 0.10 \rceil = 100{,}000$ drops against a   <code>coverAvailable</code> of <code>"5000000"</code>. <code>strandedCoverFraction: "0.9800"</code> is the 98% of posted cover that   cannot be reached at the current book size.</p>
-<ul><li><code>canWithdraw: false</code> with <code>withdrawBlockedReason: "tecTOO_SOON"</code> is <b>not an error</b>.</li></ul>
-<p>  <code>VaultWithdraw</code> returns <code>tecTOO_SOON</code> for the entire Investment phase of a closed-ended vault   regardless of liquidity. It is a phase predicate, verified on Devnet with 80 XRP of   <code>AssetsAvailable</code> sitting in the vault.</p>
+<ul><li><code>canWithdraw</code> is <code>true</code> here because the vault is in Redemption. During the Investment phase it</li></ul>
+<p>  reads <code>false</code> with <code>withdrawBlockedReason: "tecTOO_SOON"</code>, which is <b>not an error</b>.   <code>VaultWithdraw</code> returns <code>tecTOO_SOON</code> for the entire Investment phase of a closed-ended vault   regardless of liquidity. It is a phase predicate, verified on Devnet with 80 XRP of   <code>AssetsAvailable</code> sitting in the vault.</p>
 <ul><li><code>impairable: false</code> on an already-impaired loan is correct. A loan may only be impaired once it is</li></ul>
 <p>  already past due, and only once.</p>
 <ul><li><code>score.notchTrace</code> is the entire derivation. No weights are applied anywhere. See</li></ul>
@@ -343,21 +364,22 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
 <p>What is one unit of this facility actually worth. This is the small, stable document a token's own metadata points at, keyed by vault id.</p>
 <div class="tw"><table><thead><tr><th>parameter</th><th>in</th><th>required</th><th>notes</th></tr></thead><tbody><tr><td><code>vaultId</code></td><td>path</td><td>yes</td><td>64 hex characters</td></tr></tbody></table></div>
 <p>Sends <code>Cache-Control: public, max-age=4</code>.</p>
-<pre class="code" data-lang="bash"><code>curl -s http://localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5/nav</code></pre>
+<pre class="code" data-lang="bash"><code>curl -s http://localhost:8787/api/vaults/DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245/nav</code></pre>
 <pre class="code" data-lang="json"><code>{
-  "serverTime": "2026-09-12T22:20:22Z",
-  "ledgerIndex": 5263343,
+  "serverTime": "2026-10-20T14:59:02Z",
+  "ledgerIndex": 6273933,
   "schema": "orma.nav/1",
-  "asOf": "2026-09-12T22:20:22Z",
+  "asOf": "2026-10-20T14:59:02Z",
+  "freshness": { "readAt": "2026-10-20T14:59:02Z", "readLedgerIndex": 6273933, "ageSeconds": 1, "stale": false },
   "instrument": {
     "kind": "vault-share",
-    "vaultId": "5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5",
-    "shareMptId": "000000014D667775372D5B78E07FFF294678C7F9CE82AFBC",
+    "vaultId": "DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245",
+    "shareMptId": "000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797",
     "unitsOutstanding": "51000000",
     "asset": { "kind": "XRP", "currency": "XRP", "issuer": null, "mptIssuanceId": null },
     "vaultKind": "ClosedEnded",
-    "phase": "Investment",
-    "redemptionAt": "2026-09-13T15:11:47Z"
+    "phase": "Redemption",
+    "redemptionAt": "2026-10-19T22:29:17Z"
   },
   "unitValue": {
     "held": "0.803922",
@@ -374,7 +396,7 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
   "assessment": {
     "grade": "AA",
     "gradeNumeric": 89,
-    "methodVersion": "1.0.0",
+    "methodVersion": "1.1.0",
     "advisory": true
   },
   "provenance": {
@@ -383,13 +405,14 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
     "assetsTotal": "51000000",
     "lossUnrealized": "10000000",
     "unitsOutstanding": "51000000",
-    "recompute": "(assetsTotal - lossUnrealized) / unitsOutstanding",
-    "buildVersion": "3.4.0-rc5"
+    "scale": 0,
+    "recompute": "(assetsTotal - lossUnrealized) / (unitsOutstanding / 10^scale)",
+    "buildVersion": "3.4.1"
   }
 }</code></pre>
 <p>Both readings are returned on purpose:</p>
 <p>$$\text{NAV}_{\text{naive}} = \frac{A}{S} \qquad \text{NAV}_{\text{held}} = \frac{A - L}{S}$$</p>
-<p>Handing over only the honest number asks the consumer to take our word for it. Handing over both, with the gap named in basis points, lets them see what the obvious computation would have told them. <code>provenance</code> names the three ledger fields so they can recompute it without trusting us: $(51{,}000{,}000 - 10{,}000{,}000) / 51{,}000{,}000 = 0.803922$.</p>
+<p>Handing over only the honest number asks the consumer to take our word for it. Handing over both, with the gap named in basis points, lets them see what the obvious computation would have told them. <code>provenance</code> names the three ledger fields so they can recompute it without trusting us: $(51{,}000{,}000 - 10{,}000{,}000) / 51{,}000{,}000 = 0.803922$. <code>scale</code> is the vault's <code>Scale</code>: 0 for an XRP or MPT asset, 6 by default for an issued currency, whose vault mints $10^6$ share units per unit of asset. $S$ is then <code>unitsOutstanding</code> divided by $10^{\text{scale}}$.</p>
 <p><code>assessment</code> is labelled <code>advisory: true</code> and can be <code>null</code>. The valuation is a measurement, the grade is an opinion, and the grade failing to compute must never take the valuation down with it.</p>
 <hr>
 <h2 id="get-api-vaults-vaultid-nav-history">GET /api/vaults/:vaultId/nav-history</h2>
@@ -490,7 +513,7 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
 }</code></pre>
 <p>An ungated facility answers with the same shape and a populated <code>note</code>:</p>
 <pre class="code" data-lang="json"><code>{
-  "vaultId": "5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5",
+  "vaultId": "DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245",
   "gated": false,
   "private": false,
   "domainId": null,
@@ -507,11 +530,11 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
 <h2 id="get-api-vaults-vaultid-collateral">GET /api/vaults/:vaultId/collateral</h2>
 <p>What are the pledged shares of this facility actually worth. This is the route a second broker calls before lending against a pledge.</p>
 <div class="tw"><table><thead><tr><th>parameter</th><th>in</th><th>required</th><th>default</th><th>notes</th></tr></thead><tbody><tr><td><code>vaultId</code></td><td>path</td><td>yes</td><td></td><td>64 hex characters</td></tr><tr><td><code>accounts</code></td><td>query</td><td>no</td><td><code>WATCH_ACCOUNTS</code> plus the vault owner</td><td>comma separated addresses to scan for escrows. Added to the default set, not a replacement for it</td></tr><tr><td><code>haircut</code></td><td>query</td><td>no</td><td><code>0</code></td><td>the lender's own discount, in percent</td></tr></tbody></table></div>
-<pre class="code" data-lang="bash"><code>curl -s "http://localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5/collateral?haircut=20"</code></pre>
+<pre class="code" data-lang="bash"><code>curl -s "http://localhost:8787/api/vaults/DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245/collateral?haircut=20"</code></pre>
 <pre class="code" data-lang="json"><code>{
-  "serverTime": "2026-09-12T22:20:22Z",
-  "ledgerIndex": 5263343,
-  "shareMptId": "000000014D667775372D5B78E07FFF294678C7F9CE82AFBC",
+  "serverTime": "2026-10-20T14:59:10Z",
+  "ledgerIndex": 6273934,
+  "shareMptId": "000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797",
   "navNaive": "1.000000",
   "navCorrect": "0.803922",
   "pledgeCount": 0,
@@ -522,7 +545,7 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
   "totalOverstatementPct": "0.00",
   "pledges": []
 }</code></pre>
-<p><code>haircut</code> is echoed per pledge as <code>haircutPct</code>, never at the top level, so this capture is byte for byte the same with and without <code>?haircut=20</code>: no pledge was standing against Calder at that ledger.</p>
+<p><code>haircut</code> is echoed per pledge as <code>haircutPct</code>, never at the top level, so this capture is byte for byte the same with and without <code>?haircut=20</code>: no pledge was standing against Halden at that ledger.</p>
 <p>Each element of <code>pledges</code>, when there are any, carries <code>escrowId</code>, <code>pledgor</code>, <code>beneficiary</code>, <code>shares</code>, <code>valueNaive</code>, <code>valueCorrect</code>, <code>overstatement</code>, <code>overstatementPct</code>, <code>haircutPct</code>, <code>maxLendable</code>, <code>finishAfter</code>, <code>cancelAfter</code> and <code>explorerUrl</code> (<code>presentCollateral</code> in <code>src/collateral.mjs</code>).</p>
 <p>The haircut applies to the <b>honest</b> value, never to the reported one:</p>
 <p>$$V_{\text{lendable}} = u \cdot \text{NAV}_{\text{held}} \cdot (1 - h)$$</p>
@@ -649,7 +672,7 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
 <p>The same valuation as <code>/api/vaults/:vaultId/nav</code>, keyed by the share token instead of the vault, because the issuance id is the only identifier a holder has. This is the route the token's own metadata resolves to.</p>
 <div class="tw"><table><thead><tr><th>parameter</th><th>in</th><th>required</th><th>notes</th></tr></thead><tbody><tr><td><code>mptId</code></td><td>path</td><td>yes</td><td>48 hex characters</td></tr><tr><td><code>units</code></td><td>query</td><td>no</td><td>value a specific pledge of N units</td></tr></tbody></table></div>
 <p>Sends <code>Cache-Control: public, max-age=4</code>. Returns <code>SHARE_NOT_TRACKED</code> (404) if no tracked facility issues that token.</p>
-<pre class="code" data-lang="bash"><code>curl -s "http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav?units=1000000"</code></pre>
+<pre class="code" data-lang="bash"><code>curl -s "http://localhost:8787/api/mpt/000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797/nav?units=1000000"</code></pre>
 <p>The body is identical to <code>/api/vaults/:vaultId/nav</code> above, <code>schema: "orma.nav/1"</code>, plus one block when <code>units</code> is given:</p>
 <pre class="code" data-lang="json"><code>{
   "pledge": {
@@ -665,39 +688,39 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
 <h2 id="get-api-mpt-mptid-resolve">GET /api/mpt/:mptId/resolve</h2>
 <p>Can a stranger holding nothing but a token get to a valuation. This is the diagnostic that runs the whole loop a second broker runs and reports every step, including the failures.</p>
 <div class="tw"><table><thead><tr><th>parameter</th><th>in</th><th>required</th><th>default</th><th>notes</th></tr></thead><tbody><tr><td><code>mptId</code></td><td>path</td><td>yes</td><td></td><td>48 hex characters</td></tr><tr><td><code>resolve</code></td><td>query</td><td>no</td><td><code>true</code></td><td><code>false</code> stops before following the pointer</td></tr><tr><td><code>units</code></td><td>query</td><td>no</td><td></td><td>value a pledge against whatever was resolved</td></tr></tbody></table></div>
-<pre class="code" data-lang="bash"><code>curl -s http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/resolve</code></pre>
+<pre class="code" data-lang="bash"><code>curl -s "http://localhost:8787/api/mpt/000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797/resolve?units=1000000"</code></pre>
 <pre class="code" data-lang="jsonc"><code>{
-  "serverTime": "2026-09-12T22:20:22Z",
-  "ledgerIndex": 5263343,
-  "issuanceId": "000000014D667775372D5B78E07FFF294678C7F9CE82AFBC",
-  "issuer": "r3hE8HanpccSZdgmeHCfYFEkwxFjdDmmvt",
+  "serverTime": "2026-10-20T14:59:10Z",
+  "ledgerIndex": 6273934,
+  "issuanceId": "000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797",
+  "issuer": "r3XEmxGd7F51niRp94hcEcuuU7HJU47C2R",
   "unitsOutstanding": "51000000",
   "resolved": true,
-  "navUrl": "http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav",
+  "navUrl": "https://ormaprotocol.com/api/mpt/000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797/nav",
   "steps": [
-    { "step": "read MPTokenIssuance", "ok": true, "detail": "issuer r3hE8HanpccSZdgmeHCfYFEkwxFjdDmmvt, 51000000 units outstanding" },
+    { "step": "read MPTokenIssuance", "ok": true, "detail": "issuer r3XEmxGd7F51niRp94hcEcuuU7HJU47C2R, 51000000 units outstanding" },
     { "step": "decode metadata", "ok": true, "detail": "valid JSON" },
     { "step": "XLS-89 conformance", "ok": true, "detail": "asset_class rwa" },
-    { "step": "find valuation pointer", "ok": true, "detail": "http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav" },
+    { "step": "find valuation pointer", "ok": true, "detail": "https://ormaprotocol.com/api/mpt/000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797/nav" },
     { "step": "follow pointer", "ok": true, "detail": "unit value 0.803922" }
   ],
   "metadata": {
     "present": true,
     // `meta` is the decoded MPTokenMetadata verbatim. The `icon` field is elided here for
-    // width; the full 502-byte object is on /nav-pointer.
+    // width; the full 525-byte object is on /nav-pointer.
     "meta": {
-      "ticker": "ORMA-CSC3",
-      "name": "Calder Structured Credit III",
+      "ticker": "ORMA-HSC4",
+      "name": "Halden Structured Credit IV",
       "asset_class": "rwa",
       "issuer_name": "Orma",
       "desc": "Redeemable claim on a closed-ended private credit facility. Valuation is net of recognised loss.",
       "orma": {
         "v": 1,
         "instrument": "vault-share",
-        "nav_url": "http://localhost:8787/api/mpt/{mpt_issuance_id}/nav",
+        "nav_url": "https://ormaprotocol.com/api/mpt/{mpt_issuance_id}/nav",
         "nav_url_param": "{mpt_issuance_id}",
         "nav_basis": "assets net of recognised loss, divided by units outstanding",
-        "doc": "https://orma.credit/nav"
+        "doc": "https://ormaprotocol.com/docs/nav-pointer"
       }
     },
     "conformance": {
@@ -708,7 +731,13 @@ const assets = new Decimal(body.assetsTotal)   // "51000000" drops</code></pre>
       "taxonomyNote": "No XLS-89 asset_class describes a yield-bearing pooled claim; rwa is the closest. See orma.instrument."
     }
   },
-  "nav": { /* the full orma.nav/1 document from the route above */ }
+  "nav": { /* the full orma.nav/1 document from the route above */ },
+  "pledge": {
+    "units": "1000000",
+    "valueHeld": "803922",
+    "valueReported": "1000000",
+    "overstatement": "196078"
+  }
 }</code></pre>
 <p>The pointer stored on chain is a <b>template</b>, <code>.../mpt/{mpt_issuance_id}/nav</code>. The token's own id is substituted at resolve time, so one metadata blob is correct for every issuance that uses it.</p>
 <p>This route never throws. Every step reports what it found, and a failure is data rather than an exception, because "this collateral is opaque" is a legitimate and useful answer to give a lender. On failure the response carries <code>resolved: false</code>, the steps that did run, and <code>nav: null</code>, with <code>opaque: true</code> when the metadata could not be decoded at all.</p>

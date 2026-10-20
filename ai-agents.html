@@ -83,15 +83,15 @@ nav{position:static;height:auto;border-right:0;border-bottom:1px solid var(--lin
 <pre class="code" data-lang="json"><code>"orma": {
   "v": 1,
   "instrument": "vault-share",
-  "nav_url": "http://localhost:8787/api/mpt/{mpt_issuance_id}/nav",
+  "nav_url": "https://ormaprotocol.com/api/mpt/{mpt_issuance_id}/nav",
   "nav_url_param": "{mpt_issuance_id}",
   "nav_basis": "assets net of recognised loss, divided by units outstanding",
-  "doc": "https://orma.credit/nav"
+  "doc": "https://ormaprotocol.com/docs/nav-pointer"
 }</code></pre>
 <p>The pointer is a template, and not by preference: <code>VaultCreate</code> is submitted before the vault and its share issuance exist, so neither id is knowable when the pointer has to be written. It does not need to be. Whoever reads the metadata got there by holding the token, so they already have the id to substitute, which is the one thing an agent in this position always has.</p>
 <h3 id="the-call">The call</h3>
-<pre class="code" data-lang="js"><code>const BASE = 'http://localhost:8787'
-const MPT = '000000014D667775372D5B78E07FFF294678C7F9CE82AFBC'
+<pre class="code" data-lang="js"><code>const BASE = 'https://ormaprotocol.com'
+const MPT = '000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797'
 
 const res = await fetch(`${BASE}/api/mpt/${MPT}/nav`, {
   headers: { accept: 'application/json' },
@@ -108,12 +108,12 @@ if (nav.schema !== 'orma.nav/1' || !nav.unitValue?.held) {
 nav.unitValue.held          // "0.803922"  &lt;- the number to lend against
 nav.unitValue.reported      // "1.000000"  &lt;- what a metadata-diffing indexer shows
 nav.unitValue.divergenceBps // 1961
-nav.asOf                    // "2026-09-12T22:20:22Z"
-nav.ledgerIndex             // 5263343</code></pre>
+nav.asOf                    // "2026-10-20T14:59:02Z"
+nav.ledgerIndex             // 6273933</code></pre>
 <p>The response carries <code>Access-Control-Allow-Origin: *</code> and <code>Cache-Control: public, max-age=4</code>. Four seconds is the poller's interval, so a cached answer is never more than one cycle stale. An unknown share token returns <code>404</code> with <code>{"error":{"code":"SHARE_NOT_TRACKED","message":"No facility on this service issues that share token","retryable":false}}</code>.</p>
 <h3 id="valuing-a-pledge">Valuing a pledge</h3>
 <p>Two ways. Server side, add <code>units</code>:</p>
-<pre class="code"><code>GET /api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav?units=1000000</code></pre>
+<pre class="code"><code>GET /api/mpt/000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797/nav?units=1000000</code></pre>
 <p>which adds a <code>pledge</code> block to the same document:</p>
 <pre class="code" data-lang="json"><code>"pledge": {
   "units": "1000000",
@@ -147,7 +147,8 @@ NAV_held  = (A - L) / S</code></pre>
   "assetsTotal": "51000000",
   "lossUnrealized": "10000000",
   "unitsOutstanding": "51000000",
-  "recompute": "(assetsTotal - lossUnrealized) / unitsOutstanding",
+  "scale": 0,
+  "recompute": "(assetsTotal - lossUnrealized) / (unitsOutstanding / 10^scale)",
   "buildVersion": "3.4.0-rc5"
 }</code></pre>
 <p>An agent that verifies before acting should do this:</p>
@@ -155,7 +156,7 @@ NAV_held  = (A - L) / S</code></pre>
 Decimal.set({ precision: 40 })
 
 const p = nav.provenance
-const check = new Decimal(p.assetsTotal).minus(p.lossUnrealized).div(p.unitsOutstanding)
+const check = new Decimal(p.assetsTotal).minus(p.lossUnrealized).div(new Decimal(p.unitsOutstanding).div(new Decimal(10).pow(p.scale ?? 0)))
 if (check.toFixed(6) !== nav.unitValue.held) {
   throw new Error(`stated ${nav.unitValue.held}, recomputes to ${check.toFixed(6)}`)
 }</code></pre>
@@ -184,10 +185,10 @@ const nav = await fetch(url, { headers: { accept: 'application/json' } }).then((
 await client.disconnect()</code></pre>
 <p><code>/api/mpt/:mptId/resolve</code> runs that same loop and reports every step, including the failures, because "this collateral is opaque" is a legitimate answer to give a lender and a better one than an exception:</p>
 <pre class="code" data-lang="json"><code>"steps": [
-  { "step": "read MPTokenIssuance", "ok": true, "detail": "issuer r3hE8HanpccSZdgmeHCfYFEkwxFjdDmmvt, 51000000 units outstanding" },
+  { "step": "read MPTokenIssuance", "ok": true, "detail": "issuer r3XEmxGd7F51niRp94hcEcuuU7HJU47C2R, 51000000 units outstanding" },
   { "step": "decode metadata", "ok": true, "detail": "valid JSON" },
   { "step": "XLS-89 conformance", "ok": true, "detail": "asset_class rwa" },
-  { "step": "find valuation pointer", "ok": true, "detail": "http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav" },
+  { "step": "find valuation pointer", "ok": true, "detail": "https://ormaprotocol.com/api/mpt/000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797/nav" },
   { "step": "follow pointer", "ok": true, "detail": "unit value 0.803922" }
 ]</code></pre>
 <p>Two rules that module follows and that any agent following a third-party pointer should copy: only <code>http:</code> and <code>https:</code> are followed, and the fetch is bounded at 2500 ms with an <code>AbortController</code>. The URL was written by someone else.</p>
@@ -196,7 +197,7 @@ await client.disconnect()</code></pre>
 <p>The contract behind it is effectively permanent, and not out of politeness. The URL is written into write-once token metadata, so there is no migration path: no redirect we can publish, no version bump we can push to holders, no way to tell an existing token that the shape moved.</p>
 <div class="tw"><table><thead><tr><th>change</th><th>allowed</th></tr></thead><tbody><tr><td>add a field</td><td>yes</td></tr><tr><td>add a value to an existing enum</td><td>yes</td></tr><tr><td>rename a field</td><td>never</td></tr><tr><td>change a field's type</td><td>never</td></tr><tr><td>remove a field</td><td>never</td></tr><tr><td>change what a field means</td><td>never</td></tr></tbody></table></div>
 <p>A breaking change would need a new <code>schema</code> value and a new URL, which in practice means new tokens. So an agent can hard-code <code>nav.unitValue.held</code> and expect it to be there, and should still treat unknown fields as additive rather than erroring on them.</p>
-<div class="callout note"><span class="ck">Note</span><div><p><code>assessment.methodVersion</code> (<code>"1.0.0"</code>) versions the grading opinion, not the wire format. The</p><p>grade can be recalibrated without touching the schema. <code>health.contractVersion</code> versions the</p><p>wider API, which has no such write-once constraint. See <a href="nav-pointer.html">the NAV pointer</a>.</p></div></div>
+<div class="callout note"><span class="ck">Note</span><div><p><code>assessment.methodVersion</code> (<code>"1.1.0"</code>) versions the grading opinion, not the wire format. The</p><p>grade can be recalibrated without touching the schema. <code>health.contractVersion</code> versions the</p><p>wider API, which has no such write-once constraint. See <a href="nav-pointer.html">the NAV pointer</a>.</p></div></div>
 <h3 id="limits-an-agent-should-state-out-loud">Limits an agent should state out loud</h3>
 <ul><li>This runs on <b>Devnet</b>. XLS-65 and XLS-66 are not on Mainnet, so there is no production</li></ul>
 <p>  deployment to point at. <code>provenance.network</code> says <code>devnet</code> and <code>health.buildVersion</code> reports   the node, <code>3.4.0-rc5</code> at the time of capture.</p>
@@ -204,6 +205,19 @@ await client.disconnect()</code></pre>
 <p>  by construction, not in <code>L</code>. The grade partly exists to price that gap.</p>
 <ul><li>There is no reverse index from an MPT issuance to the escrows holding it, so collateral</li></ul>
 <p>  discovery needs a list of accounts to look at. That is reported as a protocol feedback item,   not solved here.</p>
+<h3 id="as-an-mcp-server">As an MCP server</h3>
+<p><code>src/mcp.mjs</code> exposes the same readings as MCP tools over stdio, so an agent reads a facility without integration code. It holds no key and signs nothing: each tool is one <code>GET</code> against <code>ORMA_API</code>, and an argument that is not a 64- or 48-hex id, or a count of units, is refused before a request is made. No dependency: the server speaks JSON-RPC itself.</p>
+<pre class="code" data-lang="json"><code>{
+  "mcpServers": {
+    "orma": {
+      "command": "node",
+      "args": ["/path/to/orma/src/mcp.mjs"],
+      "env": { "ORMA_API": "https://orma-api.onrender.com" }
+    }
+  }
+}</code></pre>
+<div class="tw"><table><thead><tr><th>tool</th><th>route</th></tr></thead><tbody><tr><td><code>list_facilities</code></td><td><code>GET /api/vaults</code></td></tr><tr><td><code>get_valuation</code></td><td><code>GET /api/vaults/:vaultId/nav</code></td></tr><tr><td><code>get_valuation_by_share</code></td><td><code>GET /api/mpt/:mptId/nav?units=</code></td></tr><tr><td><code>get_facility</code></td><td><code>GET /api/vaults/:vaultId</code></td></tr><tr><td><code>get_manager_conduct</code></td><td><code>GET /api/vaults/:vaultId/broker-history</code></td></tr></tbody></table></div>
+<p>A client that prefers to generate its own: <code>GET /api/openapi.json</code> is the OpenAPI 3.1 description of every route.</p>
 <hr>
 <h2 id="part-2-building-on-orma-with-a-coding-assistant">Part 2: building on Orma with a coding assistant</h2>
 <p>Everything below has been written wrong at least once in this codebase. Each one compiles, runs, and produces a plausible number.</p>

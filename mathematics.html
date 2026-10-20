@@ -102,7 +102,7 @@ export const rateToDec = (r) =&gt; num(r).div(RATE_SCALE)</code></pre>
     navDivergenceBps: bps(naive, correct),
   }
 }</code></pre>
-<p><b>Measured on Devnet.</b> Calder Structured Credit III, holding $A = 51{,}000{,}000$ drops, $L = 10{,}000{,}000$, $S = 51{,}000{,}000$: naive $1.000000$, held $0.803922$, $\delta = 1961$ bp.</p>
+<p><b>Measured on Devnet.</b> Halden Structured Credit IV, holding $A = 51{,}000{,}000$ drops, $L = 10{,}000{,}000$, $S = 51{,}000{,}000$: naive $1.000000$, held $0.803922$, $\delta = 1961$ bp.</p>
 <div class="callout note"><span class="ck">Note</span><div><p>$\delta$ is computed from the full-precision Decimals, not from the rounded six-decimal strings, and</p><p>the integer conversion is a round rather than a truncation: <code>bps()</code> in <code>src/num.mjs</code> returns</p><p><code>Number(a.minus(b).div(a).times(10000).toFixed(0))</code>, and <code>Decimal.prototype.toFixed</code> rounds half up.</p><p>The exact value here is $1960.78\ldots$ bp, so the API reports <b>1961</b>. A floor would</p><p>report 1960. If you reimplement this and get 1960, that is the reason.</p></div></div>
 <h3 id="why-the-naive-figure-is-not-merely-lazy">Why the naive figure is not merely lazy</h3>
 <p><code>PreviousFields</code> records a previous value only for a field the object already had. A healthy vault carries no <code>LossUnrealized</code> field, so its first impairment emits <code>PreviousFields</code> <b>empty</b>. Under cash-basis accounting (<code>LEVersion = 1</code>) impairment changes nothing else on the Vault object. An indexer that diffs transaction metadata therefore observes no change at all on the vault it is watching.</p>
@@ -211,7 +211,7 @@ export const gradeNumeric = (g) =&gt; Math.round((1 - LADDER.indexOf(g) / (LADDE
 <p>Par is $1.0$ for a closed-ended vault: subscription closes before any lending, so $S$ is capital subscribed measured in asset units, and later subscribers join at the same unit value with no profit or loss yet accrued. The term would need rethinking for an open-ended vault, where that identity does not hold.</p>
 <p><b>Measured.</b> A vault that took 50 XRP, defaulted on 40 and holds 10.5: $\rho = 79\%$, so $\Delta = -14$ from an anchor of AAA, composite <b>B</b>. Without this term the same vault scored <b>AAA</b>, identical to one that never lost a penny, and because the book sorts worst-first to surface danger, the most damaged facility sorted last. That was observed on Devnet, not hypothesised.</p>
 <h3 id="a-full-worked-grade">A full worked grade</h3>
-<p>Calder Structured Credit III at ledger 5263343, from the captured <code>GET /api/vaults/{id}</code> response: $A = 51{,}000{,}000$, $A_v = 41{,}000{,}000$, $L = 10{,}000{,}000$, $S = 51{,}000{,}000$, $D = 10{,}000{,}000$, $C = 5{,}000{,}000$, $c_{\min} = c_{\text{liq}} = 10000$, one impaired loan of $p = 10{,}000{,}000$, phase Investment.</p>
+<p>Halden Structured Credit IV at ledger 6273933, from the captured <code>GET /api/vaults/{id}</code> response: $A = 51{,}000{,}000$, $A_v = 41{,}000{,}000$, $L = 10{,}000{,}000$, $S = 51{,}000{,}000$, $D = 10{,}000{,}000$, $C = 5{,}000{,}000$, $c_{\min} = c_{\text{liq}} = 10000$, one impaired loan of $p = 10{,}000{,}000$, phase Redemption.</p>
 <div class="tw"><table><thead><tr><th>step</th><th>value</th><th>grade</th></tr></thead><tbody><tr><td>liquidity</td><td>$41/51 = 0.8039$</td><td>BBB</td></tr><tr><td>liquidatable cover</td><td>$\lceil 10{,}000{,}000 \times 0.01 \rceil = 100{,}000$</td><td></td></tr><tr><td>adequacy</td><td>$100{,}000 / \max(10{,}000{,}000,\ 10{,}000{,}000) = 0.0100$</td><td>B-</td></tr><tr><td>concentration</td><td>$10{,}000{,}000 / 10{,}000{,}000 = 1.0000$</td><td>D</td></tr><tr><td>recognition lag</td><td>0 s, the loan is already declared impaired</td><td>AAA</td></tr><tr><td>claims</td><td>$51{,}000{,}000 - 10{,}000{,}000 = 41{,}000{,}000$</td><td></td></tr><tr><td>liquidity at redemption</td><td>$41{,}000{,}000 + 0 + 100{,}000 = 41{,}100{,}000$</td><td></td></tr><tr><td>shortfall</td><td>$\max(0,\ 41{,}000{,}000 - 41{,}100{,}000) = 0$, so $0.00\%$</td><td>AAA</td></tr></tbody></table></div>
 <p>Notching: anchor AAA. $\rho = 0$ because $A \ge S$, no notch. Concentration $1.0 \ge 0.75$, $-1$, AA+. Adequacy $0.0100 &lt; 0.05$, $-1$, <b>AA</b>. Numeric $\operatorname{round}\big(100 (1 - 2/19)\big) = 89$.</p>
 <p>That matches the served response exactly, <code>notchTrace</code> included.</p>
@@ -257,7 +257,7 @@ export const decodePrice = (hex) =&gt; BigInt(`0x${hex}`)</code></pre>
 <h3 id="four-invariants">Four invariants</h3>
 <p>Each of these corrupts data silently rather than erroring.</p>
 <ol><li><code>OracleSet</code> is <b>not a merge</b>. A pair already on the object but omitted from the transaction is</li></ol>
-<p>   kept with its <code>AssetPrice</code> and <code>Scale</code> stripped, so publishing one dimension blanks the other    five. The publisher always resends all six. Removing one takes listing it with no <code>AssetPrice</code>,    so reusing a document id for a different set of assets accumulates stale pairs until the series    passes the ledger's ceiling and <code>OracleSet</code> returns <code>tecARRAY_TOO_LARGE</code>. Recovery is either    listing every stale pair with no price, or <code>OracleDelete</code> then recreate, which is what this    publisher does because it does not know what the stale pairs were. Document ids come from a counter, in    the order the publisher first meets each vault (<code>docIdFor</code> in <code>src/oracle.mjs</code>), never from a hash of    the vault id, because the id is a <code>UInt32</code> scoped to (account, id) and a collision would silently    overwrite another vault's scores. The counter lives in memory, so a restart that meets the vaults in a    different order assigns different ids. <code>BaseAsset</code> identifies the vault; the document id does not.</p>
+<p>   kept with its <code>AssetPrice</code> and <code>Scale</code> stripped, so publishing one dimension blanks the other    five. The publisher always resends all six. Removing one takes listing it with no <code>AssetPrice</code>,    so reusing a document id for a different set of assets accumulates stale pairs until the series    passes the ledger's ceiling and <code>OracleSet</code> returns <code>tecARRAY_TOO_LARGE</code>. Recovery is either    listing every stale pair with no price, or <code>OracleDelete</code> then recreate, which is what this    publisher does because it does not know what the stale pairs were. Document ids are pinned in each    facility's record under <code>demo/</code> (<code>oracleDocumentId</code>), and a vault without one is numbered above them    (<code>docIdFor</code> in <code>src/oracle.mjs</code>), never from a hash of the vault id, because the id is a <code>UInt32</code>    scoped to (account, id) and a collision would silently overwrite another vault's scores. A retired    facility keeps its id reserved, so a restart never moves a document to another vault. <code>BaseAsset</code>    still identifies the vault on its own.</p>
 <ol><li><code>LastUpdateTime</code> must <b>strictly increase</b>. Equal or lower gives <code>tecINVALID_UPDATE_TIME</code>, burning</li></ol>
 <p>   a fee and a sequence number.</p>
 <ol><li>A <code>LastUpdateTime</code> in the <b>future bricks</b> the object until wall clock catches up. Never add a</li></ol>
@@ -265,14 +265,14 @@ export const decodePrice = (hex) =&gt; BigInt(`0x${hex}`)</code></pre>
 <ol><li>Prices are hex, per above.</li></ol>
 <p><code>LastUpdateTime</code> is UNIX epoch, not Ripple epoch.</p>
 <h3 id="read-back-from-the-ledger">Read back from the ledger</h3>
-<p>Decoded from the Oracle object <code>03C7B0E151129510F11FF92CCE8FBB3E7AD3C55B25EDA6EB414324E3E995078A</code>, document id 3, for Calder Structured Credit III, as the event publisher <code>rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B</code> left it on 13 September 2026:</p>
+<p>Decoded from the Oracle object <code>02B6D31C8D7D8405A9274C092F5837EC6160C65B7983BA98FF8220289820650D</code>, document id 5, for Halden Structured Credit IV, as the deployed publisher <code>rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H</code> held it at ledger 6273933 on 20 October 2026:</p>
 <div class="tw"><table><thead><tr><th>code</th><th>raw</th><th>scale</th><th>decoded</th><th>check</th></tr></thead><tbody><tr><td><code>NAV</code></td><td><code>c4452</code></td><td>6</td><td>0.803922</td><td>$\text{0xC4452} = 803922$</td></tr><tr><td><code>HDL</code></td><td><code>22c4</code></td><td>4</td><td>0.8900</td><td>$8900$, the numeric grade 89 over 100</td></tr><tr><td><code>LIQ</code></td><td><code>1f67</code></td><td>4</td><td>0.8039</td><td>$\text{0x1F67} = 8039$</td></tr><tr><td><code>COV</code></td><td><code>64</code></td><td>4</td><td>0.0100</td><td>$\text{0x64} = 100$</td></tr><tr><td><code>CNC</code></td><td><code>2710</code></td><td>4</td><td>1.0000</td><td>$\text{0x2710} = 10000$</td></tr><tr><td><code>DDL</code></td><td><code>0</code></td><td>4</td><td>0.0000</td><td>shortfall is zero</td></tr></tbody></table></div>
 <p>XLS-47 is live on Mainnet today, unlike the lending amendments, and <code>get_aggregate_price</code> computes a median and standard deviation across independent publishers inside the ledger. That is the point of publishing here rather than serving a number over HTTP: a second publisher who disagrees changes the aggregate without asking our permission. Orma reports <code>aggregate: null</code> honestly while it is the only publisher. The invariants that make publishing it survive are below.</p>
 <div class="callout note"><span class="ck">Note</span><div><p>Everything on this page runs on Devnet, at <code>wss://s.devnet.rippletest.net:51233</code>, network id 2,</p><p>because XLS-65 vaults and XLS-66 lending are not on Mainnet. The measurement, the scoring and the</p><p>enforcement path are Devnet-only for that reason. The oracle publication is the one component with a</p><p>production path today.</p></div></div>
 <hr>
 <h2 id="checking-this-yourself">Checking this yourself</h2>
 <p>Start from the valuation document, which names the ledger state it was computed from precisely so that you do not have to trust it. The <code>provenance</code> block exists for this.</p>
-<pre class="code" data-lang="bash"><code>curl -s http://localhost:8787/api/vaults/5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5/nav</code></pre>
+<pre class="code" data-lang="bash"><code>curl -s http://localhost:8787/api/vaults/DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245/nav</code></pre>
 <pre class="code" data-lang="json"><code>"unitValue": {
   "held": "0.803922",
   "reported": "1.000000",
@@ -285,8 +285,9 @@ export const decodePrice = (hex) =&gt; BigInt(`0x${hex}`)</code></pre>
   "assetsTotal": "51000000",
   "lossUnrealized": "10000000",
   "unitsOutstanding": "51000000",
-  "recompute": "(assetsTotal - lossUnrealized) / unitsOutstanding",
-  "buildVersion": "3.4.0-rc5"
+  "scale": 0,
+  "recompute": "(assetsTotal - lossUnrealized) / (unitsOutstanding / 10^scale)",
+  "buildVersion": "3.4.1"
 }</code></pre>
 <p>Recompute both readings and the divergence from those three strings, in decimal arithmetic, not in floats:</p>
 <pre class="code" data-lang="js"><code>import Decimal from 'decimal.js'
@@ -311,7 +312,7 @@ await client.connect()
 // the parameter is vault_id, NOT vault as XLS-65 section 3.9.1 states
 const r = await client.request({
   command: 'vault_info',
-  vault_id: '5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5',
+  vault_id: 'DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245',
 })
 console.log(r.result.vault.AssetsTotal, r.result.vault.LossUnrealized)
 await client.disconnect()</code></pre>

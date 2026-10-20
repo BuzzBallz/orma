@@ -87,28 +87,28 @@ nav{position:static;height:auto;border-right:0;border-bottom:1px solid var(--lin
 <p><code>MPTokenMetadata</code> is only settable on <code>VaultCreate</code>. That transaction is submitted <b>before</b> the vault exists, so at the moment the pointer has to be composed:</p>
 <ul><li>the <code>VaultID</code> is not known, it is assigned by the transactor,</li><li>the share <code>MPTokenIssuanceID</code> is not known for the same reason,</li><li>and the field can never be corrected once either becomes known.</li></ul>
 <p>So a self-referential URL is impossible. What we write instead is a template with a placeholder:</p>
-<pre class="code"><code>http://localhost:8787/api/mpt/{mpt_issuance_id}/nav</code></pre>
+<pre class="code"><code>https://ormaprotocol.com/api/mpt/{mpt_issuance_id}/nav</code></pre>
 <p>The reader supplies the missing half. Anyone reading this metadata got to it by holding the token, so they already have the issuance id: the pointer only has to name the service and the substitution. That turns an unresolvable reference into a trivial one.</p>
 <p><code>{mpt_issuance_id}</code> is exported as <code>MPT_PLACEHOLDER</code> from <code>src/metadata.mjs</code> and is also written into the metadata itself as <code>orma.nav_url_param</code>, so a consumer who has never read this page can still see which substring is meant to be replaced.</p>
 <h2 id="the-metadata-we-actually-write">The metadata we actually write</h2>
-<p>XLS-89 fields first, in the order rippled names them, then one namespaced block of our own. This is the exact object on the ledger for Calder Structured Credit III, copied from <code>demo/metadata-vault.json</code>:</p>
+<p>XLS-89 fields first, in the order rippled names them, then one namespaced block of our own. This is the exact object on the ledger for Halden Structured Credit IV, copied from <code>demo/showcase-vault.json</code>:</p>
 <pre class="code" data-lang="json"><code>{
-  "ticker": "ORMA-CSC3",
-  "name": "Calder Structured Credit III",
-  "icon": "http://localhost:8787/assets/mark.svg",
+  "ticker": "ORMA-HSC4",
+  "name": "Halden Structured Credit IV",
+  "icon": "https://ormaprotocol.com/assets/mark.svg",
   "asset_class": "rwa",
   "issuer_name": "Orma",
   "desc": "Redeemable claim on a closed-ended private credit facility. Valuation is net of recognised loss.",
   "orma": {
     "v": 1,
     "instrument": "vault-share",
-    "nav_url": "http://localhost:8787/api/mpt/{mpt_issuance_id}/nav",
+    "nav_url": "https://ormaprotocol.com/api/mpt/{mpt_issuance_id}/nav",
     "nav_url_param": "{mpt_issuance_id}",
     "nav_basis": "assets net of recognised loss, divided by units outstanding",
-    "doc": "https://orma.credit/nav"
+    "doc": "https://ormaprotocol.com/docs/nav-pointer"
   }
 }</code></pre>
-<p>502 bytes of UTF-8, 1004 hex characters on the wire, against a ledger ceiling of 1024 bytes. <code>encodeShareMetadata()</code> throws rather than submit a blob over that ceiling, because over the ceiling is a malformed transaction and just under it is a permanent record you cannot trim later.</p>
+<p>525 bytes of UTF-8, 1050 hex characters on the wire, against a ledger ceiling of 1024 bytes. <code>encodeShareMetadata()</code> throws rather than submit a blob over that ceiling, because over the ceiling is a malformed transaction and just under it is a permanent record you cannot trim later.</p>
 <p><b>Why XLS-89 fields at all.</b> rippled volunteers a warning, unprompted, when metadata is not XLS-89 shaped: it says the token "might not be discoverable by Explorers and Indexers" and lists the fields it expects, <code>ticker</code>, <code>name</code>, <code>icon</code>, <code>asset_class</code> and <code>issuer_name</code>. A vault share created the obvious way, with no metadata, is invisible to every indexer that reads the standard. Five fields is a cheap price for being listed.</p>
 <p><b>Why <code>asset_class: "rwa"</code>.</b> The permitted values are <code>rwa</code>, <code>memes</code>, <code>wrapped</code>, <code>gaming</code>, <code>defi</code> and <code>other</code>. None of them describes a yield-bearing pooled claim. <code>rwa</code> is the closest true statement, since a private credit facility is a real world asset, and the precise thing lives in <code>orma.instrument</code> as <code>vault-share</code>. <code>xls89Report()</code> returns that caveat on the wire as <code>taxonomyNote</code>, so a consumer reading <code>asset_class</code> is told it is being given less information than the field appears to carry.</p>
 <p>Building and encoding it, from <code>src/demo/bake-metadata.mjs</code>:</p>
@@ -116,8 +116,8 @@ nav{position:static;height:auto;border-right:0;border-bottom:1px solid var(--lin
 
 const navTemplate = `${BASE.replace(/\/+$/, '')}/api/mpt/${MPT_PLACEHOLDER}/nav`
 const meta = buildShareMetadata({
-  ticker: 'ORMA-CSC3',
-  name: 'Calder Structured Credit III',
+  ticker: 'ORMA-HSC4',
+  name: 'Halden Structured Credit IV',
   navUrl: navTemplate,
   icon: `${BASE.replace(/\/+$/, '')}/assets/mark.svg`,
   issuerName: 'Orma',
@@ -135,7 +135,7 @@ await c.submitAndWait({
 <p>This is what a second lender runs. They hold an MPT issuance id and nothing else: no relationship with the facility, no access to its reporting, no reason to trust a figure anyone hands them.</p>
 <pre class="code" data-lang="js"><code>import { Client } from 'xrpl'
 
-const ISSUANCE = '000000014D667775372D5B78E07FFF294678C7F9CE82AFBC'
+const ISSUANCE = '000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797'
 
 const c = new Client('wss://s.devnet.rippletest.net:51233')
 await c.connect()
@@ -160,27 +160,27 @@ await c.disconnect()</code></pre>
 <p>Every step before the last is ledger state. The last one is a URL the ledger named. Nothing in the loop requires Orma to be known to the lender in advance, which is the difference between a dashboard, which you have to already know about, and a primitive, which is reachable from the asset itself.</p>
 <p><code>src/nav.mjs</code> implements the same loop as <code>resolveFromIssuance()</code>, with the failure handling a lender's tool actually needs. It never throws. Each step reports what it found, because "this collateral is opaque" is a legitimate and useful answer to give a credit desk, and a much better one than an exception.</p>
 <h3 id="running-it-through-the-api">Running it through the API</h3>
-<pre class="code" data-lang="bash"><code>curl -s "http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/resolve"</code></pre>
+<pre class="code" data-lang="bash"><code>curl -s "https://ormaprotocol.com/api/mpt/000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797/resolve"</code></pre>
 <p>Captured response, trimmed to the loop itself:</p>
 <pre class="code" data-lang="json"><code>{
-  "serverTime": "2026-09-12T22:20:22Z",
-  "ledgerIndex": 5263343,
-  "issuanceId": "000000014D667775372D5B78E07FFF294678C7F9CE82AFBC",
-  "issuer": "r3hE8HanpccSZdgmeHCfYFEkwxFjdDmmvt",
+  "serverTime": "2026-10-20T14:59:10Z",
+  "ledgerIndex": 6273934,
+  "issuanceId": "000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797",
+  "issuer": "r3XEmxGd7F51niRp94hcEcuuU7HJU47C2R",
   "unitsOutstanding": "51000000",
   "resolved": true,
-  "navUrl": "http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav",
+  "navUrl": "https://ormaprotocol.com/api/mpt/000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797/nav",
   "steps": [
     { "step": "read MPTokenIssuance", "ok": true,
-      "detail": "issuer r3hE8HanpccSZdgmeHCfYFEkwxFjdDmmvt, 51000000 units outstanding" },
+      "detail": "issuer r3XEmxGd7F51niRp94hcEcuuU7HJU47C2R, 51000000 units outstanding" },
     { "step": "decode metadata", "ok": true, "detail": "valid JSON" },
     { "step": "XLS-89 conformance", "ok": true, "detail": "asset_class rwa" },
     { "step": "find valuation pointer", "ok": true,
-      "detail": "http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav" },
+      "detail": "https://ormaprotocol.com/api/mpt/000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797/nav" },
     { "step": "follow pointer", "ok": true, "detail": "unit value 0.803922" }
   ]
 }</code></pre>
-<p>Five steps, all green. The issuer on that first line, <code>r3hE8HanpccSZdgmeHCfYFEkwxFjdDmmvt</code>, is the vault pseudo-account: the same account whose <code>lsfDisableMaster</code> flag makes the metadata permanent.</p>
+<p>Five steps, all green. The issuer on that first line, <code>r3XEmxGd7F51niRp94hcEcuuU7HJU47C2R</code>, is the vault pseudo-account: the same account whose <code>lsfDisableMaster</code> flag makes the metadata permanent.</p>
 <p>The valuation document that comes back is the one described in <a href="http-api.html">the API reference</a>, and the pointer route serves it keyed by share token rather than by vault id, because the issuance id is the only identifier a holder has. It carries its own inputs. Trimmed to the valuation and its provenance:</p>
 <pre class="code" data-lang="json"><code>{
   "schema": "orma.nav/1",
@@ -195,8 +195,8 @@ await c.disconnect()</code></pre>
     "assetsTotal": "51000000",
     "lossUnrealized": "10000000",
     "unitsOutstanding": "51000000",
-    "recompute": "(assetsTotal - lossUnrealized) / unitsOutstanding",
-    "buildVersion": "3.4.0-rc5"
+    "recompute": "(assetsTotal - lossUnrealized) / (unitsOutstanding / 10^scale)",
+    "buildVersion": "3.4.1"
   }
 }</code></pre>
 <div class="callout tip"><span class="ck">Tip</span><div><p><code>provenance</code> exists so a lender never has to take our word for anything. Those three</p><p>integers are on the <code>Vault</code> ledger entry and the share <code>MPTokenIssuance</code>. Read them</p><p>yourself and apply the one-line formula in <code>recompute</code>.</p></div></div>
@@ -206,7 +206,7 @@ await c.disconnect()</code></pre>
 <p>A pledge of 1,000,000 units, which is the call <code>GET /api/mpt/{id}/nav?units=1000000</code> or <code>valuePledge(nav, '1000000')</code>:</p>
 <div class="tw"><table><thead><tr><th>line</th><th>drops</th><th>XRP</th></tr></thead><tbody><tr><td>value on the reported figure</td><td><code>1000000</code></td><td>1.000000</td></tr><tr><td>value on the honest figure</td><td><code>803922</code></td><td>0.803922</td></tr><tr><td>overstatement avoided</td><td><code>196078</code></td><td>0.196078</td></tr></tbody></table></div>
 <p>19.61% of the stated collateral value was not there. A haircut does not fix this: a haircut $h$ is applied to the held value, $V_{\text{lendable}} = V_{\text{held}}(1-h)$, and absorbs volatility in a number that is correct. It does not absorb a number that is wrong.</p>
-<div class="callout note"><span class="ck">Note</span><div><p>The impairment on this facility is transaction</p><p><code>BD18EFB94490CA540E7A9C249971740C1228D1FBC3ED97C9BA9F4908F52D5F4F</code> on Devnet.</p><p><code>PreviousFields</code> records only fields the object already had, and a healthy vault carries no</p><p><code>LossUnrealized</code>, so the impairment that creates it emits an empty <code>PreviousFields</code> and an</p><p>indexer that diffs metadata sees no change at all. That behaviour is captured on a separate</p><p>facility, transaction</p><p><code>075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3</code> in</p><p><code>demo/indexer-race.json</code>, where <code>PreviousFields</code> is empty while <code>FinalFields</code> carries a</p><p><code>LossUnrealized</code> of 10,000,000 drops. It is why the reported figure stays at 1.000000</p><p>wherever it is read by diffing.</p></div></div>
+<div class="callout note"><span class="ck">Note</span><div><p>The impairment on this facility is transaction</p><p><code>EC385DAF2DF412F86F06648B7855AEFDB1A1B8596048DA33C33B0A09FB2D08E5</code> on Devnet.</p><p><code>PreviousFields</code> records only fields the object already had, and a healthy vault carries no</p><p><code>LossUnrealized</code>, so the impairment that creates it emits an empty <code>PreviousFields</code> and an</p><p>indexer that diffs metadata sees no change at all. That behaviour is captured on a separate</p><p>facility, transaction</p><p><code>075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3</code> in</p><p><code>demo/indexer-race.json</code>, where <code>PreviousFields</code> is empty while <code>FinalFields</code> carries a</p><p><code>LossUnrealized</code> of 10,000,000 drops. It is why the reported figure stays at 1.000000</p><p>wherever it is read by diffing.</p></div></div>
 <p>All arithmetic here is string in, string out, at 40 significant digits with <code>decimal.js</code>. No monetary value in Orma passes through <code>Number()</code> or <code>parseFloat</code>.</p>
 <h2 id="when-the-loop-fails-and-what-the-lender-is-told">When the loop fails, and what the lender is told</h2>
 <p>Every one of these is a normal outcome, not an error, and each is reported as a failed step with the rest of the document intact.</p>
@@ -222,16 +222,15 @@ await c.disconnect()</code></pre>
 <p>The two routes are kept separate for the same reason. <code>/api/mpt/{id}/nav</code> is what the template resolves to and never follows a pointer itself, because a valuation reachable only by walking a pointer to itself is a loop. <code>/api/mpt/{id}/resolve</code> is the diagnostic that walks the loop and reports every step, and accepts <code>?resolve=false</code> to stop at the pointer without following it. Both send open CORS headers: the entire point is that a party with no relationship to us can call them, and both are read-only views of public ledger state.</p>
 <h2 id="honest-limits">Honest limits</h2>
 <p><b>Devnet only.</b> XLS-65 vaults and XLS-66 lending are not on Mainnet, so everything here runs against <code>wss://s.devnet.rippletest.net:51233</code>, rippled 3.4.0-rc5, with <code>xrpl</code> 5.2.0 on Node 24.13.0. Nothing about the mechanism depends on Devnet, but nothing about it has been exercised under Mainnet load either.</p>
-<p><b>The base URL in the baked facility is <code>http://localhost:8787</code>.</b> That is what a hackathon demo can honestly commit to. The field is permanent, so in production the base must be a hostname you are willing to keep serving for the full life of the vault, on https. Writing a host you might move off is the one mistake this design cannot recover from.</p>
-<p><b>The <code>icon</code> in that blob does not resolve.</b> <code>http://localhost:8787/assets/mark.svg</code> is written into the permanent metadata, and the reader serves thirteen JSON routes and no static files, so that URL is a 404 today. Nothing in the resolution loop reads <code>icon</code>. It is an XLS-89 discoverability field for explorers, and <code>resolveFromIssuance()</code> never fetches it, so the valuation path is unaffected. It is stated here because it is the same permanence trap as the base URL, caught one field later, and it cannot be corrected on this facility.</p>
+<p><b>The base URL is permanent.</b> The field cannot be corrected, so the base must be a hostname you are willing to keep serving for the full life of the vault, on https. Writing a host you might move off is the one mistake this design cannot recover from. The first facility baked this way, Calder Structured Credit III, made it: its pointer names <code>http://localhost:8787</code> and its <code>doc</code> a domain that no longer answers. Calder is retired from the portfolio for that reason, and its record stays in <code>demo/metadata-vault.json</code>. Halden carries the same figures behind a pointer to <code>ormaprotocol.com</code>.</p>
 <p><b>The pointer is a pointer.</b> It moves the trust question from "do you believe this number" to "do you believe this host", and <code>provenance</code> is what shrinks that second question: the three ledger integers and the formula are in every response, so a lender who distrusts the host entirely can still read the same vault themselves and check. The pointer's value is that it tells them <b>where to look</b> and <b>what basis to use</b>, not that it is authoritative.</p>
 <p><b>There is no global index from an <code>mpt_issuance_id</code> to the escrows holding it.</b> You can enumerate collateral pledged in your favour by scanning your own account objects, but you always have to start from an account.</p>
 <p><b>A share token can point anywhere.</b> Nothing stops a vault owner writing their own endpoint into their own share metadata and serving whatever number they like. The design does not assume otherwise. What it provides is that the pointer is public, permanent and readable by everyone, so a lender can see whose valuation they are being asked to accept before they accept it, and a competing valuation of the same vault is one <code>vault_info</code> call away.</p>
-<p><b>The capture in <code>demo/metadata-vault.json</code> shows step 5 failing with HTTP 404.</b> That is the bake script, not a bug: it writes the new facility to <code>demo/</code> and the API reads that directory at startup, so the first run resolves the pointer correctly and finds a service that has not yet been restarted. The ledger half of the loop, which is the half that had to be proven, closes in that same capture. The sample above is the same facility after the restart.</p>
+<p><b>The capture in <code>demo/showcase-vault.json</code> resolves all five steps through the public site.</b> It was taken after the deployed service had loaded the new record, at <code>resolution.verifiedAt</code>.</p>
 <h2 id="the-facility">The facility</h2>
 <p>Everything on this page is one live Devnet facility:</p>
-<div class="tw"><table><thead><tr><th></th><th></th></tr></thead><tbody><tr><td>label</td><td>Calder Structured Credit III</td></tr><tr><td>ticker</td><td>ORMA-CSC3</td></tr><tr><td>vault</td><td><code>5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5</code></td></tr><tr><td>loan broker</td><td><code>1C160EFFCA8208DFD8CE9B065A3C3C41CCA80758FBC3099BE27AACFBD1478173</code></td></tr><tr><td>share issuance</td><td><code>000000014D667775372D5B78E07FFF294678C7F9CE82AFBC</code></td></tr><tr><td>share issuer (vault pseudo-account)</td><td><code>r3hE8HanpccSZdgmeHCfYFEkwxFjdDmmvt</code></td></tr><tr><td>vault owner</td><td><code>rGMo2ke9of3GEqJwWAzDmFjrm6SwYowTsB</code></td></tr><tr><td>impairment</td><td><code>BD18EFB94490CA540E7A9C249971740C1228D1FBC3ED97C9BA9F4908F52D5F4F</code></td></tr></tbody></table></div>
-<p>Rebuild it from scratch with <code>node src/demo/bake-metadata.mjs</code>, which funds two wallets, creates the vault with the metadata attached, deposits 51 XRP, originates and impairs a 10 XRP loan, then runs the resolution loop and prints every step.</p>
+<div class="tw"><table><thead><tr><th></th><th></th></tr></thead><tbody><tr><td>label</td><td>Halden Structured Credit IV</td></tr><tr><td>ticker</td><td>ORMA-HSC4</td></tr><tr><td>vault</td><td><code>DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245</code></td></tr><tr><td>loan broker</td><td><code>3A87743DC5EEEBD4A527543D73E5CBDCB7B0201113084A47E1C4FE5D0B480AF6</code></td></tr><tr><td>share issuance</td><td><code>000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797</code></td></tr><tr><td>share issuer (vault pseudo-account)</td><td><code>r3XEmxGd7F51niRp94hcEcuuU7HJU47C2R</code></td></tr><tr><td>vault owner</td><td><code>r4nBvMQHt9ow7tXZqtgxwo4jXf4BvnD8hC</code></td></tr><tr><td>impairment</td><td><code>EC385DAF2DF412F86F06648B7855AEFDB1A1B8596048DA33C33B0A09FB2D08E5</code></td></tr></tbody></table></div>
+<p>Bake another from scratch with <code>node src/demo/bake-metadata.mjs --label "Name" --ticker T --out demo/&lt;name&gt;.json</code>, which funds two wallets, creates the vault with the metadata attached, deposits 51 XRP, originates and impairs a 10 XRP loan, then runs the resolution loop and prints every step.</p>
     <div class="foot">
       Orma — built at the XRPL Lending Protocol Hackathon, Paris, 12-13 September 2026,
       by Alexandre Lemiere and Andrea Gonzalez. Devnet only.

@@ -117,21 +117,21 @@ nav{position:static;height:auto;border-right:0;border-bottom:1px solid var(--lin
 <h2 id="enforce">Enforce</h2>
 <p>A grade nobody acts on is a press release. The last step makes it bind: Orma issues an XLS-70 credential of type <code>ORMA-IG</code> to an LP, the LP accepts it (issuance alone grants nothing, a deposit without the accept is still <code>tecNO_AUTH</code>), and a vault owner who wants graded capital names Orma's issuer in a PermissionedDomain and creates the vault with <code>tfVaultPrivate</code>. After that the ledger itself refuses a deposit from an uncredentialed account. Orma signs nothing in that step, is never asked, and cannot refuse to be cited, which is the correct shape for a rating. Revocation is asymmetric on purpose: deleting the credential bounces the next deposit, and leaves the existing position fully withdrawable. A rater who can trap capital is a worse problem than the one being solved. See <a href="gate.html">/gate</a>.</p>
 <h2 id="the-four-facilities-on-devnet">The four facilities on Devnet</h2>
-<p>All four are live, baked before the demo, and readable by anyone pointed at <code>wss://s.devnet.rippletest.net:51233</code> (network id 2).</p>
-<div class="tw"><table><thead><tr><th>facility</th><th>vault id</th><th>what it demonstrates</th></tr></thead><tbody><tr><td>Meridian Trade Finance I</td><td><code>864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835</code></td><td>The empty <code>PreviousFields</code>. Impaired at <code>075FE6D2...E49229C3</code>, NAV 1.000000 reported against 0.803922 held, 1961 bp.</td></tr><tr><td>Kestrel Bridge Financing II</td><td><code>24EAA01AD4CE70D8ABB4ACB4255DC4C216B8AF3B9E7315DB8052BFC1E5810089</code></td><td>The ordering lever. Two defaults declared largest first, 0.500000 XRP of cover consumed where the investor-best order would have consumed 0.700000. Conduct grade E, score 25.</td></tr><tr><td>Calder Structured Credit III</td><td><code>5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5</code></td><td>The share token pointer. MPT <code>000000014D667775372D5B78E07FFF294678C7F9CE82AFBC</code>, ticker <code>ORMA-CSC3</code>, metadata resolving to the same 0.803922.</td></tr><tr><td>Thorne Senior Secured I</td><td><code>4A5A8E3716D52E334AEB077ADB09456EF4A941CC26021A8EAD37F95B00190DF5</code></td><td>The gate. Private vault behind domain <code>FFBEC89D98B4E7CF52F4F254235086514A90CED0EC531941BDF747AF40C5A2FB</code>, accepting credential type <code>ORMA-IG</code> from issuer <code>rKQjjU5KFs9RAZCDvYVjcaoVK5gGsCJgkP</code>.</td></tr></tbody></table></div>
+<p>All four are live and readable by anyone pointed at <code>wss://s.devnet.rippletest.net:51233</code> (network id 2).</p>
+<div class="tw"><table><thead><tr><th>facility</th><th>vault id</th><th>what it demonstrates</th></tr></thead><tbody><tr><td>Meridian Trade Finance I</td><td><code>864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835</code></td><td>The empty <code>PreviousFields</code>. Impaired at <code>075FE6D2...E49229C3</code>, NAV 1.000000 reported against 0.803922 held, 1961 bp.</td></tr><tr><td>Kestrel Bridge Financing II</td><td><code>24EAA01AD4CE70D8ABB4ACB4255DC4C216B8AF3B9E7315DB8052BFC1E5810089</code></td><td>The ordering lever. Two defaults declared largest first, 0.500000 XRP of cover consumed where the investor-best order would have consumed 0.700000. Conduct grade E, score 25.</td></tr><tr><td>Halden Structured Credit IV</td><td><code>DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245</code></td><td>The share token pointer. MPT <code>000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797</code>, ticker <code>ORMA-HSC4</code>, metadata resolving to the same 0.803922.</td></tr><tr><td>Thorne Senior Secured I</td><td><code>4A5A8E3716D52E334AEB077ADB09456EF4A941CC26021A8EAD37F95B00190DF5</code></td><td>The gate. Private vault behind domain <code>FFBEC89D98B4E7CF52F4F254235086514A90CED0EC531941BDF747AF40C5A2FB</code>, accepting credential type <code>ORMA-IG</code> from issuer <code>rKQjjU5KFs9RAZCDvYVjcaoVK5gGsCJgkP</code>.</td></tr></tbody></table></div>
 <h2 id="try-it">Try it</h2>
 <p>With the backend running (<code>npm start</code>, which defaults to port 8787), the valuation route keyed by share token is the one a third party would call, because the share token id is the only identifier a holder has. It is one of three routes that opt into a public cache header for cross-origin callers, alongside the vault-keyed <code>/api/vaults/{vaultId}/nav</code> and the resolver, because all three exist to be called by a party with no relationship to Orma:</p>
-<pre class="code" data-lang="bash"><code>curl -s http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav</code></pre>
+<pre class="code" data-lang="bash"><code>curl -s http://localhost:8787/api/mpt/000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797/nav</code></pre>
 <pre class="code" data-lang="json"><code>{
   "schema": "orma.nav/1",
   "instrument": {
     "kind": "vault-share",
-    "vaultId": "5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5",
-    "shareMptId": "000000014D667775372D5B78E07FFF294678C7F9CE82AFBC",
+    "vaultId": "DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245",
+    "shareMptId": "000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797",
     "unitsOutstanding": "51000000",
     "vaultKind": "ClosedEnded",
-    "phase": "Investment",
-    "redemptionAt": "2026-09-13T15:11:47Z"
+    "phase": "Redemption",
+    "redemptionAt": "2026-10-19T22:29:17Z"
   },
   "unitValue": {
     "held": "0.803922",
@@ -144,8 +144,8 @@ nav{position:static;height:auto;border-right:0;border-bottom:1px solid var(--lin
     "assetsTotal": "51000000",
     "lossUnrealized": "10000000",
     "unitsOutstanding": "51000000",
-    "recompute": "(assetsTotal - lossUnrealized) / unitsOutstanding",
-    "buildVersion": "3.4.0-rc5"
+    "recompute": "(assetsTotal - lossUnrealized) / (unitsOutstanding / 10^scale)",
+    "buildVersion": "3.4.1"
   }
 }</code></pre>
 <p>That body is abridged. The full document also carries <code>serverTime</code>, <code>ledgerIndex</code>, <code>asOf</code>, the asset descriptor inside <code>instrument</code>, a <code>valuation</code> block and the <code>assessment</code>.</p>
