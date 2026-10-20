@@ -203,7 +203,7 @@ the book, not ten.
 Note what the base is. The formula is keyed to the broker's **total** book $D$, not to the principal
 of the loan that failed. A broker with a shrinking book liquidates less cover on each successive
 default, and a single loan that is most of the book liquidates cover keyed to that whole book once
-and then leaves nothing behind it. Calder Structured Credit III shows the scale of the gap: 10 XRP
+and then leaves nothing behind it. Halden Structured Credit IV shows the scale of the gap: 10 XRP
 of debt, 5 XRP of cover posted, and 0.1 XRP of that cover reachable on a default.
 
 ```json
@@ -226,8 +226,8 @@ were loss-absorbing.
 
 This is a protocol fact, not a configuration choice. `LoanBrokerSet` requires the submitting account
 to be the vault's `Owner` (`LoanBrokerSet.cpp:109`), so the party who posts first-loss capital and
-the party who manages the fund are necessarily the same account. On Calder both read
-`rGMo2ke9of3GEqJwWAzDmFjrm6SwYowTsB`.
+the party who manages the fund are necessarily the same account. On Halden both read
+`r4nBvMQHt9ow7tXZqtgxwo4jXf4BvnD8hC`.
 
 Only that owner may impair, unimpair or default a loan (`LoanManage.cpp:124-129`). There is no
 independent servicer, no trustee, no rating committee.

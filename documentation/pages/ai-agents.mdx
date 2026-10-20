@@ -33,10 +33,10 @@ are on [the NAV pointer page](/nav-pointer):
 "orma": {
   "v": 1,
   "instrument": "vault-share",
-  "nav_url": "http://localhost:8787/api/mpt/{mpt_issuance_id}/nav",
+  "nav_url": "https://ormaprotocol.com/api/mpt/{mpt_issuance_id}/nav",
   "nav_url_param": "{mpt_issuance_id}",
   "nav_basis": "assets net of recognised loss, divided by units outstanding",
-  "doc": "https://orma.credit/nav"
+  "doc": "https://ormaprotocol.com/docs/nav-pointer"
 }
 ```
 
@@ -48,8 +48,8 @@ to substitute, which is the one thing an agent in this position always has.
 ### The call
 
 ```js
-const BASE = 'http://localhost:8787'
-const MPT = '000000014D667775372D5B78E07FFF294678C7F9CE82AFBC'
+const BASE = 'https://ormaprotocol.com'
+const MPT = '000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797'
 
 const res = await fetch(`${BASE}/api/mpt/${MPT}/nav`, {
   headers: { accept: 'application/json' },
@@ -66,8 +66,8 @@ if (nav.schema !== 'orma.nav/1' || !nav.unitValue?.held) {
 nav.unitValue.held          // "0.803922"  <- the number to lend against
 nav.unitValue.reported      // "1.000000"  <- what a metadata-diffing indexer shows
 nav.unitValue.divergenceBps // 1961
-nav.asOf                    // "2026-09-12T22:20:22Z"
-nav.ledgerIndex             // 5263343
+nav.asOf                    // "2026-10-20T14:59:02Z"
+nav.ledgerIndex             // 6273933
 ```
 
 The response carries `Access-Control-Allow-Origin: *` and `Cache-Control: public, max-age=4`.
@@ -80,7 +80,7 @@ An unknown share token returns `404` with
 Two ways. Server side, add `units`:
 
 ```
-GET /api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav?units=1000000
+GET /api/mpt/000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797/nav?units=1000000
 ```
 
 which adds a `pledge` block to the same document:
@@ -204,10 +204,10 @@ than an exception:
 
 ```json
 "steps": [
-  { "step": "read MPTokenIssuance", "ok": true, "detail": "issuer r3hE8HanpccSZdgmeHCfYFEkwxFjdDmmvt, 51000000 units outstanding" },
+  { "step": "read MPTokenIssuance", "ok": true, "detail": "issuer r3XEmxGd7F51niRp94hcEcuuU7HJU47C2R, 51000000 units outstanding" },
   { "step": "decode metadata", "ok": true, "detail": "valid JSON" },
   { "step": "XLS-89 conformance", "ok": true, "detail": "asset_class rwa" },
-  { "step": "find valuation pointer", "ok": true, "detail": "http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav" },
+  { "step": "find valuation pointer", "ok": true, "detail": "https://ormaprotocol.com/api/mpt/000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797/nav" },
   { "step": "follow pointer", "ok": true, "detail": "unit value 0.803922" }
 ]
 ```

@@ -51,7 +51,7 @@ Devnet transactions the project submitted during the event; the full record is u
 
 | Transaction | What Orma uses it for | Verified on Devnet |
 |---|---|---|
-| `VaultCreate` | Creates each demo facility. All four are closed-ended: `VaultKind=1` with `SubscriptionDate` and `RedemptionDate`, because `LoanBrokerSet` returns `tecNO_PERMISSION` otherwise, and `VaultKind` is immutable. | [Meridian](https://devnet.xrpl.org/transactions/D07C59257F0C568DAF401C4253E8609C206B900F838289E9B45B418F7DE4807C) · [Kestrel](https://devnet.xrpl.org/transactions/0AD99C9FC08A84FE743061488024FFFE7ED8ECBD034A73F007444523B283A258) · [Calder](https://devnet.xrpl.org/transactions/1819ECF651E1CFFA424E8F5890AF73FFCC61C552C22E580AE2DBE9CF9CDDC69E) · [Thorne](https://devnet.xrpl.org/transactions/3FC79BF77240B0D52148428DABEAC0A5F4971957ABEC1D429ABDF297470F2461) |
+| `VaultCreate` | Creates each demo facility. All four are closed-ended: `VaultKind=1` with `SubscriptionDate` and `RedemptionDate`, because `LoanBrokerSet` returns `tecNO_PERMISSION` otherwise, and `VaultKind` is immutable. | [Meridian](https://devnet.xrpl.org/transactions/D07C59257F0C568DAF401C4253E8609C206B900F838289E9B45B418F7DE4807C) · [Kestrel](https://devnet.xrpl.org/transactions/0AD99C9FC08A84FE743061488024FFFE7ED8ECBD034A73F007444523B283A258) · [Halden](https://devnet.xrpl.org/transactions/1A226B33CD370E82683A39F58FF8465A16FD1DED99C87EC65B00E8BA2B7B4CF5) · [Thorne](https://devnet.xrpl.org/transactions/3FC79BF77240B0D52148428DABEAC0A5F4971957ABEC1D429ABDF297470F2461) |
 | `VaultDeposit` | Subscribes investor capital, and is the transaction the XLS-70 gate admits or refuses at Thorne. | [Meridian](https://devnet.xrpl.org/transactions/3ACF03E8E5E68CD30814694CC7CD5C4BBE67E2EA396EF61EA8C756063892AA8C) · [Thorne, admitted](https://devnet.xrpl.org/transactions/7FC5C01BD735E9A41A0AC6ACFA4B6994B1347A8FA06DAEF8012A62B0E1DF98AF) · [Thorne, refused `tecNO_AUTH`](https://devnet.xrpl.org/transactions/E7CF5DB29DFE652801F4936C11D50A493EB3C474D6EEDFE9FC24394E8DD26101) · [wrong phase `tecEXPIRED`](https://devnet.xrpl.org/transactions/7A10D8053FEE687A008F17E2AD98121EE08553CBDEAAE92DDEC3C2798A1CB15B) |
 | `VaultWithdraw` | Redemption. Also the proof that revoking a credential closes entry without trapping the exit. | [Thorne, after revocation](https://devnet.xrpl.org/transactions/2E71A25973D55E26C8AECFDFDF1EF3BF0571B8FB4DD9D524B6A8C750994F39FE) · [Redemption](https://devnet.xrpl.org/transactions/D26222EC26111FFC4F77D3CCADE0FDD2E7C2B9710B9D3957CC4CB725EF58A734) · [wrong phase `tecTOO_SOON`](https://devnet.xrpl.org/transactions/CC104682C298DFB3619EE4C15F0112ACE2B6A95B4971CA0A0AC748F9B5B6617A) |
 
@@ -60,9 +60,9 @@ Devnet transactions the project submitted during the event; the full record is u
 | Transaction | What Orma uses it for | Verified on Devnet |
 |---|---|---|
 | `LoanBrokerSet` | Creates the `LoanBroker`. Its owner is necessarily the vault owner, which is the asymmetry the whole project measures. | [Meridian](https://devnet.xrpl.org/transactions/14CBC3F22EC25532DE74D3EB7758F7A1BB710B0F7ABA3C18C0A4DAC8EAE2785C) · [Kestrel](https://devnet.xrpl.org/transactions/E3D4366469498DDBFC60BC05AF582C18D829B27C52A7224CBE2A58A54B0896AF) · [open-ended vault `tecNO_PERMISSION`](https://devnet.xrpl.org/transactions/CE477E29A099A6BBC30EBA52F3E09AB2A450CDB05F338AE517EDAAC0584827AB) |
-| `LoanBrokerCoverDeposit` | Posts the first-loss cover whose consumption the ordering lever moves. | [Meridian](https://devnet.xrpl.org/transactions/C9483EBB8CD46DA7C6AA9A3E465FC2213E252D8C953F7AF6C347B032D14BB958) · [Kestrel](https://devnet.xrpl.org/transactions/E979EB6D211701C6B8BD66F7D4F3AD1A98388029414BF17FF70D092B74D2B76A) · [Calder](https://devnet.xrpl.org/transactions/13ECAC8451FB861723953DFE8BA9EC8B642A14FA5255943E7C7B1349EB1DD562) |
+| `LoanBrokerCoverDeposit` | Posts the first-loss cover whose consumption the ordering lever moves. | [Meridian](https://devnet.xrpl.org/transactions/C9483EBB8CD46DA7C6AA9A3E465FC2213E252D8C953F7AF6C347B032D14BB958) · [Kestrel](https://devnet.xrpl.org/transactions/E979EB6D211701C6B8BD66F7D4F3AD1A98388029414BF17FF70D092B74D2B76A) · [Halden](https://devnet.xrpl.org/transactions/A075625DAA314EEC6D8B1C032753E15CAF9A7F45364F1D27F60B5296F257D309) |
 | `LoanSet` | Originates each loan, counterparty-signed. Under cash-basis accounting (`LEVersion=1`) origination moves `DebtTotal`, not `AssetsTotal`. | [Meridian](https://devnet.xrpl.org/transactions/1523BD1B1548A01B46AAA88871EA965EE973BFA7016D7B8ACC950E463567AA4A) · [Kestrel, first](https://devnet.xrpl.org/transactions/525FC003CF1D4C99B82E876DE945000A681230D4312C03DE1120EA9F905118AB) · [Kestrel, second](https://devnet.xrpl.org/transactions/30B97AA397678AF36EDA7604582789C76F1F1B3B1083F453F95FB3107796A06B) · [wrong phase `tecTOO_SOON`](https://devnet.xrpl.org/transactions/E1121DED12D4A320FB58F77D02549429885D8A826B794F2B2539EC936BE39011) · [wrong phase `tecEXPIRED`](https://devnet.xrpl.org/transactions/8A09A988DD3C5433B30E92F5E7B42086D6B17CEB51C6C05572E7A74552B9DAE1) |
-| `LoanManage` | Impairs (`Flags 0x20000`) and defaults (`Flags 0x10000`). These are the two levers. Only the broker owner may submit either. | [impair, Meridian](https://devnet.xrpl.org/transactions/075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3) · [impair, Calder](https://devnet.xrpl.org/transactions/BD18EFB94490CA540E7A9C249971740C1228D1FBC3ED97C9BA9F4908F52D5F4F) · [default, Kestrel, larger](https://devnet.xrpl.org/transactions/FB23EC5313F85FA157D56966E0B0B1665068905988D925C70BB0E7C35C3B221B) · [default, Kestrel, smaller](https://devnet.xrpl.org/transactions/DE49DF0D6136B96AD28B253CD32100E5715078FD2D0AE6D1DB747AFECB803D1F) |
+| `LoanManage` | Impairs (`Flags 0x20000`) and defaults (`Flags 0x10000`). These are the two levers. Only the broker owner may submit either. | [impair, Meridian](https://devnet.xrpl.org/transactions/075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3) · [impair, Halden](https://devnet.xrpl.org/transactions/EC385DAF2DF412F86F06648B7855AEFDB1A1B8596048DA33C33B0A09FB2D08E5) · [default, Kestrel, larger](https://devnet.xrpl.org/transactions/FB23EC5313F85FA157D56966E0B0B1665068905988D925C70BB0E7C35C3B221B) · [default, Kestrel, smaller](https://devnet.xrpl.org/transactions/DE49DF0D6136B96AD28B253CD32100E5715078FD2D0AE6D1DB747AFECB803D1F) |
 
 ### XLS-47, Price Oracles (amendment `PriceOracle`)
 
@@ -135,18 +135,19 @@ Two loans originated, then both defaulted, the larger first. Cover consumed: 0.4
 | 7 | `LoanManage`, default | `tesSUCCESS` | 2026-09-12 21:11:02Z | [`FB23EC53…3B221B`](https://devnet.xrpl.org/transactions/FB23EC5313F85FA157D56966E0B0B1665068905988D925C70BB0E7C35C3B221B) |
 | 8 | `LoanManage`, default | `tesSUCCESS` | 2026-09-12 21:11:10Z | [`DE49DF0D…803D1F`](https://devnet.xrpl.org/transactions/DE49DF0D6136B96AD28B253CD32100E5715078FD2D0AE6D1DB747AFECB803D1F) |
 
-### Calder Structured Credit III, the token that prices itself
+### Halden Structured Credit IV, the token that prices itself
 
-The `VaultCreate` here carries the share token's XLS-89 metadata and its valuation pointer.
+The `VaultCreate` here carries the share token's XLS-89 metadata and its valuation pointer. These six were
+submitted on 19 October 2026, after the event.
 
 | | Transaction | Result | Validated (UTC) | Explorer |
 |---|---|---|---|---|
-| 1 | `VaultCreate` | `tesSUCCESS` | 2026-09-12 21:11:31Z | [`1819ECF6…DDC69E`](https://devnet.xrpl.org/transactions/1819ECF651E1CFFA424E8F5890AF73FFCC61C552C22E580AE2DBE9CF9CDDC69E) |
-| 2 | `VaultDeposit` | `tesSUCCESS` | 2026-09-12 21:11:41Z | [`49CE7BCB…01A9F8`](https://devnet.xrpl.org/transactions/49CE7BCBD34636EE1B6AACB62EB441C0FC6BC82862E7BA947D6290C31401A9F8) |
-| 3 | `LoanBrokerSet` | `tesSUCCESS` | 2026-09-12 21:11:50Z | [`7C49B287…93A1BF`](https://devnet.xrpl.org/transactions/7C49B28754CB04FFE11214E7388AA7DE217E73AC550EA85F9C0221A1D193A1BF) |
-| 4 | `LoanBrokerCoverDeposit` | `tesSUCCESS` | 2026-09-12 21:11:51Z | [`13ECAC84…1DD562`](https://devnet.xrpl.org/transactions/13ECAC8451FB861723953DFE8BA9EC8B642A14FA5255943E7C7B1349EB1DD562) |
-| 5 | `LoanSet` | `tesSUCCESS` | 2026-09-12 21:12:01Z | [`16BC60F5…38291E`](https://devnet.xrpl.org/transactions/16BC60F5B9AA7D48E23E166F27CE681F96797C0639C6F996496EB50F1538291E) |
-| 6 | `LoanManage`, impair | `tesSUCCESS` | 2026-09-12 21:14:22Z | [`BD18EFB9…2D5F4F`](https://devnet.xrpl.org/transactions/BD18EFB94490CA540E7A9C249971740C1228D1FBC3ED97C9BA9F4908F52D5F4F) |
+| 1 | `VaultCreate` | `tesSUCCESS` | 2026-10-19 21:29:01Z | [`1A226B33…7B4CF5`](https://devnet.xrpl.org/transactions/1A226B33CD370E82683A39F58FF8465A16FD1DED99C87EC65B00E8BA2B7B4CF5) |
+| 2 | `VaultDeposit` | `tesSUCCESS` | 2026-10-19 21:29:10Z | [`22233F6B…2F17A2`](https://devnet.xrpl.org/transactions/22233F6BBEAC488A871ABBC35410F55D81A72D964E3FA4A4C970A9D7C22F17A2) |
+| 3 | `LoanBrokerSet` | `tesSUCCESS` | 2026-10-19 21:29:12Z | [`904C06FD…582AD0`](https://devnet.xrpl.org/transactions/904C06FDF6E60F881C74AE5F996AA7458C8DBAFCBBD41D9E83A9EF49FC582AD0) |
+| 4 | `LoanBrokerCoverDeposit` | `tesSUCCESS` | 2026-10-19 21:29:21Z | [`A075625D…57D309`](https://devnet.xrpl.org/transactions/A075625DAA314EEC6D8B1C032753E15CAF9A7F45364F1D27F60B5296F257D309) |
+| 5 | `LoanSet` | `tesSUCCESS` | 2026-10-19 21:29:31Z | [`D8301546…7CD10F`](https://devnet.xrpl.org/transactions/D8301546882B271F9B2200771ABD6E3320EC4233026983B4BF5B1FAFA87CD10F) |
+| 6 | `LoanManage`, impair | `tesSUCCESS` | 2026-10-19 21:31:52Z | [`EC385DAF…2D08E5`](https://devnet.xrpl.org/transactions/EC385DAF2DF412F86F06648B7855AEFDB1A1B8596048DA33C33B0A09FB2D08E5) |
 
 ### Thorne Senior Secured I, the gate
 
@@ -199,9 +200,10 @@ overran the redemption buffer; `feedback/appendix.pdf`, Appendix E, isolates tha
 | Vault shares pledged on ledger to that lender | `EscrowCreate` | `tesSUCCESS` | [`3322B921…1C1536`](https://devnet.xrpl.org/transactions/3322B9214FB87822BA5699423691DAED4A043121D1E17080673F6292E01C1536) |
 | Delegation positive control: `Payment` delegates, the lending permissions return `temMALFORMED` and never reach a ledger | `DelegateSet` | `tesSUCCESS` | [`547DA719…10AF17`](https://devnet.xrpl.org/transactions/547DA71992D469ACA345A0B3CEAD07864E2801919201B256EA606C3A7910AF17) |
 
-The reader numbers XLS-47 documents in the order it first publishes them (`src/oracle.mjs`, `docIdFor`).
-On 13 October 2026 that gave the same ids on both publisher accounts: **1** Thorne, **2** Meridian, **3** Calder,
-**4** Kestrel. The id is not fixed, so identify a vault by `BaseAsset`, the first 20 bytes of its vault id.
+The reader pins each facility's XLS-47 document id in its record under `demo/` (`oracleDocumentId`), so a
+restart or a retired vault never moves a document to another vault (`src/oracle.mjs`, `docIdFor`): **1** Thorne,
+**2** Meridian, **3** Calder, **4** Kestrel, **5** Halden. Calder is retired; id 3 stays reserved and is no longer
+updated. Identify a vault by `BaseAsset`, the first 20 bytes of its vault id.
 Two accounts hold them:
 
 | Publisher | What its objects are |
@@ -273,14 +275,14 @@ is minimised by declaring the largest exposure first. Conduct grade **E**, findi
 `ORDERING_SELF_SERVING` and `DEFAULT_WITHOUT_IMPAIRMENT`. The facility destroyed **79% of subscribed
 capital**, which notches the composite from an AAA anchor down 14 steps to **B**.
 
-### 3. Calder Structured Credit III, the token that prices itself
+### 3. Halden Structured Credit IV, the token that prices itself
 
 ```
-vault     5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5
-broker    1C160EFFCA8208DFD8CE9B065A3C3C41CCA80758FBC3099BE27AACFBD1478173
-shareMPT  000000014D667775372D5B78E07FFF294678C7F9CE82AFBC
-impair    BD18EFB94490CA540E7A9C249971740C1228D1FBC3ED97C9BA9F4908F52D5F4F
-file      demo/metadata-vault.json
+vault     DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245
+broker    3A87743DC5EEEBD4A527543D73E5CBDCB7B0201113084A47E1C4FE5D0B480AF6
+shareMPT  000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797
+impair    EC385DAF2DF412F86F06648B7855AEFDB1A1B8596048DA33C33B0A09FB2D08E5
+file      demo/showcase-vault.json
 ```
 
 The share token carries a valuation pointer in its own MPT metadata. An investor pledges units to a second

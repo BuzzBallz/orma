@@ -173,14 +173,14 @@ A rater who can trap capital is a worse problem than the one being solved. See
 
 ## The four facilities on Devnet
 
-All four are live, baked before the demo, and readable by anyone pointed at
+All four are live and readable by anyone pointed at
 `wss://s.devnet.rippletest.net:51233` (network id 2).
 
 | facility | vault id | what it demonstrates |
 |---|---|---|
 | Meridian Trade Finance I | `864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835` | The empty `PreviousFields`. Impaired at `075FE6D2...E49229C3`, NAV 1.000000 reported against 0.803922 held, 1961 bp. |
 | Kestrel Bridge Financing II | `24EAA01AD4CE70D8ABB4ACB4255DC4C216B8AF3B9E7315DB8052BFC1E5810089` | The ordering lever. Two defaults declared largest first, 0.500000 XRP of cover consumed where the investor-best order would have consumed 0.700000. Conduct grade E, score 25. |
-| Calder Structured Credit III | `5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5` | The share token pointer. MPT `000000014D667775372D5B78E07FFF294678C7F9CE82AFBC`, ticker `ORMA-CSC3`, metadata resolving to the same 0.803922. |
+| Halden Structured Credit IV | `DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245` | The share token pointer. MPT `000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797`, ticker `ORMA-HSC4`, metadata resolving to the same 0.803922. |
 | Thorne Senior Secured I | `4A5A8E3716D52E334AEB077ADB09456EF4A941CC26021A8EAD37F95B00190DF5` | The gate. Private vault behind domain `FFBEC89D98B4E7CF52F4F254235086514A90CED0EC531941BDF747AF40C5A2FB`, accepting credential type `ORMA-IG` from issuer `rKQjjU5KFs9RAZCDvYVjcaoVK5gGsCJgkP`. |
 
 ## Try it
@@ -192,7 +192,7 @@ for cross-origin callers, alongside the vault-keyed `/api/vaults/{vaultId}/nav` 
 resolver, because all three exist to be called by a party with no relationship to Orma:
 
 ```bash
-curl -s http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE82AFBC/nav
+curl -s http://localhost:8787/api/mpt/000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797/nav
 ```
 
 ```json
@@ -200,12 +200,12 @@ curl -s http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE
   "schema": "orma.nav/1",
   "instrument": {
     "kind": "vault-share",
-    "vaultId": "5763707D11EA19D1B5FF04E4EBA4F9336057955CDE65B725D1FF3EF2A96CB0E5",
-    "shareMptId": "000000014D667775372D5B78E07FFF294678C7F9CE82AFBC",
+    "vaultId": "DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245",
+    "shareMptId": "000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797",
     "unitsOutstanding": "51000000",
     "vaultKind": "ClosedEnded",
-    "phase": "Investment",
-    "redemptionAt": "2026-09-13T15:11:47Z"
+    "phase": "Redemption",
+    "redemptionAt": "2026-10-19T22:29:17Z"
   },
   "unitValue": {
     "held": "0.803922",
@@ -218,8 +218,8 @@ curl -s http://localhost:8787/api/mpt/000000014D667775372D5B78E07FFF294678C7F9CE
     "assetsTotal": "51000000",
     "lossUnrealized": "10000000",
     "unitsOutstanding": "51000000",
-    "recompute": "(assetsTotal - lossUnrealized) / unitsOutstanding",
-    "buildVersion": "3.4.0-rc5"
+    "recompute": "(assetsTotal - lossUnrealized) / (unitsOutstanding / 10^scale)",
+    "buildVersion": "3.4.1"
   }
 }
 ```
