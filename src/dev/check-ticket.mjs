@@ -318,14 +318,14 @@ async function positions() {
   const loanA = { index: hex64('L1'), LoanBrokerID: deskBroker, LoanSequence: 1, Borrower: BORROWER, PrincipalOutstanding: '40000000' }
   const loanB = { index: hex64('L2'), LoanBrokerID: deskBroker, LoanSequence: 2, Borrower: BORROWER, PrincipalOutstanding: '400000' }
   const memo = (idx) => [{ Memo: { MemoType: Buffer.from('orma.escrow').toString('hex').toUpperCase(), MemoData: idx } }]
-  const loanSet = (loan, idx, hash) => ({ hash, ledger_index: 900, validated: true, tx_json: { TransactionType: 'LoanSet', Account: BORROWER, LoanBrokerID: deskBroker, Memos: memo(idx) }, meta: { TransactionResult: 'tesSUCCESS', AffectedNodes: [{ CreatedNode: { LedgerEntryType: 'Loan', LedgerIndex: loan.index, NewFields: { LoanBrokerID: deskBroker } } }] } })
+  const loanSet = (loan, idx, hash, ticketed = false) => ({ hash, ledger_index: 900, validated: true, tx_json: { TransactionType: 'LoanSet', Account: BORROWER, LoanBrokerID: deskBroker, Memos: [...(ticketed ? [{ Memo: { MemoType: Buffer.from('orma.ticket').toString('hex').toUpperCase(), MemoData: hex64('B') } }] : []), ...memo(idx)] }, meta: { TransactionResult: 'tesSUCCESS', AffectedNodes: [{ CreatedNode: { LedgerEntryType: 'Loan', LedgerIndex: loan.index, NewFields: { LoanBrokerID: deskBroker } } }] } })
   const objects = {
     [deskBroker]: { index: deskBroker, LoanSequence: 3 }, [spareBroker]: { index: spareBroker, LoanSequence: 1 },
     [e1]: pledge(col, e1), [e2]: pledge(col, e2), [e3]: pledge(col, e3),
   }
   const fx = fakeXrpl([mer, { ...mer, loans: [loanA, loanB], broker: { index: hex64('Z9'), LoanSequence: 0 }, id: hex64('Q'), share: 'none', vault: { ...mer.vault, Owner: 'rNobody' } }], {
     objects, owned: { [col]: [pledge(col, e1), pledge(col, e2), pledge(col, e3)] }, accounts: { [col]: account(col) }, mptokens: token,
-    txs: { [BORROWER]: [loanSet(loanA, e1, hex64('91')), loanSet(loanB, e2, hex64('92'))] },
+    txs: { [BORROWER]: [loanSet(loanA, e1, hex64('91')), loanSet(loanB, e2, hex64('92'), true)] },
   })
   const p = await readPositions(fx, { reader: fakeReader([mer], fx), demoDir: dir })
   const built = buildPositions(p, MANDATE_PASS)
@@ -334,6 +334,7 @@ async function positions() {
   eq('the third escrow, named by no LoanSet, is on no line', built.positions.some((x) => x.collateral.some((c) => c.escrowId === e3)), false)
   eq('each line carries the hash of the LoanSet that created its loan', built.positions.map((x) => x.loanSetTxHash), [hex64('91'), hex64('92')])
   eq('each line carries the ledger its LoanSet was validated in', built.positions.map((x) => x.loanSetLedger), [900, 900])
+  eq('a line says whether its LoanSet carries the desk gate\'s ticket Memo', built.positions.map((x) => x.loanSetTicket), [false, true])
   const held = new Decimal(1000000).times('0.803922').toFixed(0)
   eq('ltvHeldBps = floor(40000000 × 10000 / held value), one usage entry per limit', [built.positions[0].collateralHeldDrops, built.positions[0].ltvHeldBps, built.positions[0].usage.map((u) => u.limit)], [held, JSON.parse(new Decimal(40000000).times(10000).div(held).floor().toFixed(0)), ['maxLtvBps', 'maxSingleLoanDrops', 'maxN2LossDrops', 'maxLockupDays']])
   eq('the collateral account on the line, without its raw objects', 'raw' in built.positions[0].collateral[0].account, false)

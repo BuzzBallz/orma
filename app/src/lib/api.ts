@@ -78,7 +78,7 @@ export interface DeskPlan {
 }
 export interface PositionCollateral { escrowId: string; shareMptId: string; units: string; account: CollateralAccount }
 export interface Position {
-  loanId: string; loanSetTxHash: string | null; loanSetLedger?: number | null; vaultId: string; borrower: string; principalOutstanding: string
+  loanId: string; loanSetTxHash: string | null; loanSetLedger?: number | null; loanSetTicket?: boolean | null; vaultId: string; borrower: string; principalOutstanding: string
   collateral: PositionCollateral[]; collateralHeldDrops: string; ltvHeldBps: number
   usage: { limit: string; value: string; threshold: string }[]
   /** Step 20: the desk's margin call on this loan, judged at the ledger of the answer. */
@@ -105,14 +105,15 @@ export function deskTicketPaths(deskPlan: DeskPlan, facility?: string | null): {
   }
 }
 
-/** The facility's demo loan: a validated LoanSet whose escrow holds the Harbor's shares, on desk first, else the first one. */
+/** The facility's demo loan: a validated LoanSet whose escrow holds the Harbor's shares, the desk's gated ones first (ticket Memo), then desk vault first, else the first one. */
 export function demoLoanFor(positions: Positions | null, deskPlan: DeskPlan, facility?: string | null): Position | null {
   const harbor = deskTicketPaths(deskPlan, facility).harbor
   if (!harbor || !positions) return null
   const backed = positions.positions.filter((p) => /^[0-9A-F]{64}$/i.test(p.loanSetTxHash ?? '')
     && p.collateral.some((c) => c.shareMptId.toUpperCase() === harbor.shareMptId.toUpperCase()))
   const desk = deskPlan.vaults.find((v) => v.label === 'desk')
-  return backed.find((p) => desk && p.vaultId.toUpperCase() === desk.vaultId.toUpperCase()) ?? backed[0] ?? null
+  const pool = backed.some((p) => p.loanSetTicket) ? backed.filter((p) => p.loanSetTicket) : backed
+  return pool.find((p) => desk && p.vaultId.toUpperCase() === desk.vaultId.toUpperCase()) ?? pool[0] ?? null
 }
 
 // --- step 20, the cure of a margin call ------------------------------------------------------------

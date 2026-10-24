@@ -367,7 +367,7 @@ function PositionsTab({ doc, deskPlan, harbor }: { doc: Positions; deskPlan?: De
               return (
                 <Fragment key={p.loanId}>
                 <tr>
-                  <td>{p.loanSetTxHash ? <HashLink hash={p.loanSetTxHash} /> : <span className="dim">LoanSet not found in the history</span>}{p.loanSetLedger ? <span className="t-fig-s dim">{` ledger ${p.loanSetLedger}`}</span> : null}<span className="t-fig-s dim block">{`loan ${p.loanId.slice(0, 8)}`}</span><span className="t-body-s block">{`${BORROWER_NAME} `}<HashLink hash={p.borrower} kind="accounts" /></span></td>
+                  <td>{p.loanSetTxHash ? <HashLink hash={p.loanSetTxHash} /> : <span className="dim">LoanSet not found in the history</span>}{p.loanSetLedger ? <span className="t-fig-s dim">{` ledger ${p.loanSetLedger}`}</span> : null}<span className="t-fig-s dim block">{`loan ${p.loanId.slice(0, 8)}`}</span>{p.loanSetTicket === false && <span className="t-body-s dim block">Countersigned outside the mandate check of the desk: its Memo carries no ticket.</span>}<span className="t-body-s block">{`${BORROWER_NAME} `}<HashLink hash={p.borrower} kind="accounts" /></span></td>
                   <td>
                     {p.collateral.map((c) => {
                       const v = deskPlan?.vaults.find((x) => same(x.shareMptId, c.shareMptId))
@@ -1154,6 +1154,14 @@ export const SMOKE_CASES: SmokeCase[] = [
     name: 'positions with a CURED margin call', element: positionsTab(positionWith(FIX_CURED)),
     mustContain: ["Margin call cured at ledger 6390000: LTV at withdrawal value back within the mandate's limit.", FIX_ENTRY],
     mustNotContain: ['Margin call issued by', CURE_VERB, 'Time left to cure'],
+  },
+  {
+    name: 'positions: a LoanSet without the gate\'s ticket says so', element: positionsTab({ ...positionWith(FIX_NONE), loanSetTicket: false }),
+    mustContain: ['Countersigned outside the mandate check of the desk: its Memo carries no ticket.'],
+  },
+  {
+    name: 'positions: a LoanSet with its ticket says nothing', element: positionsTab({ ...positionWith(FIX_NONE), loanSetTicket: true }),
+    mustNotContain: ['Countersigned outside'],
   },
   {
     name: 'positions with no margin call', element: positionsTab(positionWith(FIX_NONE)),

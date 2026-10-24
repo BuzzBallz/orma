@@ -281,7 +281,7 @@ export function buildPositions(p, mandate) {
       { limit: 'maxLockupDays', value: lockedUntil === null ? null : lockedUntil.toFixed(0), threshold: num(mandate.limits.maxLockupDays).times(86400).toFixed(0) },
     ]
     return {
-      loanId: loan.loanId, loanSetTxHash: loan.loanSetTxHash, loanSetLedger: loan.loanSetLedger ?? null, vaultId: loan.vaultId, borrower: loan.borrower,
+      loanId: loan.loanId, loanSetTxHash: loan.loanSetTxHash, loanSetLedger: loan.loanSetLedger ?? null, loanSetTicket: loan.loanSetTicket ?? null, vaultId: loan.vaultId, borrower: loan.borrower,
       principalOutstanding: principal.toFixed(0), collateral, collateralHeldDrops: held.toFixed(0), ltvHeldBps, usage,
     }
   })
