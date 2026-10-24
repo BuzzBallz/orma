@@ -274,7 +274,8 @@ const surfaces = [
   ...readdirSync('src/screens').filter((n) => /^(Desk|Role).*\.tsx$/.test(n)).map((n) => 'src/screens/' + n),
 ]
 for (const file of surfaces) {
-  let src = readFileSync(file, 'utf8')
+  // LF whatever the checkout: under core.autocrlf (a Windows clone) the end of Verdict is CRLF } CRLF
+  let src = readFileSync(file, 'utf8').replace(/\r\n/g, NL)
   const verdict = src.indexOf('export function Verdict')
   if (verdict >= 0) src = src.slice(0, verdict) + src.slice(src.indexOf(NL + '}' + NL, verdict) + 3)
   const found = []
