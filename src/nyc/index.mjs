@@ -13,6 +13,7 @@ import { logger } from '../log.mjs'
 import { mandateHash } from './contracts.mjs'
 import { readTicketInputs, readPositions, readDemo, SnapshotError, ShareNotTrackedError } from '../ticket/inputs.mjs'
 import { buildTicket, buildPositions } from '../ticket/engine.mjs'
+import { createSigner, registerDeskActions, withDeskErrors } from '../desk/signer.mjs'
 
 /**
  * @param {{ reader: import('../poll.mjs').Reader, env: NodeJS.ProcessEnv }} deps
@@ -288,11 +289,38 @@ export function createNyc({ reader, env }) {
     return true
   }
 
+  // --- step 10: desk-signer ---
+  // The riskOfficer's approve, decline and rerequest on the role engine: the desk countersigns only after
+  // a re-read at the ledger of the confirm (src/desk/signer.mjs), every decision chained in DESK_LOG_PATH.
+  // demo/desk.json is read at each approval, never here. A DeskError leaves the engine's handle with its
+  // own status (404 during an approval, 503 NOT_CONFIGURED), not the engine's 409. GET /api/desk/decisions.
+  const deskWallet = (() => {
+    if (!env.DESK_SEED) return null
+    try {
+      return Wallet.fromSeed(env.DESK_SEED)
+    } catch {
+      return null
+    }
+  })()
+  const signer = createSigner({
+    xrpl: new Xrpl(env.XRPL_WS ?? DEVNET_WS), reader, wallet: deskWallet,
+    logPath: env.DESK_LOG_PATH || '.demo/decisions.jsonl', loanSetOf: (actionId) => roleEngine.loanSetOf(actionId),
+  })
+  roleEngine.handle = withDeskErrors(roleEngine.handle)
+  registerDeskActions(roleEngine, { signer, deskAddress: () => deskWallet?.address ?? null, borrower: () => roleWallets().borrower ?? null })
+  async function handleDeskSigner(req, res, url, { send, stamp }) {
+    if (url.pathname !== '/api/desk/decisions' || (req.method !== 'GET' && req.method !== 'HEAD')) return false
+    const journal = signer.decisions()
+    send(200, stamp({ entries: journal.entries(), chain: journal.verifyChain() }))
+    return true
+  }
+
   return {
     async handle(req, res, url, helpers) {
       if (await handleHarness(req, res, url, helpers)) return true
       if (await handleOrmaMark(req, res, url, helpers)) return true
       if (await handleTicket(req, res, url, helpers)) return true
+      if (await handleDeskSigner(req, res, url, helpers)) return true
       return false
     },
     missing,
