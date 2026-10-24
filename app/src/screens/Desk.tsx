@@ -191,7 +191,7 @@ function ApprovalReading({ ticket }: { ticket: Ticket }) {
   )
 }
 
-const VIEWS = [['summary', 'Summary'], ['defaults', 'If a loan defaults'], ['history', 'History'], ['proof', 'Proof'], ['audit', 'Audit']] as const
+const VIEWS = [['summary', 'Summary'], ['defaults', 'If a loan defaults'], ['history', 'Assets and lock-up'], ['proof', 'Proof'], ['audit', 'Audit']] as const
 type View = typeof VIEWS[number][0]
 
 function TicketView({ ticket, mark, harbor, loan, buyTicket, deskPlan, changeRows, onChange }: {
@@ -279,7 +279,7 @@ function TicketView({ ticket, mark, harbor, loan, buyTicket, deskPlan, changeRow
             </details>
           </div>
 
-          <div hidden={view !== 'defaults'}>
+          <div hidden={view !== 'defaults'} className="view-stack">
             <Panel provenance="MODELLED" title="If one loan defaults alone" source="Orma">
               <DefaultDots now={perShareNow} rows={f.n2.map((e) => ({ label: `${e.label} defaults alone`, value: e.heldPerUnitIfDefault.value, impaired: e.alreadyInHeld }))} />
               <div className="table-scroll">
@@ -299,7 +299,7 @@ function TicketView({ ticket, mark, harbor, loan, buyTicket, deskPlan, changeRow
             </Panel>
           </div>
 
-          <div hidden={view !== 'history'}>
+          <div hidden={view !== 'history'} className="view-stack">
             <Panel provenance="REAL" title="Assets, cash and lock-up" source="Orma">
               <div className="two">
                 {totalInput && lossInput && <div><p className="t-label-m dim">{`Where the vault's ${formatXrp(totalInput.value)} XRP sit`}</p><BalanceBar total={totalInput.value} available={f.n3.cashAvailable.value} loss={lossInput.value} /></div>}
@@ -308,7 +308,7 @@ function TicketView({ ticket, mark, harbor, loan, buyTicket, deskPlan, changeRow
             </Panel>
           </div>
 
-          <div hidden={view !== 'proof'}>
+          <div hidden={view !== 'proof'} className="view-stack">
             {mark && <PointerPanel mark={mark} />}
             <MandatePanel ticket={ticket} />
             <section className="escrow-note" aria-label="How the escrow works">
@@ -317,7 +317,7 @@ function TicketView({ ticket, mark, harbor, loan, buyTicket, deskPlan, changeRow
             </section>
           </div>
 
-          <div hidden={view !== 'audit'}>
+          <div hidden={view !== 'audit'} className="view-stack">
             <AuditTable entries={audit} />
             <ShowWork rows={changeRows} />
             <ProvenanceKey />
