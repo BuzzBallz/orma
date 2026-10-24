@@ -74,9 +74,10 @@ export const deskTitle = (harbor: string | null, tab: string) => `Credit desk: $
 const cap = (x: string) => x.replace(/^./, (c) => c.toUpperCase())
 const same = (a?: string | null, b?: string | null) => Boolean(a && b && a.toUpperCase() === b.toUpperCase())
 
-function ErrorBlock({ code, message }: { code: string; message?: string }) {
+function ErrorBlock({ code, status, message }: { code: string; status?: number; message?: string }) {
   return (
     <div role="alert">
+      <p className="caption"><b>{status && status >= 400 ? `${status} ${code}` : code}</b></p>
       <p className="caption">{errorSentence(code)}</p>
       {message && <p className="caption">{message}</p>}
       <details><summary>Error code</summary><code>{code}</code></details>
@@ -569,7 +570,7 @@ export function rememberOperator(session: OperatorSession, patch: { pledgeAction
 
 interface RoleAction { actionId: string; state: string; engineResult?: string; txHash?: string; preview?: ActionPreview | null }
 type Phase = 'idle' | 'previewing' | 'previewed' | 'confirming' | 'validated' | 'failed' | 'refused' | 'pending-approval' | 'done'
-export interface RowState { phase: Phase; actionId?: string; preview?: ActionPreview; action?: RoleAction; error?: ActionError }
+export interface RowState { phase: Phase; actionId?: string; preview?: ActionPreview; action?: RoleAction; error?: ActionError; accepted?: boolean }
 
 const money = (p?: ActionPreview | null) => (p?.money ?? {}) as Record<string, unknown>
 const text = (v: unknown) => (v === undefined || v === null ? '—' : String(v))
@@ -667,7 +668,7 @@ function useActionFlow({ role, action, session, remember, onChange, initial }: {
       return setRow({ phase: 'previewed', actionId: a.body.actionId, preview: a.body.preview })
     }
     if (action === 'requestLoan' && err?.code === 'ESCROW_POLICY' && err.requestActionId) remember?.({ requestActionId: err.requestActionId })
-    setRow({ phase: 'refused', error: err ?? { code: 'UNREACHABLE' } })
+    setRow({ phase: 'refused', error: { ...(err ?? { code: 'UNREACHABLE' }), status: a.status } })
   }
 
   async function confirm() {
@@ -675,7 +676,8 @@ function useActionFlow({ role, action, session, remember, onChange, initial }: {
     setRow((r) => ({ ...r, phase: 'confirming' }))
     const a = await confirmAction(session.runId, session.token, row.actionId)
     const state = a.body.state
-    if (a.status !== 202) return setRow((r) => ({ ...r, phase: 'refused', error: a.body.error ?? { code: 'UNREACHABLE' } }))
+    if (a.status !== 202) return setRow((r) => ({ ...r, phase: 'refused', error: { ...(a.body.error ?? { code: 'UNREACHABLE' }), status: a.status } }))
+    setRow((r) => ({ ...r, accepted: true }))
     if (state === 'pending-approval') return setRow((r) => ({ ...r, phase: 'pending-approval' }))
     // A preview-only action (simulateWithdraw, wait) has nothing to submit: its confirm ends there.
     if (state === 'previewed') return setRow((r) => ({ ...r, phase: 'done' }))
@@ -692,7 +694,7 @@ function ActionStatus({ action, verb, row, units, focus }: { action: string; ver
     <div role="status" tabIndex={-1} ref={focus}>
       {row.preview && <MoneyPreview action={action} preview={row.preview} units={units} />}
       {row.phase === 'confirming' && (
-        <p className="caption">{row.action?.state === 'validated' ? 'Realising… reading the vault at the validation ledger' : 'Submitting to the ledger…'}</p>
+        <p className="caption">{row.action?.state === 'validated' ? 'Realising… reading the vault at the validation ledger' : action === 'approve' && !row.accepted ? 'Checking the mandate…' : 'Submitting to the ledger…'}</p>
       )}
       {row.phase === 'validated' && (
         <div>
@@ -712,7 +714,7 @@ function ActionStatus({ action, verb, row, units, focus }: { action: string; ver
       )}
       {row.phase === 'done' && <p className="caption">Recorded as a preview only: this action builds no transaction to submit.</p>}
       {row.phase === 'failed' && <p role="alert" className="caption">{`The ledger did not apply it: ${text(row.action?.engineResult)}.`}</p>}
-      {row.phase === 'refused' && row.error && <ErrorBlock code={row.error.code} message={action === 'requestLoan' && row.error.requestActionId ? row.error.message : undefined} />}
+      {row.phase === 'refused' && row.error && <ErrorBlock code={row.error.code} status={row.error.status} message={action === 'requestLoan' && row.error.requestActionId ? row.error.message : undefined} />}
     </div>
   )
 }
@@ -1073,8 +1075,16 @@ export const SMOKE_CASES: SmokeCase[] = [
   { name: 'pointer chain with a pending oracle', element: <PointerPanel mark={FIX_MARK} />, before: ['oracle cross-check', 'oracle pending: last publish precedes this ledger'], mustContain: ['passes: oracle pending'] },
   { name: 'mandate panel: BREACHED at withdrawal value, PASS at 1:1', element: <MandatePanel ticket={FIX_TICKET} />, before: ['LTV at withdrawal value', 'BREACHED', 'Lender at 1:1', 'PASS'] },
   {
-    name: 'approve refused BREACHED keeps its preview', element: row('approve', { phase: 'refused', actionId: FIX_ACTION, preview: PREVIEWS.approve, error: { code: 'BREACHED' } }),
-    mustContain: ['BREACHED', 'Lender at 1:1', 'PASS', errorSentence('BREACHED'), 'role="alert"', 'tabindex="-1"'], before: ['Lender at 1:1', errorSentence('BREACHED')],
+    name: 'approve refused BREACHED keeps its preview', element: row('approve', { phase: 'refused', actionId: FIX_ACTION, preview: PREVIEWS.approve, error: { code: 'BREACHED', status: 409 } }),
+    mustContain: ['409 BREACHED', 'Lender at 1:1', 'PASS', errorSentence('BREACHED'), 'role="alert"', 'tabindex="-1"'], before: ['Lender at 1:1', '409 BREACHED', errorSentence('BREACHED')],
+  },
+  {
+    name: 'approve confirming: the mandate is being checked, nothing is said to be submitted', element: row('approve', { phase: 'confirming', actionId: FIX_ACTION, preview: PREVIEWS.approve }),
+    mustContain: ['Checking the mandate…'], mustNotContain: ['Submitting to the ledger…'],
+  },
+  {
+    name: 'approve confirming, accepted: now it is submitted', element: row('approve', { phase: 'confirming', actionId: FIX_ACTION, preview: PREVIEWS.approve, accepted: true }),
+    mustContain: ['Submitting to the ledger…'], mustNotContain: ['Checking the mandate…'],
   },
   {
     name: 'requestLoan refused ESCROW_POLICY on an existing request', element: row('requestLoan', { phase: 'refused', error: { code: 'ESCROW_POLICY', requestActionId: 'q1', message: 'The pledged escrow is already named by another loan request. Nothing was signed. Use Re-request with a fresh ticket.' } }),

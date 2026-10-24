@@ -142,7 +142,7 @@ export function buildActionRequest(action: string, role: string, runId: string, 
 
 /** What a role action answered: its status and its envelope, an error included, never thrown. */
 export interface ActionAnswer { status: number; body: { actionId?: string; preview?: ActionPreview; state?: string; error?: ActionError } & Record<string, unknown> }
-export interface ActionError { code: string; message?: string; requestActionId?: string; breaches?: unknown[] }
+export interface ActionError { code: string; message?: string; requestActionId?: string; breaches?: unknown[]; status?: number }
 export interface ActionPreview { engineResult?: string | null; provenance?: string; money?: Record<string, unknown>; schema?: string; rows?: ChangeRow[] }
 
 async function send(url: string, init: RequestInit): Promise<ActionAnswer> {
