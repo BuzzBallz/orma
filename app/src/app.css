@@ -1114,7 +1114,7 @@ main:focus{ outline: none; }
 .proof{ display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
 .proof p{ margin: 0; }
 .hash{ display: inline-flex; align-items: center; gap: var(--space-2); }
-.hash-copy{ min-height: var(--size-control); min-width: var(--size-control); padding: 0 var(--space-2); background: none; border: 0; color: var(--color-text-2); font: 500 14px/1 var(--font-sans); cursor: pointer; text-decoration: underline; text-underline-offset: 4px; }
+.hash .btn{ min-height: var(--size-control); min-width: var(--size-control); padding: 0 var(--space-2); background: none; border: 0; color: var(--color-text-2); font: 500 14px/1 var(--font-sans); cursor: pointer; text-decoration: underline; text-underline-offset: 4px; }
 
 .n1{ display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: var(--space-4) var(--space-10); align-items: start; }
 .n1 > :nth-child(1){ grid-column: 1; grid-row: 1; }
@@ -1311,8 +1311,8 @@ main:focus{ outline: none; }
 
 /* Calm layout: one message per screen, the rest behind a sub-tab or a folded line. */
 .subtabs{ display: flex; gap: var(--space-2); flex-wrap: wrap; }
-.subtab{ min-height: var(--size-control); padding: 0 var(--space-4); background: none; border: 1px solid var(--color-line); border-radius: var(--radius-sm); font: 500 16px/1 var(--font-sans); color: var(--color-text-2); cursor: pointer; }
-.subtab[aria-pressed="true"]{ background: var(--color-bg-inverse); color: var(--color-text-inverse); border-color: var(--color-bg-inverse); }
+.subtabs .btn{ min-height: var(--size-control); padding: 0 var(--space-4); background: none; border: 1px solid var(--color-line); border-radius: var(--radius-sm); font: 500 16px/1 var(--font-sans); color: var(--color-text-2); cursor: pointer; }
+.subtabs .btn[aria-pressed="true"]{ background: var(--color-bg-inverse); color: var(--color-text-inverse); border-color: var(--color-bg-inverse); }
 .view-summary{ display: flex; flex-direction: column; gap: var(--space-5); }
 .price-hero{ display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: var(--space-8); align-items: end; padding-bottom: var(--space-2); }
 .price-hero .fig-display{ font-size: clamp(52px, 4.6vw, 88px); }
@@ -1351,8 +1351,8 @@ main:focus{ outline: none; }
 .ld-inputs .num{ text-align: right; }
 .audit-tbl .ld-row td{ background: var(--color-bg-sunken); padding: 0 var(--space-5); border-top: 0; }
 .audit-tbl .ld-row[hidden]{ display: none; }
-.ld-toggle{ min-height: var(--size-control); padding: 0 var(--space-3); background: none; border: 0; color: var(--color-text-2); font: 500 16px/1 var(--font-sans); text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
-.ld-toggle[aria-expanded="true"]{ color: var(--color-text); font-weight: 600; }
+.audit-tbl .btn{ min-height: var(--size-control); padding: 0 var(--space-3); background: none; border: 0; color: var(--color-text-2); font: 500 16px/1 var(--font-sans); text-decoration: underline; text-underline-offset: 4px; cursor: pointer; }
+.audit-tbl .btn[aria-expanded="true"]{ color: var(--color-text); font-weight: 600; }
 .pop-wide{ width: min(860px, 85vw) !important; }
 
 /* Details open in place inside tables and lists: a floating box would be clipped or run off the page. */
@@ -1368,3 +1368,4 @@ main:focus{ outline: none; }
 .proof-dl .fig-ledger[open] > .pop-body{ position: static; width: auto; border: 0; padding: var(--space-2) 0; background: none; }
 .proof-dl > div{ align-items: start; }
 .proof-dl dt{ padding-top: 10px; }
+.ld-calc code{ font: 500 15px/1.5 var(--font-mono); }
