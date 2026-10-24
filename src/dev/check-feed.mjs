@@ -154,7 +154,10 @@ const failing = async () => { throw new Error('offline') }
     })
     req.on('error', () => resolve({ status: 0 }))
   })
-  const streams = await Promise.all(Array.from({ length: 300 }, () => open()))
+  // Three waves of 100 at once, every stream kept open: a Windows listener refuses connections past its
+  // backlog (ECONNREFUSED on 68 of 300 opened together), which the cap never gets to answer.
+  const streams = []
+  for (let wave = 0; wave < 3; wave++) streams.push(...await Promise.all(Array.from({ length: 100 }, () => open())))
   eq('300 streams: the first 100 served, the others 503 BUSY', [streams.filter((s) => s.status === 200).length, streams.filter((s) => s.status === 503).length, streams.find((s) => s.status === 200)?.type],
     [100, 200, 'text/event-stream'])
   await reader.emit(readerSnap(202))
