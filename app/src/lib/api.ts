@@ -78,7 +78,7 @@ export interface DeskPlan {
 }
 export interface PositionCollateral { escrowId: string; shareMptId: string; units: string; account: CollateralAccount }
 export interface Position {
-  loanId: string; loanSetTxHash: string | null; vaultId: string; borrower: string; principalOutstanding: string
+  loanId: string; loanSetTxHash: string | null; loanSetLedger?: number | null; vaultId: string; borrower: string; principalOutstanding: string
   collateral: PositionCollateral[]; collateralHeldDrops: string; ltvHeldBps: number
   usage: { limit: string; value: string; threshold: string }[]
   /** Step 20: the desk's margin call on this loan, judged at the ledger of the answer. */

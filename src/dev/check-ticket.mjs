@@ -333,6 +333,7 @@ async function positions() {
   eq('each loan carries only the escrow its LoanSet names', built.positions.map((x) => x.collateral.map((c) => c.escrowId)), [[e1], [e2]])
   eq('the third escrow, named by no LoanSet, is on no line', built.positions.some((x) => x.collateral.some((c) => c.escrowId === e3)), false)
   eq('each line carries the hash of the LoanSet that created its loan', built.positions.map((x) => x.loanSetTxHash), [hex64('91'), hex64('92')])
+  eq('each line carries the ledger its LoanSet was validated in', built.positions.map((x) => x.loanSetLedger), [900, 900])
   const held = new Decimal(1000000).times('0.803922').toFixed(0)
   eq('ltvHeldBps = floor(40000000 × 10000 / held value), one usage entry per limit', [built.positions[0].collateralHeldDrops, built.positions[0].ltvHeldBps, built.positions[0].usage.map((u) => u.limit)], [held, JSON.parse(new Decimal(40000000).times(10000).div(held).floor().toFixed(0)), ['maxLtvBps', 'maxSingleLoanDrops', 'maxN2LossDrops', 'maxLockupDays']])
   eq('the collateral account on the line, without its raw objects', 'raw' in built.positions[0].collateral[0].account, false)

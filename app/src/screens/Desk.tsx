@@ -366,7 +366,7 @@ function PositionsTab({ doc, deskPlan, harbor }: { doc: Positions; deskPlan?: De
               return (
                 <Fragment key={p.loanId}>
                 <tr>
-                  <td>{p.loanSetTxHash ? <HashLink hash={p.loanSetTxHash} /> : <span className="dim">LoanSet not found in the history</span>}<span className="t-fig-s dim block">{`loan ${p.loanId.slice(0, 8)}`}</span><span className="t-body-s block">{`${BORROWER_NAME} `}<HashLink hash={p.borrower} kind="accounts" /></span></td>
+                  <td>{p.loanSetTxHash ? <HashLink hash={p.loanSetTxHash} /> : <span className="dim">LoanSet not found in the history</span>}{p.loanSetLedger ? <span className="t-fig-s dim">{` ledger ${p.loanSetLedger}`}</span> : null}<span className="t-fig-s dim block">{`loan ${p.loanId.slice(0, 8)}`}</span><span className="t-body-s block">{`${BORROWER_NAME} `}<HashLink hash={p.borrower} kind="accounts" /></span></td>
                   <td>
                     {p.collateral.map((c) => {
                       const v = deskPlan?.vaults.find((x) => same(x.shareMptId, c.shareMptId))
@@ -1008,7 +1008,7 @@ const FIX_EXPIRED: MarginCall = { ...FIX_CALL, status: 'EXPIRED', ledgerIndex: F
 const FIX_CURED: MarginCall = { ...FIX_CALL, status: 'CURED', shortfall: null, ltvHeldBps: 5100, reasons: ['LTV at withdrawal value 51.00% against the limit of 53.44%.'], triggerTx: undefined }
 const FIX_NONE: MarginCall = { ...FIX_CALL, status: 'NONE', issuedLedger: null, issuedAt: null, cureBy: null, shortfall: null, reasons: [], entryHash: undefined, triggerTx: undefined }
 const positionWith = (marginCall: MarginCall, loanId = FIX_LOAN): Position => ({
-  loanId, loanSetTxHash: 'B3'.repeat(32), vaultId: FIX_DESK_VAULT, borrower: 'rBorrowerOfTheFixture', principalOutstanding: '2000000',
+  loanId, loanSetTxHash: 'B3'.repeat(32), loanSetLedger: 6384808, vaultId: FIX_DESK_VAULT, borrower: 'rBorrowerOfTheFixture', principalOutstanding: '2000000',
   collateral: [{ escrowId: 'A4'.repeat(32), shareMptId: FIX_SHARE, units: '5000000', account: FIX_ACCOUNT }], collateralHeldDrops: '3600000', ltvHeldBps: 5556,
   usage: [{ limit: 'maxLtvBps', value: '5556', threshold: '5344' }], marginCall: { ...marginCall, loanId },
 })
@@ -1147,7 +1147,7 @@ export const SMOKE_CASES: SmokeCase[] = [
   },
   {
     name: 'positions with no margin call', element: positionsTab(positionWith(FIX_NONE)),
-    mustContain: ['Collateral at withdrawal value', 'LTV at withdrawal value'], mustNotContain: ['Margin call', CURE_VERB, 'Time left to cure'],
+    mustContain: ['Collateral at withdrawal value', 'LTV at withdrawal value', 'ledger 6384808'], mustNotContain: ['Margin call', CURE_VERB, 'Time left to cure'],
   },
   {
     name: 'positions with two ISSUED margin calls: the first cure primary, the second secondary', element: positionsTab(positionWith(FIX_CALL), positionWith(FIX_CALL, 'C2'.repeat(32))),

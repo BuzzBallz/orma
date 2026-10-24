@@ -333,7 +333,7 @@ export async function readPositions(xrpl, { reader, demoDir = 'demo', at: pinned
       const node = (e.meta.AffectedNodes ?? []).map((a) => a.CreatedNode).find((c) => c?.LedgerEntryType === 'Loan')
       if (!node || !brokerIds.has(node.NewFields?.LoanBrokerID ?? t.LoanBrokerID)) continue
       const memo = (t.Memos ?? []).map((m) => m.Memo).find((m) => same(m?.MemoType, MEMO_ESCROW))
-      createdBy.set(String(node.LedgerIndex).toUpperCase(), { txHash: e.hash ?? t.hash, escrowIndex: memo?.MemoData ? String(memo.MemoData).toUpperCase() : null })
+      createdBy.set(String(node.LedgerIndex).toUpperCase(), { txHash: e.hash ?? t.hash, ledgerIndex: e.ledger_index ?? t.ledger_index ?? null, escrowIndex: memo?.MemoData ? String(memo.MemoData).toUpperCase() : null })
     }
   }
   const out = []
@@ -360,7 +360,7 @@ export async function readPositions(xrpl, { reader, demoDir = 'demo', at: pinned
       collateral.push({ escrowId: c.index, shareMptId, units: String(escrow.Amount.value), account, ticketInputs, cure: true })
     }
     out.push({
-      loanId: loan.index, loanSetTxHash: made?.txHash ?? null, vaultId, borrower: loan.Borrower,
+      loanId: loan.index, loanSetTxHash: made?.txHash ?? null, loanSetLedger: made?.ledgerIndex ?? null, vaultId, borrower: loan.Borrower,
       principalOutstanding: num(loan.PrincipalOutstanding).toFixed(0), collateral,
     })
   }
