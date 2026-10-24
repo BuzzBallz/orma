@@ -68,17 +68,19 @@ export function openLog(path = process.env.DESK_LOG_PATH ?? '.demo/decisions.jso
 
   /**
    * Append one margin-call transition (step 20, addendum A11): the second kind of entry of the same log,
-   * chained by the same rule, the desk's decision and the ledger it was read at.
-   * @param {{ status: 'ISSUED'|'CURED'|'EXPIRED', loanId: string, mandateHash: string, policyHash: string, issuedLedger: number, issuedAt: string, cureBy: string, ltvHeldBps: number|null, maxLtvBps: number, ledgerIndex: number, ledgerHash: string }} entry
+   * chained by the same rule, the desk's decision and the ledger it was read at. The shortfall the call
+   * demands goes with an ISSUED or EXPIRED entry, so that a restart that cannot judge again at once (no
+   * usable price, an inconsistent snapshot) still serves the call whole.
+   * @param {{ status: 'ISSUED'|'CURED'|'EXPIRED', loanId: string, mandateHash: string, policyHash: string, issuedLedger: number, issuedAt: string, cureBy: string, ltvHeldBps: number|null, maxLtvBps: number, ledgerIndex: number, ledgerHash: string, shortfall?: object|null }} entry
    */
-  function appendMarginCall({ status, loanId, mandateHash, policyHash, issuedLedger, issuedAt, cureBy, ltvHeldBps, maxLtvBps, ledgerIndex, ledgerHash }) {
+  function appendMarginCall({ status, loanId, mandateHash, policyHash, issuedLedger, issuedAt, cureBy, ltvHeldBps, maxLtvBps, ledgerIndex, ledgerHash, shortfall = null }) {
     const all = lines()
     const last = all.at(-1)
     const body = {
       seq: all.length + 1,
       prevHash: last?.hash ?? GENESIS,
       kind: 'margin-call', status, loanId, mandateHash, policyHash, issuedLedger, issuedAt, cureBy, ltvHeldBps, maxLtvBps,
-      ledgerIndex, ledgerHash,
+      ledgerIndex, ledgerHash, ...(shortfall && { shortfall }),
     }
     const entry = { ...body, hash: sha256Hex(canonical(body)) }
     appendFileSync(path, JSON.stringify(entry) + '\n')

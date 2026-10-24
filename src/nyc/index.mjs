@@ -486,7 +486,7 @@ export function createNyc({ reader, env, fetchImpl = fetch }) {
       if (e?.kind !== 'margin-call' || typeof e.loanId !== 'string') continue
       marginCalls.set(e.loanId.toUpperCase(), {
         status: e.status, loanId: e.loanId, issuedLedger: e.issuedLedger, issuedAt: e.issuedAt, cureBy: e.cureBy,
-        ltvHeldBps: e.ltvHeldBps, maxLtvBps: e.maxLtvBps, shortfall: null, reasons: [], provenance: 'DECLARED',
+        ltvHeldBps: e.ltvHeldBps, maxLtvBps: e.maxLtvBps, shortfall: e.shortfall ?? null, reasons: [], provenance: 'DECLARED',
         ledgerIndex: e.ledgerIndex, ledgerHash: e.ledgerHash, entryHash: e.hash,
       })
     }
@@ -552,7 +552,7 @@ export function createNyc({ reader, env, fetchImpl = fetch }) {
           const entry = signer.decisions().appendMarginCall({
             status: call.status, loanId: j.id, mandateHash: m.hash, policyHash: policy.hash, issuedLedger: call.issuedLedger,
             issuedAt: call.issuedAt, cureBy: call.cureBy, ltvHeldBps: call.ltvHeldBps, maxLtvBps: call.maxLtvBps,
-            ledgerIndex: p.ledgerIndex, ledgerHash: p.ledgerHash,
+            ledgerIndex: p.ledgerIndex, ledgerHash: p.ledgerHash, shortfall: call.shortfall,
           })
           call = { ...call, entryHash: entry.hash }
           marginLog.info(`margin call ${call.status}`, { loanId: j.id, ledgerIndex: p.ledgerIndex, ledgerHash: p.ledgerHash, entry: entry.hash })

@@ -246,6 +246,7 @@ async function block() {
   const call = r.body.marginCalls?.[0]
   const log1 = entriesOf(logPath)
   eq('after the impairment: ISSUED at ledger 2001, 345450 units to add, logged once', [call?.status, call?.issuedLedger, call?.shortfall?.sharesToAdd, log1.length, log1[0]?.kind, log1[0]?.status], ['ISSUED', 2001, '345450', 1, 'margin-call', 'ISSUED'])
+  eq('the entry records the shortfall the call demands, so a restart serves it whole', [log1[0]?.shortfall, SCHEMAS.marginCallEntry(log1[0] ?? {})], [call?.shortfall, []])
   eq('the call carries its log entry, the entry chains and hashes as a decision does',
     [call?.entryHash === log1[0]?.hash, Boolean(log1[0]) && log1[0].hash === decisionHash(log1[0]), log1[0] ? SCHEMAS.decision(log1[0]) : null, SCHEMAS.marginCalls(r.body)], [true, true, [], []])
   const feed = await a.get('/api/feed')
@@ -274,6 +275,7 @@ async function block() {
   const log2 = entriesOf(logPath)
   eq('the cure pledge counts: CURED within the deadline, a second entry, chained to the first',
     [r.body.marginCalls?.[0]?.status, r.body.marginCalls?.[0]?.ltvHeldBps, log2.length, log2[1]?.status, log2[1]?.prevHash === log2[0]?.hash], ['CURED', 5344, 2, 'CURED', true])
+  eq('a CURED entry keeps no shortfall', 'shortfall' in (log2[1] ?? {}), false)
   const posCured = await a.get('/api/desk/positions')
   eq('the cure escrow is on the line as collateral, flagged cure, its account conforming',
     [posCured.body.positions?.[0]?.collateral?.map((c) => [c.escrowId === fx.cureIndex, Boolean(c.cure), c.account?.conforming])], [[[false, false, true], [true, true, true]]])

@@ -281,7 +281,7 @@ export function decisionHash(entry) {
  * @typedef {{
  *   seq: number, prevHash: string, kind: 'margin-call', status: 'ISSUED'|'CURED'|'EXPIRED', loanId: string,
  *   mandateHash: string, policyHash: string, issuedLedger: number, issuedAt: string, cureBy: string, ltvHeldBps: number|null, maxLtvBps: number,
- *   ledgerIndex: number, ledgerHash: string, hash: string
+ *   ledgerIndex: number, ledgerHash: string, hash: string, shortfall?: MarginCall['shortfall']
  * }} MarginCallEntry
  */
 
@@ -1252,6 +1252,16 @@ function validateMarginCallEntry(doc) {
   if (e.ltvHeldBps !== null) r.int(e.ltvHeldBps, 'ltvHeldBps')
   r.int(e.maxLtvBps, 'maxLtvBps')
   r.absent(e, 'decision', '', 'on a margin-call entry')
+  // the shortfall the call demanded, so a restart serves the call whole (on ISSUED and EXPIRED)
+  if ('shortfall' in e) {
+    if (e.status === 'CURED') r.fail('shortfall', 'is kept on a cured call')
+    else if (r.obj(e.shortfall, 'shortfall')) {
+      r.re(e.shortfall.collateralValueDrops, UINT, 'shortfall.collateralValueDrops', 'a whole number of drops')
+      r.re(e.shortfall.sharesToAdd, UINT, 'shortfall.sharesToAdd', 'a whole number of share units')
+      r.dec(e.shortfall.withdrawalValuePerShare, 'shortfall.withdrawalValuePerShare')
+      if ('collateralValueUsd' in e.shortfall) r.dec(e.shortfall.collateralValueUsd, 'shortfall.collateralValueUsd')
+    }
+  }
   ledgerAt(r, e, '')
   hex64(r, e.hash, 'hash')
   if (out.length === 0 && e.hash !== decisionHash(e)) r.fail('hash', 'is not sha256Hex(canonical(entry without hash))')

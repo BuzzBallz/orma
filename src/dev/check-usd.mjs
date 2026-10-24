@@ -264,6 +264,10 @@ async function offline() {
     eq('the margin call: the previous status stands, with the reason, in dollars', [kept.status, kept.issuedLedger, kept.currency, kept.reasons.at(-1).startsWith('No XRP/USD price at ledger 7000')], ['ISSUED', 6990, 'USD', true])
     const none = judgeMarginCall({ position: { ...p, withdrawalValuePerShare: '0.800000', shareScale: 0 }, policy, mandate, snapshot })
     eq('with no call before: NONE, saying why, never a breach invented', [none.status, none.ltvHeldBps, none.currency], ['NONE', null, 'USD'])
+    // a call restored from the decision log at startup, as the step-20 block builds it, its shortfall from the entry
+    const restored = { status: 'ISSUED', loanId: 'A'.repeat(64), issuedLedger: 6990, issuedAt: issued.issuedAt, cureBy: issued.cureBy, ltvHeldBps: 5689, maxLtvBps: 5344, shortfall: issued.shortfall, reasons: [], provenance: 'DECLARED', ledgerIndex: 6990, ledgerHash: '6'.repeat(64), entryHash: 'E'.repeat(64) }
+    const afterRestart = judgeMarginCall({ position: { ...p, withdrawalValuePerShare: '0.800000', shareScale: 0 }, policy, mandate, snapshot, previous: restored })
+    eq('restarted with no usable price: the call restored from its log entry stands whole and passes SCHEMAS.marginCall', [afterRestart.status, afterRestart.shortfall?.sharesToAdd, SCHEMAS.marginCall(afterRestart)], ['ISSUED', '1', []])
   }
 
   console.log('the XRP path, unchanged')

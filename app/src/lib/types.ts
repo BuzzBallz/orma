@@ -443,6 +443,8 @@ export interface MarginCallEntry {
   seq: number; prevHash: string; kind: 'margin-call'; status: 'ISSUED' | 'CURED' | 'EXPIRED'; loanId: string
   mandateHash: string; policyHash: string; issuedLedger: number; issuedAt: string; cureBy: string; ltvHeldBps: number | null; maxLtvBps: number
   ledgerIndex: number; ledgerHash: string; hash: string
+  /** On ISSUED and EXPIRED: the shortfall the call demanded, so a restart serves the call whole. */
+  shortfall?: MarginCall['shortfall']
 }
 /** GET /api/desk/margin-calls */
 export interface MarginCalls { ledgerIndex: number; ledgerHash: string; policy: MarginPolicy; marginCalls: MarginCall[] }
