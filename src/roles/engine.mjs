@@ -522,9 +522,16 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
 function readJson(req) {
   return new Promise((resolve, reject) => {
     let s = ''
+    let bytes = 0
     req.on('data', (c) => {
+      bytes += c.length
+      if (bytes > BODY_MAX_BYTES) {
+        req.removeAllListeners('data')
+        req.pause()
+        reject(bad('The body is over 64 KB'))
+        return
+      }
       s += c
-      if (s.length > BODY_MAX_BYTES) reject(bad('The body is over 64 KB'))
     })
     req.on('end', () => {
       try {

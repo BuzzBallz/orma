@@ -407,6 +407,8 @@ async function main() {
     eq('an allowed Origin: the 202, a 400 and the preflight carry its Access-Control-Allow-Origin and Vary: Origin',
       [cors(allowed), cors(allowed400), cors(preflight), preflight.headers['access-control-allow-methods']],
       [[202, ORIGIN, 'Origin'], [400, ORIGIN, 'Origin'], [204, ORIGIN, 'Origin'], 'POST,GET,OPTIONS'])
+    const huge = await s.post(run1, 'holder', 'simulateWithdraw', { vault: 'harbor-1', pad: 'x'.repeat(70 * 1024) })
+    eq('a body over 64 KB is 400 BAD_REQUEST', [huge.status, huge.body?.error?.code], [400, 'BAD_REQUEST'])
     const kill = await s.call('POST', '/api/demo/kill', { origin: ORIGIN })
     eq('POST /api/demo/kill with an Origin is 403, as before the engine', kill.status, 403)
 
