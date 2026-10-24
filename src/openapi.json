@@ -501,6 +501,598 @@
           }
         }
       }
+    },
+    "/api/mpt/{mptId}/status": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/mptId"
+        }
+      ],
+      "get": {
+        "summary": "Is this share attested by Orma, and is the attestation current",
+        "responses": {
+          "200": {
+            "description": "Always 200 for any 48-hex id: attested, not-tracked, revoked or stale.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/mark/{mptId}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/mptId"
+        }
+      ],
+      "get": {
+        "summary": "Verify a share from its MPT id alone, on a fresh connection (orma.mark/1)",
+        "responses": {
+          "200": {
+            "description": "The verdict, agree or disagree; a disagreement is a result, not an error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mark"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/tickets": {
+      "parameters": [
+        {
+          "name": "share",
+          "in": "query",
+          "required": true,
+          "description": "The share MPT issuance id, 48 hex characters.",
+          "schema": {
+            "type": "string",
+            "pattern": "^[A-Fa-f0-9]{48}$"
+          }
+        },
+        {
+          "name": "op",
+          "in": "query",
+          "required": true,
+          "description": "pledge (a loan against the shares) or buy (an OTC purchase).",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "pledge",
+              "buy"
+            ]
+          }
+        },
+        {
+          "name": "units",
+          "in": "query",
+          "required": true,
+          "description": "Share units, scaled.",
+          "schema": {
+            "type": "string",
+            "pattern": "^[0-9]{1,30}$"
+          }
+        },
+        {
+          "name": "mandate",
+          "in": "query",
+          "required": true,
+          "description": "The mandate id, desk-1.",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "summary": "The decision document of one operation, recomputable from the ledger (orma.ticket/1)",
+        "responses": {
+          "200": {
+            "description": "The ticket, every figure with its formula and its inputs at one ledger.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ticket"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/desk/mandates/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "The mandate id.",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "summary": "The risk officer's mandate, its hash recomputed, and the desk plan (orma.mandate/1)",
+        "responses": {
+          "200": {
+            "description": "The mandate and its sister key deskPlan, which never enters the hash.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Mandate"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/roles/{runId}/{role}/{action}": {
+      "parameters": [
+        {
+          "name": "runId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "role",
+          "in": "path",
+          "required": true,
+          "description": "holder, borrower, riskOfficer, broker or buyer.",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "action",
+          "in": "path",
+          "required": true,
+          "description": "An action of the role whitelist; anything else is 404.",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "post": {
+        "summary": "Create and preview a role action; nothing is submitted",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "description": "Bearer <run token>, from POST /api/demo/run.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "vault"
+                ],
+                "properties": {
+                  "vault": {
+                    "type": "string",
+                    "enum": [
+                      "harbor-1",
+                      "harbor-2",
+                      "harbor-3",
+                      "desk",
+                      "spare"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Not used: a created action answers 202.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "The action id and its preview.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleActionCreated"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "423": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/roles/{runId}/actions/{actionId}/confirm": {
+      "parameters": [
+        {
+          "name": "runId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "actionId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "post": {
+        "summary": "Queue the action on its account's serial queue (for approve: the desk signer)",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "description": "Bearer <run token>, from POST /api/demo/run.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Not used: a confirmed action answers 202.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleAction"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "The action, queued or further along; a confirm on such an action resubmits nothing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleAction"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "423": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/roles/{runId}/actions/{actionId}": {
+      "parameters": [
+        {
+          "name": "runId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "actionId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "summary": "The state of a role action, and its change document",
+        "responses": {
+          "200": {
+            "description": "The action; validated only together with the fields its validation produces.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleAction"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/demo/run": {
+      "post": {
+        "summary": "Create a run: its runId and operator token (loopback or X-Demo-Key, no Origin)",
+        "responses": {
+          "200": {
+            "description": "The run.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "runId": {
+                      "type": "string"
+                    },
+                    "token": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/demo/kill": {
+      "post": {
+        "summary": "Stop every role action (loopback or X-Demo-Key, no Origin)",
+        "responses": {
+          "200": {
+            "description": "The kill switch is on; role writes answer 423 LOCKED.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/demo/unkill": {
+      "post": {
+        "summary": "Allow role actions again (loopback or X-Demo-Key, no Origin)",
+        "responses": {
+          "200": {
+            "description": "The kill switch is off.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/desk/positions": {
+      "get": {
+        "summary": "LTV at withdrawal value and use of the mandate's limits, per desk loan",
+        "responses": {
+          "200": {
+            "description": "Every desk loan, its collateral and its collateral account, at one ledger.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Positions"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/desk/decisions": {
+      "get": {
+        "summary": "The chained decision log of the desk, and whether its chain holds",
+        "responses": {
+          "200": {
+            "description": "The log, oldest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "entries": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Decision"
+                      }
+                    },
+                    "chain": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/universe": {
+      "get": {
+        "summary": "The known vaults and those seen live since start, read at one ledger (orma.universe/1)",
+        "responses": {
+          "200": {
+            "description": "The vaults, priced or not, with the reason when not.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Universe"
+                }
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/feed": {
+      "parameters": [
+        {
+          "name": "after",
+          "in": "query",
+          "required": false,
+          "description": "A cursor: the ledger on 19 digits, a dash, a counter.",
+          "schema": {
+            "type": "string",
+            "pattern": "^[0-9]{19}-[0-9]+$"
+          }
+        }
+      ],
+      "get": {
+        "summary": "Credit events derived from full re-reads, and the amendment votes",
+        "responses": {
+          "200": {
+            "description": "At most 100 events after the cursor.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/FeedEvent"
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "amendments": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/feed/stream": {
+      "get": {
+        "summary": "Server-sent credit events, and a heartbeat every 10 s",
+        "responses": {
+          "200": {
+            "description": "event: credit with a FeedEvent, event: heartbeat with { serverTime }.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -880,6 +1472,643 @@
             "type": "boolean"
           }
         }
+      },
+      "ShareStatus": {
+        "type": "object",
+        "description": "The attestation status of a share.",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "attested",
+              "not-tracked",
+              "revoked",
+              "stale"
+            ]
+          }
+        }
+      },
+      "Figure": {
+        "type": "object",
+        "description": "A figure with its closed formula and its inputs, each read at one ledger. value is a decimal string.",
+        "required": [
+          "value",
+          "unit",
+          "meaning",
+          "formula",
+          "formulaId",
+          "inputs",
+          "provenance"
+        ],
+        "properties": {
+          "value": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "drops",
+              "share-units",
+              "ratio",
+              "seconds",
+              "bps"
+            ]
+          },
+          "meaning": {
+            "type": "string"
+          },
+          "formula": {
+            "type": "string"
+          },
+          "formulaId": {
+            "type": "string",
+            "enum": [
+              "heldValue",
+              "naiveValue",
+              "n1Overpayment",
+              "cover",
+              "heldPerUnitIfDefault",
+              "lossAfterCover",
+              "maxLoan",
+              "maxUnits",
+              "requested",
+              "ltvHeld",
+              "lender1to1",
+              "cashAvailable",
+              "claim",
+              "lockedUntil"
+            ]
+          },
+          "inputs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "description": "One input, read at the ledger of the document.",
+              "required": [
+                "name",
+                "value",
+                "object",
+                "field",
+                "id",
+                "ledgerIndex",
+                "ledgerHash"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                },
+                "object": {
+                  "type": "string"
+                },
+                "field": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "ledgerIndex": {
+                  "type": "integer"
+                },
+                "ledgerHash": {
+                  "type": "string",
+                  "pattern": "^[A-Fa-f0-9]{64}$"
+                }
+              }
+            }
+          },
+          "provenance": {
+            "type": "string",
+            "enum": [
+              "REAL",
+              "DECLARED",
+              "MODELLED",
+              "SIMULATED"
+            ]
+          }
+        }
+      },
+      "Ticket": {
+        "type": "object",
+        "description": "orma.ticket/1: computed on demand, never stored.",
+        "required": [
+          "schema",
+          "ticketId",
+          "inputsDigest",
+          "asOf",
+          "ledgerIndex",
+          "ledgerHash",
+          "op",
+          "share",
+          "mandate",
+          "figures",
+          "conduct",
+          "escrowPolicy",
+          "statement",
+          "verdict"
+        ],
+        "properties": {
+          "schema": {
+            "const": "orma.ticket/1"
+          },
+          "ticketId": {
+            "type": "string"
+          },
+          "inputsDigest": {
+            "type": "string"
+          },
+          "asOf": {
+            "type": "string"
+          },
+          "ledgerIndex": {
+            "type": "integer"
+          },
+          "ledgerHash": {
+            "type": "string",
+            "pattern": "^[A-Fa-f0-9]{64}$"
+          },
+          "op": {
+            "type": "string",
+            "enum": [
+              "pledge",
+              "buy"
+            ]
+          },
+          "share": {
+            "type": "object"
+          },
+          "mandate": {
+            "type": "object"
+          },
+          "figures": {
+            "type": "object",
+            "description": "Each leaf is a Figure."
+          },
+          "conduct": {
+            "type": "object"
+          },
+          "escrowPolicy": {
+            "type": "object"
+          },
+          "statement": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "The manager's statement (DECLARED) and its consistency with the ledger (REAL)."
+          },
+          "verdict": {
+            "type": "object"
+          },
+          "verdict1to1": {
+            "type": "object",
+            "description": "pledge only."
+          }
+        }
+      },
+      "Mandate": {
+        "type": "object",
+        "description": "orma.mandate/1, with its sister key deskPlan (never hashed).",
+        "required": [
+          "schema",
+          "id",
+          "desk",
+          "riskOfficer",
+          "limits",
+          "policy",
+          "issuedAt",
+          "hash",
+          "anchorTx"
+        ],
+        "properties": {
+          "schema": {
+            "const": "orma.mandate/1"
+          },
+          "id": {
+            "type": "string"
+          },
+          "desk": {
+            "type": "string"
+          },
+          "riskOfficer": {
+            "type": "string"
+          },
+          "limits": {
+            "type": "object"
+          },
+          "policy": {
+            "type": "object"
+          },
+          "issuedAt": {
+            "type": "string"
+          },
+          "hash": {
+            "type": "string"
+          },
+          "anchorTx": {
+            "type": "string"
+          },
+          "deskPlan": {
+            "type": "object"
+          }
+        }
+      },
+      "Mark": {
+        "type": "object",
+        "description": "orma.mark/1: a third-party verification.",
+        "required": [
+          "schema",
+          "shareMptId",
+          "verdict",
+          "tolerance",
+          "steps",
+          "ledgerIndex",
+          "ledgerHash",
+          "node"
+        ],
+        "properties": {
+          "schema": {
+            "const": "orma.mark/1"
+          },
+          "shareMptId": {
+            "type": "string"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "agree",
+              "disagree"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "SPOOFED",
+              "RECOMPUTE_MISMATCH",
+              "ORACLE_MISMATCH",
+              "UNREACHABLE"
+            ]
+          },
+          "tolerance": {
+            "type": "string"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "ledgerIndex": {
+            "type": "integer"
+          },
+          "ledgerHash": {
+            "type": "string",
+            "pattern": "^[A-Fa-f0-9]{64}$"
+          },
+          "node": {
+            "type": "string"
+          }
+        }
+      },
+      "Change": {
+        "type": "object",
+        "description": "orma.change/1: the field-by-field preview of a transaction, then its realisation.",
+        "required": [
+          "schema",
+          "txType",
+          "txJson",
+          "simulatedAt",
+          "engineResult",
+          "rows",
+          "hiddenCount",
+          "provenance"
+        ],
+        "properties": {
+          "schema": {
+            "const": "orma.change/1"
+          },
+          "txType": {
+            "type": "string"
+          },
+          "txJson": {
+            "type": "object"
+          },
+          "simulatedAt": {
+            "type": "object"
+          },
+          "engineResult": {
+            "type": "string"
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "hiddenCount": {
+            "type": "integer"
+          },
+          "provenance": {
+            "const": "SIMULATED"
+          },
+          "realised": {
+            "type": "object"
+          }
+        }
+      },
+      "RoleAction": {
+        "type": "object",
+        "description": "A role action. previewing is internal and never served; approving is a request while its approve confirms.",
+        "required": [
+          "actionId",
+          "runId",
+          "role",
+          "action",
+          "state"
+        ],
+        "properties": {
+          "actionId": {
+            "type": "string"
+          },
+          "runId": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "vault": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "previewed",
+              "pending-approval",
+              "approving",
+              "queued",
+              "submitted",
+              "validated",
+              "failed",
+              "refused"
+            ]
+          },
+          "preview": {
+            "type": "object"
+          },
+          "change": {
+            "$ref": "#/components/schemas/Change"
+          },
+          "txHash": {
+            "type": "string"
+          },
+          "engineResult": {
+            "type": "string"
+          },
+          "ledgerIndex": {
+            "type": "integer"
+          }
+        }
+      },
+      "RoleActionCreated": {
+        "type": "object",
+        "description": "A created action.",
+        "required": [
+          "actionId",
+          "preview"
+        ],
+        "properties": {
+          "actionId": {
+            "type": "string"
+          },
+          "preview": {
+            "type": "object"
+          }
+        }
+      },
+      "Positions": {
+        "type": "object",
+        "description": "Every desk loan at one ledger.",
+        "required": [
+          "ledgerIndex",
+          "ledgerHash",
+          "positions"
+        ],
+        "properties": {
+          "ledgerIndex": {
+            "type": "integer"
+          },
+          "ledgerHash": {
+            "type": "string",
+            "pattern": "^[A-Fa-f0-9]{64}$"
+          },
+          "positions": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "Decision": {
+        "type": "object",
+        "description": "An entry of the chained decision log.",
+        "required": [
+          "seq",
+          "prevHash",
+          "ticketId",
+          "mandateHash",
+          "decision",
+          "ledgerIndex",
+          "ledgerHash",
+          "hash"
+        ],
+        "properties": {
+          "seq": {
+            "type": "integer"
+          },
+          "prevHash": {
+            "type": "string"
+          },
+          "ticketId": {
+            "type": "string"
+          },
+          "mandateHash": {
+            "type": "string"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "refused",
+              "declined"
+            ]
+          },
+          "code": {
+            "type": "string",
+            "examples": [
+              "ESCROW_POLICY",
+              "INCONSISTENT_SNAPSHOT",
+              "STALE",
+              "BREACHED",
+              "SEQUENCE_PASSED",
+              "SUBMIT_UNCONFIRMED"
+            ],
+            "description": "For refused. SUBMIT_UNCONFIRMED: the submission threw and a 60 s re-read did not find it; txHash is the hash sent."
+          },
+          "txHash": {
+            "type": "string"
+          },
+          "ledgerIndex": {
+            "type": "integer"
+          },
+          "ledgerHash": {
+            "type": "string",
+            "pattern": "^[A-Fa-f0-9]{64}$"
+          },
+          "hash": {
+            "type": "string"
+          }
+        }
+      },
+      "FeedEvent": {
+        "type": "object",
+        "description": "A credit event; STATEMENT is DECLARED, the six credit types are REAL.",
+        "required": [
+          "id",
+          "type",
+          "provenance",
+          "vaultId",
+          "ledgerIndex",
+          "ledgerHash",
+          "why",
+          "moneyEffect",
+          "receipts"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "LOAN_LATE",
+              "IMPAIRMENT",
+              "DEFAULT",
+              "COVER_DRAWN",
+              "SHARES_PLEDGED",
+              "LOAN_ORIGINATED",
+              "STATEMENT"
+            ]
+          },
+          "provenance": {
+            "type": "string",
+            "enum": [
+              "REAL",
+              "DECLARED"
+            ]
+          },
+          "vaultId": {
+            "type": "string"
+          },
+          "loanId": {
+            "type": "string"
+          },
+          "ledgerIndex": {
+            "type": "integer"
+          },
+          "ledgerHash": {
+            "type": "string",
+            "pattern": "^[A-Fa-f0-9]{64}$"
+          },
+          "txHash": {
+            "type": "string"
+          },
+          "why": {
+            "type": "string"
+          },
+          "moneyEffect": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "receipts": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "statement": {
+            "type": "object"
+          }
+        }
+      },
+      "Universe": {
+        "type": "object",
+        "description": "orma.universe/1: the known vaults and those seen live, read at one ledger; not an inventory of Devnet.",
+        "required": [
+          "schema",
+          "ledgerIndex",
+          "ledgerHash",
+          "count",
+          "vaults",
+          "coverage",
+          "banner"
+        ],
+        "properties": {
+          "schema": {
+            "const": "orma.universe/1"
+          },
+          "ledgerIndex": {
+            "type": "integer"
+          },
+          "ledgerHash": {
+            "type": "string",
+            "pattern": "^[A-Fa-f0-9]{64}$"
+          },
+          "count": {
+            "type": "integer"
+          },
+          "vaults": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "coverage": {
+            "type": "object"
+          },
+          "banner": {
+            "const": "not live on mainnet"
+          }
+        }
+      },
+      "NycErrorCode": {
+        "type": "string",
+        "description": "The error codes NYC routes add. BUSY (503, retryable) is also raised by /api/tickets and /api/desk/positions (four desk ledger walks at once) and by /api/feed/stream (100 open streams).",
+        "enum": [
+          "NOT_CONFIGURED",
+          "UNAUTHORIZED",
+          "LOCKED",
+          "STALE",
+          "BREACHED",
+          "ESCROW_POLICY",
+          "BAD_OP",
+          "BAD_CURSOR",
+          "MANDATE_NOT_FOUND",
+          "SEQUENCE_PASSED",
+          "INCONSISTENT_SNAPSHOT",
+          "BUSY"
+        ]
       }
     }
   }

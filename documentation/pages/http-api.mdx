@@ -131,6 +131,18 @@ distressed loans and reports par.
 | `BAD_UNITS` | 400 | false | `units` on an MPT route is not a whole number of at most 30 digits |
 | `BUSY` | 503 | true | four collateral or resolve requests are already reading the ledger; retry shortly |
 | `INTERNAL` | 500 | true | anything unhandled |
+| `NOT_CONFIGURED` | 503 | true | a write route needs a variable this server was started without (`ROLES_FILE` or `DESK_SEED`); an `error` line at start-up names it |
+| `UNAUTHORIZED` | 401 | false | the run token of a role write is missing or wrong |
+| `LOCKED` | 423 | false | the operator's kill switch is on: every role action is stopped |
+| `STALE` | 409 | true | a value the ticket read has changed since the request (its `inputsDigest` recomputed at the current ledger differs); nothing was signed; take a fresh ticket. The ledger moving on alone is not a change |
+| `BREACHED` | 409 | false | the mandate's verdict recomputed at the current ledger is not `PASS`; `breaches` lists each limit, its value and its threshold |
+| `ESCROW_POLICY` | 409 | false | the named escrow, its 2-of-3 collateral account or the pledged share does not meet the escrow policy; the message gives the reason |
+| `BAD_OP` | 400 | false | `op` on `/api/tickets` is not `pledge` or `buy` |
+| `BAD_CURSOR` | 400 | false | `after` on `/api/feed` is not a feed cursor (the ledger on 19 digits, a dash, a counter) |
+| `MANDATE_NOT_FOUND` | 404 | false | no mandate with that id |
+| `SEQUENCE_PASSED` | 409 | false | the borrower's account sequence has moved past the signed `LoanSet`'s, or the `LoanSet` would expire before inclusion; nothing was submitted; re-request, which signs again |
+| `INCONSISTENT_SNAPSHOT` | 409 | true | the ledger objects read at one ledger do not agree with each other (the vault invariants rippled checks after every transaction); no figure is shown and nothing is signed; retry on the next ledger |
+| `BUSY` | 503 | true | on `/api/tickets` and `/api/desk/positions`, four desk ledger walks are already running between them; on `/api/feed/stream`, 100 streams are already open; retry shortly |
 
 Every route that answers `GET` also answers `HEAD`, with the same status and headers and no body, so a
 link checker sees the status a reader would.
@@ -189,6 +201,28 @@ fields may be added, nothing may ever be renamed, retyped or removed.
 | `GET /api/oracle-aggregate` | can a second publisher contest a reading, and what median does the ledger report |
 | `GET /api/demo/state` | which facilities are baked and live |
 | `GET /api/openapi.json` | the OpenAPI 3.1 description of these routes |
+| `GET /api/mpt/:mptId/status` | is this share attested, not tracked, revoked or stale (200 for any well-formed id) |
+| `GET /api/mark/:mptId` | does a fresh verification of this share, from its MPT id alone, agree with the published reading |
+| `GET /api/tickets` | what are these shares worth as collateral at withdrawal value, and does the mandate allow the operation |
+| `GET /api/desk/mandates/:id` | what the risk officer's mandate allows, with its hash recomputed |
+| `POST /api/roles/:runId/:role/:action` | preview one role action; nothing is signed or submitted |
+| `POST /api/roles/:runId/actions/:actionId/confirm` | queue a previewed action on its account, or, for an approval, have the desk re-read and countersign |
+| `GET /api/roles/:runId/actions/:actionId` | where a role action stands, and what it changed on the ledger |
+| `POST /api/demo/run` | open a run and get its operator token (loopback or demo key only) |
+| `POST /api/demo/kill` | stop every role action (loopback or demo key only) |
+| `POST /api/demo/unkill` | allow role actions again (loopback or demo key only) |
+| `GET /api/desk/positions` | each desk loan's LTV at withdrawal value, its collateral account, and how much of each limit it uses |
+| `GET /api/desk/decisions` | every desk decision, hash-chained, and whether the chain holds |
+| `GET /api/universe` | which vaults are known or seen live, each priced at one ledger or said why not |
+| `GET /api/feed` | which credit events happened after a cursor, and the amendment votes |
+| `GET /api/feed/stream` | the same credit events, pushed as server-sent events, with a heartbeat every 10 s |
+
+The rows from `/api/mpt/:mptId/status` down are the routes of Orma Desk. Every amount in their documents
+is a decimal string and no document carries a grade; their shapes are in `src/openapi.json` and, executable, in
+`src/nyc/contracts.mjs`. A route a deployment does not serve yet answers `404 NOT_FOUND`. A role action is
+`previewed`, `pending-approval`, `approving` (a request while its approval confirms), `queued`, `submitted`,
+`validated`, `failed` or `refused`. A `refused` entry of the decision log carries its code; `SUBMIT_UNCONFIRMED`
+is a submission that threw and that a 60-second re-read did not find, logged with the hash that was sent.
 
 ---
 

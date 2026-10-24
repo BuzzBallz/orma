@@ -324,3 +324,118 @@ export interface GateStep {
   hash: string | null
   note: string | null
 }
+
+// --- NYC: the orma.*/1 documents of Orma Desk -------------------------------------------------------
+// Exact mirrors of the JSDoc typedefs of src/nyc/contracts.mjs (frozen at step 1, additive only). Every
+// amount is a decimal string; no document carries a grade.
+
+export type Provenance = 'REAL' | 'DECLARED' | 'MODELLED' | 'SIMULATED'
+export interface FigureInput { name: string; value: string; object: string; field: string; id: string; ledgerIndex: number; ledgerHash: string }
+/** The closed set of formulas a Figure may carry: the keys of FORMULAS. */
+export type FormulaId =
+  | 'heldValue' | 'naiveValue' | 'n1Overpayment' | 'cover' | 'heldPerUnitIfDefault' | 'lossAfterCover' | 'maxLoan'
+  | 'maxUnits' | 'requested' | 'ltvHeld' | 'lender1to1' | 'cashAvailable' | 'claim' | 'lockedUntil'
+
+export interface Figure {
+  value: string
+  unit: 'drops' | 'share-units' | 'ratio' | 'seconds' | 'bps'
+  meaning: string
+  formula: string
+  formulaId: FormulaId
+  inputs: FigureInput[]
+  provenance: Provenance
+}
+
+export interface N2Entry { loanId: string; label: string; scenario: string; lossAfterCover: Figure; cover: Figure; heldPerUnitIfDefault: Figure; alreadyInHeld: boolean }
+export interface Verdict { status: 'PASS' | 'BREACHED'; breaches: { limit: string; value: string; threshold: string }[] }
+
+export interface Ticket {
+  schema: 'orma.ticket/1'; ticketId: string; inputsDigest: string; asOf: string; ledgerIndex: number; ledgerHash: string
+  op: 'pledge' | 'buy'
+  share: { mptId: string; vaultId: string; units: string; shareScale: number }
+  mandate: { id: string; hash: string; anchorTx: string }
+  figures: {
+    heldValue: Figure; naiveValue: Figure; n1Overpayment: Figure; n2: N2Entry[]
+    n3: { lockedUntil: Figure; redemptionAt: string; cashAvailable: Figure; claim: Figure }
+    maxLoan?: Figure; maxUnits?: Figure; requested?: Figure; ltvHeld?: Figure; lender1to1?: Figure
+  }
+  conduct: { recognitionLagSeconds: string[]; defaultsWithoutImpairment: number; coverOrderCostDrops: string }
+  escrowPolicy: { finishAfter: string; cancelAfter: string; text: string }
+  statement: Statement | null
+  verdict: Verdict
+  verdict1to1?: Verdict
+}
+
+export interface ChangeRow {
+  object: { type: string; index: string }; field: string; before: unknown; after: unknown
+  admitted: 'YES' | 'HIDDEN'; rule: { source: 'rippled 3.4.1'; file: string; line: number }
+  moneyEffect: { value: string; unit: string } | null; verdict?: 'MATCH' | 'MISMATCH'
+}
+
+export interface Change {
+  schema: 'orma.change/1'; txType: string; txJson: object
+  simulatedAt: { ledgerIndex: number; ledgerHash: string }; engineResult: string
+  rows: ChangeRow[]; hiddenCount: number; provenance: 'SIMULATED'
+  realised?: { txHash: string; ledgerIndex: number; ledgerHash: string; rows: ChangeRow[] }
+}
+
+export interface Mandate {
+  schema: 'orma.mandate/1'; id: string; desk: string; riskOfficer: string
+  limits: { maxLtvBps: number; maxSingleLoanDrops: string; maxN2LossDrops: string; maxLockupDays: number }
+  policy: { escrowFinish: 'only-after-default'; finishAfterMarginSeconds: number; approvalSlackSeconds: number; cancelAfterOffsetSeconds: number }
+  issuedAt: string; hash: string; anchorTx: string
+}
+
+export interface Mark {
+  schema: 'orma.mark/1'; shareMptId: string; verdict: 'agree' | 'disagree'
+  reason?: 'SPOOFED' | 'RECOMPUTE_MISMATCH' | 'ORACLE_MISMATCH' | 'UNREACHABLE'
+  tolerance: string; steps: { step: string; ok: boolean; detail: string }[]
+  ledgerIndex: number; ledgerHash: string; node: string
+}
+
+export interface StatementDoc { s: 'orma.stmt/1'; loan?: string; kind: 'impaired' | 'defaulted' | 'repaid' | 'note'; text: string; at: number }
+export interface StatementCheck { status: 'CONSISTENT' | 'INCONSISTENT' | 'NOT_CHECKABLE' | 'UNPARSEABLE'; detail: string; provenance: 'REAL'; ledgerIndex: number; ledgerHash: string }
+export interface Statement { provenance: 'DECLARED'; raw: string; owner: string; doc: StatementDoc | null; consistency: StatementCheck }
+
+export interface CollateralAccount {
+  address: string; signers: { borrower: string; desk: string; agent: string }; quorum: number
+  masterDisabled: boolean; regularKey: string | null; depositAuth: boolean; mptAuthorized: boolean; sharesHeld: string; escrowCount: number; ownerCount: number
+  pledges?: { account: string; sequence: number; index: string; txHash: string; ledgerIndex: number }[]
+  conforming: boolean; reasons: string[]; provenance: 'REAL'; ledgerIndex: number; ledgerHash: string
+}
+
+export interface FeedEvent {
+  id: string
+  type: 'LOAN_LATE' | 'IMPAIRMENT' | 'DEFAULT' | 'COVER_DRAWN' | 'SHARES_PLEDGED' | 'LOAN_ORIGINATED' | 'STATEMENT'
+  provenance: 'REAL' | 'DECLARED'
+  vaultId: string; loanId?: string; ledgerIndex: number; ledgerHash: string; txHash?: string
+  why: string; moneyEffect: { value: string; unit: string } | null
+  receipts: { object: string; field: string; before: unknown; after: unknown }[]
+  statement?: Statement
+}
+
+export interface UniverseVault {
+  vaultId: string
+  asset: { currency: 'XRP' } | { currency: string; issuer: string } | { mpt_issuance_id: string }
+  brokers: string[]; priced: boolean; perUnitHeld?: string; perUnitNaive?: string; reason?: string; seen: 'known' | 'live'
+}
+
+export interface Universe {
+  schema: 'orma.universe/1'; ledgerIndex: number; ledgerHash: string; count: number
+  vaults: UniverseVault[]
+  coverage: { known: number; live: number; liveSinceLedger: number | null }
+  banner: 'not live on mainnet'
+}
+
+export interface Decision {
+  seq: number; prevHash: string; ticketId: string; mandateHash: string
+  decision: 'approved' | 'refused' | 'declined'; code?: string; txHash?: string; ledgerIndex: number; ledgerHash: string; hash: string
+}
+
+/** A role action's state; `previewing` is internal and never served, `approving` is a request while its approve confirms. */
+export type ActionState = 'previewed' | 'pending-approval' | 'approving' | 'queued' | 'submitted' | 'validated' | 'failed' | 'refused'
+export interface RoleAction { actionId: string; runId: string; role: string; action: string; vault?: string; state: ActionState; txHash?: string; engineResult?: string; ledgerIndex?: number }
+
+// Fails tsc -b if any of the twelve is missing: an export that is absent or unused compiles otherwise.
+const _typeProbe: [Ticket, Change, Mandate, Mark, FeedEvent, Universe, Decision, Figure, Provenance, FormulaId, Statement, CollateralAccount] | null = null
+void _typeProbe
