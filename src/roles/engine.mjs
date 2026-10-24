@@ -3,7 +3,8 @@
  * submitted through one serial queue per signing account. Every submission of the API goes through
  * `enqueue`: two submissions from one account in parallel steal each other's Sequence.
  *
- *   POST /api/roles/{runId}/{role}/{action}             -> 202 { actionId, preview }, nothing submitted
+ *   POST /api/roles/{runId}/{role}/{action}             -> 202 { actionId, preview }, nothing submitted;
+ *                                                          a simulated preview is orma.change/1 (src/change/engine.mjs)
  *   POST /api/roles/{runId}/actions/{actionId}/confirm  -> 202, the action queued on its account
  *   GET  /api/roles/{runId}/actions/{actionId}          -> the action, public (no Origin, token or kill check)
  */
@@ -15,6 +16,11 @@ import { num } from '../num.mjs'
 import { FLAG } from '../history.mjs'
 import { logger } from '../log.mjs'
 import { COLLATERAL_POLICY, COLLATERAL_STAGES, judgeCollateralAccount } from '../nyc/contracts.mjs'
+import { buildChange, realise, rereadAt, simulateAndRead } from '../change/engine.mjs'
+import { readTicketInputs } from '../ticket/inputs.mjs'
+import { buildTicket } from '../ticket/engine.mjs'
+import { Reader } from '../poll.mjs'
+import { normaliseVault } from '../xrpl.mjs'
 
 const log = logger('roles')
 
@@ -200,17 +206,117 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
   }
   const locked = (act) => finish(act, { state: 'failed', engineResult: 'LOCKED' })
 
-  /** Rebuild, re-autofill, re-simulate, then submit; anything but tesSUCCESS fails the action, nothing submitted after it. */
-  async function submitRebuilt(act, build, wallet, extra = () => ({})) {
+  /**
+   * Rebuild, re-autofill, re-simulate, then submit; anything but tesSUCCESS fails the action, nothing
+   * submitted after it. The re-simulation builds the change the action keeps: the confirm's, never the
+   * preview's (an object that moved between the two is not a MISMATCH). Once validated, the objects and,
+   * for an action with money, the vault are read again at the validation ledger while the action stays
+   * `submitted`; then `validated` is published with all of it in one assignment.
+   */
+  async function submitRebuilt(act, build, wallet, extra = () => ({}), money = null) {
     if (stopped()) return locked(act)
     const tx = await prepare(await build())
-    const sim = await simulate(tx)
-    if (sim?.engine_result !== 'tesSUCCESS') return finish(act, { state: 'failed', engineResult: sim?.engine_result ?? 'not simulated' })
+    const { s, change, applied } = await changeOf(tx)
+    // The change the action keeps is the confirm's. A simulation without metadata applied nothing: no row to realise.
+    if (applied) act.change = change
+    else log.warn('confirm simulated without metadata: the action keeps no change', { runId: act.runId, actionId: act.actionId, ledgerIndex: s.ledgerIndex, engineResult: s.simulated?.engine_result ?? null })
+    if (money) act.preview = { ...act.preview, money: { ...act.preview?.money, predicted: await money.at(atOf(s)) } }
+    if (s.simulated?.engine_result !== 'tesSUCCESS') return finish(act, { state: 'failed', engineResult: s.simulated?.engine_result ?? 'not simulated' })
     if (stopped()) return locked(act)
+    const more = extra(tx) // from the transaction alone, before it is sent: nothing after validation can fail it
     act.state = 'submitted'
     const r = await submit(tx, wallet)
     const outcome = { txHash: r.txHash, engineResult: r.engineResult, ledgerIndex: r.ledgerIndex }
-    return finish(act, r.engineResult === 'tesSUCCESS' ? { state: 'validated', ...outcome, ...extra(tx) } : { state: 'failed', ...outcome })
+    if (r.engineResult !== 'tesSUCCESS') return finish(act, { state: 'failed', ...outcome })
+    return finish(act, { state: 'validated', ...outcome, ...more, ...(await afterValidation(act, r, applied ? change : null, money)) })
+  }
+
+  /**
+   * What validation produced, read again at the validation ledger while the action stays `submitted`:
+   * the vault first (money.realised), then the change's objects (change.realised). A read that fails
+   * leaves change.realised absent and gives money.realised.error, never an absent realised.
+   */
+  async function afterValidation(act, r, change, money) {
+    const ids = { runId: act.runId, actionId: act.actionId, ledgerIndex: r.ledgerIndex }
+    const out = {}
+    let at
+    try {
+      at = await ledgerAt(r.ledgerIndex)
+    } catch (e) {
+      const why = `ledger ${r.ledgerIndex} could not be read: ${String(e?.message ?? e).slice(0, 120)}`
+      log.warn('nothing read again after validation', { ...ids, err: why })
+      if (money) out.preview = { ...act.preview, money: { ...act.preview?.money, realised: { error: `The ${why}.` } } }
+      return out
+    }
+    let vaultRead = true
+    if (money) {
+      const realised = await realisedMoney(act.preview?.money?.predicted, at, money)
+      vaultRead = !realised.error
+      out.preview = { ...act.preview, money: { ...act.preview?.money, realised } }
+    }
+    if (change && vaultRead) {
+      try {
+        out.change = realise(change, { txHash: r.txHash, ledgerIndex: at.ledgerIndex, ledgerHash: at.ledgerHash, objects: await rereadAt(xrpl, change, at.ledgerIndex) })
+      } catch (e) {
+        log.warn('change not realised: the objects could not be read again', { ...ids, err: String(e?.message ?? e).slice(0, 200) })
+      }
+    } else if (change) {
+      log.warn('change not realised: the vault could not be read again at the validation ledger', ids)
+    }
+    return out
+  }
+
+  /** The validated ledger a transaction landed in: its hash and close_time, for the reads after validation. */
+  async function ledgerAt(ledgerIndex) {
+    if (!Number.isSafeInteger(ledgerIndex)) throw new Error('the submission returned no validation ledger')
+    const r = (await xrpl.req({ command: 'ledger', ledger_index: ledgerIndex })).result
+    const closeTime = r.ledger?.close_time
+    if (!Number.isSafeInteger(closeTime)) throw new Error(`ledger ${ledgerIndex} came back without its close_time`)
+    return { ledgerIndex, ledgerHash: r.ledger_hash ?? r.ledger?.ledger_hash ?? null, closeTime }
+  }
+
+  const atOf = (s) => ({ ledgerIndex: s.ledgerIndex, ledgerHash: s.ledgerHash, closeTime: s.closeTime })
+
+  /** { predicted, realised, verdict }: the withdrawal value per share read again at the validation ledger, by the same code. */
+  async function realisedMoney(predicted, at, money) {
+    if (typeof predicted !== 'string') return { error: `The prediction at confirm could not be computed: ${predicted?.error ?? 'none was made.'}` }
+    try {
+      const realised = await money.realised(at)
+      return { predicted, realised, verdict: realised === predicted ? 'MATCH' : 'MISMATCH' }
+    } catch (e) {
+      return { error: `The vault could not be read again at ledger ${at.ledgerIndex}: ${String(e?.message ?? e).slice(0, 160)}` }
+    }
+  }
+
+  /** The withdrawal value per share of a vault's share at one ledger (Reader.nav, toFixed(6)). */
+  async function heldPerUnit(vault, at) {
+    const inputs = await readTicketInputs(xrpl, { shareMptId: vault.shareMptId, reader, at, history: false })
+    return Reader.nav(normaliseVault(inputs.vault.raw, inputs.closeTime)).navCorrect
+  }
+
+  /**
+   * The money of a default of L2 on a Harbor, at one ledger: the planned loan's units of its share,
+   * priced by buildTicket (four decimal strings, never Figures), or { error } when it cannot be.
+   */
+  async function defaultMoney(vault, at) {
+    try {
+      const plan = vaults.desk?.plannedLoan
+      if (!plan?.units) throw new Error('demo/desk.json carries no plannedLoan.units')
+      const inputs = await readTicketInputs(xrpl, { shareMptId: vault.shareMptId, reader, at, history: false })
+      const ticket = buildTicket(inputs, { op: 'pledge', units: plan.units, mandate: mandate(), principalDrops: plan.principalDrops })
+      const n2 = ticket.figures.n2.find((e) => sameId(e.loanId, vault.loans?.L2))
+      if (!n2) throw new Error(`L2 of ${vault.label} is not a late loan at ledger ${inputs.ledgerIndex}, so it has no default to price.`)
+      return {
+        heldPerUnitNow: Reader.nav(normaliseVault(inputs.vault.raw, inputs.closeTime)).navCorrect,
+        heldPerUnitIfDefault: n2.heldPerUnitIfDefault.value,
+        lossAfterCover: n2.lossAfterCover.value,
+        cover: n2.cover.value,
+      }
+    } catch (e) {
+      // a sentence alone: the desk prints it after its own "could not be computed"
+      log.warn('defaultL2 money not computed', { vault: vault.label, ledgerIndex: at?.ledgerIndex ?? null, err: String(e?.message ?? e).slice(0, 160) })
+      return { error: String(e?.message ?? e).slice(0, 200) }
+    }
   }
 
   /** One setup transaction of a collateral account created at confirm: true when it validated. */
@@ -262,18 +368,40 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
     return enqueue(borrower.address, () => submitRebuilt(act, async () => (await pledgeTx(act, created.address)).tx, borrower, escrowOf))
   }
 
-  const simulated = async (tx) => {
-    const r = await simulate(tx)
-    return { engineResult: r?.engine_result ?? null, engineResultMessage: r?.engine_result_message ?? null, provenance: 'SIMULATED' }
+  /**
+   * L fixed, simulated, the touched objects read again at L, then orma.change/1. A simulate response
+   * without metadata (nothing applied: a tem, tef, tel or ter result) gives a document with no row;
+   * `applied` says whether there was metadata to build rows from.
+   */
+  async function changeOf(tx) {
+    const s = await simulateAndRead(xrpl, tx, { simulate })
+    const change = buildChange({ txJson: tx, before: s.before, simulated: s.simulated ?? {}, ledgerIndex: s.ledgerIndex, ledgerHash: s.ledgerHash })
+    return { s, change, applied: Boolean(s.simulated?.meta) }
   }
+
+  /** The preview of a simulated transaction: its orma.change/1. */
+  const simulated = async (tx) => (await changeOf(tx)).change
 
   const loanManage = (flag, key) => ({
     async preview({ vault }) {
       const loanId = vault.loans?.[key]
       if (!loanId) throw bad(`The vault ${vault.label} has no loan ${key}`)
       const tx = { TransactionType: 'LoanManage', Account: accounts.broker.address, LoanID: loanId, Flags: flag }
-      return { tx, preview: await simulated(tx) }
+      if (key !== 'L2') return { tx, preview: await simulated(tx) }
+      // defaultL2: what the default does to the money, at the preview's L, beside the change.
+      const c = await changeOf(tx)
+      return { tx, preview: { ...c.change, money: await defaultMoney(vault, atOf(c.s)) } }
     },
+    ...(key === 'L2' && {
+      money: (vault) => ({
+        // the prediction at the confirm's L: a decimal string, or { error }
+        at: async (at) => {
+          const m = await defaultMoney(vault, at)
+          return m.heldPerUnitIfDefault ?? m
+        },
+        realised: (at) => heldPerUnit(vault, at),
+      }),
+    }),
   })
 
   /** role -> action -> handler. A handler's preview never signs for the desk nor submits. */
@@ -443,7 +571,7 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
       log.info('action queued', { runId: run.runId, actionId: act.actionId, ledgerIndex: xrpl.lastLedger ?? null })
       const done = handler.confirmBuiltIn
         ? handler.confirmBuiltIn(act)
-        : enqueue(act.account, () => submitRebuilt(act, async () => tx, accounts[act.role]))
+        : enqueue(act.account, () => submitRebuilt(act, async () => tx, accounts[act.role], undefined, handler.money?.(vaults[act.vault]) ?? null))
       done.catch((e) => {
         finish(act, { state: 'failed', engineResult: String(e?.message ?? e).slice(0, 120) })
         log.error('submission threw', { runId: run.runId, actionId: act.actionId, err: String(e).slice(0, 200) })
