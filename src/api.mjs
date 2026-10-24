@@ -91,7 +91,6 @@ export function createApi(reader, opts = {}) {
       res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,OPTIONS')
     }
     res.setHeader('Cache-Control', 'no-store')
-    if (req.method === 'OPTIONS') return res.writeHead(204).end()
 
     const send = (code, body, o = {}) => {
       const headers = { 'Content-Type': 'application/json' }
@@ -108,6 +107,15 @@ export function createApi(reader, opts = {}) {
     }
     const fail = (code, errCode, message, retryable = false) =>
       send(code, { error: { code: errCode, message, retryable } })
+
+    // Before the OPTIONS short-circuit: the NYC modules own their paths, whatever the method.
+    try {
+      if (opts.nyc && (await opts.nyc.handle(req, res, url, { send, fail, stamp }))) return
+    } catch (e) {
+      log.error('unhandled', { key, err: String(e).slice(0, 200) })
+      return fail(500, 'INTERNAL', 'unexpected error', true)
+    }
+    if (req.method === 'OPTIONS') return res.writeHead(204).end()
     // Not read yet is not absent: say retry, not "no such vault". Until the reader's first full
     // pass ends, an id may be a vault it has not reached (a reader that counts no passes: until its
     // first snapshot). After it, a vault it tracks but could not read is still on its way, unless the

@@ -25,6 +25,18 @@ function emit(level, module, msg, fields) {
   }
 }
 
+/** A crash must leave one JSON line and a non-zero exit, never a silent hang or a bare stack. */
+export function installProcessGuards(log = logger('process')) {
+  process.on('unhandledRejection', (e) => {
+    log.error('unhandled rejection', { err: String(e).slice(0, 300) })
+    process.exit(1)
+  })
+  process.on('uncaughtException', (e) => {
+    log.error('uncaught exception', { err: String(e).slice(0, 300) })
+    process.exit(1)
+  })
+}
+
 /**
  * @param {string} module e.g. "poll:vault"
  */

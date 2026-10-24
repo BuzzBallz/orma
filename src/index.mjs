@@ -13,6 +13,8 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 // shell override still works. Written without regexes on purpose: the escaping is a
 // liability in a file that gets patched, and indexOf says what it means.
 if (existsSync('.env')) {
+  // The last occurrence of a key in the file wins, as with `node --env-file`.
+  const fromFile = new Map()
   for (const raw of readFileSync('.env', 'utf8').split(String.fromCharCode(10))) {
     const line = raw.trim()
     if (!line || line.startsWith('#')) continue
@@ -20,8 +22,9 @@ if (existsSync('.env')) {
     if (eq < 1) continue
     const k = line.slice(0, eq).trim()
     const v = line.slice(eq + 1).trim().replace(/^["']|["']$/g, '')
-    if (process.env[k] === undefined) process.env[k] = v
+    fromFile.set(k, v)
   }
+  for (const [k, v] of fromFile) if (process.env[k] === undefined) process.env[k] = v
 }
 import { join } from 'node:path'
 import { Client, Wallet } from 'xrpl'
@@ -31,9 +34,11 @@ import { setLabel } from './present.mjs'
 import { OraclePublisher } from './oracle.mjs'
 import { PublishLoop } from './publish-loop.mjs'
 import { archive } from './archive.mjs'
-import { logger } from './log.mjs'
+import { logger, installProcessGuards } from './log.mjs'
+import { createNyc } from './nyc/index.mjs'
 
 const log = logger('main')
+installProcessGuards()
 
 function parseArgs(argv) {
   const vaults = []
@@ -152,7 +157,11 @@ if (existsSync(join('demo', 'gate-vault.json'))) {
   } catch { /* optional */ }
 }
 
+const nyc = createNyc({ reader, env: process.env })
+if (nyc.missing.length) log.error('nyc config incomplete', { missing: nyc.missing })
+
 const api = createApi(reader, {
+  nyc,
   source: 'devnet',
   watchAccounts,
   raterAddress,
@@ -178,6 +187,7 @@ log.info('up', {
 const shutdown = async (sig) => {
   log.info('shutting down', { sig })
   await reader.stop()
+  await nyc.close?.()
   await api.close()
   process.exit(0)
 }
