@@ -1,0 +1,100 @@
+{
+  "Account": "rKS7Q49nLj8QzSBzXwiwUUehZbcuCHfEXT",
+  "Fee": "1",
+  "Flags": 131072,
+  "LastLedgerSequence": 6384865,
+  "LoanID": "E09102AEBBCF7B2E9B7A855B2B7DDC91B26DFC9DE588CB2E15F1BA89DBEE2735",
+  "Sequence": 6384621,
+  "SigningPubKey": "EDCFED0E945B3B034F02284AB4D0F13BD0A143E4424FDD74CA18FFA5A7A0B12974",
+  "TransactionType": "LoanManage",
+  "TxnSignature": "E56531314EE00E5684A7CEAB9F86D25FF22F2D0D08A931D22E00CB222709E9CF7192522B342FE521612505C0BE841BD817B086928F28BC8389B264F567E92208",
+  "ctid": "C0616CCF00000002",
+  "date": 846180562,
+  "hash": "D38861C64E4228444AA04EEEAC5F2972E29FF378000446CCE0A5AA5C6C56A51F",
+  "inLedger": 6384847,
+  "ledger_index": 6384847,
+  "meta": {
+    "AffectedNodes": [
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Borrower": "rasn9rodLstZG6dmLZZgKqxbUe79nGaAyA",
+            "Flags": 131072,
+            "GracePeriod": 60,
+            "InterestRate": 100000,
+            "LateInterestRate": 20000,
+            "LoanBrokerID": "A47E5F8A65955BF64130D787C7FF50F0ACC3F01E71E0F44E921EF44256280AED",
+            "LoanBrokerNode": "0",
+            "LoanSequence": 1,
+            "NextPaymentDueDate": 846180470,
+            "OwnerNode": "0",
+            "PaymentInterval": 60,
+            "PaymentRemaining": 3,
+            "PeriodicPayment": "3333346.017258355048",
+            "PrincipalOutstanding": "10000000",
+            "StartDate": 846180410,
+            "TotalValueOutstanding": "10000039"
+          },
+          "LedgerEntryType": "Loan",
+          "LedgerIndex": "E09102AEBBCF7B2E9B7A855B2B7DDC91B26DFC9DE588CB2E15F1BA89DBEE2735",
+          "PreviousFields": {
+            "Flags": 0
+          },
+          "PreviousTxnID": "E4FEEA2E814178F7D2A53CFEBBDAE569874C0CB8885B45837800BAAF7C66FA28",
+          "PreviousTxnLgrSeq": 6384795
+        }
+      },
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Account": "rpkGrg7KN1Fcev7i1oEN2m4Nu2vGo2Prex",
+            "Asset": {
+              "currency": "XRP"
+            },
+            "AssetsAvailable": "35000000",
+            "AssetsTotal": "50000000",
+            "Flags": 0,
+            "LEVersion": 1,
+            "LossUnrealized": "10000000",
+            "Owner": "rKS7Q49nLj8QzSBzXwiwUUehZbcuCHfEXT",
+            "OwnerNode": "0",
+            "RedemptionDate": 847598400,
+            "Sequence": 6384606,
+            "ShareMPTID": "0000000113268B160349A129A3343579AE8B0059C4BDC2F8",
+            "SubscriptionDate": 846180262,
+            "VaultKind": 1,
+            "WithdrawalPolicy": 1
+          },
+          "LedgerEntryType": "Vault",
+          "LedgerIndex": "E216E96DCFCC2EC98C8B70E878D2FC4C2FB5B4BCE7C177801A5D1374D2CFA352",
+          "PreviousFields": {},
+          "PreviousTxnID": "3420270B93FA047C39580B71A882766797B23C06A4C6AB0AF7691B0EDB2C5182",
+          "PreviousTxnLgrSeq": 6384797
+        }
+      },
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Account": "rKS7Q49nLj8QzSBzXwiwUUehZbcuCHfEXT",
+            "Balance": "90399969",
+            "Flags": 0,
+            "OwnerCount": 15,
+            "Sequence": 6384622
+          },
+          "LedgerEntryType": "AccountRoot",
+          "LedgerIndex": "F8AD9351C8C704DFD9A83650D429FDAF5211474F68691BACEDB4FCD16D5E5FC5",
+          "PreviousFields": {
+            "Balance": "90399970",
+            "Sequence": 6384621
+          },
+          "PreviousTxnID": "6EA40580AB4C5C6CB02232916DBDEA08F9F7B5668C5E7ADE7F57D46A6D03BC97",
+          "PreviousTxnLgrSeq": 6384804
+        }
+      }
+    ],
+    "TransactionIndex": 0,
+    "TransactionResult": "tesSUCCESS"
+  },
+  "status": "success",
+  "validated": true
+}

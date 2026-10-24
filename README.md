@@ -1,5 +1,103 @@
 # Orma
 
+## Built in New York
+
+At the XRPL hackathon in New York, on 24–25 October 2026, we built **Orma Desk**. It sits on the information
+layer this README describes further down: the vault reader, the withdrawal value and the XLS-47 publisher,
+built in Paris in September 2026.
+
+A closed-ended XLS-65 vault refuses every withdrawal until its redemption date (`VaultWithdraw` returns
+`tecTOO_SOON`). A holder who needs XRP before then has to sell the shares or borrow against them, and either
+way someone must price a share the vault will not yet redeem. The price everyone reads, `AssetsTotal /
+shares`, ignores the losses the vault has already recognised. At ledger 6387294, a share of the Harbor-1
+vault, which redeems on 10 November 2026, read 1.000000 that way and was worth 0.800000.
+
+Orma Desk is a credit desk that lends XRP against such shares, and it values them at one price only: their
+withdrawal value, the XLS-65 withdraw rate `(AssetsTotal − LossUnrealized) / shares`, read at a validated
+ledger. The borrower pledges the shares through an XLS-85 escrow into a 2-of-3 account. Its three keys belong
+to the borrower, the desk and the Orma agent, a program that co-signs only what a published rule allows, and
+any two of them move the shares. The desk refuses the loan with `409 BREACHED` when the risk officer's
+mandate does not hold: its limits on loan-to-value, loan size, loss in a default and lock-up. It runs against
+XRPL Devnet, the network where the lending amendments are live, at
+[ormaprotocol.com/desk](https://ormaprotocol.com/desk).
+
+Where the event's work starts, and how to check that without trusting us: [HACKATHON.md](HACKATHON.md). The
+diff is [`nyc-start...main`](https://github.com/BuzzBallz/orma/compare/nyc-start...main), or
+`git log --oneline nyc-start..main` in a clone. Each build step is one commit and one tag, from
+`step-01-contract` on.
+
+| Part | What it does | Offline check |
+|---|---|---|
+| Risk ticket, `orma.ticket/1` | For a share and a mandate: the withdrawal value beside the value read by all, the loss if each late loan defaults alone, the lock-up, the largest loan the mandate allows, and the verdict. Every figure names its formula and the ledger index and hash of each input, so anyone can recompute it. | `node src/dev/check-ticket.mjs` |
+| Desk signer | Countersigns a `LoanSet` only after reading again, at the ledger it signs at, the escrow the loan's memo names, the 2-of-3 account and the ticket. Each decision goes into a hash-chained log. | `node src/dev/check-desk.mjs` |
+| Change engine, `orma.change/1` | Before a transaction is signed, every field it will change, including the ones its metadata leaves out of `PreviousFields`, each with the rippled 3.4.1 file and line that sets it; after validation, MATCH or MISMATCH per field. | `node src/dev/check-change.mjs` |
+| Release rule and auditor | The public rule that sends pledged shares to the desk after a default or back to the borrower after repayment, the guard on what the Orma agent co-signs, and a read-only auditor of the desk's log and collateral accounts. | `node src/desk/audit.mjs --self-test` |
+| Role engine, desk screens, Feed, Universe | Named actions previewed by `simulate` and submitted through one queue per signing account; credit events derived from two full reads of a vault; every vault on file or seen in the transaction stream, read at one ledger. | `npm test` |
+
+### The event's transactions on Devnet
+
+Each link below is a validated Devnet transaction of the event, captured as JSON and as binary in
+[`evidence/devnet-tx/`](evidence/devnet-tx/). Devnet nodes prune their history, so a node may no longer serve
+a past ledger: the proof is the hash and its capture, not a fresh read.
+
+The three Harbor vaults are fictional credit facilities. Their own loans, L1 and L2, are what produce their
+losses. The desk lends against Harbor shares out of the `desk` vault, and in the chain test out of `spare`.
+
+| Vault | Created | Loans L1 and L2 | L1 impaired | Manager's statement |
+|---|---|---|---|---|
+| Harbor-1 | [FBD87DF2…](https://devnet.xrpl.org/transactions/FBD87DF24EAC9B6537A09FA27D9CBD1E735C7C505066DB4C47E29D9551BA13F4) | [E4FEEA2E…](https://devnet.xrpl.org/transactions/E4FEEA2E814178F7D2A53CFEBBDAE569874C0CB8885B45837800BAAF7C66FA28) · [3420270B…](https://devnet.xrpl.org/transactions/3420270B93FA047C39580B71A882766797B23C06A4C6AB0AF7691B0EDB2C5182) | [D38861C6…](https://devnet.xrpl.org/transactions/D38861C64E4228444AA04EEEAC5F2972E29FF378000446CCE0A5AA5C6C56A51F) | [FF81A871…](https://devnet.xrpl.org/transactions/FF81A871D4437C40CE554BE3C293D480E514BDB14B3D993E3CFB26D953A85A79) |
+| Harbor-2 | [B752D9AB…](https://devnet.xrpl.org/transactions/B752D9AB2A79990ED0404610A16CDC5585654D5A01FF297C87CEA9BCF97E675A) | [8FC8CB2A…](https://devnet.xrpl.org/transactions/8FC8CB2AB566D06128E0B105C0113C351C05FA8360D4B2CEBE11EF0DCBC54B07) · [C07E8885…](https://devnet.xrpl.org/transactions/C07E8885EEAC4BC1CA76BDCEAA5C72449C4ECA86F391543302E178753FC6DECA) | [F72442F6…](https://devnet.xrpl.org/transactions/F72442F6B625C0A45D55B35B269D9EDC17478D5E7A6E1B248E0D94F1A5D43843) | [3DC3B33F…](https://devnet.xrpl.org/transactions/3DC3B33F68689D913D3F166FF6FC97A594F73C0990EF255E59077C4F7B3A06E6) |
+| Harbor-3 | [B471BFC2…](https://devnet.xrpl.org/transactions/B471BFC2E3AC5997C2679EBE725CB9A8BA678DE0749539FFE97C89E456E0F086) | [B2F2A187…](https://devnet.xrpl.org/transactions/B2F2A1871976A922C72764ED6296B09C81E666C259F15E1F26443B1D97A9834B) · [6EA40580…](https://devnet.xrpl.org/transactions/6EA40580AB4C5C6CB02232916DBDEA08F9F7B5668C5E7ADE7F57D46A6D03BC97) | [D155ED6C…](https://devnet.xrpl.org/transactions/D155ED6C45C9BC14588D960F1F373857822B388244357F7A5E8B93B948906B2C) | [5CBB6ED4…](https://devnet.xrpl.org/transactions/5CBB6ED468907DF3D802EB5A22AC90EE95FFB3A00EF903A30A560639AF43F28D) |
+| desk, the vault the desk lends from | [07D7FF14…](https://devnet.xrpl.org/transactions/07D7FF14A713A8D2657528F641CC71C871D2F3ACE4E771444FC2CF038962F2D2) | | | |
+| spare, its second lending vault | [954DA2B3…](https://devnet.xrpl.org/transactions/954DA2B3BBE1572EA37E0529EBC7D44BDFD7CEC1A5DBF6B50FFA8B4F17000791) | | | |
+
+The first impairment of each Harbor vault sets `Vault.LossUnrealized`, a field the vault did not carry
+before. Its metadata leaves that field out of `PreviousFields`, so an indexer that diffs metadata never sees
+the loss appear. `node src/dev/check-change.mjs` replays Harbor-1's from the captured transaction.
+
+- The chain test on `spare`: the borrower's
+  [escrow of 5,000,000 Harbor-1 share units](https://devnet.xrpl.org/transactions/9690077B02B4F8951182106AB315B9B51A92F31659466883DBD493D8510E22DD)
+  into a 2-of-3 account, the
+  [LoanSet countersigned by the desk](https://devnet.xrpl.org/transactions/8A8F8176C6DB9FC3E511D72144A4351C37084DBB99D069027510ED3FDC7648E1)
+  whose memo names that escrow, and a
+  [Payment of shares out of a 2-of-3 test account](https://devnet.xrpl.org/transactions/D3E98D23A112CCCC9E922D03625C41B8456984A1CB12696D9689F3074F09D4EC),
+  signed by the desk and the agent, two of its three keys.
+- The mandate `desk-1`,
+  [anchored by the risk officer](https://devnet.xrpl.org/transactions/E63C8AB9D41042B315AE41F45CF2B624592CDC190C66E87D17C8275A2A0A92ED)
+  with its hash in the memo.
+- [Harbor-1's XLS-47 publication](https://devnet.xrpl.org/transactions/DE7AF2C4F11D3250A2AD66A85E65EE179A6B29277609EA76AE3E09F9AE135262)
+  by the publisher account `r91JiCEYCm4CzTF8G5eks1FpzVJxa5FtdL`, at 20:07:30 UTC on 24 October.
+
+The L2 loans default at the two demo slots on 25 October; the hashes of those defaults are added here after
+each slot.
+
+### What must never happen, and how anyone can check it
+
+Each local command below runs from a fresh clone after `npm ci`, with no `.demo/` and no access to our
+server; we ran each one that way on 24 October 2026. Two checks read production instead: the health URL of
+I4, and the auditor below the table.
+
+| | Rule | Check |
+|---|---|---|
+| I1 | A pledge is valued only at its withdrawal value, read at a validated ledger: every input of every figure carries that ledger's index and hash. | `node src/dev/check-ticket.mjs` |
+| I2 | The desk countersigns a `LoanSet` only if, at the ledger it signs at, the escrow its memo names exists, belongs to the borrower, holds the ticket's shares and pays into a conforming 2-of-3 account, and the ticket recomputed there passes the mandate. | `node src/dev/check-desk.mjs` |
+| I3a | No single party, the desk, the borrower or Orma, can move pledged shares. | `node src/dev/check-nyc-contracts.mjs`, and the REAL collateral line of the ticket screen, read at a ledger |
+| I3b | The Orma agent co-signs only the release `Payment` its published rule names. | `node src/desk/audit.mjs --self-test` |
+| I4 | One process publishes with the publisher's key: the API container on our server. | `node --env-file-if-exists=.env src/dev/with-api.mjs --self-test`; and our former host, https://orma-api.onrender.com/api/health, is suspended, so it must not answer `ok: true` |
+| I5 | No `LoanPay` and no `tfLoanUnimpair` on a demo vault. | `git grep --untracked -qE "LoanPay\|tfLoanUnimpair\|VaultDeposit" -- src/roles`, which exits 1 |
+| I6 | A manager's statement (`orma.stmt/1` in `Vault.Data`) is labelled DECLARED and enters no computed figure. | `node src/dev/check-ticket.mjs` |
+| I7 | Orma recomputes the vault's withdrawal price as a second implementation, held to the vault-state invariants xrpld checks after every transaction (`VaultInvariant.cpp` 574-644). | `node src/dev/check-ticket.mjs` |
+
+The auditor also reads production. `node src/desk/audit.mjs` takes the desk's decision log from the
+production API and the ledger from Devnet, with no key. It exits 0 with no violation, 1 on a violation of I1
+to I3 or I7, and 2 when a read is impossible.
+
+What these rules do not cover: the borrower and the desk together can always move the pledged shares, a
+consensual exit, and in this demo our team holds both roles. The agent's release command
+(`node src/desk/audit.mjs --release`) is built and tested offline; no live release is run in the demo.
+
+---
+
 A lending vault on XRPL Devnet took 51 XRP, lent 10, and the borrower stopped paying. The manager wrote the
 loan down, the unit fell from 1.000000 to 0.803922, and the transaction metadata that every indexer diffs
 came back with `PreviousFields: {}`, an empty change set. Orma is a credit measurement, publication and

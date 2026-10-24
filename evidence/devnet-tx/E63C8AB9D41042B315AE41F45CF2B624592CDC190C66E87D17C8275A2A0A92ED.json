@@ -1,0 +1,50 @@
+{
+  "Account": "rL8Yjys2DE33LsEk3mJNFDGiVjQt1rYA47",
+  "Fee": "1",
+  "Flags": 0,
+  "LastLedgerSequence": 6384877,
+  "Memos": [
+    {
+      "Memo": {
+        "MemoData": "6F726D612E6D616E646174652F313A39353836383865646237393661396463633039633638353231623165393061636136633535653461386565316639386639376664343461626666383066666435",
+        "MemoType": "6F726D612E6D616E646174652F31"
+      }
+    }
+  ],
+  "Sequence": 6384608,
+  "SigningPubKey": "ED46CC3BA0AA6955EA783A735FF6C07D7FE6045C51C297014F573D9F8E83E4462C",
+  "TransactionType": "AccountSet",
+  "TxnSignature": "1AB729B0472AEC59804D77F708313118F21135DE0F6723B54B9B93C5DD94AAEFBEE8B1521E76FA56E679AADC1F4DC78F9F6AB75E5904D22D974F7E7AC6374D02",
+  "ctid": "C0616CDB00000002",
+  "date": 846180601,
+  "hash": "E63C8AB9D41042B315AE41F45CF2B624592CDC190C66E87D17C8275A2A0A92ED",
+  "inLedger": 6384859,
+  "ledger_index": 6384859,
+  "meta": {
+    "AffectedNodes": [
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Account": "rL8Yjys2DE33LsEk3mJNFDGiVjQt1rYA47",
+            "Balance": "99999999",
+            "Flags": 0,
+            "OwnerCount": 0,
+            "Sequence": 6384609
+          },
+          "LedgerEntryType": "AccountRoot",
+          "LedgerIndex": "E7534B8F6CC09325E844312FA4194D7D1278112EABB4EF05BBF5B01677E5A077",
+          "PreviousFields": {
+            "Balance": "100000000",
+            "Sequence": 6384608
+          },
+          "PreviousTxnID": "49ED80ADFFB1DD41EF25C7EA5A53192F28FAB5DBCA264F162ABF699DCD247D61",
+          "PreviousTxnLgrSeq": 6384608
+        }
+      }
+    ],
+    "TransactionIndex": 0,
+    "TransactionResult": "tesSUCCESS"
+  },
+  "status": "success",
+  "validated": true
+}

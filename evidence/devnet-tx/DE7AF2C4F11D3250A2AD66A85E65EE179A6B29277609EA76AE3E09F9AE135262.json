@@ -1,0 +1,167 @@
+{
+  "Account": "r91JiCEYCm4CzTF8G5eks1FpzVJxa5FtdL",
+  "AssetClass": "7269736B",
+  "Fee": "1",
+  "Flags": 0,
+  "LastLedgerSequence": 6387147,
+  "LastUpdateTime": 1792872441,
+  "OracleDocumentID": 2611978006,
+  "PriceDataSeries": [
+    {
+      "PriceData": {
+        "AssetPrice": "c3500",
+        "BaseAsset": "E216E96DCFCC2EC98C8B70E878D2FC4C2FB5B4BC",
+        "QuoteAsset": "NAV",
+        "Scale": 6
+      }
+    },
+    {
+      "PriceData": {
+        "AssetPrice": "1068",
+        "BaseAsset": "E216E96DCFCC2EC98C8B70E878D2FC4C2FB5B4BC",
+        "QuoteAsset": "HDL",
+        "Scale": 4
+      }
+    },
+    {
+      "PriceData": {
+        "AssetPrice": "1b58",
+        "BaseAsset": "E216E96DCFCC2EC98C8B70E878D2FC4C2FB5B4BC",
+        "QuoteAsset": "LIQ",
+        "Scale": 4
+      }
+    },
+    {
+      "PriceData": {
+        "AssetPrice": "64",
+        "BaseAsset": "E216E96DCFCC2EC98C8B70E878D2FC4C2FB5B4BC",
+        "QuoteAsset": "COV",
+        "Scale": 4
+      }
+    },
+    {
+      "PriceData": {
+        "AssetPrice": "1a0b",
+        "BaseAsset": "E216E96DCFCC2EC98C8B70E878D2FC4C2FB5B4BC",
+        "QuoteAsset": "CNC",
+        "Scale": 4
+      }
+    },
+    {
+      "PriceData": {
+        "AssetPrice": "4bd",
+        "BaseAsset": "E216E96DCFCC2EC98C8B70E878D2FC4C2FB5B4BC",
+        "QuoteAsset": "DDL",
+        "Scale": 4
+      }
+    }
+  ],
+  "Provider": "4F726D61",
+  "Sequence": 6384452,
+  "SigningPubKey": "ED54A5DEFE2FCD813812F5E042591E7E68DD7F2043BF2A2E8BEA98F850C4118558",
+  "TransactionType": "OracleSet",
+  "TxnSignature": "6919A3FA091E6DF18D50221A34D32DE6B6E46294EA25DEB0E1B2B8C065444ADF05FAD933CC3DA1A77F48D2937A547C106C4BA03CDCB8B00C0A2921EB0BD83005",
+  "ctid": "C06175B9000C0002",
+  "date": 846187650,
+  "hash": "DE7AF2C4F11D3250A2AD66A85E65EE179A6B29277609EA76AE3E09F9AE135262",
+  "inLedger": 6387129,
+  "ledger_index": 6387129,
+  "meta": {
+    "AffectedNodes": [
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Account": "r91JiCEYCm4CzTF8G5eks1FpzVJxa5FtdL",
+            "Balance": "99999069",
+            "Domain": "6F726D6170726F746F636F6C2E636F6D",
+            "Flags": 0,
+            "OwnerCount": 18,
+            "Sequence": 6384453
+          },
+          "LedgerEntryType": "AccountRoot",
+          "LedgerIndex": "48B51727EB44D83C329D6728EEE3E8EBE6B70EC8622B8C8206E13D2A55DFC724",
+          "PreviousFields": {
+            "Balance": "99999070",
+            "Sequence": 6384452
+          },
+          "PreviousTxnID": "87BA8CD589034DAFCA0EFB907EB434C5D3FCCFE9DE949BD62C0D6104CA075FC6",
+          "PreviousTxnLgrSeq": 6387128
+        }
+      },
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "AssetClass": "7269736B",
+            "Flags": 0,
+            "LastUpdateTime": 1792872441,
+            "OracleDocumentID": 2611978006,
+            "Owner": "r91JiCEYCm4CzTF8G5eks1FpzVJxa5FtdL",
+            "OwnerNode": "0",
+            "PriceDataSeries": [
+              {
+                "PriceData": {
+                  "AssetPrice": "1a0b",
+                  "BaseAsset": "E216E96DCFCC2EC98C8B70E878D2FC4C2FB5B4BC",
+                  "QuoteAsset": "CNC",
+                  "Scale": 4
+                }
+              },
+              {
+                "PriceData": {
+                  "AssetPrice": "64",
+                  "BaseAsset": "E216E96DCFCC2EC98C8B70E878D2FC4C2FB5B4BC",
+                  "QuoteAsset": "COV",
+                  "Scale": 4
+                }
+              },
+              {
+                "PriceData": {
+                  "AssetPrice": "4bd",
+                  "BaseAsset": "E216E96DCFCC2EC98C8B70E878D2FC4C2FB5B4BC",
+                  "QuoteAsset": "DDL",
+                  "Scale": 4
+                }
+              },
+              {
+                "PriceData": {
+                  "AssetPrice": "1068",
+                  "BaseAsset": "E216E96DCFCC2EC98C8B70E878D2FC4C2FB5B4BC",
+                  "QuoteAsset": "HDL",
+                  "Scale": 4
+                }
+              },
+              {
+                "PriceData": {
+                  "AssetPrice": "1b58",
+                  "BaseAsset": "E216E96DCFCC2EC98C8B70E878D2FC4C2FB5B4BC",
+                  "QuoteAsset": "LIQ",
+                  "Scale": 4
+                }
+              },
+              {
+                "PriceData": {
+                  "AssetPrice": "c3500",
+                  "BaseAsset": "E216E96DCFCC2EC98C8B70E878D2FC4C2FB5B4BC",
+                  "QuoteAsset": "NAV",
+                  "Scale": 6
+                }
+              }
+            ],
+            "Provider": "4F726D61"
+          },
+          "LedgerEntryType": "Oracle",
+          "LedgerIndex": "62DFE55126099EE85576B2C5081124FA567BEA0AA7ADCA0B571C5FE627785C74",
+          "PreviousFields": {
+            "LastUpdateTime": 1792872373
+          },
+          "PreviousTxnID": "1956E9EAC5BD353FFE1123095AED8A263431CCF90F149C086D0AFAEEC8F61943",
+          "PreviousTxnLgrSeq": 6387107
+        }
+      }
+    ],
+    "TransactionIndex": 12,
+    "TransactionResult": "tesSUCCESS"
+  },
+  "status": "success",
+  "validated": true
+}

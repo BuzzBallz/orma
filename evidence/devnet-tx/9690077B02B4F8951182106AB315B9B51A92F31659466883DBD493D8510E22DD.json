@@ -1,0 +1,138 @@
+{
+  "Account": "r3NyTbfeANQCDqrGQwngQdW8Kza56tH3AF",
+  "Amount": {
+    "mpt_issuance_id": "0000000113268B160349A129A3343579AE8B0059C4BDC2F8",
+    "value": "5000000"
+  },
+  "CancelAfter": 846371230,
+  "Destination": "rnx5a6pqDXJWsWWDo5gKi9nn8wMAJti7E9",
+  "Fee": "1",
+  "FinishAfter": 846284830,
+  "Flags": 0,
+  "LastLedgerSequence": 6384824,
+  "Sequence": 6384605,
+  "SigningPubKey": "ED9279A684F4239481509FB234ACB3368B1794E9395BD07D1EB79331278D98CA72",
+  "TransactionType": "EscrowCreate",
+  "TxnSignature": "84AB7FA744DE1AB4C680EC88A2ADCF6B55F5AE63DF512948AFE2027552826BC7E619F7F87CC158D7DC39D06098D02F0F1B3D69D377EF6A64A434299A61A20702",
+  "ctid": "C0616CA600010002",
+  "date": 846180432,
+  "hash": "9690077B02B4F8951182106AB315B9B51A92F31659466883DBD493D8510E22DD",
+  "inLedger": 6384806,
+  "ledger_index": 6384806,
+  "meta": {
+    "AffectedNodes": [
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Flags": 0,
+            "Owner": "r3NyTbfeANQCDqrGQwngQdW8Kza56tH3AF",
+            "RootIndex": "3A4BC0D0DD697D1022F82423C1498255A6DE726836325555D14FFAD37361A5A0"
+          },
+          "LedgerEntryType": "DirectoryNode",
+          "LedgerIndex": "3A4BC0D0DD697D1022F82423C1498255A6DE726836325555D14FFAD37361A5A0",
+          "PreviousTxnID": "B236E135EEA730BDB8228AD1544221B39FFF0258368950CB318970CC7CBD8463",
+          "PreviousTxnLgrSeq": 6384647
+        }
+      },
+      {
+        "CreatedNode": {
+          "LedgerEntryType": "Escrow",
+          "LedgerIndex": "408423E0AEAF0E6A605CB73797C8498446ED8CF5AB29D4EAD6E9237AE6B167E4",
+          "NewFields": {
+            "Account": "r3NyTbfeANQCDqrGQwngQdW8Kza56tH3AF",
+            "Amount": {
+              "mpt_issuance_id": "0000000113268B160349A129A3343579AE8B0059C4BDC2F8",
+              "value": "5000000"
+            },
+            "CancelAfter": 846371230,
+            "Destination": "rnx5a6pqDXJWsWWDo5gKi9nn8wMAJti7E9",
+            "FinishAfter": 846284830,
+            "Sequence": 6384605
+          }
+        }
+      },
+      {
+        "ModifiedNode": {
+          "LedgerEntryType": "AccountRoot",
+          "LedgerIndex": "54070544E992CED93041D7A361A5D4D95FAAD211968D5B1444DF8C99B3B169AF",
+          "PreviousTxnID": "900D334615C459E5B8AD9B00ECA7DB2CF037A0EBE49E93EF0F1DFA0DCC693023",
+          "PreviousTxnLgrSeq": 6384675
+        }
+      },
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Flags": 0,
+            "Owner": "rnx5a6pqDXJWsWWDo5gKi9nn8wMAJti7E9",
+            "RootIndex": "76945B9111193B89A15E5E721E5CE904C5CEF55973916EEAF4403BDB4B9F2E28"
+          },
+          "LedgerEntryType": "DirectoryNode",
+          "LedgerIndex": "76945B9111193B89A15E5E721E5CE904C5CEF55973916EEAF4403BDB4B9F2E28",
+          "PreviousTxnID": "BE988710D7DEE0A5FB419CA3C5E69CED4D43F1A327F40B94AA8E6EA89A7E51CC",
+          "PreviousTxnLgrSeq": 6384673
+        }
+      },
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Flags": 56,
+            "Issuer": "rpkGrg7KN1Fcev7i1oEN2m4Nu2vGo2Prex",
+            "LockedAmount": "5000000",
+            "MPTokenMetadata": "7B227469636B6572223A224F524D412D48425231222C226E616D65223A22486172626F722050726976617465204372656469742049202866696374696F6E616C29222C2269636F6E223A2268747470733A2F2F6F726D6170726F746F636F6C2E636F6D2F6173736574732F6D61726B2E737667222C2261737365745F636C617373223A22727761222C226973737565725F6E616D65223A224F726D61222C2264657363223A2252656465656D61626C6520636C61696D206F6E206120636C6F7365642D656E64656420707269766174652063726564697420666163696C697479202866696374696F6E616C292E2056616C756174696F6E206973206E6574206F66207265636F676E69736564206C6F73732E222C226F726D61223A7B2276223A312C22696E737472756D656E74223A227661756C742D7368617265222C226E61765F75726C223A2268747470733A2F2F6F726D6170726F746F636F6C2E636F6D2F762F7B6D70745F69737375616E63655F69647D2F6E6176222C226E61765F75726C5F706172616D223A227B6D70745F69737375616E63655F69647D222C226E61765F6261736973223A22617373657473206E6574206F66207265636F676E69736564206C6F73732C206469766964656420627920756E697473206F75747374616E64696E67222C22646F63223A2268747470733A2F2F6F726D6170726F746F636F6C2E636F6D2F646F63732F6E61762D706F696E746572227D7D",
+            "OutstandingAmount": "50000000",
+            "OwnerNode": "0",
+            "Sequence": 1
+          },
+          "LedgerEntryType": "MPTokenIssuance",
+          "LedgerIndex": "90D5DB35AFE720730EE448EF7A1264B7D78E577377933790722182B0D27A706C",
+          "PreviousFields": {},
+          "PreviousTxnID": "4974EE145EF81A7C4F40ACEFA9D2433F628298F8BA0914D71A2974BBC480E090",
+          "PreviousTxnLgrSeq": 6384639
+        }
+      },
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Account": "r3NyTbfeANQCDqrGQwngQdW8Kza56tH3AF",
+            "Balance": "109999996",
+            "Flags": 0,
+            "OwnerCount": 4,
+            "Sequence": 6384606
+          },
+          "LedgerEntryType": "AccountRoot",
+          "LedgerIndex": "C498F05A34D93D91432107A3C3446811035ACAA082C93E47FCCCDA560D087FF9",
+          "PreviousFields": {
+            "Balance": "109999997",
+            "OwnerCount": 3,
+            "Sequence": 6384605
+          },
+          "PreviousTxnID": "B236E135EEA730BDB8228AD1544221B39FFF0258368950CB318970CC7CBD8463",
+          "PreviousTxnLgrSeq": 6384647
+        }
+      },
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Account": "r3NyTbfeANQCDqrGQwngQdW8Kza56tH3AF",
+            "Flags": 0,
+            "LockedAmount": "5000000",
+            "MPTAmount": "25000000",
+            "MPTokenIssuanceID": "0000000113268B160349A129A3343579AE8B0059C4BDC2F8",
+            "OwnerNode": "0"
+          },
+          "LedgerEntryType": "MPToken",
+          "LedgerIndex": "D94ECBAC11702AFF6E1E2B929B1AF52F1C983B1CD61FD3D26EC5C07145706F5B",
+          "PreviousFields": {
+            "MPTAmount": "30000000"
+          },
+          "PreviousTxnID": "4974EE145EF81A7C4F40ACEFA9D2433F628298F8BA0914D71A2974BBC480E090",
+          "PreviousTxnLgrSeq": 6384639
+        }
+      }
+    ],
+    "TransactionIndex": 1,
+    "TransactionResult": "tesSUCCESS"
+  },
+  "status": "success",
+  "validated": true
+}

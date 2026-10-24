@@ -1,0 +1,193 @@
+{
+  "Account": "rKS7Q49nLj8QzSBzXwiwUUehZbcuCHfEXT",
+  "Counterparty": "rasn9rodLstZG6dmLZZgKqxbUe79nGaAyA",
+  "CounterpartySignature": {
+    "SigningPubKey": "ED3B7AB8B00189B4D86FDB5EF3DA49F1F3E1AD2ED7A1B92EAE1B6070E8861FF65A",
+    "TxnSignature": "AEE942201153D1DCCD1A6E35BC98162B50521BDBB05EBB817F33A68FADF25913DD9EF647707100D9239E3E35E7B86F6BB12DAD14CB93A815DD7C181746C9600F"
+  },
+  "Fee": "4",
+  "Flags": 0,
+  "GracePeriod": 60,
+  "InterestRate": 100000,
+  "LastLedgerSequence": 6384820,
+  "LateInterestRate": 20000,
+  "LoanBrokerID": "08EE3D750BA7E5E8E97CAE3BA45874D310A364DAA58AAD45D821FE0DDC3714DE",
+  "PaymentInterval": 60,
+  "PaymentTotal": 3,
+  "PrincipalRequested": "10000000",
+  "Sequence": 6384619,
+  "SigningPubKey": "EDCFED0E945B3B034F02284AB4D0F13BD0A143E4424FDD74CA18FFA5A7A0B12974",
+  "TransactionType": "LoanSet",
+  "TxnSignature": "F6DD6271893175163687E337D93DF67B01A1F9E9B2368AF0F2BD3E658A18AC55E772C7F3E847BFFA9344158F3EB8E1666BB5F6D28EF124F4B29369C66FA3DB0D",
+  "ctid": "C0616CA200030002",
+  "date": 846180421,
+  "hash": "B2F2A1871976A922C72764ED6296B09C81E666C259F15E1F26443B1D97A9834B",
+  "inLedger": 6384802,
+  "ledger_index": 6384802,
+  "meta": {
+    "AffectedNodes": [
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Account": "r9UKu3oBpJecLUwKmCpJdGy2S9FRifF6Km",
+            "CoverAvailable": "3000000",
+            "CoverRateLiquidation": 10000,
+            "CoverRateMinimum": 10000,
+            "DebtMaximum": "50000000",
+            "DebtTotal": "10000000",
+            "Flags": 0,
+            "LoanSequence": 2,
+            "ManagementFeeRate": 1000,
+            "Owner": "rKS7Q49nLj8QzSBzXwiwUUehZbcuCHfEXT",
+            "OwnerCount": 1,
+            "OwnerNode": "0",
+            "Sequence": 6384611,
+            "VaultID": "0BAC80C3ADD732B15D1BD9AA6F3A922A6BE47037FD1DA1D21CBE78AEC93F3144",
+            "VaultNode": "0"
+          },
+          "LedgerEntryType": "LoanBroker",
+          "LedgerIndex": "08EE3D750BA7E5E8E97CAE3BA45874D310A364DAA58AAD45D821FE0DDC3714DE",
+          "PreviousFields": {
+            "LoanSequence": 1
+          },
+          "PreviousTxnID": "9217F4A72329B9869B5581C5A6783D738DEA108C3AB7C667BDD53BA250B4AC95",
+          "PreviousTxnLgrSeq": 6384661
+        }
+      },
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Account": "rPiyuMXZT5Mby1i7b8Ve6ERmr3KGXod9id",
+            "Asset": {
+              "currency": "XRP"
+            },
+            "AssetsAvailable": "40000000",
+            "AssetsTotal": "50000000",
+            "Flags": 0,
+            "LEVersion": 1,
+            "Owner": "rKS7Q49nLj8QzSBzXwiwUUehZbcuCHfEXT",
+            "OwnerNode": "0",
+            "RedemptionDate": 847598400,
+            "Sequence": 6384610,
+            "ShareMPTID": "00000001FAC6A63970C06903678F91A8F23398B5F342059F",
+            "SubscriptionDate": 846180262,
+            "VaultKind": 1,
+            "WithdrawalPolicy": 1
+          },
+          "LedgerEntryType": "Vault",
+          "LedgerIndex": "0BAC80C3ADD732B15D1BD9AA6F3A922A6BE47037FD1DA1D21CBE78AEC93F3144",
+          "PreviousFields": {
+            "AssetsAvailable": "50000000"
+          },
+          "PreviousTxnID": "B236E135EEA730BDB8228AD1544221B39FFF0258368950CB318970CC7CBD8463",
+          "PreviousTxnLgrSeq": 6384647
+        }
+      },
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Account": "rasn9rodLstZG6dmLZZgKqxbUe79nGaAyA",
+            "Balance": "140000000",
+            "Flags": 0,
+            "OwnerCount": 5,
+            "Sequence": 6384617
+          },
+          "LedgerEntryType": "AccountRoot",
+          "LedgerIndex": "75CF46A55CD7821458B82C5E5445B9752CF088A270CAF48BA62B9AF5E71B74DD",
+          "PreviousFields": {
+            "Balance": "130000000",
+            "OwnerCount": 4
+          },
+          "PreviousTxnID": "C07E8885EEAC4BC1CA76BDCEAA5C72449C4ECA86F391543302E178753FC6DECA",
+          "PreviousTxnLgrSeq": 6384800
+        }
+      },
+      {
+        "CreatedNode": {
+          "LedgerEntryType": "Loan",
+          "LedgerIndex": "95E2CF7EE70EB07F19581DFE6126E7C7E9B620ACCA6BB79583516B2C255E7335",
+          "NewFields": {
+            "Borrower": "rasn9rodLstZG6dmLZZgKqxbUe79nGaAyA",
+            "GracePeriod": 60,
+            "InterestRate": 100000,
+            "LateInterestRate": 20000,
+            "LoanBrokerID": "08EE3D750BA7E5E8E97CAE3BA45874D310A364DAA58AAD45D821FE0DDC3714DE",
+            "LoanSequence": 1,
+            "NextPaymentDueDate": 846180490,
+            "PaymentInterval": 60,
+            "PaymentRemaining": 3,
+            "PeriodicPayment": "3333346.017258355048",
+            "PrincipalOutstanding": "10000000",
+            "StartDate": 846180430,
+            "TotalValueOutstanding": "10000039"
+          }
+        }
+      },
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Account": "rPiyuMXZT5Mby1i7b8Ve6ERmr3KGXod9id",
+            "Balance": "40000000",
+            "Flags": 26214400,
+            "OwnerCount": 1,
+            "Sequence": 0,
+            "VaultID": "0BAC80C3ADD732B15D1BD9AA6F3A922A6BE47037FD1DA1D21CBE78AEC93F3144"
+          },
+          "LedgerEntryType": "AccountRoot",
+          "LedgerIndex": "B295C133212CC01CE72693C97B562674A42AEB18129963B599A4351E1EBF45CF",
+          "PreviousFields": {
+            "Balance": "50000000"
+          },
+          "PreviousTxnID": "B236E135EEA730BDB8228AD1544221B39FFF0258368950CB318970CC7CBD8463",
+          "PreviousTxnLgrSeq": 6384647
+        }
+      },
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Flags": 0,
+            "Owner": "rasn9rodLstZG6dmLZZgKqxbUe79nGaAyA",
+            "RootIndex": "C6A089DEC59E673762CF46DA254862470DE7F70551854E1207A76DFC7C7B76F3"
+          },
+          "LedgerEntryType": "DirectoryNode",
+          "LedgerIndex": "C6A089DEC59E673762CF46DA254862470DE7F70551854E1207A76DFC7C7B76F3",
+          "PreviousTxnID": "C07E8885EEAC4BC1CA76BDCEAA5C72449C4ECA86F391543302E178753FC6DECA",
+          "PreviousTxnLgrSeq": 6384800
+        }
+      },
+      {
+        "CreatedNode": {
+          "LedgerEntryType": "DirectoryNode",
+          "LedgerIndex": "DD2A5408D18935809DC6992E3F78072782E270E4628E51822FD7A293CC617E55",
+          "NewFields": {
+            "Owner": "r9UKu3oBpJecLUwKmCpJdGy2S9FRifF6Km",
+            "RootIndex": "DD2A5408D18935809DC6992E3F78072782E270E4628E51822FD7A293CC617E55"
+          }
+        }
+      },
+      {
+        "ModifiedNode": {
+          "FinalFields": {
+            "Account": "rKS7Q49nLj8QzSBzXwiwUUehZbcuCHfEXT",
+            "Balance": "90399974",
+            "Flags": 0,
+            "OwnerCount": 15,
+            "Sequence": 6384620
+          },
+          "LedgerEntryType": "AccountRoot",
+          "LedgerIndex": "F8AD9351C8C704DFD9A83650D429FDAF5211474F68691BACEDB4FCD16D5E5FC5",
+          "PreviousFields": {
+            "Balance": "90399978",
+            "Sequence": 6384619
+          },
+          "PreviousTxnID": "C07E8885EEAC4BC1CA76BDCEAA5C72449C4ECA86F391543302E178753FC6DECA",
+          "PreviousTxnLgrSeq": 6384800
+        }
+      }
+    ],
+    "TransactionIndex": 3,
+    "TransactionResult": "tesSUCCESS"
+  },
+  "status": "success",
+  "validated": true
+}
