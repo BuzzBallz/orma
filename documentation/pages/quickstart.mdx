@@ -177,34 +177,36 @@ before you commit anywhere near a seed.
 
 ### Reading the objects already on Devnet
 
-The scores of the four baked facilities sit on two publisher accounts.
-`rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B`, the one in the log line above, published during the event;
-its objects were last updated between 14:20 and 14:21 UTC on 13 September 2026.
-`rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H` is the deployed reader behind
-`orma-api.onrender.com`, which publishes while the service runs. The free tier can sleep when idle,
-so read `LastUpdateTime` before using a value. Each facility's document id is pinned in its record
-under `demo/` (`oracleDocumentId`, read by `docIdFor` in `src/oracle.mjs`), so a restart or a retired
-vault never moves a document to another vault. Ids 1 to 4 are the same on both accounts; 5 exists
-only on the deployed publisher:
+The scores sit on the current publisher, `r91JiCEYCm4CzTF8G5eks1FpzVJxa5FtdL` (`Provider` `Orma`, since
+24 October 2026), which publishes while the service runs, so read `LastUpdateTime` before using a value.
+Two older accounts keep their last objects and are no longer updated: `rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B`,
+the one in the log line above, published during the event, last updated between 14:20 and 14:21 UTC on
+13 September 2026; `rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H` published under the project's former name until
+24 October 2026, and `OracleSet` refuses a `Provider` changed on an existing Oracle, so the new name took a
+new account. Each document id is `oracleDocId(VaultID)`, the first four bytes of `sha256(VaultID)` as a
+big-endian `UInt32` (`src/oracle.mjs`), so a restart or a retired vault never moves a document to another
+vault:
 
 | `oracle_document_id` | Facility | Vault id |
 |---|---|---|
-| 1 | Thorne Senior Secured I | `4A5A8E37…5B00190DF5` |
-| 2 | Meridian Trade Finance I | `864C5A2D…E37E8C835` |
-| 3 | Calder Structured Credit III, retired: reserved, no longer updated | `5763707D…2A96CB0E5` |
-| 4 | Kestrel Bridge Financing II | `24EAA01A…1E5810089` |
-| 5 | Halden Structured Credit IV | `DAB9E1EE…5A602B245` |
+| 3238869064 | Thorne Senior Secured I | `4A5A8E37…` |
+| 275365832 | Meridian Trade Finance I | `864C5A2D…` |
+| 4197695612 | Kestrel Bridge Financing II | `24EAA01A…` |
+| 3412668304 | Halden Structured Credit IV | `DAB9E1EE…` |
+| 2611978006 | Harbor-1 | `E216E96D…` |
+| 1197106457 | Harbor-2 | `1F50CE2B…` |
+| 3647726209 | Harbor-3 | `0BAC80C3…` |
 
-Kestrel, from the deployed publisher:
+Calder Structured Credit III is retired: it is not read and has no document under the current publisher.
+Harbor-1, from the current publisher:
 
 ```json
-{ "command": "ledger_entry", "oracle": { "account": "rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H", "oracle_document_id": 4 }, "ledger_index": "validated" }
+{ "command": "ledger_entry", "oracle": { "account": "r91JiCEYCm4CzTF8G5eks1FpzVJxa5FtdL", "oracle_document_id": 2611978006 }, "ledger_index": "validated" }
 ```
 
 Every `BaseAsset` in the answer is the first 20 bytes of the vault id,
-`24EAA01AD4CE70D8ABB4ACB4255DC4C216B8AF3B` for Kestrel, which is how to check that the object is
-the vault you meant. The same request with the `rpVg1…` account returns Kestrel as it stood at the
-end of the event. `GET /api/vaults/:vaultId` reports the publisher, document id and object index a
+`E216E96DCFCC2EC98C8B70E878D2FC4C2FB5B4BC` for Harbor-1, which is how to check that the object is
+the vault you meant. `GET /api/vaults/:vaultId` reports the publisher, document id and object index a
 reader is using, under `oracle`.
 
 ## Step 4: the frontend

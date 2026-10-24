@@ -494,11 +494,11 @@ if (result === 'tecARRAY_TOO_LARGE') {
 }
 ```
 
-The two rules we follow as a result: always resend the full six-dimension series, and number
-`OracleDocumentID`s from a counter in the order vaults are first published rather than from a hash of the
-vault id, since the id is a `UInt32` scoped to the account and a collision silently overwrites another
-vault's scores. The counter lives in memory, so a restart that meets the vaults in a different order
-assigns different ids; identify a vault by `BaseAsset`, not by document id.
+The two rules we follow as a result: always resend the full six-dimension series, and derive each
+`OracleDocumentID` from the vault id alone, the first four bytes of `sha256(VaultID)` as a `UInt32`, so a
+restart or a second process never moves a document. Since the id is a `UInt32` scoped to the account and a
+collision silently overwrites another vault's scores, the publisher refuses to publish a second vault under
+an id it already holds. `BaseAsset` still names the vault on its own.
 
 **Cheapest fix.** Put all four behaviours in the `OracleSet` reference page, and say plainly that the
 transaction replaces the document rather than merging into it. Then document the non-price use, because

@@ -480,13 +480,15 @@ curl -s http://localhost:8787/api/vaults/DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06
   },
   "oracle": {
     "published": true,
-    "oracleDocumentId": 5,
-    "publisher": "rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H",
-    "objectIndex": "02B6D31C8D7D8405A9274C092F5837EC6160C65B7983BA98FF8220289820650D",
+    "oracleDocumentId": 3412668304,
+    "publisher": "r91JiCEYCm4CzTF8G5eks1FpzVJxa5FtdL",
+    "objectIndex": "EB75475B29F5D704C2AEF4A30ADCB8A1DCC49A29ABA76E1E070B103AC3CE2E35",
     "baseAssetHex": "DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06C",
-    "lastUpdateAt": "2026-10-20T14:58:00Z",
-    "ageSeconds": 73,
-    "stale": true,
+    "lastUpdateAt": "2026-10-24T19:47:52Z",
+    "ageSeconds": 22,
+    "stale": false,
+    "lastPublishTx": "03A59D07A8DA37C236C0C155C98C653A57A2789AEB8E6B7270ABFEB408281A2C",
+    "explorerUrl": "https://devnet.xrpl.org/transactions/03A59D07A8DA37C236C0C155C98C653A57A2789AEB8E6B7270ABFEB408281A2C",
     "dimensionsOnChain": [
       { "key": "CNC", "raw": "2710",  "value": "1.0000",   "scale": 4 },
       { "key": "COV", "raw": "64",    "value": "0.0100",   "scale": 4 },
@@ -523,9 +525,18 @@ Things in there that are easy to misread:
   Writing `"100"` into that field means 256, not one hundred. Full detail in
   [/mathematics](/mathematics#8-publication-as-an-oracle-object).
 - `oracle.publisher` and `oracle.oracleDocumentId` name the account and document the answering
-  reader publishes to. This capture is from the deployed reader, `rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H`;
-  during the event it was `rpVg1…`, whose objects stopped updating on 13 September. Document id 5 is
-  Halden. The full mapping is in
+  reader publishes to. This capture is from the deployed reader, `r91JiCEYCm4CzTF8G5eks1FpzVJxa5FtdL`,
+  on 24 October 2026. The document id is `oracleDocId(VaultID)`, the first four bytes of
+  `sha256(VaultID)` as a big-endian `UInt32`: 3412668304 is Halden. The Oracle object names its
+  publisher in `Provider`, which decodes to Orma:
+
+  ```json
+  { "account": "r91JiCEYCm4CzTF8G5eks1FpzVJxa5FtdL", "oracleDocumentId": 3412668304, "provider": "Orma", "objectIndex": "EB75475B29F5D704C2AEF4A30ADCB8A1DCC49A29ABA76E1E070B103AC3CE2E35" }
+  ```
+
+  The objects of the two earlier publishers, `rpVg1…` (the event, frozen since 13 September) and
+  `rPuYT6…` (the deployed reader under the project's former name, until 24 October), are no longer
+  updated: `OracleSet` refuses a `Provider` changed on an existing Oracle. The full mapping is in
   [the quickstart](/quickstart#reading-the-objects-already-on-devnet).
 - `coverRateMinimum` and `coverRateLiquidation` are in units of $10^{-5}$. A stated `10000` is
   $0.10$. **Both** are divided by $10^{5}$, which is why `maxLiquidatableNow` is
@@ -1240,68 +1251,20 @@ the median rippled computed across them with `get_aggregate_price`. No parameter
 curl -s http://localhost:8787/api/oracle-aggregate
 ```
 
-```json
-{
-  "serverTime": "2026-10-13T15:13:50Z",
-  "ledgerIndex": 6092503,
-  "probedAt": "2026-09-13T10:01:52Z",
-  "probedDuring": "XRPL Lending Protocol Hackathon, Paris, 12-13 September 2026",
-  "network": "devnet",
-  "buildVersion": "3.4.0-rc5",
-  "label": "Meridian Trade Finance I",
-  "vaultId": "864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835",
-  "baseAsset": "864C5A2DDCED78C6198B0703169D533B747A56E5",
-  "quoteAsset": "NAV",
-  "question": "Can a second publisher contest our reading without our permission, and does the ledger report the spread?",
-  "publishers": [
-    {
-      "role": "this service",
-      "account": "rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B",
-      "oracleDocumentId": 2,
-      "provider": "BuzzBallz Vault Solvency",
-      "nav": "0.803922",
-      "basis": "re-reads the vault object"
-    },
-    {
-      "role": "a second account of ours, playing a naive indexer",
-      "account": "raiwYKSDdrhiediLdgJyGEzP1estXcmVcM",
-      "oracleDocumentId": 1,
-      "provider": "Naive metadata indexer",
-      "nav": "1.000000",
-      "basis": "the naive reading a metadata diff gives, copied from demo/indexer-race.json",
-      "publishHash": null
-    }
-  ],
-  "aggregate": {
-    "median": "0.901961",
-    "mean": "0.901961",
-    "standardDeviation": "0.1386480834414958655",
-    "size": 2,
-    "ledgerIndex": null,
-    "computedBy": "rippled, from get_aggregate_price. Neither publisher computed it and neither can alter it."
-  },
-  "aggregateError": null,
-  "answer": "Yes. A second publisher can post a contrary reading without our permission; rippled reports a median of 0.901961 across both. In this capture both accounts were ours.",
-  "reproduce": {
-    "command": "get_aggregate_price",
-    "base_asset": "864C5A2DDCED78C6198B0703169D533B747A56E5",
-    "quote_asset": "NAV",
-    "oracles": [
-      {
-        "account": "rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B",
-        "oracle_document_id": 2
-      },
-      {
-        "account": "raiwYKSDdrhiediLdgJyGEzP1estXcmVcM",
-        "oracle_document_id": 1
-      }
-    ]
-  },
-  "redacted": [
-    "The second publisher is a throwaway Devnet faucet account. Its seed was never written to disk."
-  ]
-}
-```
+The route serves `demo/oracle-aggregate.json`
+as captured, probed on 13 September 2026 at the Paris event (Devnet, rippled 3.4.0-rc5) on Meridian Trade
+Finance I, `BaseAsset` `864C5A2DDCED78C6198B0703169D533B747A56E5`, quote `NAV`:
+
+| Role in the capture | Account | Document | Reading |
+|---|---|---|---|
+| this service, at the event | `rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B` | 2 | `0.803922`, the vault object re-read |
+| a second account of ours, playing a naive indexer | `raiwYKSDdrhiediLdgJyGEzP1estXcmVcM` | 1 | `1.000000`, what a metadata-diffing indexer computes |
+| `get_aggregate_price`, computed by rippled | — | — | median `0.901961` across both |
+
+Each publisher entry of the file carries the `Provider` its Oracle object holds on the ledger: the event-time
+publisher wrote the project's former name, which an existing Oracle can no longer change. The file also
+carries `question`, `answer`, `reproduce` (the request to run it again) and `redacted` (the second
+publisher is a throwaway faucet account whose seed was never written to disk).
 
 Both publishers were accounts of ours: the event-time publisher, which re-reads the vault object
 (`0.803922`), and a throwaway faucet account that published, once, the `1.000000` a metadata-diffing

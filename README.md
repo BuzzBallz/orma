@@ -200,27 +200,42 @@ overran the redemption buffer; `feedback/appendix.pdf`, Appendix E, isolates tha
 | Vault shares pledged on ledger to that lender | `EscrowCreate` | `tesSUCCESS` | [`3322B921…1C1536`](https://devnet.xrpl.org/transactions/3322B9214FB87822BA5699423691DAED4A043121D1E17080673F6292E01C1536) |
 | Delegation positive control: `Payment` delegates, the lending permissions return `temMALFORMED` and never reach a ledger | `DelegateSet` | `tesSUCCESS` | [`547DA719…10AF17`](https://devnet.xrpl.org/transactions/547DA71992D469ACA345A0B3CEAD07864E2801919201B256EA606C3A7910AF17) |
 
-The reader pins each facility's XLS-47 document id in its record under `demo/` (`oracleDocumentId`), so a
-restart or a retired vault never moves a document to another vault (`src/oracle.mjs`, `docIdFor`): **1** Thorne,
-**2** Meridian, **3** Calder, **4** Kestrel, **5** Halden. Calder is retired; id 3 stays reserved and is no longer
-updated. Identify a vault by `BaseAsset`, the first 20 bytes of its vault id.
-Two accounts hold them:
+The reader publishes each facility's XLS-47 document under `oracleDocId(VaultID)`: the first four bytes of
+`sha256(VaultID)`, read as a big-endian `UInt32` (`src/oracle.mjs`). The id is a function of the vault alone,
+so a restart, a retired vault or a second process never moves a document to another vault, and the publisher
+refuses to publish a second vault under an id already held rather than overwrite its scores. Identify a vault
+by `BaseAsset`, the first 20 bytes of its vault id. The documents the reader writes:
+
+| `oracle_document_id` | Facility | Vault id |
+|---|---|---|
+| 3238869064 | Thorne Senior Secured I | `4A5A8E37…` |
+| 275365832 | Meridian Trade Finance I | `864C5A2D…` |
+| 4197695612 | Kestrel Bridge Financing II | `24EAA01A…` |
+| 3412668304 | Halden Structured Credit IV | `DAB9E1EE…` |
+| 2611978006 | Harbor-1 | `E216E96D…` |
+| 1197106457 | Harbor-2 | `1F50CE2B…` |
+| 3647726209 | Harbor-3 | `0BAC80C3…` |
+| 587307429 | desk | `3422A5AD…` |
+| 2761675937 | spare | `88849E4F…` |
+
+Calder is retired: it is not read and has no document under the current publisher. Three accounts hold
+Orma's objects:
 
 | Publisher | What its objects are |
 |---|---|
-| [`rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B`](https://devnet.xrpl.org/accounts/rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B) | Written during the event and frozen since, `LastUpdateTime` 2026-09-13 between 14:20 and 14:21 UTC. Kestrel's is `C67EBC7A…80DCC1`. |
-| [`rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H`](https://devnet.xrpl.org/accounts/rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H) | The deployed reader's publisher. It republishes when a vault's NAV or grade changes, and on a 60-second heartbeat, while the service runs; the service sleeps when idle, so `LastUpdateTime` says how fresh an object is. Kestrel's is `ADE9F4B4…EF805C`. |
+| [`r91JiCEYCm4CzTF8G5eks1FpzVJxa5FtdL`](https://devnet.xrpl.org/accounts/r91JiCEYCm4CzTF8G5eks1FpzVJxa5FtdL) | The current publisher, `Provider` `Orma`, since 24 October 2026. Its `Domain` is `ormaprotocol.com`, which lists it in `/.well-known/xrp-ledger.toml`. It republishes when a vault's NAV or grade changes, and on a 60-second heartbeat. |
+| [`rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H`](https://devnet.xrpl.org/accounts/rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H) | The deployed reader's publisher until 24 October 2026, under the project's former name, with document ids 1 to 5. Its objects are no longer updated: `OracleSet` refuses a `Provider` changed on an existing Oracle, so the new name needed a new account. |
+| [`rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B`](https://devnet.xrpl.org/accounts/rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B) | Written during the Paris event and frozen since, `LastUpdateTime` 2026-09-13 between 14:20 and 14:21 UTC, with document ids 1 to 4, numbered by the publisher of that time. |
 
 `devnet.xrpl.org` has no route for a bare ledger index, so fetch the object itself rather than
-following a link to it. Kestrel, from the deployed publisher:
+following a link to it. Halden, from the current publisher:
 
 ```bash
-curl -s https://s.devnet.rippletest.net:51234 -H 'Content-Type: application/json' -d '{"method":"ledger_entry","params":[{"oracle":{"account":"rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H","oracle_document_id":4},"ledger_index":"validated"}]}'
+curl -s https://s.devnet.rippletest.net:51234 -H 'Content-Type: application/json' -d '{"method":"ledger_entry","params":[{"oracle":{"account":"r91JiCEYCm4CzTF8G5eks1FpzVJxa5FtdL","oracle_document_id":3412668304},"ledger_index":"validated"}]}'
 ```
 
-Every `PriceData` entry carries `BaseAsset` `24EAA01AD4CE70D8ABB4ACB4255DC4C216B8AF3B`, the first 20 bytes
-of Kestrel's vault id, and `NAV` reads `33450` hex at `Scale` 6, which is 0.210000. Put
-`rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B` in `account` for the event-time object.
+Every `PriceData` entry carries `BaseAsset` `DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06C`, the first 20 bytes
+of Halden's vault id, and `NAV` reads `c4452` hex at `Scale` 6, which is 0.803922.
 
 During the event we set two publishers against each other on Meridian, so `get_aggregate_price` had
 something to aggregate. The event-time publisher, `rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B` (document 2),

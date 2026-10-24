@@ -503,12 +503,13 @@ Each of these corrupts data silently rather than erroring.
    so reusing a document id for a different set of assets accumulates stale pairs until the series
    passes the ledger's ceiling and `OracleSet` returns `tecARRAY_TOO_LARGE`. Recovery is either
    listing every stale pair with no price, or `OracleDelete` then recreate, which is what this
-   publisher does because it does not know what the stale pairs were. Document ids are pinned in each
-   facility's record under `demo/` (`oracleDocumentId`), and a vault without one is numbered above them
-   (`docIdFor` in `src/oracle.mjs`), never from a hash of the vault id, because the id is a `UInt32`
-   scoped to (account, id) and a collision would silently overwrite another vault's scores. A retired
-   facility keeps its id reserved, so a restart never moves a document to another vault. `BaseAsset`
-   still identifies the vault on its own.
+   publisher does because it does not know what the stale pairs were. The document id is
+   `oracleDocId(VaultID)`, the first four bytes of `sha256(VaultID)` read as a big-endian `UInt32`
+   (`docIdFor` in `src/oracle.mjs`): a function of the vault alone, so a restart, a retired vault or a
+   second process never moves a document to another vault. The id is a `UInt32` scoped to
+   (account, id), and a collision would silently overwrite another vault's scores, so the publisher
+   keeps the vault each id was first published for and refuses to publish another vault under it.
+   `BaseAsset` still identifies the vault on its own.
 2. `LastUpdateTime` must **strictly increase**. Equal or lower gives `tecINVALID_UPDATE_TIME`, burning
    a fee and a sequence number.
 3. A `LastUpdateTime` in the **future bricks** the object until wall clock catches up. Never add a
@@ -521,9 +522,9 @@ Each of these corrupts data silently rather than erroring.
 ### Read back from the ledger
 
 Decoded from the Oracle object
-`02B6D31C8D7D8405A9274C092F5837EC6160C65B7983BA98FF8220289820650D`, document id 5, for Halden
-Structured Credit IV, as the deployed publisher `rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H` held it at
-ledger 6273933 on 20 October 2026:
+`EB75475B29F5D704C2AEF4A30ADCB8A1DCC49A29ABA76E1E070B103AC3CE2E35`, document id 3412668304
+(`oracleDocId` of Halden Structured Credit IV), as the publisher `r91JiCEYCm4CzTF8G5eks1FpzVJxa5FtdL`,
+`Provider` `Orma`, held it on 24 October 2026:
 
 | code | raw | scale | decoded | check |
 |---|---|---|---|---|
