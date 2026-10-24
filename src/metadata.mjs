@@ -25,6 +25,8 @@
  * yield-bearing pooled claim. We use `rwa` because a private-credit facility IS a real
  * world asset, and carry the precise thing in `orma.instrument`.
  */
+import { lookup } from 'node:dns/promises'
+import { BlockList, isIP } from 'node:net'
 import { logger } from './log.mjs'
 
 const log = logger('metadata')
@@ -185,4 +187,57 @@ export function xls89Report(meta) {
       ? 'No XLS-89 asset_class describes a yield-bearing pooled claim; rwa is the closest. See orma.instrument.'
       : null,
   }
+}
+
+// The ranges src/nav.mjs refuses to follow a pointer into (its NOT_PUBLIC), copied here: a base that
+// resolves into one is engraved for ever as a pointer nobody outside this machine can follow.
+const NOT_PUBLIC = new BlockList()
+for (const [net, bits] of [['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16], ['172.16.0.0', 12], ['192.168.0.0', 16]]) NOT_PUBLIC.addSubnet(net, bits, 'ipv4')
+for (const [net, bits] of [['::', 127], ['fc00::', 7], ['fe80::', 10]]) NOT_PUBLIC.addSubnet(net, bits, 'ipv6')
+
+/**
+ * Whether a base URL may be engraved in a new share's pointer, which can never be corrected: null when
+ * it may, else the sentence that says why not. It must be https, resolve only to public addresses,
+ * answer over TLS, and serve Orma: `GET <base>/v/<48 zeros>/nav` must return a JSON envelope carrying
+ * `serverTime` or `error.code` (an HTML page means the /v/:mpt/nav rewrite is not deployed).
+ * @param {string} base
+ * @param {{ fetchImpl?: typeof fetch, lookupImpl?: typeof lookup, timeoutMs?: number }} [opts]
+ * @returns {Promise<string|null>}
+ */
+export async function permanentBaseProblem(base, { fetchImpl = fetch, lookupImpl = lookup, timeoutMs = 15000 } = {}) {
+  let u
+  try {
+    u = new URL(base)
+  } catch {
+    return `${JSON.stringify(base)} is not a URL`
+  }
+  if (u.protocol !== 'https:') return `the pointer base must be https, not ${u.protocol.replace(/:$/, '')}: it is engraved for ever in every new share`
+  const host = u.hostname.replace(/^\[|\]$/g, '')
+  let addrs
+  try {
+    addrs = isIP(host) ? [{ address: host, family: isIP(host) }] : await lookupImpl(host, { all: true })
+  } catch (e) {
+    return `${host} does not resolve (${String(e?.code ?? e).slice(0, 60)})`
+  }
+  const inside = addrs.filter((a) => NOT_PUBLIC.check(a.address, a.family === 6 ? 'ipv6' : 'ipv4'))
+  if (addrs.length === 0) return `${host} resolves to no address`
+  if (inside.length) return `${host} resolves to ${inside.map((a) => a.address).join(', ')}, a loopback, private or link-local address: no one outside this network could follow the pointer`
+  const probe = `${base.replace(/\/+$/, '')}/v/${'0'.repeat(48)}/nav`
+  let res
+  try {
+    res = await fetchImpl(probe, { redirect: 'follow', signal: AbortSignal.timeout(timeoutMs) })
+  } catch (e) {
+    return `${probe} could not be fetched over TLS (${String(e?.cause?.code ?? e?.message ?? e).slice(0, 80)})`
+  }
+  const type = res.headers.get('content-type') ?? 'no content type'
+  let body
+  try {
+    body = await res.json()
+  } catch {
+    return `${probe} answered ${res.status} ${type}, not an Orma JSON envelope: is the /v/:mpt/nav rewrite deployed?`
+  }
+  if (!body || typeof body !== 'object' || (typeof body.serverTime !== 'string' && typeof body.error?.code !== 'string')) {
+    return `${probe} answered ${res.status} with JSON that is not an Orma envelope (neither serverTime nor error.code)`
+  }
+  return null
 }

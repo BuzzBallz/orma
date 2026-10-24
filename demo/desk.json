@@ -1,0 +1,186 @@
+{
+  "label": "desk",
+  "vaultId": "3422A5ADB75987A3A2C2661D3254841ED9F58846C973F558897F43720AF7928E",
+  "shareMptId": "000000013D48E8B6BDCD0414EEC672703ACD6AB884CCC2BF",
+  "loanBrokerId": "7A8BFE215C09BD7D8E81E0907331ED21A5F782ADBBCEA13F953F60570C6D8C36",
+  "owner": "rPjXveBHGSkMbBPCXXMZhK78S1g4aog2ut",
+  "navUrl": "https://ormaprotocol.com/v/000000013D48E8B6BDCD0414EEC672703ACD6AB884CCC2BF/nav",
+  "subscriptionDate": 846180262,
+  "redemptionDate": 846388800,
+  "loans": {
+    "L1": null,
+    "L2": null
+  },
+  "impairL1Tx": null,
+  "impairL1Hidden": null,
+  "statementTx": null,
+  "bakedAt": "2026-10-24T18:10:02Z",
+  "plannedLoan": {
+    "units": "5000000",
+    "principalDrops": "2000000",
+    "paymentInterval": 86400,
+    "gracePeriod": 3600
+  },
+  "plannedBuy": {
+    "share": "0000000113D92F1BA13DCE607C6F9F071B60FFD8C0205AA4",
+    "units": "6000000"
+  },
+  "mandate": {
+    "hash": "958688edb796a9dcc09c68521b1e90aca6c55e4a8ee1f98f97fd44abff80ffd5",
+    "anchorTx": "E63C8AB9D41042B315AE41F45CF2B624592CDC190C66E87D17C8275A2A0A92ED"
+  },
+  "calibration": {
+    "vault": "harbor-1",
+    "ledgerIndex": 6384857,
+    "ledgerHash": "FE40FF4B3C630E72E3859460EEC7E1699F50595123475AE83FDE3F3277047235",
+    "closeTime": 846180592,
+    "objects": {
+      "vault": {
+        "Account": "rpkGrg7KN1Fcev7i1oEN2m4Nu2vGo2Prex",
+        "Asset": {
+          "currency": "XRP"
+        },
+        "AssetsAvailable": "35000000",
+        "AssetsTotal": "50000000",
+        "Data": "7B2273223A226F726D612E73746D742F31222C226C6F616E223A2245303931303241454242434637423245394237413835354232423744444339314232364446433944453538384342324531354631424138394442454532373335222C226B696E64223A22696D706169726564222C2274657874223A224C31206D61726B656420696D7061697265643A207061796D656E74206D69737365642062792031206D696E222C226174223A3834363138303536327D",
+        "Flags": 0,
+        "LEVersion": 1,
+        "LedgerEntryType": "Vault",
+        "LossUnrealized": "10000000",
+        "Owner": "rKS7Q49nLj8QzSBzXwiwUUehZbcuCHfEXT",
+        "OwnerNode": "0",
+        "PreviousTxnID": "FF81A871D4437C40CE554BE3C293D480E514BDB14B3D993E3CFB26D953A85A79",
+        "PreviousTxnLgrSeq": 6384849,
+        "RedemptionDate": 847598400,
+        "Sequence": 6384606,
+        "ShareMPTID": "0000000113268B160349A129A3343579AE8B0059C4BDC2F8",
+        "SubscriptionDate": 846180262,
+        "VaultKind": 1,
+        "WithdrawalPolicy": 1,
+        "index": "E216E96DCFCC2EC98C8B70E878D2FC4C2FB5B4BCE7C177801A5D1374D2CFA352",
+        "shares": {
+          "Flags": 56,
+          "Issuer": "rpkGrg7KN1Fcev7i1oEN2m4Nu2vGo2Prex",
+          "LedgerEntryType": "MPTokenIssuance",
+          "LockedAmount": "5000000",
+          "MPTokenMetadata": "7B227469636B6572223A224F524D412D48425231222C226E616D65223A22486172626F722050726976617465204372656469742049202866696374696F6E616C29222C2269636F6E223A2268747470733A2F2F6F726D6170726F746F636F6C2E636F6D2F6173736574732F6D61726B2E737667222C2261737365745F636C617373223A22727761222C226973737565725F6E616D65223A224F726D61222C2264657363223A2252656465656D61626C6520636C61696D206F6E206120636C6F7365642D656E64656420707269766174652063726564697420666163696C697479202866696374696F6E616C292E2056616C756174696F6E206973206E6574206F66207265636F676E69736564206C6F73732E222C226F726D61223A7B2276223A312C22696E737472756D656E74223A227661756C742D7368617265222C226E61765F75726C223A2268747470733A2F2F6F726D6170726F746F636F6C2E636F6D2F762F7B6D70745F69737375616E63655F69647D2F6E6176222C226E61765F75726C5F706172616D223A227B6D70745F69737375616E63655F69647D222C226E61765F6261736973223A22617373657473206E6574206F66207265636F676E69736564206C6F73732C206469766964656420627920756E697473206F75747374616E64696E67222C22646F63223A2268747470733A2F2F6F726D6170726F746F636F6C2E636F6D2F646F63732F6E61762D706F696E746572227D7D",
+          "OutstandingAmount": "50000000",
+          "OwnerNode": "0",
+          "PreviousTxnID": "824F5D0EF11C30D6F4B824FE0DF860F104C717A325B2294C20EBC18BBA2D65FC",
+          "PreviousTxnLgrSeq": 6384840,
+          "Sequence": 1,
+          "index": "90D5DB35AFE720730EE448EF7A1264B7D78E577377933790722182B0D27A706C",
+          "mpt_issuance_id": "0000000113268B160349A129A3343579AE8B0059C4BDC2F8"
+        }
+      },
+      "broker": {
+        "Account": "rKnSoZ4KBL8tZoznitH791hxMPFuBgNmom",
+        "CoverAvailable": "3000000",
+        "CoverRateLiquidation": 10000,
+        "CoverRateMinimum": 10000,
+        "DebtMaximum": "50000000",
+        "DebtTotal": "15000000",
+        "Flags": 0,
+        "LedgerEntryType": "LoanBroker",
+        "LoanSequence": 3,
+        "ManagementFeeRate": 1000,
+        "Owner": "rKS7Q49nLj8QzSBzXwiwUUehZbcuCHfEXT",
+        "OwnerCount": 2,
+        "OwnerNode": "0",
+        "PreviousTxnID": "3420270B93FA047C39580B71A882766797B23C06A4C6AB0AF7691B0EDB2C5182",
+        "PreviousTxnLgrSeq": 6384797,
+        "Sequence": 6384607,
+        "VaultID": "E216E96DCFCC2EC98C8B70E878D2FC4C2FB5B4BCE7C177801A5D1374D2CFA352",
+        "VaultNode": "0",
+        "index": "A47E5F8A65955BF64130D787C7FF50F0ACC3F01E71E0F44E921EF44256280AED"
+      },
+      "loans": {
+        "L1": {
+          "Borrower": "rasn9rodLstZG6dmLZZgKqxbUe79nGaAyA",
+          "Flags": 131072,
+          "GracePeriod": 60,
+          "InterestRate": 100000,
+          "LateInterestRate": 20000,
+          "LedgerEntryType": "Loan",
+          "LoanBrokerID": "A47E5F8A65955BF64130D787C7FF50F0ACC3F01E71E0F44E921EF44256280AED",
+          "LoanBrokerNode": "0",
+          "LoanSequence": 1,
+          "NextPaymentDueDate": 846180470,
+          "OwnerNode": "0",
+          "PaymentInterval": 60,
+          "PaymentRemaining": 3,
+          "PeriodicPayment": "3333346.017258355048",
+          "PreviousTxnID": "D38861C64E4228444AA04EEEAC5F2972E29FF378000446CCE0A5AA5C6C56A51F",
+          "PreviousTxnLgrSeq": 6384847,
+          "PrincipalOutstanding": "10000000",
+          "StartDate": 846180410,
+          "TotalValueOutstanding": "10000039",
+          "index": "E09102AEBBCF7B2E9B7A855B2B7DDC91B26DFC9DE588CB2E15F1BA89DBEE2735"
+        },
+        "L2": {
+          "Borrower": "rasn9rodLstZG6dmLZZgKqxbUe79nGaAyA",
+          "Flags": 0,
+          "GracePeriod": 60,
+          "InterestRate": 100000,
+          "LateInterestRate": 20000,
+          "LedgerEntryType": "Loan",
+          "LoanBrokerID": "A47E5F8A65955BF64130D787C7FF50F0ACC3F01E71E0F44E921EF44256280AED",
+          "LoanBrokerNode": "0",
+          "LoanSequence": 2,
+          "NextPaymentDueDate": 846180472,
+          "OwnerNode": "0",
+          "PaymentInterval": 60,
+          "PaymentRemaining": 3,
+          "PeriodicPayment": "1666673.008629177524",
+          "PreviousTxnID": "3420270B93FA047C39580B71A882766797B23C06A4C6AB0AF7691B0EDB2C5182",
+          "PreviousTxnLgrSeq": 6384797,
+          "PrincipalOutstanding": "5000000",
+          "StartDate": 846180412,
+          "TotalValueOutstanding": "5000020",
+          "index": "76C6DD60E3C774959674EFF8658876092575C5B5055241929802EA45B7B80FD7"
+        }
+      }
+    },
+    "units": "5000000",
+    "principalDrops": "2000000",
+    "heldNow": "0.800000",
+    "naiveNow": "1.000000",
+    "heldIfL2": "0.703000",
+    "coverL2": "150000",
+    "exposureL2": "5000000",
+    "ltvNow": 5000,
+    "ltvIfL2": 5689,
+    "ltv1to1": 4000,
+    "lossL2Drops": "485000"
+  },
+  "collateral": {
+    "agent": "rae7ZZ1BLvTSEWiHnYteeP5X5TZSvCkGuB",
+    "borrower": "r3NyTbfeANQCDqrGQwngQdW8Kza56tH3AF",
+    "desk": "rPjXveBHGSkMbBPCXXMZhK78S1g4aog2ut",
+    "quorum": 2,
+    "accounts": {
+      "harbor-1": [
+        "rnx5a6pqDXJWsWWDo5gKi9nn8wMAJti7E9",
+        "rP1RH4mG6tiiSrhmawe9BWrBU9YD2F82Mq",
+        "r3HuYZ1rnojSpA42z846keTeLo54sL2Azo",
+        "r4VBGdqPEBUwTzXxLgToBV91XM1JYJ9XVk",
+        "rMvSWRkBUgfcyAzntYxwc1MZ4wnz3WHkkp",
+        "rCfV2rZTTvh3bwSLNXqxHBAAhdiTSzhge"
+      ],
+      "harbor-2": [
+        "r3ZSKeMGuyFJKKGnAgdQao5xKYpakvyXc5",
+        "rhgnjrRPtMK4CfBQtc6KdT5mG5GqtPAVg4",
+        "rPAAJVz3EDBCbfj1RmFEKdQmXj3k6UpqX4",
+        "r3gdbxKSfoJqp7oKCqVT3sT9DUjxcmfBRf",
+        "rMMbz9xACSy8GrPDYwSdh4TcwqxcaaKnRS"
+      ],
+      "harbor-3": [
+        "rNd25qaV5J3T1oSuexK1R8881mp9ajVAKv",
+        "r496RBJwLkuLHTHZe5Wg2wNu35gNJHk1FG",
+        "rpa9GU2NzN7zS14wroVkivoepJYLoLeVY4",
+        "r9NS582Cii5s1LPSGB1eegx1VReMJURFrK",
+        "rUZTohBgtrkrTaKryWcdDuNb1LxUeqrbjn"
+      ]
+    }
+  }
+}

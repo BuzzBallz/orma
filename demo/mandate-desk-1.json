@@ -1,0 +1,21 @@
+{
+  "schema": "orma.mandate/1",
+  "id": "desk-1",
+  "desk": "Harbor Credit Desk (fictional)",
+  "riskOfficer": "rL8Yjys2DE33LsEk3mJNFDGiVjQt1rYA47",
+  "limits": {
+    "maxLtvBps": 5344,
+    "maxSingleLoanDrops": "4000000",
+    "maxN2LossDrops": "970000",
+    "maxLockupDays": 23
+  },
+  "policy": {
+    "escrowFinish": "only-after-default",
+    "finishAfterMarginSeconds": 14400,
+    "approvalSlackSeconds": 120,
+    "cancelAfterOffsetSeconds": 86400
+  },
+  "issuedAt": "2026-10-24T18:09:58.336Z",
+  "hash": "958688edb796a9dcc09c68521b1e90aca6c55e4a8ee1f98f97fd44abff80ffd5",
+  "anchorTx": "E63C8AB9D41042B315AE41F45CF2B624592CDC190C66E87D17C8275A2A0A92ED"
+}

@@ -1,0 +1,18 @@
+{
+  "label": "spare",
+  "vaultId": "88849E4FF63601124F5E5DF0DA22258D5C1D0C0E2D38F8683291EEB7171887B6",
+  "shareMptId": "0000000113D92F1BA13DCE607C6F9F071B60FFD8C0205AA4",
+  "loanBrokerId": "D53DE0CA9042F8BAE3D039AC686E14E6215546BF721DF82A12E41CF898BF1441",
+  "owner": "rPjXveBHGSkMbBPCXXMZhK78S1g4aog2ut",
+  "navUrl": "https://ormaprotocol.com/v/0000000113D92F1BA13DCE607C6F9F071B60FFD8C0205AA4/nav",
+  "subscriptionDate": 846180262,
+  "redemptionDate": 846388800,
+  "loans": {
+    "L1": null,
+    "L2": null
+  },
+  "impairL1Tx": null,
+  "impairL1Hidden": null,
+  "statementTx": null,
+  "bakedAt": "2026-10-24T18:10:02Z"
+}
