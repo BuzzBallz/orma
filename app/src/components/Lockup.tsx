@@ -1,35 +1,35 @@
 import type { MouseEvent } from 'react'
 
-/**
- * mark.svg, drawn inline. An <img> cannot read this page's colours, so the O and the upper
- * current would stay cream on a light page. Inline, they take the text colour of whichever
- * theme the reader is in; the lower current stays gold in both.
- */
+/** The symbol, drawn inline so it takes the text colour of the theme (an <img> cannot read the page's colours). */
 export function Mark({ size }: { size?: number }) {
+  // New identity, "Deux lectures": an eccentric ring, two circles read one inside the other.
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden="true">
-      <path
-        d="M32 6c10.5 0 18 8.9 18 21.5S42.5 49 32 49 14 40.1 14 27.5 21.5 6 32 6Zm0 4.6c-5.6 0-8.9 6.6-8.9 16.9s3.3 16.9 8.9 16.9 8.9-6.6 8.9-16.9S37.6 10.6 32 10.6Z"
-        fill="currentColor"
-      />
-      <path
-        d="M7 54.2c5.6-3.6 9.9-3.6 14.5-.9 5.2 3 8.4 3.1 12.9.4 5.5-3.3 9.7-3.4 14.8-.6 3.2 1.8 6 1.9 8.8.4"
-        stroke="currentColor" strokeWidth="2.1" strokeLinecap="round"
-      />
-      <path
-        d="M11 59.6c5.3-2.6 9.4-2.6 13.7-.4 4.9 2.5 8 2.5 12.2.1 5.2-2.9 9.2-3 14-.6"
-        style={{ stroke: 'var(--color-brand-gold)' }} strokeWidth="2.1" strokeLinecap="round"
-      />
+    <svg width={size} height={size} viewBox="0 0 256 256" fill="currentColor" aria-hidden="true">
+      <path d="M30 128A98 98 0 1 1 226 128A98 98 0 1 1 30 128ZM66 146A62 62 0 1 0 190 146A62 62 0 1 0 66 146Z" />
     </svg>
   )
 }
 
-/** Mark and wordmark, as the link home. */
+/** Mark and wordmark, as the link home. Ink on light; gold ring and cream word on dark. */
 export function Lockup({ small, onClick }: { small?: boolean; onClick?: (e: MouseEvent) => void }) {
   return (
-    <a className={'lockup' + (small ? ' lockup-sm' : '')} href="/" aria-label="Orma, Portfolio" onClick={onClick}>
-      <Mark />
-      <span className="lockup-word">Orma</span>
+    <a className={'lockup lockup-img' + (small ? ' lockup-sm' : '')} href="/" aria-label="Orma, Portfolio" onClick={onClick}>
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcSet="/assets/brand/orma-lockup-color-dark.svg" />
+        <img src="/assets/brand/orma-lockup-ink.svg" alt="" height={small ? 34 : 40} />
+      </picture>
+    </a>
+  )
+}
+
+/** New identity, "Deux lectures": the Orma | DESK lockup. Ink on light, gold ring and cream word on dark. */
+export function DeskLockup({ onClick }: { onClick?: (e: MouseEvent) => void }) {
+  return (
+    <a className="lockup lockup-desk" href="/" aria-label="Orma Desk, Portfolio" onClick={onClick}>
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcSet="/assets/brand/orma-desk-lockup-color-dark.svg" />
+        <img src="/assets/brand/orma-desk-lockup-ink.svg" alt="" height={44} />
+      </picture>
     </a>
   )
 }

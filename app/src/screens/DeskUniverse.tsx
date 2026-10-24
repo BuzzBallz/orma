@@ -1,5 +1,6 @@
 import type { Universe, UniverseVault } from '../lib/types'
 import { Panel } from '../components/Ledger'
+import { Dumbbell } from '../components/Charts'
 import { errorSentence } from '../lib/api'
 import type { SmokeCase } from './Desk'
 
@@ -33,26 +34,29 @@ const notPriced = (v: UniverseVault) => (v.reason === 'inconsistent snapshot' ? 
 
 const wrap = { wordBreak: 'break-all' } as const
 
-function VaultRow({ v }: { v: UniverseVault }) {
+function VaultRow({ v, name }: { v: UniverseVault; name: string }) {
   return (
     <tr>
-      <td><code style={wrap}>{v.vaultId}</code></td>
-      <td style={wrap}>{assetText(v.asset)}</td>
       <td>
-        {v.brokers.length === 0
-          ? 'none'
-          : v.brokers.map((b) => <div key={b}><code style={wrap}>{b}</code></div>)}
+        <span className="block">{name}</span>
+        <span className="t-fig-s dim block" title={v.vaultId} style={wrap}>{`${assetText(v.asset)} · ${v.brokers.length} ${v.brokers.length === 1 ? 'broker' : 'brokers'} · ${v.vaultId.slice(0, 8)}…`}</span>
+        {v.brokers.length > 0 && (
+          <details className="fig-ledger">
+            <summary>Brokers</summary>
+            <div className="pop-body">{v.brokers.map((b) => <code key={b} className="block" style={wrap}>{b}</code>)}</div>
+          </details>
+        )}
       </td>
       {v.priced
         ? <><td className="num">{v.perUnitHeld}</td><td className="num">{v.perUnitNaive}</td></>
         : <td colSpan={2}>{notPriced(v)}</td>}
-      <td>{v.seen}</td>
+      <td>{v.seen === 'live' ? 'Seen live' : 'On file'}</td>
     </tr>
   )
 }
 
 /** `data`: the answer of /api/universe through DeskScreen; `error`: the code of its last failed read. */
-export function DeskUniverse({ data, error }: { data: unknown; error: string | null }) {
+export function DeskUniverse({ data, error, names = {} }: { data: unknown; error: string | null; names?: Record<string, string> }) {
   // Inside DeskScreen a stale document arrives with its error, which the tab frame already shows above.
   if (!isUniverse(data)) {
     return error
@@ -65,32 +69,41 @@ export function DeskUniverse({ data, error }: { data: unknown; error: string | n
       : <p className="caption">{LOADING}</p>
   }
   const doc = data
+  const nameOf = (id: string) => names[id.toUpperCase()] ?? `Vault ${id.slice(0, 6)}`
+  const priced = doc.vaults.filter((v) => v.priced && v.perUnitHeld !== undefined && v.perUnitNaive !== undefined)
   return (
-    <Panel provenance="REAL" title="Vaults on file and seen live" source="Orma">
-      <p className="caption">{`${doc.count} vaults read at ledger ${doc.ledgerIndex}.`}</p>
-      <p className="caption" role="note">
-        <span style={{ color: 'var(--color-text-2)', border: '1px solid var(--color-line)', padding: '0 6px' }}>{BANNER}</span>
+    <>
+      <p className="t-body-l summary-line">
+        <span className="prov" data-prov="REAL">REAL</span>{` ${doc.count} vaults read at ledger ${doc.ledgerIndex}. `}
+        <span role="note" className="prov">{BANNER}</span>{` ${scopeSentence(doc.coverage.liveSinceLedger)}`}
       </p>
-      <p className="caption">{scopeSentence(doc.coverage.liveSinceLedger)}</p>
       {doc.vaults.length === 0
-        ? <p className="caption">{EMPTY}</p>
+        ? <div className="state"><p className="t-body-s dim">{EMPTY}</p></div>
         : (
-            <div className="tbl-wrap">
-              <table className="op-tbl">
-                <thead>
-                  <tr>
-                    <th scope="col">Vault</th><th scope="col">Asset</th><th scope="col">Brokers</th>
-                    <th scope="col">Withdrawal value per share</th><th scope="col">Value read by all per share</th><th scope="col">Seen</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {doc.vaults.map((v) => <VaultRow key={v.vaultId} v={v} />)}
-                </tbody>
-              </table>
-            </div>
+            <>
+              {priced.length > 0 && (
+                <Panel provenance="REAL" title="Two readings of one share, vault by vault" source="Orma">
+                  <p className="t-body-s dim">Filled dot: withdrawal value. Open dot: value read by all. The longer the line, the more a lender who trusts the second would overpay.</p>
+                  <Dumbbell rows={priced.map((v) => ({ label: nameOf(v.vaultId), held: v.perUnitHeld as string, naive: v.perUnitNaive as string }))} />
+                </Panel>
+              )}
+              <div className="tbl-wrap">
+                <table className="op-tbl">
+                  <thead>
+                    <tr>
+                      <th scope="col">Vault</th>
+                      <th scope="col" className="num">Withdrawal value per share</th><th scope="col" className="num">Value read by all per share</th><th scope="col">Seen</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {doc.vaults.map((v) => <VaultRow key={v.vaultId} v={v} name={nameOf(v.vaultId)} />)}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
-      <p className="caption">{`${doc.coverage.known} on file · ${doc.coverage.live} seen live · ledger hash ${doc.ledgerHash}`}</p>
-    </Panel>
+      <p className="t-body-s dim">{`${doc.coverage.known} on file · ${doc.coverage.live} seen live · ledger hash ${doc.ledgerHash}`}</p>
+    </>
   )
 }
 

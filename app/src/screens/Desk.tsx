@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import Decimal from 'decimal.js'
 import type { ChangeRow, Figure as FigureDoc, Mandate, Mark, Ticket } from '../lib/types'
-import { Figure, Panel, Recompute, ShowWork, TestNetBanner, Verdict, formatBps, type VerdictStatus } from '../components/Ledger'
+import { AuditTable, FigureValue, HashLink, Panel, ProvenanceKey, ReadAt, Recompute, ShowWork, TestNetBanner, Verdict, Figure, formatBps, formatXrp, type VerdictStatus } from '../components/Ledger'
+import { BalanceBar, DefaultDots, LockBar, LtvGauge, PriceBars } from '../components/Charts'
 import {
   confirmAction, deskPlanPath, deskTicketPaths, demoLoanFor, errorSentence, postAction, readOperatorSession,
   sessionFromFragment, writeOperatorSession,
   type ActionError, type ActionPreview, type DeskPlan, type DeskPlanVault, type OperatorSession, type Position, type Positions,
 } from '../lib/api'
 import { usePoll } from '../lib/usePoll'
-import { tabHref } from '../lib/useRoute'
+import { follow, tabHref } from '../lib/useRoute'
 import { dropsToXrp } from '../lib/format'
 import { DeskUniverse } from './DeskUniverse'
 import { DeskFeed, FEED_POLL_MS, type FeedDoc } from './DeskFeed'
@@ -63,11 +65,8 @@ export const DESK_TABS: DeskTab[] = [
 const harborName = (label: string | null) => (label ? label.replace(/^harbor-/, 'Harbor-') : 'unknown facility')
 export const deskTitle = (harbor: string | null, tab: string) => `Credit desk: ${harborName(harbor)} · ${tab}`
 
+const cap = (x: string) => x.replace(/^./, (c) => c.toUpperCase())
 const same = (a?: string | null, b?: string | null) => Boolean(a && b && a.toUpperCase() === b.toUpperCase())
-
-function TxLink({ hash }: { hash: string }) {
-  return <a className="lnk" href={`https://devnet.xrpl.org/transactions/${hash}`} target="_blank" rel="noreferrer"><code>{hash}</code></a>
-}
 
 function ErrorBlock({ code, message }: { code: string; message?: string }) {
   return (
@@ -83,26 +82,16 @@ function Loading() {
   return <p className="caption">{LOADING}</p>
 }
 
-function collateralLine(c: Position['collateral'][number]): string {
-  const a = c.account
-  return a.conforming
-    ? `Collateral: 2-of-3 account ${a.address} {borrower, desk, Orma agent}, master key disabled`
-    : `Collateral account ${a.address} does not meet the 2-of-3 policy: ${a.reasons.join('; ')}`
-}
-
 // --- the tab bar -------------------------------------------------------------------------------------
 
 function TabBar({ current, facility }: { current: string; facility?: string }) {
   const search = facility ? `?facility=${facility}` : ''
+  const go = (href: string) => () => { history.pushState(null, '', href); dispatchEvent(new PopStateEvent('popstate')) }
   return (
-    <nav aria-label="Desk tabs">
-      <ul style={{ display: 'flex', gap: 'var(--space-4)', listStyle: 'none', padding: 0 }}>
-        {DESK_TABS.map((t) => (
-          <li key={t.id}>
-            <a className="lnk" href={tabHref(search, t.id)} aria-current={t.id === current ? 'page' : undefined}>{t.label}</a>
-          </li>
-        ))}
-      </ul>
+    <nav className="tabs" aria-label="Desk tabs">
+      {DESK_TABS.map((t) => (
+        <a key={t.id} href={tabHref(search, t.id)} aria-current={t.id === current ? 'page' : undefined} onClick={(e) => follow(e, go(tabHref(search, t.id)))}>{t.label}</a>
+      ))}
     </nav>
   )
 }
@@ -136,189 +125,327 @@ function MandatePanel({ ticket }: { ticket: Ticket }) {
   )
 }
 
-function LayerOne({ ticket }: { ticket: Ticket }) {
-  const f = ticket.figures
-  return (
-    <>
-      <Panel provenance={f.heldValue.provenance} title="N1 · What the shares are worth" source="Orma">
-        <Line label="Withdrawal value" meaning="What these units redeem for at the XLS-65 withdraw rate: the vault's assets net of the loss it has recognised." figure={f.heldValue} />
-        <Line label="Value read by all" meaning="AssetsTotal / shares: what a reader that ignores recognised loss quotes for the same units." figure={f.naiveValue} />
-        <Line label="Overpayment if valued at the value read by all" meaning="What a lender would overpay by pricing these units at the value read by all." figure={f.n1Overpayment} />
-      </Panel>
-
-      <Panel provenance="MODELLED" title="N2 · If a loan of the vault defaults" source="Orma">
-        {f.n2.length === 0 && <p className="caption">The vault has no outstanding loan.</p>}
-        {f.n2.map((e) => (
-          <div key={e.loanId} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-            <p className="caption">{`${e.label} · ${e.scenario}`}</p>
-            {e.alreadyInHeld
-              ? <p className="caption">Loss after cover: already in the withdrawal value (impaired).</p>
-              : <Line label="Loss after cover" meaning="What the pledged units lose at the withdrawal value if this loan defaults, after the first-loss cover." figure={e.lossAfterCover} />}
-            <Line label="First-loss cover liquidated" meaning="The broker's cover the vault receives on this default." figure={e.cover} />
-            <Line label="Withdrawal value per unit after default" meaning="The withdraw rate once this default is recognised." figure={e.heldPerUnitIfDefault} />
-          </div>
-        ))}
-      </Panel>
-
-      <Panel provenance="REAL" title="N3 · When the capital comes back" source="Orma">
-        <Line label="Locked until redemption" meaning="Time left before the vault's redemption date: the capital stays committed until then, as the first institutional clients asked." figure={f.n3.lockedUntil} />
-        <p className="caption">{`Redemption opens ${f.n3.redemptionAt}.`}</p>
-        <Line label="Cash available in the vault" meaning="The vault's assets not lent out." figure={f.n3.cashAvailable} />
-        <Line label="Claim at redemption" meaning="What these units claim at the withdrawal value." figure={f.n3.claim} />
-      </Panel>
-
-      {f.maxLoan && (
-        <Panel provenance="MODELLED" title="Largest loan the mandate allows">
-          <Line label="Maximum loan" meaning="The mandate's loan-to-value limit applied to the withdrawal value." figure={f.maxLoan} />
-        </Panel>
-      )}
-
-      <MandatePanel ticket={ticket} />
-    </>
-  )
-}
-
-/** What the ticket says about its facility before any figure: the demo loan, its collateral, L1's impairment, the curator's statement. */
-function TicketHeader({ ticket, harbor, positions, deskPlan, facility }: { ticket: Ticket; harbor: DeskPlanVault; positions: Positions | null; deskPlan: DeskPlan; facility?: string }) {
-  const demo = demoLoanFor(positions, deskPlan, facility)
-  const pledged = demo?.collateral.find((c) => same(c.shareMptId, harbor.shareMptId)) ?? null
-  const loss = ticket.figures.heldValue.inputs.find((i) => i.object === 'Vault' && i.name === 'LossUnrealized')?.value ?? '0'
-  const st = ticket.statement
-  const check = st && ({
-    CONSISTENT: `Consistent with the ledger at ${st.consistency.ledgerIndex}`,
-    INCONSISTENT: `Not consistent with the ledger at ${st.consistency.ledgerIndex}: ${st.consistency.detail}`,
-    NOT_CHECKABLE: `Not checkable against the ledger: ${st.consistency.detail}`,
-    UNPARSEABLE: 'Unreadable statement in Vault.Data',
-  })[st.consistency.status]
-  return (
-    <Panel provenance="REAL" title={`${harborName(harbor.label)} · facility on file`} source="Orma">
-      {demo?.loanSetTxHash
-        ? <p className="caption">Demo loan, LoanSet <TxLink hash={demo.loanSetTxHash} /></p>
-        : <p className="caption">{positions ? 'No demo loan yet for this facility.' : 'Reading the desk\'s positions for the demo loan…'}</p>}
-      {pledged && (
-        <p className="caption">{collateralLine(pledged)}<br />{`REAL · read at ledger ${pledged.account.ledgerIndex}`}</p>
-      )}
-      {harbor.impairL1Tx && (
-        <div>
-          <p className="caption">L1 impaired by the broker before the slot</p>
-          <p className="caption"><TxLink hash={harbor.impairL1Tx} /></p>
-          {(harbor.impairL1Hidden ?? []).map((field) => <p key={field} className="caption"><code>{`${field}: absent → ${loss}, not in PreviousFields`}</code></p>)}
-        </div>
-      )}
-      {st && (
-        <div>
-          <p className="caption">Curator statement — DECLARED, signed on the ledger by the vault owner</p>
-          <p className="caption">{`“${st.doc?.text ?? ''}”`}</p>
-          {harbor.statementTx && <p className="caption"><TxLink hash={harbor.statementTx} /></p>}
-          <p className="caption"><span style={{ color: 'var(--color-text-2)', border: '1px solid var(--color-line)', padding: '0 6px' }}>REAL</span>{` ${check}`}</p>
-        </div>
-      )}
-    </Panel>
-  )
-}
-
 /** The six steps of orma-mark for the share, each with its own result: a pending oracle passes. */
 function PointerPanel({ mark }: { mark: Mark }) {
   return (
     <Panel provenance="REAL" title="Nav pointer chain" source="Orma">
-      <p className="caption">{`orma-mark verdict: ${mark.verdict}${mark.reason ? ` (${mark.reason})` : ''} · ledger ${mark.ledgerIndex}`}</p>
-      <ol>
+      <p className="t-body-m">{`orma-mark verdict: ${mark.verdict}${mark.reason ? ` (${mark.reason})` : ''} · ledger ${mark.ledgerIndex}`}</p>
+      <ol className="chain">
         {mark.steps.map((s) => (
-          <li key={s.step} className="caption"><b>{s.step}</b>{` — ${s.ok ? 'passes' : 'fails'}: ${s.detail}`}</li>
+          <li key={s.step}><span className="t-label-m">{s.step}</span><span className="t-body-s dim">{` ${s.ok ? 'passes' : 'fails'}: ${s.detail}`}</span></li>
         ))}
       </ol>
     </Panel>
   )
 }
 
+const LIMIT_LABEL: Record<string, string> = { maxLtvBps: 'Max LTV', maxSingleLoanDrops: 'Max single loan', maxN2LossDrops: 'Max loss if one loan defaults', maxLockupDays: 'Max lock-up' }
+const limitValue = (limit: string, x: string) => (limit.endsWith('Bps') ? formatBps(x) : limit.endsWith('Days') ? `${x} days` : `${formatXrp(x)} XRP`)
+/** The threshold the server named for the LTV limit, when it named one: only a breach carries it on the ticket. */
+const ltvLimit = (ticket: Ticket) => ticket.verdict.breaches.find((b) => b.limit === 'maxLtvBps')?.threshold
+
+function Statement({ t, txHash }: { t: Ticket; txHash?: string | null }) {
+  const s = t.statement
+  if (!s) return null
+  const c = s.consistency
+  const line = c.status === 'CONSISTENT' ? `Consistent with the ledger at ${c.ledgerIndex}`
+    : c.status === 'INCONSISTENT' ? `Not consistent with the ledger at ${c.ledgerIndex}: ${c.detail}`
+    : c.status === 'NOT_CHECKABLE' ? `Not checkable against the ledger: ${c.detail}`
+    : 'Unreadable statement in Vault.Data'
+  return (
+    <div>
+      <dt>Curator statement <span className="prov" data-prov="DECLARED">DECLARED</span></dt>
+      <dd className="stmt">
+        {s.doc && <span className="t-body-m">&ldquo;{s.doc.text}&rdquo;</span>}
+        <span className="t-body-s dim" title={s.owner}>Signed by the vault owner</span>
+        {txHash && <HashLink hash={txHash} />}
+        <span className="t-body-s"><span className="prov" data-prov="REAL">REAL</span>{` ${line}`}</span>
+      </dd>
+    </div>
+  )
+}
+
+/** The reading of the ticket beside the approval: the verdict and the loan-to-value, as the ticket states them. */
+function ApprovalReading({ ticket }: { ticket: Ticket }) {
+  const f = ticket.figures
+  const par = f.lender1to1?.value ?? null
+  return (
+    <aside className="desk-aside" aria-label="Approval">
+      <div className="approval">
+        <h2 className="t-heading-s">Approval</h2>
+        {f.requested ? (
+          <>
+            <p className="t-body-m approval-line">{`Loan of ${formatXrp(f.requested.value)} XRP against collateral worth ${formatXrp(f.heldValue.value)} XRP at withdrawal value.`}</p>
+            <div className="approval-verdict">
+              <span className="t-label-m">LTV at withdrawal value <span className="dim">(loan ÷ collateral)</span></span>
+              <Verdict status={statusOf(ticket.verdict)} big />
+            </div>
+            {f.ltvHeld && par !== null && <LtvGauge ltvBps={f.ltvHeld.value} parBps={par} limitBps={ltvLimit(ticket)} />}
+            {ticket.verdict.breaches.map((b) => <p key={b.limit} className="t-body-s"><strong>{`${LIMIT_LABEL[b.limit] ?? b.limit}: ${limitValue(b.limit, b.value)} of ${limitValue(b.limit, b.threshold)}, over the limit.`}</strong></p>)}
+            {ticket.verdict1to1 && <p className="t-body-m approval-line">Lender at 1:1 <Verdict status={statusOf(ticket.verdict1to1)} /></p>}
+            <p className="t-body-s dim">The risk officer approves in the operator controls below.</p>
+          </>
+        ) : <p className="t-body-m approval-line">No loan request is waiting. Play “Sign and request loan” in the operator controls below.</p>}
+      </div>
+    </aside>
+  )
+}
+
+const VIEWS = [['summary', 'Summary'], ['defaults', 'If a loan defaults'], ['history', 'Assets and lock-up'], ['proof', 'Proof'], ['audit', 'Audit']] as const
+type View = typeof VIEWS[number][0]
+
+function TicketView({ ticket, mark, harbor, loan, buyTicket, deskPlan, changeRows, onChange }: {
+  ticket: Ticket; mark: Mark | null; harbor: DeskPlanVault | null; loan: Position | null; buyTicket: Ticket | null; deskPlan?: DeskPlan
+  changeRows: ChangeRow[]; onChange: (rows: ChangeRow[]) => void
+}) {
+  const [view, setView] = useState<View>('summary')
+  const f = ticket.figures
+  const acct = loan?.collateral[0]?.account
+  const hiddenField = harbor?.impairL1Hidden?.[0]
+  const lossInput = f.heldValue.inputs.find((i) => i.field === 'LossUnrealized')
+  const totalInput = f.heldValue.inputs.find((i) => i.field === 'AssetsTotal')
+  // The lender at 1:1 takes one share for the drop deposited: par = units / 10^shareScale drops (read off the ticket's own share).
+  const par = new Decimal(ticket.share.units).div(new Decimal(10).pow(ticket.share.shareScale)).toFixed(0)
+  const perShareNow = new Decimal(f.heldValue.value).div(ticket.share.units).toFixed(6)
+  const audit: { label: string; figure: FigureDoc }[] = [
+    { label: 'Withdrawal value', figure: f.heldValue },
+    { label: 'Value read by all', figure: f.naiveValue },
+    { label: 'Overpayment if valued at the value read by all', figure: f.n1Overpayment },
+    ...f.n2.flatMap((e) => [
+      { label: `${e.label}: loss on the ${ticket.share.units} pledged shares, after cover`, figure: e.lossAfterCover },
+      { label: `${e.label}: withdrawal value per share if it defaults`, figure: e.heldPerUnitIfDefault },
+      { label: `${e.label}: vault cover liquidated`, figure: e.cover },
+    ]),
+    { label: 'Locked until redemption', figure: f.n3.lockedUntil },
+    { label: 'Cash in the vault', figure: f.n3.cashAvailable },
+    { label: 'Claim at redemption', figure: f.n3.claim },
+    ...(f.maxLoan ? [{ label: 'Largest loan the mandate allows', figure: f.maxLoan }] : []),
+    ...(f.requested ? [{ label: 'Requested', figure: f.requested }] : []),
+    ...(f.ltvHeld ? [{ label: 'LTV at withdrawal value', figure: f.ltvHeld }] : []),
+    ...(f.lender1to1 ? [{ label: 'Lender at 1:1', figure: f.lender1to1 }] : []),
+  ]
+  return (
+    <>
+      <nav className="subtabs" aria-label="Ticket sections">
+        {VIEWS.map(([id, label]) => <button key={id} type="button" className="btn btn-secondary" aria-pressed={view === id} onClick={() => setView(id)}>{label}</button>)}
+      </nav>
+      <div className="desk-grid">
+        <ApprovalReading ticket={ticket} />
+        <div className="desk-report">
+          <div hidden={view !== 'summary'} className="view-summary">
+            <section className="price-hero" aria-label="Withdrawal value">
+              <FigureValue size="display" label="Withdrawal value" mention="XLS-65 withdraw rate" figure={f.heldValue} against={[formatXrp(f.naiveValue.value), formatXrp(par)]} />
+              <div className="price-hero-side">
+                <FigureValue size="m" label="Value read by all" mention="AssetsTotal / shares" figure={f.naiveValue} against={[formatXrp(f.heldValue.value), formatXrp(par)]} />
+                <FigureValue size="m" label="Overpayment if valued at the value read by all" figure={f.n1Overpayment} />
+              </div>
+            </section>
+            <Panel provenance="REAL" title="The three prices of one share" source="Orma">
+              <PriceBars held={f.heldValue.value} naive={f.naiveValue.value} par={par} />
+            </Panel>
+            {hiddenField && lossInput && (
+              <p className="hidden-field t-body-m">
+                <strong>Not in the transaction log.</strong>{` ${hiddenField}: absent → ${lossInput.value} (${formatXrp(lossInput.value)} XRP), not in PreviousFields.`}
+              </p>
+            )}
+            <details className="evidence">
+              <summary>
+                <span className="t-body-m">{loan ? 'This loan is live on Devnet' : 'No demo loan yet for this facility.'}</span>
+                {loan?.loanSetTxHash && <span className="t-fig-m dim">{`${loan.loanSetTxHash.slice(0, 8)}…${loan.loanSetTxHash.slice(-6)}`}</span>}
+                <span className="dim t-body-s">Evidence</span>
+              </summary>
+              <dl className="proof-dl" aria-label="Evidence">
+                <div><dt>LoanSet transaction</dt><dd>{loan?.loanSetTxHash && <HashLink hash={loan.loanSetTxHash} />}</dd></div>
+                <div>
+                  <dt>Collateral <span className="prov" data-prov="REAL">REAL</span></dt>
+                  <dd>
+                    {acct && (
+                      <>
+                        <span className="t-body-s">{acct.conforming ? 'Collateral: 2-of-3 account, master key disabled' : `Collateral account does not meet the 2-of-3 policy: ${acct.reasons.join('; ')}`}</span>
+                        <details className="fig-ledger"><summary>Signers</summary>
+                          <dl className="ld-calc pop-body">
+                            <div><dt>Account</dt><dd><HashLink hash={acct.address} kind="accounts" /></dd></div>
+                            <div><dt>Signers</dt><dd className="t-body-s">borrower, desk, Orma agent: any two must sign; the master key is disabled</dd></div>
+                            {acct.ledgerIndex !== undefined && <div><dt>Read at</dt><dd className="t-fig-s">{`ledger ${acct.ledgerIndex}`}</dd></div>}
+                          </dl>
+                        </details>
+                      </>
+                    )}
+                  </dd>
+                </div>
+                {harbor?.impairL1Tx && <div><dt>L1 impaired by the broker before the slot</dt><dd><HashLink hash={harbor.impairL1Tx} /></dd></div>}
+                <Statement t={ticket} txHash={harbor?.statementTx} />
+              </dl>
+            </details>
+          </div>
+
+          <div hidden={view !== 'defaults'} className="view-stack">
+            <Panel provenance="MODELLED" title="If one loan defaults alone" source="Orma">
+              <DefaultDots now={perShareNow} rows={f.n2.map((e) => ({ label: `${e.label} defaults alone`, value: e.heldPerUnitIfDefault.value, impaired: e.alreadyInHeld }))} />
+              <div className="table-scroll">
+                <table className="op-tbl">
+                  <thead><tr>{['Scenario', `Loss on the ${ticket.share.units} pledged shares, after cover`, 'Vault cover liquidated'].map((h) => <th key={h} scope="col">{h}</th>)}</tr></thead>
+                  <tbody>
+                    {f.n2.map((e) => (
+                      <tr key={e.loanId}>
+                        <td>{e.scenario}</td>
+                        <td className="t-fig-m">{e.alreadyInHeld ? 'already in the withdrawal value (impaired)' : `${formatXrp(e.lossAfterCover.value)} XRP`}</td>
+                        <td className="t-fig-m">{`${formatXrp(e.cover.value)} XRP`}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Panel>
+          </div>
+
+          <div hidden={view !== 'history'} className="view-stack">
+            <Panel provenance="REAL" title="Assets, cash and lock-up" source="Orma">
+              <div className="two">
+                {totalInput && lossInput && <div><p className="t-label-m dim">{`Where the vault's ${formatXrp(totalInput.value)} XRP sit`}</p><BalanceBar total={totalInput.value} available={f.n3.cashAvailable.value} loss={lossInput.value} /></div>}
+                <div><p className="t-label-m dim">{`Locked ${new Decimal(f.n3.lockedUntil.value).div(86400).floor().toString()} more days · claim ${formatXrp(f.n3.claim.value)} XRP on ${new Date(f.n3.redemptionAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}`}</p><LockBar seconds={f.n3.lockedUntil.value} /></div>
+              </div>
+            </Panel>
+          </div>
+
+          <div hidden={view !== 'proof'} className="view-stack">
+            {mark && <PointerPanel mark={mark} />}
+            <MandatePanel ticket={ticket} />
+            <section className="escrow-note" aria-label="How the escrow works">
+              <h2 className="t-label-m">How the escrow works</h2>
+              <p className="t-body-m">{ticket.escrowPolicy.text.charAt(0).toUpperCase() + ticket.escrowPolicy.text.slice(1) + (ticket.escrowPolicy.text.endsWith('.') ? '' : '.')}</p>
+            </section>
+          </div>
+
+          <div hidden={view !== 'audit'} className="view-stack">
+            <AuditTable entries={audit} />
+            <ShowWork rows={changeRows} />
+            <ProvenanceKey />
+          </div>
+        </div>
+      </div>
+      <OperatorPanel ticket={ticket} buyTicket={buyTicket} harbor={harbor} units={deskPlan?.plannedLoan.units ?? ticket.share.units} onChange={onChange} />
+    </>
+  )
+}
+
+const usageValues = (u: Position['usage'][number]) => `${limitValue(u.limit, u.value)} of ${limitValue(u.limit, u.threshold)}`
+
+/** A bar of what is used against a limit, drawn with the limit at 70% of the track so a breach visibly crosses it. */
+function Mini({ value, limit }: { value: string; limit: string }) {
+  const used = new Decimal(limit).isZero() ? new Decimal(0) : new Decimal(value).div(limit).times(70)
+  return (
+    <span className="mini" aria-hidden>
+      <span className="mini-fill" style={{ width: `${Decimal.min(100, used).toFixed(1)}%` }} />
+      <span className="mini-limit" style={{ left: '70%' }} />
+    </span>
+  )
+}
+
+function PositionsTab({ doc, deskPlan, harbor }: { doc: Positions; deskPlan?: DeskPlan; harbor: DeskPlanVault | null }) {
+  if (doc.positions.length === 0) return <div className="state"><p className="t-body-s dim">The desk has no loan yet.</p></div>
+  return (
+    <>
+      <p className="t-body-l summary-line">{`${doc.positions.length} ${doc.positions.length === 1 ? 'loan' : 'loans'} on the desk.`}</p>
+      <div className="tbl-wrap"><table className="op-tbl">
+          <thead><tr>{['Loan', 'Collateral', 'Collateral at withdrawal value', 'LTV at withdrawal value'].map((h) => <th key={h} scope="col" className={h === 'Collateral at withdrawal value' ? 'num' : undefined}>{h}</th>)}</tr></thead>
+          <tbody>
+            {doc.positions.map((p) => {
+              const ltvLimit = p.usage.find((u) => u.limit === 'maxLtvBps')?.threshold
+              return (
+                <tr key={p.loanId}>
+                  <td>{p.loanSetTxHash ? <HashLink hash={p.loanSetTxHash} /> : <span className="dim">LoanSet not found in the history</span>}<span className="t-fig-s dim block">{`loan ${p.loanId.slice(0, 8)}`}</span></td>
+                  <td>
+                    {p.collateral.map((c) => {
+                      const v = deskPlan?.vaults.find((x) => same(x.shareMptId, c.shareMptId))
+                      return (
+                        <div key={c.escrowId}>
+                          <p>{v ? cap(harborName(v.label)) : 'Unknown facility'}{harbor && same(c.shareMptId, harbor.shareMptId) && <span className="prov" data-prov="admitted">Selected facility</span>}</p>
+                          <p className="t-body-s dim"><span className="prov" data-prov="REAL">REAL</span>{c.account.conforming ? ' 2-of-3, master key disabled' : ` Collateral account ${c.account.address} does not meet the 2-of-3 policy: ${c.account.reasons.join('; ')}`}</p>
+                        </div>
+                      )
+                    })}
+                  </td>
+                  <td className="t-fig-m num">{`${formatXrp(p.collateralHeldDrops)} XRP`}</td>
+                  <td>
+                    <span className="t-fig-m block">{formatBps(String(p.ltvHeldBps))}</span>
+                    {ltvLimit !== undefined && <Mini value={String(p.ltvHeldBps)} limit={ltvLimit} />}
+                    <details className="fig-ledger limits-fold"><summary>All limits</summary>
+                      <dl className="usage pop-body">{p.usage.map((u) => <div key={u.limit}><dt>{(LIMIT_LABEL[u.limit] ?? u.limit).replace('Max ', '')}</dt><dd className="t-fig-s">{usageValues(u)}</dd></div>)}</dl>
+                    </details>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table></div>
+      <p className="t-body-s dim">Source: Orma. LTV is loan-to-value: the loan divided by the collateral valued at its withdrawal value. The tick on each bar is the mandate&apos;s limit.</p>
+    </>
+  )
+}
+
+function MandateTab({ doc, positions }: { doc: Mandate; positions?: Positions | null }) {
+  const l = doc.limits
+  const gloss = (t: string) => <span className="block dim t-body-s">{t}</span>
+  // The position nearest to each limit, for the bar only: the figures shown are the server's own.
+  const worst = (limit: string) => (positions?.positions ?? []).flatMap((p) => p.usage.filter((u) => u.limit === limit)).reduce<{ value: string; threshold: string } | null>((m, u) => (!m || new Decimal(u.value).div(u.threshold).gt(new Decimal(m.value).div(m.threshold)) ? { value: u.value, threshold: u.threshold } : m), null)
+  const rows: { key: string; name: string; note: string; shown: string }[] = [
+    { key: 'maxLtvBps', name: 'Maximum loan-to-value at withdrawal value', note: "Loan-to-value: the loan divided by the collateral's withdrawal value", shown: formatBps(String(l.maxLtvBps)) },
+    { key: 'maxSingleLoanDrops', name: 'Largest single loan', note: 'The largest principal the desk will lend in one loan', shown: `${formatXrp(l.maxSingleLoanDrops)} XRP` },
+    { key: 'maxN2LossDrops', name: 'Largest loss if a vault loan defaults', note: 'What the pledged shares could lose if one late loan of the vault defaults', shown: `${formatXrp(l.maxN2LossDrops)} XRP` },
+    { key: 'maxLockupDays', name: 'Longest lock-up', note: 'How long the shares may stay locked before redemption', shown: `${l.maxLockupDays} days` },
+  ]
+  return (
+    <Panel provenance="DECLARED" title={`Mandate ${doc.id}`}>
+      <p className="t-body-m">{`${doc.desk} · risk officer ${doc.riskOfficer} · issued ${doc.issuedAt}`}</p>
+      <div className="table-scroll">
+        <table className="op-tbl">
+          <thead><tr>{['Limit', 'Mandate', 'Highest position today', 'Used'].map((h) => <th key={h} scope="col" className={h === 'Mandate' || h === 'Highest position today' ? 'num' : undefined}>{h}</th>)}</tr></thead>
+          <tbody>
+            {rows.map((r) => {
+              const w = worst(r.key)
+              return (
+                <tr key={r.key}>
+                  <td>{r.name}{gloss(r.note)}</td>
+                  <td className="t-fig-m num">{r.shown}</td>
+                  <td className="t-fig-m num">{w ? limitValue(r.key, w.value) : '—'}</td>
+                  <td>{w && <Mini value={w.value} limit={w.threshold} />}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+      <details className="evidence">
+        <summary><span className="t-body-m">Escrow rule and mandate fingerprint</span><span className="dim t-body-s">Details</span></summary>
+        <dl className="kv kv-wide">
+          <div><dt>Escrow{gloss('Collateral shares sit in escrow for the life of the loan')}</dt><dd className="t-body-m">{`Finish ${doc.policy.escrowFinish}, ${doc.policy.finishAfterMarginSeconds} s after the loan's last due date and grace period; cancellable ${doc.policy.cancelAfterOffsetSeconds} s later.`}</dd></div>
+          <div><dt>Mandate fingerprint{gloss('Recomputed by the server; it must match the one anchored on the ledger')}</dt><dd><HashLink hash={doc.hash} noLink /></dd></div>
+          <div><dt>Anchored on the ledger by{gloss('The transaction that published the fingerprint')}</dt><dd><HashLink hash={doc.anchorTx} /></dd></div>
+        </dl>
+      </details>
+    </Panel>
+  )
+}
+
+
 function TicketTab({ ticket, mark, error, buyTicket, deskPlan, positions, facility, harbor }: {
   ticket: Ticket | null; mark: Mark | null; error: string | null; buyTicket: Ticket | null
   deskPlan?: DeskPlan; positions: Positions | null; facility?: string; harbor: DeskPlanVault | null
 }) {
   const [rows, setRows] = useState<ChangeRow[]>([])
-  if (deskPlan && !harbor) return <p className="caption">{NOT_A_HARBOR}</p>
+  if (deskPlan && !harbor) return <p className="t-body-s">{NOT_A_HARBOR}</p>
   // Without a plan (the smoke of step 9) the share guard does not apply: the props are drawn as given.
   const own = ticket && (!harbor || same(ticket.share.mptId, harbor.shareMptId)) ? ticket : null
   const ownMark = mark && (!harbor || same(mark.shareMptId, harbor.shareMptId)) ? mark : null
   if (!own) return error ? <ErrorBlock code={error} /> : <Loading />
+  const loan = deskPlan ? demoLoanFor(positions, deskPlan, facility) : null
   return (
     <>
       {error && <ErrorBlock code={error} />}
-      <p className="caption">{error ? `Read at ledger ${own.ledgerIndex} — these figures are no longer current.` : `Read at ledger ${own.ledgerIndex}`}</p>
-      {deskPlan && harbor && <TicketHeader ticket={own} harbor={harbor} positions={positions} deskPlan={deskPlan} facility={facility} />}
-      <LayerOne ticket={own} />
-      <Panel provenance="SIMULATED" title="N4 · What the last previewed action changes">
-        <ShowWork rows={rows} />
-      </Panel>
-      {ownMark && <PointerPanel mark={ownMark} />}
-      <OperatorPanel ticket={own} buyTicket={buyTicket} harbor={harbor ?? null} units={deskPlan?.plannedLoan.units ?? own.share.units} onChange={setRows} />
+      {error ? <p className="read-at t-fig-s">{`Read at ledger ${own.ledgerIndex} — these figures are no longer current.`}</p> : <ReadAt ledger={own.ledgerIndex} at={own.asOf} />}
+      <TicketView ticket={own} mark={ownMark} harbor={harbor} loan={loan} buyTicket={buyTicket} deskPlan={deskPlan} changeRows={rows} onChange={setRows} />
     </>
-  )
-}
-
-// --- positions and mandate ---------------------------------------------------------------------------
-
-function PositionsTab({ doc, deskPlan, harbor }: { doc: Positions; deskPlan?: DeskPlan; harbor: DeskPlanVault | null }) {
-  const labelOf = (share: string) => deskPlan?.vaults.find((v) => same(v.shareMptId, share))?.label ?? null
-  return (
-    <Panel provenance="MODELLED" title="Positions of the desk" source="Orma">
-      <div className="tbl-wrap">
-        <table className="op-tbl">
-          <thead>
-            <tr>
-              <th scope="col">Loan</th><th scope="col">Collateral</th><th scope="col">Collateral at withdrawal value</th>
-              <th scope="col">LTV at withdrawal value</th><th scope="col">Mandate usage</th>
-            </tr>
-          </thead>
-          <tbody>
-            {doc.positions.length === 0 && <tr><td colSpan={5}>The desk has no loan yet.</td></tr>}
-            {doc.positions.map((p) => (
-              <tr key={p.loanId}>
-                <td>
-                  {p.loanSetTxHash ? <TxLink hash={p.loanSetTxHash} /> : <code>{p.loanId}</code>}
-                  <br />{`${dropsToXrp(p.principalOutstanding)} XRP outstanding`}
-                  {harbor && p.collateral.some((c) => same(c.shareMptId, harbor.shareMptId)) && <><br /><b>Selected facility</b></>}
-                </td>
-                <td>
-                  {p.collateral.map((c) => (
-                    <div key={c.escrowId}>
-                      <b>{`${harborName(labelOf(c.shareMptId))} · ${c.units} units`}</b>
-                      <br />{collateralLine(c)}
-                    </div>
-                  ))}
-                </td>
-                <td className="num">{`${dropsToXrp(p.collateralHeldDrops)} XRP`}</td>
-                <td className="num">{formatBps(String(p.ltvHeldBps))}</td>
-                <td>{p.usage.map((u) => <div key={u.limit}>{`${u.limit}: ${u.value} of ${u.threshold}`}</div>)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <p className="caption">Source: Orma</p>
-    </Panel>
-  )
-}
-
-function MandateTab({ doc }: { doc: Mandate }) {
-  return (
-    <Panel provenance="DECLARED" title={`Mandate ${doc.id}`}>
-      <p className="caption">{`${doc.desk} · risk officer ${doc.riskOfficer} · issued ${doc.issuedAt}`}</p>
-      <div className="tbl-wrap">
-        <table className="op-tbl fit">
-          <thead><tr><th scope="col">Limit</th><th scope="col">Value</th></tr></thead>
-          <tbody>
-            <tr><td>Maximum loan-to-value at withdrawal value</td><td className="num">{formatBps(String(doc.limits.maxLtvBps))}</td></tr>
-            <tr><td>Largest single loan</td><td className="num">{`${dropsToXrp(doc.limits.maxSingleLoanDrops)} XRP`}</td></tr>
-            <tr><td>Largest loss if a vault loan defaults</td><td className="num">{`${dropsToXrp(doc.limits.maxN2LossDrops)} XRP`}</td></tr>
-            <tr><td>Longest lock-up</td><td className="num">{`${doc.limits.maxLockupDays} days`}</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <p className="caption">{`Escrow policy: finish ${doc.policy.escrowFinish}, ${doc.policy.finishAfterMarginSeconds} s after the loan's last due date and grace period; cancellable ${doc.policy.cancelAfterOffsetSeconds} s later.`}</p>
-      <p className="caption">{`Hash ${doc.hash}`}</p>
-      <p className="caption">Anchored by <TxLink hash={doc.anchorTx} /></p>
-    </Panel>
   )
 }
 
@@ -328,19 +455,27 @@ function DataTab({ tab, data, error, positions, deskPlan, harbor }: {
   // Positions paints at once from the poll the ticket header already keeps warm.
   const doc = tab.accepts(data) ? data : tab.id === 'positions' && hasArray('positions')(positions) ? positions : null
   const failure = error && (tab.id === 'mandate' && error === 'INTERNAL'
-    ? <div role="alert"><p className="caption">The mandate on file does not match its anchored hash.</p><details><summary>Error code</summary><code>{error}</code></details></div>
+    ? <div role="alert"><p className="t-body-s">The mandate on file does not match its anchored hash.</p><details><summary>Error code</summary><code>{error}</code></details></div>
     : <ErrorBlock code={error} />)
   if (!doc) return failure || <Loading />
+  const names = Object.fromEntries((deskPlan?.vaults ?? []).map((v) => [v.vaultId.toUpperCase(), cap(harborName(v.label))]))
   return (
     <>
       {failure}
-      <p className="caption">{`Read at ledger ${String((doc as { ledgerIndex?: number }).ledgerIndex)}`}</p>
+      <ReadAt ledger={String((doc as { ledgerIndex?: number }).ledgerIndex)} />
       {tab.id === 'positions' && <PositionsTab doc={doc as Positions} deskPlan={deskPlan} harbor={harbor} />}
-      {tab.id === 'universe' && <DeskUniverse data={data} error={error} />}
-      {tab.id === 'mandate' && <MandateTab doc={doc as Mandate} />}
+      {tab.id === 'universe' && <DeskUniverse data={data} error={error} names={names} />}
+      {tab.id === 'mandate' && <MandateTab doc={doc as Mandate} positions={positions} />}
       {tab.id === 'feed' && <DeskFeed data={doc as FeedDoc} />}
     </>
   )
+}
+
+const TAB_SUBTITLE: Record<string, string> = {
+  positions: "The loans the desk has made, the collateral held behind each, and how close each stands to the mandate's limits.",
+  mandate: "The risk officer's limits. The desk refuses any loan that breaks one of them.",
+  universe: 'The vaults Orma reads, all valued at the same ledger.',
+  feed: "Credit events seen on the ledger, with each curator's own statements shown next to what the ledger confirms.",
 }
 
 /** `data`: the answer of the current tab's source; `error`: the code of its last failed read. */
@@ -351,14 +486,35 @@ export function DeskScreen({ ticket, mark, tab, data, error = null, buyTicket = 
   const current = DESK_TABS.find((t) => t.id === tab) ?? DESK_TABS[0]
   const harbor = deskPlan ? deskTicketPaths(deskPlan, facility).harbor : null
   const label = deskPlan ? harbor?.label ?? null : 'harbor-1'
+  const harbors = deskPlan?.vaults.filter((v) => v.label.startsWith('harbor-')) ?? []
+  // Another Harbor, same tab: `tab` first, so a tab link and a Harbor link never read alike.
+  const harborHref = (vaultId: string) => '/desk?' + new URLSearchParams({ tab: current.id, facility: vaultId })
+  const go = (href: string) => () => { history.pushState(null, '', href); dispatchEvent(new PopStateEvent('popstate')) }
+  const title = current.id === 'ticket' ? `Collateral report${label ? ` · ${cap(harborName(label))}` : ''}` : current.label
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+    <div className="desk-stage">
       <TestNetBanner />
-      <h1 className="exh-title">{deskTitle(label, current.label)}</h1>
+      <header className="desk-head">
+        <div>
+          <h1 className="t-heading-l">{title}</h1>
+          {TAB_SUBTITLE[current.id] && <p className="t-body-m dim tab-sub">{TAB_SUBTITLE[current.id]}</p>}
+        </div>
+        {harbors.length > 0 && (current.id === 'ticket' || current.id === 'positions') && (
+          <div className="desk-head-right">
+            <nav className="harbors" aria-label="Harbor">
+              {harbors.map((h) => (
+                <a key={h.label} href={harborHref(h.vaultId)} aria-current={harbor?.label === h.label ? 'true' : undefined} onClick={(e) => follow(e, go(harborHref(h.vaultId)))}>{cap(harborName(h.label))}</a>
+              ))}
+            </nav>
+          </div>
+        )}
+      </header>
       <TabBar current={current.id} facility={facility} />
-      {current.id === 'ticket'
-        ? <TicketTab ticket={ticket} mark={mark} error={error} buyTicket={buyTicket} deskPlan={deskPlan} positions={positions} facility={facility} harbor={harbor} />
-        : <DataTab tab={current} data={data} error={error} positions={positions} deskPlan={deskPlan} harbor={harbor} />}
+      <div id="desk-body" className="desk-body">
+        {current.id === 'ticket'
+          ? <TicketTab ticket={ticket} mark={mark} error={error} buyTicket={buyTicket} deskPlan={deskPlan} positions={positions} facility={facility} harbor={harbor} />
+          : <DataTab tab={current} data={data} error={error} positions={positions} deskPlan={deskPlan} harbor={harbor} />}
+      </div>
     </div>
   )
 }
