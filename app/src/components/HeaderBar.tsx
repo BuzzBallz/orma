@@ -6,7 +6,7 @@ import { fmtIso } from '../lib/format'
 import { FacilityPicker } from './VaultPicker'
 import { SignInButton } from './WalletButton'
 import { SignInDialog } from './WalletDialog'
-import { Lockup } from './Lockup'
+import { DeskLockup, Lockup } from './Lockup'
 import { Dialog, DialogClose, DialogContent, DialogTitle } from '@/components/ui/dialog'
 
 /**
@@ -66,11 +66,13 @@ export function HeaderBar({ vaults, activeVaultId, path, asOf, withheld, slide, 
   const showStamp = path === '/' || path === '/evidence'
   const showPicker = path === '/facility' || path === '/event'
   const openSignIn = () => { setMenu(false); setSignIn(true) }
+  // The desk signs on the server: no wallet flow is offered next to a loan report.
+  const showSignIn = path !== '/desk'
 
   return (
     <header className="mast">
-      <div className="wrap mast-in">
-        <Lockup onClick={home} />
+      <div className="wrap mast-in" data-desk={path === '/desk' || undefined}>
+        {path === '/desk' ? <DeskLockup onClick={home} /> : <Lockup onClick={home} />}
 
         <nav className="desks" aria-label="Sections" ref={nav}>
           {DESKS.map(([p, label]) => (
@@ -91,13 +93,13 @@ export function HeaderBar({ vaults, activeVaultId, path, asOf, withheld, slide, 
         <div className="mast-right" data-picker-desk={showPicker || undefined}>
           {/* Every name and figure here is made up for a test network; a visitor must not have to
               open an exhibit to learn it. */}
-          <span className="net-pill" title="Every facility shown is demonstration data on a test network">Test network</span>
+          {path !== '/desk' && <span className="net-pill" title="Every facility shown is demonstration data on a test network">Test network</span>}
           {showStamp && <Stamp asOf={asOf} withheld={withheld} />}
           <a className="lnk lnk-plain mast-docs" href={DOCS_URL} target="_blank" rel="noreferrer noopener">
             Docs <ArrowUpRight size={16} strokeWidth={1.75} aria-hidden />
           </a>
           {showPicker && <FacilityPicker vaults={vaults} activeVaultId={activeVaultId} onSelect={onSelect} />}
-          <SignInButton onOpen={openSignIn} />
+          {showSignIn && <SignInButton onOpen={openSignIn} />}
         </div>
 
         <button type="button" className="menu-btn" aria-label="Menu" aria-expanded={menu} onClick={() => setMenu(true)}>
@@ -127,7 +129,7 @@ export function HeaderBar({ vaults, activeVaultId, path, asOf, withheld, slide, 
             <a className="lnk" href={DOCS_URL} target="_blank" rel="noreferrer noopener">
               Docs <ArrowUpRight size={16} strokeWidth={1.75} aria-hidden />
             </a>
-            <SignInButton onOpen={openSignIn} />
+            {showSignIn && <SignInButton onOpen={openSignIn} />}
           </div>
           <p className="menu-stamp"><Stamp asOf={asOf} withheld={withheld} /></p>
         </DialogContent>
