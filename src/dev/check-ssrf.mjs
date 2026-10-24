@@ -6,11 +6,14 @@ import { createServer } from 'node:http'
 import { resolveFromIssuance } from '../nav.mjs'
 
 const ID = 'CD'.repeat(24)
+const VAULT = 'AB'.repeat(32)
 const xrplFor = (navUrl) => ({
   mptIssuance: async () => ({
     Issuer: 'rIssuer', OutstandingAmount: '1',
     MPTokenMetadata: Buffer.from(JSON.stringify({ orma: { nav_url: navUrl } })).toString('hex').toUpperCase(),
   }),
+  // The anti-spoof reads the issuer's AccountRoot and the vault it points at.
+  req: async ({ command }) => ({ result: command === 'account_info' ? { account_data: { VaultID: VAULT } } : { vault: { ShareMPTID: ID } } }),
 })
 const follow = (out) => out.steps.find((s) => s.step === 'follow pointer')
 
@@ -32,7 +35,7 @@ eq('and nothing was fetched', fetched, 0)
 const PUBLIC = 'https://93.184.215.14/nav'
 const respond = (res) => async () => res
 eq('a public pointer that answers a valuation',
-  follow(await resolveFromIssuance(xrplFor(PUBLIC), ID, { fetchImpl: respond(Response.json({ unitValue: { held: '0.8' } })) })).ok, true)
+  follow(await resolveFromIssuance(xrplFor(PUBLIC), ID, { fetchImpl: respond(Response.json({ unitValue: { held: '0.8' }, instrument: { shareMptId: ID, vaultId: VAULT } })) })).ok, true)
 eq('a body over 64 KB',
   follow(await resolveFromIssuance(xrplFor(PUBLIC), ID, { fetchImpl: respond(new Response('x'.repeat(65 * 1024))) })).detail, 'answered, but over 64 KB')
 eq('an HTML page does not leak into the detail',

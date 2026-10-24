@@ -67,6 +67,7 @@ export function presentNav(snap, opts = {}) {
   const v = snap.vault
   const naive = snap.navNaive
   const correct = snap.navCorrect
+  const fresh = freshness(snap, opts.closeTime)
   return {
     schema: NAV_SCHEMA,
     // The reader stamps time and ledger on the envelope, so this repeats them inside the
@@ -77,7 +78,10 @@ export function presentNav(snap, opts = {}) {
     // good snapshot, and `freshness` says how far behind the ledger that is.
     asOf: snap.readAt ?? null,
     ledgerIndex: snap.ledgerIndex ?? null,
-    freshness: freshness(snap, opts.closeTime),
+    freshness: fresh,
+    // Additions of the NYC build: what a verifier needs to name the ledger and recompute the unit value.
+    ledgerHash: snap.ledgerHash ?? null,
+    attestation: { status: fresh.stale ? 'stale' : 'attested' },
 
     instrument: {
       kind: 'vault-share',
@@ -125,7 +129,60 @@ export function presentNav(snap, opts = {}) {
       recompute: '(assetsTotal - lossUnrealized) / (unitsOutstanding / 10^scale)',
       buildVersion: opts.buildVersion ?? null,
     },
+
+    inputs: {
+      assetsAvailable: num(v.assetsAvailable).toFixed(0),
+      lockedAmount: num(v.lockedAmount).toFixed(0),
+      leVersion: v.leVersion === 'CashBasis' ? '1' : '0',
+      brokers: (snap.brokers ?? []).map((b) => ({
+        id: b.loanBrokerId,
+        debtTotal: num(b.debtTotal).toFixed(0),
+        coverAvailable: num(b.coverAvailable).toFixed(0),
+        coverRateMinimum: String(b.coverRateMinimum ?? 0),
+        coverRateLiquidation: String(b.coverRateLiquidation ?? 0),
+      })),
+    },
+    unit: { numerator: 'drops', denominator: 'share-unit', shareScale: v.scale ?? 0 },
   }
+}
+
+/**
+ * How the service stands on a share: attested (tracked, snapshot fresh), stale (snapshot older than
+ * STALE_AFTER_SECONDS), revoked (a tracked vault the ledger says is gone), not-tracked otherwise.
+ * @param {import('./poll.mjs').Reader} reader @param {string} mptId
+ */
+export function attestationStatus(reader, mptId) {
+  const snap = reader.getByShareMpt(mptId)
+  if (!snap) return 'not-tracked'
+  // The reader keeps the last good snapshot of a vault the ledger no longer has.
+  if (reader.missing?.has(snap.vaultId)) return 'revoked'
+  return freshness(snap, reader.closeTime).stale ? 'stale' : 'attested'
+}
+
+/**
+ * Anyone can mint a share whose metadata names a valuation that belongs to another share. A
+ * document is this share's only if it names this token, and the issuer's AccountRoot points at a
+ * Vault whose share is this token. Returns the reason it is not, or null.
+ * @param {{ req: Function, lastLedger?: number|null }} xrpl
+ * @param {string} token @param {string} issuer @param {any} doc
+ */
+export async function spoofReason(xrpl, token, issuer, doc) {
+  const want = String(token).toUpperCase()
+  if (String(doc?.instrument?.shareMptId ?? '').toUpperCase() !== want) return 'the document names another share'
+  const at = Number.isInteger(doc.ledgerIndex) ? doc.ledgerIndex : xrpl.lastLedger
+  // A read that fails is not an answer: it throws. Only an object the ledger says is absent is one.
+  const vaultId = (await xrpl.req({ command: 'account_info', account: issuer, ledger_index: at })).result.account_data?.VaultID
+  if (!vaultId) return 'the issuer is not the pseudo-account of a vault'
+  let vault
+  try {
+    vault = (await xrpl.req({ command: 'vault_info', vault_id: vaultId, ledger_index: at })).result.vault
+  } catch (e) {
+    if (e?.data?.error === 'entryNotFound' || e?.data?.error === 'objectNotFound') return 'the issuer\'s vault does not exist'
+    throw e
+  }
+  if (String(vault?.ShareMPTID ?? '').toUpperCase() !== want) return 'the issuer\'s vault does not issue this share'
+  if (String(doc.instrument.vaultId ?? '').toUpperCase() !== String(vaultId).toUpperCase()) return 'the document names another vault'
+  return null
 }
 
 /**
@@ -277,8 +334,13 @@ export async function resolveFromIssuance(xrpl, issuanceId, opts = {}) {
       // trusting a document that says nothing.
       step('follow pointer', false, 'answered, but the document carries no unitValue')
     } else {
-      out.nav = body
-      step('follow pointer', true, `unit value ${body.unitValue.held}`)
+      const spoof = await spoofReason(xrpl, issuanceId, node.Issuer, body)
+      if (spoof) {
+        step('follow pointer', false, `SPOOFED: ${spoof}`)
+      } else {
+        out.nav = body
+        step('follow pointer', true, `unit value ${body.unitValue.held}`)
+      }
     }
   } catch (e) {
     step('follow pointer', false, e?.name === 'AbortError' ? 'timeout' : 'no answer')
