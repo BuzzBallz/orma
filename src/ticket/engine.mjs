@@ -437,7 +437,7 @@ export function buildPositions(p, mandate) {
     // maxSingleLoanUsd of the terms in place of the mandate's maxSingleLoanDrops
     if (isUsd) usage[1] = { limit: 'maxSingleLoanUsd', value: principal.toFixed(), threshold: terms ? String(terms.maxSingleLoanUsd) : null }
     return {
-      loanId: loan.loanId, loanSetTxHash: loan.loanSetTxHash, vaultId: loan.vaultId, borrower: loan.borrower,
+      loanId: loan.loanId, loanSetTxHash: loan.loanSetTxHash, loanSetLedger: loan.loanSetLedger ?? null, loanSetTicket: loan.loanSetTicket ?? null, vaultId: loan.vaultId, borrower: loan.borrower,
       // the loan's PrincipalOutstanding as the ledger states it, in the loan's asset: drops for XRP, dollars for USD
       principalOutstanding: isUsd ? principal.toFixed() : principal.toFixed(0), collateral, collateralHeldDrops: held.toFixed(0), ltvHeldBps, usage,
       currency: isUsd ? 'USD' : 'XRP',

@@ -349,6 +349,8 @@ export async function readPositions(xrpl, { reader, demoDir = 'demo', at: pinned
   // the LoanSets that created the desk's loans, and the escrow each one names
   const createdBy = new Map()
   const MEMO_ESCROW = Buffer.from('orma.escrow', 'utf8').toString('hex').toUpperCase()
+  // the desk's gate (step 10) keeps its ticket in the first Memo: a LoanSet without it was countersigned outside the gate
+  const MEMO_TICKET = Buffer.from('orma.ticket', 'utf8').toString('hex').toUpperCase()
   // step 20: a pledge that cures a margin call names its loan in an orma.cure Memo of its EscrowCreate
   const MEMO_CURE = Buffer.from('orma.cure', 'utf8').toString('hex').toUpperCase()
   /** loan id -> the cure escrows that name it: { index, borrower } */
@@ -370,7 +372,7 @@ export async function readPositions(xrpl, { reader, demoDir = 'demo', at: pinned
       const node = (e.meta.AffectedNodes ?? []).map((a) => a.CreatedNode).find((c) => c?.LedgerEntryType === 'Loan')
       if (!node || !brokerIds.has(node.NewFields?.LoanBrokerID ?? t.LoanBrokerID)) continue
       const memo = (t.Memos ?? []).map((m) => m.Memo).find((m) => same(m?.MemoType, MEMO_ESCROW))
-      createdBy.set(String(node.LedgerIndex).toUpperCase(), { txHash: e.hash ?? t.hash, escrowIndex: memo?.MemoData ? String(memo.MemoData).toUpperCase() : null })
+      createdBy.set(String(node.LedgerIndex).toUpperCase(), { txHash: e.hash ?? t.hash, ledgerIndex: e.ledger_index ?? t.ledger_index ?? null, ticketed: (t.Memos ?? []).some((m) => same(m.Memo?.MemoType, MEMO_TICKET)), escrowIndex: memo?.MemoData ? String(memo.MemoData).toUpperCase() : null })
     }
   }
   const out = []
@@ -397,7 +399,7 @@ export async function readPositions(xrpl, { reader, demoDir = 'demo', at: pinned
       collateral.push({ escrowId: c.index, shareMptId, units: String(escrow.Amount.value), account, ticketInputs, cure: true })
     }
     out.push({
-      loanId: loan.index, loanSetTxHash: made?.txHash ?? null, vaultId, borrower: loan.Borrower,
+      loanId: loan.index, loanSetTxHash: made?.txHash ?? null, loanSetLedger: made?.ledgerIndex ?? null, loanSetTicket: made ? made.ticketed : null, vaultId, borrower: loan.Borrower,
       // drops of XRP, or dollars of the test dollar, as the ledger states them
       principalOutstanding: currency === 'USD' ? num(loan.PrincipalOutstanding).toFixed() : num(loan.PrincipalOutstanding).toFixed(0), collateral, currency,
     })

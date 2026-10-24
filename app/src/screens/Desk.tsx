@@ -151,9 +151,10 @@ function CurrencyChoice({ asset, facility }: { asset: LoanCurrency; facility?: s
   )
 }
 
-function ErrorBlock({ code, message }: { code: string; message?: string }) {
+function ErrorBlock({ code, status, message }: { code: string; status?: number; message?: string }) {
   return (
     <div role="alert">
+      <p className="caption"><b>{status && status >= 400 ? `${status} ${code}` : code}</b></p>
       <p className="caption">{errorSentence(code)}</p>
       {message && <p className="caption">{message}</p>}
       <details><summary>Error code</summary><code>{code}</code></details>
@@ -642,7 +643,7 @@ function PositionsTab({ doc, deskPlan, harbor }: { doc: Positions; deskPlan?: De
               return (
                 <Fragment key={p.loanId}>
                 <tr>
-                  <td>{p.loanSetTxHash ? <HashLink hash={p.loanSetTxHash} /> : <span className="dim">LoanSet not found in the history</span>}<span className="t-fig-s dim block">{`loan ${p.loanId.slice(0, 8)}`}</span><span className="t-body-s block">{principalLine(p)}</span><span className="t-body-s block">{`${BORROWER_NAME} `}<HashLink hash={p.borrower} kind="accounts" /></span></td>
+                  <td>{p.loanSetTxHash ? <HashLink hash={p.loanSetTxHash} /> : <span className="dim">LoanSet not found in the history</span>}{p.loanSetLedger ? <span className="t-fig-s dim">{` ledger ${p.loanSetLedger}`}</span> : null}<span className="t-fig-s dim block">{`loan ${p.loanId.slice(0, 8)}`}</span>{p.loanSetTicket === false && <span className="t-body-s dim block">Countersigned outside the mandate check of the desk: its Memo carries no ticket.</span>}<span className="t-body-s block">{principalLine(p)}</span><span className="t-body-s block">{`${BORROWER_NAME} `}<HashLink hash={p.borrower} kind="accounts" /></span></td>
                   <td>
                     {p.collateral.map((c) => {
                       const v = deskPlan?.vaults.find((x) => same(x.shareMptId, c.shareMptId))
@@ -866,7 +867,7 @@ export function rememberOperator(session: OperatorSession, patch: { pledgeAction
 
 interface RoleAction { actionId: string; state: string; engineResult?: string; txHash?: string; preview?: ActionPreview | null }
 type Phase = 'idle' | 'previewing' | 'previewed' | 'confirming' | 'validated' | 'failed' | 'refused' | 'pending-approval' | 'done'
-export interface RowState { phase: Phase; actionId?: string; preview?: ActionPreview; action?: RoleAction; error?: ActionError }
+export interface RowState { phase: Phase; actionId?: string; preview?: ActionPreview; action?: RoleAction; error?: ActionError; accepted?: boolean }
 
 const money = (p?: ActionPreview | null) => (p?.money ?? {}) as Record<string, unknown>
 const text = (v: unknown) => (v === undefined || v === null ? '—' : String(v))
@@ -992,7 +993,7 @@ function useActionFlow({ role, action, session, remember, onChange, initial }: {
       return setRow({ phase: 'previewed', actionId: a.body.actionId, preview: a.body.preview })
     }
     if (action === 'requestLoan' && err?.code === 'ESCROW_POLICY' && err.requestActionId) remember?.({ requestActionId: err.requestActionId })
-    setRow({ phase: 'refused', error: err ?? { code: 'UNREACHABLE' } })
+    setRow({ phase: 'refused', error: { ...(err ?? { code: 'UNREACHABLE' }), status: a.status } })
   }
 
   async function confirm() {
@@ -1000,7 +1001,8 @@ function useActionFlow({ role, action, session, remember, onChange, initial }: {
     setRow((r) => ({ ...r, phase: 'confirming' }))
     const a = await confirmAction(session.runId, session.token, row.actionId)
     const state = a.body.state
-    if (a.status !== 202) return setRow((r) => ({ ...r, phase: 'refused', error: a.body.error ?? { code: 'UNREACHABLE' } }))
+    if (a.status !== 202) return setRow((r) => ({ ...r, phase: 'refused', error: { ...(a.body.error ?? { code: 'UNREACHABLE' }), status: a.status } }))
+    setRow((r) => ({ ...r, accepted: true }))
     if (state === 'pending-approval') return setRow((r) => ({ ...r, phase: 'pending-approval' }))
     // A preview-only action (simulateWithdraw, wait) has nothing to submit: its confirm ends there.
     if (state === 'previewed') return setRow((r) => ({ ...r, phase: 'done' }))
@@ -1017,7 +1019,7 @@ function ActionStatus({ action, verb, row, units, focus }: { action: string; ver
     <div role="status" tabIndex={-1} ref={focus}>
       {row.preview && <MoneyPreview action={action} preview={row.preview} units={units} />}
       {row.phase === 'confirming' && (
-        <p className="caption">{row.action?.state === 'validated' ? 'Realising… reading the vault at the validation ledger' : 'Submitting to the ledger…'}</p>
+        <p className="caption">{row.action?.state === 'validated' ? 'Realising… reading the vault at the validation ledger' : action === 'approve' && !row.accepted ? 'Checking the mandate…' : 'Submitting to the ledger…'}</p>
       )}
       {row.phase === 'validated' && (
         <div>
@@ -1037,7 +1039,7 @@ function ActionStatus({ action, verb, row, units, focus }: { action: string; ver
       )}
       {row.phase === 'done' && <p className="caption">Recorded as a preview only: this action builds no transaction to submit.</p>}
       {row.phase === 'failed' && <p role="alert" className="caption">{`The ledger did not apply it: ${text(row.action?.engineResult)}.`}</p>}
-      {row.phase === 'refused' && row.error && <ErrorBlock code={row.error.code} message={action === 'requestLoan' && row.error.requestActionId ? row.error.message : undefined} />}
+      {row.phase === 'refused' && row.error && <ErrorBlock code={row.error.code} status={row.error.status} message={action === 'requestLoan' && row.error.requestActionId ? row.error.message : undefined} />}
     </div>
   )
 }
@@ -1377,7 +1379,7 @@ const FIX_EXPIRED: MarginCall = { ...FIX_CALL, status: 'EXPIRED', ledgerIndex: F
 const FIX_CURED: MarginCall = { ...FIX_CALL, status: 'CURED', shortfall: null, ltvHeldBps: 5100, reasons: ['LTV at withdrawal value 51.00% against the limit of 53.44%.'], triggerTx: undefined }
 const FIX_NONE: MarginCall = { ...FIX_CALL, status: 'NONE', issuedLedger: null, issuedAt: null, cureBy: null, shortfall: null, reasons: [], entryHash: undefined, triggerTx: undefined }
 const positionWith = (marginCall: MarginCall, loanId = FIX_LOAN): Position => ({
-  loanId, loanSetTxHash: 'B3'.repeat(32), vaultId: FIX_DESK_VAULT, borrower: 'rBorrowerOfTheFixture', principalOutstanding: '2000000',
+  loanId, loanSetTxHash: 'B3'.repeat(32), loanSetLedger: 6384808, vaultId: FIX_DESK_VAULT, borrower: 'rBorrowerOfTheFixture', principalOutstanding: '2000000',
   collateral: [{ escrowId: 'A4'.repeat(32), shareMptId: FIX_SHARE, units: '5000000', account: FIX_ACCOUNT }], collateralHeldDrops: '3600000', ltvHeldBps: 5556,
   usage: [{ limit: 'maxLtvBps', value: '5556', threshold: '5344' }], marginCall: { ...marginCall, loanId },
 })
@@ -1541,8 +1543,16 @@ export const SMOKE_CASES: SmokeCase[] = [
   { name: 'pointer chain with a pending oracle', element: <PointerPanel mark={FIX_MARK} />, before: ['oracle cross-check', 'oracle pending: last publish precedes this ledger'], mustContain: ['passes: oracle pending'] },
   { name: 'mandate panel: BREACHED at withdrawal value, PASS at 1:1', element: <MandatePanel ticket={FIX_TICKET} />, before: ['LTV at withdrawal value', 'BREACHED', 'Lender at 1:1', 'PASS'] },
   {
-    name: 'approve refused BREACHED keeps its preview', element: row('approve', { phase: 'refused', actionId: FIX_ACTION, preview: PREVIEWS.approve, error: { code: 'BREACHED' } }),
-    mustContain: ['BREACHED', 'Lender at 1:1', 'PASS', errorSentence('BREACHED'), 'role="alert"', 'tabindex="-1"'], before: ['Lender at 1:1', errorSentence('BREACHED')],
+    name: 'approve refused BREACHED keeps its preview', element: row('approve', { phase: 'refused', actionId: FIX_ACTION, preview: PREVIEWS.approve, error: { code: 'BREACHED', status: 409 } }),
+    mustContain: ['409 BREACHED', 'Lender at 1:1', 'PASS', errorSentence('BREACHED'), 'role="alert"', 'tabindex="-1"'], before: ['Lender at 1:1', '409 BREACHED', errorSentence('BREACHED')],
+  },
+  {
+    name: 'approve confirming: the mandate is being checked, nothing is said to be submitted', element: row('approve', { phase: 'confirming', actionId: FIX_ACTION, preview: PREVIEWS.approve }),
+    mustContain: ['Checking the mandate…'], mustNotContain: ['Submitting to the ledger…'],
+  },
+  {
+    name: 'approve confirming, accepted: now it is submitted', element: row('approve', { phase: 'confirming', actionId: FIX_ACTION, preview: PREVIEWS.approve, accepted: true }),
+    mustContain: ['Submitting to the ledger…'], mustNotContain: ['Checking the mandate…'],
   },
   {
     name: 'requestLoan refused ESCROW_POLICY on an existing request', element: row('requestLoan', { phase: 'refused', error: { code: 'ESCROW_POLICY', requestActionId: 'q1', message: 'The pledged escrow is already named by another loan request. Nothing was signed. Use Re-request with a fresh ticket.' } }),
@@ -1614,8 +1624,16 @@ export const SMOKE_CASES: SmokeCase[] = [
     mustNotContain: ['Margin call issued by', CURE_VERB, 'Time left to cure'],
   },
   {
+    name: 'positions: a LoanSet without the gate\'s ticket says so', element: positionsTab({ ...positionWith(FIX_NONE), loanSetTicket: false }),
+    mustContain: ['Countersigned outside the mandate check of the desk: its Memo carries no ticket.'],
+  },
+  {
+    name: 'positions: a LoanSet with its ticket says nothing', element: positionsTab({ ...positionWith(FIX_NONE), loanSetTicket: true }),
+    mustNotContain: ['Countersigned outside'],
+  },
+  {
     name: 'positions with no margin call', element: positionsTab(positionWith(FIX_NONE)),
-    mustContain: ['Collateral at withdrawal value', 'LTV at withdrawal value'], mustNotContain: ['Margin call', CURE_VERB, 'Time left to cure'],
+    mustContain: ['Collateral at withdrawal value', 'LTV at withdrawal value', 'ledger 6384808'], mustNotContain: ['Margin call', CURE_VERB, 'Time left to cure'],
   },
   {
     name: 'positions with two ISSUED margin calls: the first cure primary, the second secondary', element: positionsTab(positionWith(FIX_CALL), positionWith(FIX_CALL, 'C2'.repeat(32))),

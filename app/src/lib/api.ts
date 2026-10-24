@@ -89,7 +89,7 @@ export interface DeskPlanUsd {
 export interface PositionCollateral { escrowId: string; shareMptId: string; units: string; account: CollateralAccount }
 export interface Position {
   /** principalOutstanding: the loan's PrincipalOutstanding in its asset, drops for XRP, dollars for USD (step 21). */
-  loanId: string; loanSetTxHash: string | null; vaultId: string; borrower: string; principalOutstanding: string
+  loanId: string; loanSetTxHash: string | null; loanSetLedger?: number | null; loanSetTicket?: boolean | null; vaultId: string; borrower: string; principalOutstanding: string
   /** null when no pledged collateral was read, or (USD) no usable price: the server says so, never a zero. */
   collateral: PositionCollateral[]; collateralHeldDrops: string; ltvHeldBps: number | null
   /** value (and, without USD terms, threshold) is null when the server could not state it. */
@@ -136,7 +136,7 @@ export function deskTicketPaths(deskPlan: DeskPlan, facility?: string | null, as
 }
 
 /**
- * The facility's demo loan: a validated LoanSet whose escrow holds the Harbor's shares, on desk first, else the first one.
+ * The facility's demo loan: a validated LoanSet whose escrow holds the Harbor's shares, the desk's gated ones first (ticket Memo), then desk vault first, else the first one.
  * Step 21: with `currency`, only the loans in that currency (a position without `currency` is an XRP one).
  */
 export function demoLoanFor(positions: Positions | null, deskPlan: DeskPlan, facility?: string | null, currency?: LoanCurrency): Position | null {
@@ -146,7 +146,8 @@ export function demoLoanFor(positions: Positions | null, deskPlan: DeskPlan, fac
     && (currency === undefined || (p.currency ?? 'XRP') === currency)
     && p.collateral.some((c) => c.shareMptId.toUpperCase() === harbor.shareMptId.toUpperCase()))
   const desk = deskPlan.vaults.find((v) => v.label === 'desk')
-  return backed.find((p) => desk && p.vaultId.toUpperCase() === desk.vaultId.toUpperCase()) ?? backed[0] ?? null
+  const pool = backed.some((p) => p.loanSetTicket) ? backed.filter((p) => p.loanSetTicket) : backed
+  return pool.find((p) => desk && p.vaultId.toUpperCase() === desk.vaultId.toUpperCase()) ?? pool[0] ?? null
 }
 
 // --- step 20, the cure of a margin call ------------------------------------------------------------
@@ -180,7 +181,7 @@ export function buildActionRequest(action: string, role: string, runId: string, 
 
 /** What a role action answered: its status and its envelope, an error included, never thrown. */
 export interface ActionAnswer { status: number; body: { actionId?: string; preview?: ActionPreview; state?: string; error?: ActionError } & Record<string, unknown> }
-export interface ActionError { code: string; message?: string; requestActionId?: string; breaches?: unknown[] }
+export interface ActionError { code: string; message?: string; requestActionId?: string; breaches?: unknown[]; status?: number }
 export interface ActionPreview { engineResult?: string | null; provenance?: string; money?: Record<string, unknown>; schema?: string; rows?: ChangeRow[] }
 
 async function send(url: string, init: RequestInit): Promise<ActionAnswer> {
