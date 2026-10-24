@@ -27,6 +27,8 @@ export class Reader {
     this.snapshots = new Map()
     this.serverTime = null
     this.ledgerIndex = null
+    /** hash of ledgerIndex, null when the server did not give one */
+    this.ledgerHash = null
     this.closeTime = null
     this.degraded = false
     this.lastGoodAt = null
@@ -37,8 +39,51 @@ export class Reader {
     this.missing = new Set()
     this._timer = null
     this._running = false
-    /** optional hook, set by the publish loop. Must never block or throw into tick(). */
-    this.onSnapshot = null
+    /** called with each snapshot, in subscription order; none may block or throw into tick() */
+    this._subscribers = []
+    this._hook = null
+    this._hookOff = null
+  }
+
+  /**
+   * Be told of every snapshot a pass produces. A subscriber that throws or rejects is logged and the
+   * pass goes on.
+   * @param {(snap: object) => unknown} fn
+   * @returns {() => void} unsubscribe
+   */
+  subscribe(fn) {
+    if (typeof fn !== 'function') throw new TypeError('subscribe takes a function')
+    const entry = { fn }
+    this._subscribers.push(entry)
+    return () => { this._subscribers = this._subscribers.filter((e) => e !== entry) }
+  }
+
+  /**
+   * The single hook the publish loop sets (`reader.onSnapshot = fn`, PublishLoop.attach()). Setting it
+   * subscribes fn, replacing the hook set before it; null removes it. Other consumers use subscribe().
+   */
+  set onSnapshot(fn) {
+    this._hookOff?.()
+    this._hookOff = null
+    this._hook = null
+    if (typeof fn === 'function') {
+      this._hookOff = this.subscribe(fn)
+      this._hook = fn
+    }
+  }
+
+  get onSnapshot() { return this._hook ?? null }
+
+  _notify(snap) {
+    for (const { fn } of this._subscribers) {
+      try {
+        const r = fn(snap)
+        if (r && typeof r.catch === 'function') r.catch((e) => log.warn('snapshot subscriber failed', { vault: snap.vaultId.slice(0, 12), err: String(e).slice(0, 80) }))
+      } catch (e) {
+        // never let a consumer break a read
+        log.warn('snapshot subscriber failed', { vault: snap.vaultId.slice(0, 12), err: String(e).slice(0, 80) })
+      }
+    }
   }
 
   addVault(id) {
@@ -48,12 +93,11 @@ export class Reader {
     }
   }
 
-  /** Read one vault completely: vault, its brokers, and every loan under them. */
-  async readVault(vaultId, closeTime) {
+  /** Read one vault completely, at one ledger: vault, its brokers, and every loan under them. */
+  async readVault(vaultId, closeTime, at = this.ledgerIndex ?? undefined) {
     // Every read of the pass on the ledger the pass took its close time from: asked for "validated"
     // one by one, a vault read before an impairment and its loan read after it graded a state that
     // never existed on any ledger.
-    const at = this.ledgerIndex ?? 'validated'
     const raw = await this.xrpl.vaultInfo(vaultId, at)
     const vault = normaliseVault({ ...raw, index: raw.index ?? vaultId }, closeTime)
 
@@ -132,12 +176,15 @@ export class Reader {
     }
     this.closeTime = closeTime
     this.ledgerIndex = this.xrpl.lastLedger
+    this.ledgerHash = this.xrpl.lastLedgerHash ?? null
+    const L = this.ledgerIndex
+    const H = this.ledgerHash
     this.serverTime = new Date((closeTime + 946684800) * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z')
 
     let failed = false
     for (const id of this.vaultIds) {
       try {
-        const { vault, brokers, loans } = await this.readVault(id, closeTime)
+        const { vault, brokers, loans } = await this.readVault(id, closeTime, L ?? undefined)
         const snap = {
           vaultId: id,
           readAt: this.serverTime,
@@ -145,7 +192,8 @@ export class Reader {
           // clock stops too, and only this one says how old the snapshot has become.
           readMs: Date.now(),
           closeTimeUsed: closeTime,
-          ledgerIndex: this.ledgerIndex,
+          ledgerIndex: L,
+          ledgerHash: H,
           vault,
           brokers,
           loans,
@@ -155,7 +203,7 @@ export class Reader {
         const prev = this.snapshots.get(id)
         this.snapshots.set(id, snap)
         this.missing.delete(id)
-        if (this.onSnapshot) { try { this.onSnapshot(snap) } catch { /* never let a consumer break a read */ } }
+        this._notify(snap)
         this.lastGoodAt = Date.now()
 
         // Log only transitions, so the operator console stays readable on stage.

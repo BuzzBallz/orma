@@ -39,15 +39,19 @@ const EXPLORER = 'https://devnet.xrpl.org'
  * @param {import('./xrpl.mjs').Xrpl} xrpl
  * @param {string} shareMptId
  * @param {string[]} accounts accounts that might own such an escrow
+ * @param {number} [ledgerIndex] every account read at this ledger: the Reader's L, else the last
+ *   validated ledger xrpl read
  */
-export async function findShareEscrows(xrpl, shareMptId, accounts) {
+export async function findShareEscrows(xrpl, shareMptId, accounts, ledgerIndex = xrpl.lastLedger ?? undefined) {
   /** @type {Map<string, object>} keyed by escrow index: the same object is returned
    * by both the pledgor's and the beneficiary's directory. */
   const byId = new Map()
   for (const account of [...new Set(accounts.filter(Boolean))]) {
     let objects = []
     try {
-      objects = await xrpl.accountObjects(account, 'escrow')
+      objects = await xrpl.accountObjects(account, 'escrow', ledgerIndex)
+      // a fresh connection discovered its ledger on the first read: the next accounts are read there too
+      ledgerIndex ??= xrpl.lastLedger ?? undefined
     } catch (e) {
       log.debug('escrow scan failed', { account, err: (e?.data?.error ?? String(e)).slice(0, 60) })
       continue

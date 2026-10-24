@@ -131,8 +131,11 @@ export async function createDomain(client, owner, accepted) {
  *
  * Reads the SHARE ISSUANCE, not the Vault. DomainID is not on the Vault ledger entry, so
  * the obvious lookup returns undefined and reads exactly like "open to everyone".
+ *
+ * Both reads at one ledger: the Reader's L when given, else the last validated ledger xrpl read.
+ * @param {number} [ledgerIndex]
  */
-export async function gateStatus(xrpl, vault) {
+export async function gateStatus(xrpl, vault, ledgerIndex = xrpl.lastLedger ?? undefined) {
   const out = {
     gated: false, private: false, domainId: null, acceptedCredentials: [], domainOwner: null,
     note: null,
@@ -144,7 +147,7 @@ export async function gateStatus(xrpl, vault) {
   }
   let issuance
   try {
-    issuance = await xrpl.mptIssuance(vault.shareMptId)
+    issuance = await xrpl.mptIssuance(vault.shareMptId, ledgerIndex)
   } catch (e) {
     out.note = `share issuance unreadable: ${String(e?.data?.error ?? e).slice(0, 80)}`
     return out
@@ -158,7 +161,8 @@ export async function gateStatus(xrpl, vault) {
   }
   out.domainId = domainId
   try {
-    const dom = await xrpl.req({ command: 'ledger_entry', index: domainId })
+    // the issuance read pinned the connection to a ledger if it had none: read the domain there too
+    const dom = await xrpl.req({ command: 'ledger_entry', index: domainId, ledger_index: ledgerIndex ?? xrpl.lastLedger })
     const node = dom.result.node
     out.domainOwner = node.Owner ?? null
     out.acceptedCredentials = (node.AcceptedCredentials ?? []).map((a) => ({

@@ -15,6 +15,11 @@
  *    so a backfill by walking PreviousTxnID hits txnNotFound on anything older.
  *
  * Everything here re-reads current state. Nothing here diffs metadata.
+ *
+ * Every state read is pinned to one numeric validated ledger L: the one given, else the last one
+ * closeTime() read (discovered first on a fresh connection). closeTime() is the only request that asks
+ * for 'validated', to discover L. The one exception is account_tx (history): it reads a window of
+ * ledgers, not the state at one, and is not pinned.
  */
 import { Client } from 'xrpl'
 import { logger } from './log.mjs'
@@ -34,6 +39,8 @@ export class Xrpl {
     this.connected = false
     this._backoff = 500
     this.lastLedger = null
+    /** hash of lastLedger, null when the server did not give one */
+    this.lastLedgerHash = null
     this.lastCloseTime = null
     // Reported by the server, never asserted. Devnet moved rc4 -> rc5 mid-event.
     this.buildVersion = null
@@ -97,34 +104,54 @@ export class Xrpl {
     throw lastErr
   }
 
-  /** Validated ledger close_time. The ONLY clock we trust: Devnet lags wall clock by up to 10s. */
+  /**
+   * Validated ledger close_time. The ONLY clock we trust: Devnet lags wall clock by up to 10s. Also the
+   * one request that discovers L: it keeps the ledger's index and hash for every read pinned to it.
+   */
   async closeTime() {
     const r = await this.req({ command: 'ledger', ledger_index: 'validated' })
     this.lastLedger = r.result.ledger_index ?? Number(r.result.ledger.ledger_index)
+    this.lastLedgerHash = r.result.ledger_hash ?? r.result.ledger?.ledger_hash ?? null
     this.lastCloseTime = Number(r.result.ledger.close_time)
     return this.lastCloseTime
+  }
+
+  /**
+   * The ledger a state read is pinned to: the one given, else the last validated ledger read. A fresh
+   * connection has read none yet, so it reads one first: rippled refuses ledger_index null.
+   * @param {number} [ledgerIndex]
+   * @returns {Promise<number>}
+   */
+  async pinned(ledgerIndex) {
+    if (ledgerIndex !== undefined && ledgerIndex !== null) {
+      if (!Number.isSafeInteger(ledgerIndex)) throw new TypeError(`a state read is pinned to a ledger number, got ${JSON.stringify(ledgerIndex)}`)
+      return ledgerIndex
+    }
+    if (this.lastLedger === null || this.lastLedger === undefined) await this.closeTime()
+    return this.lastLedger
   }
 
   /**
    * Read a Vault plus its share issuance.
    * NOTE: the parameter is `vault_id`, NOT `vault` as XLS-65 section 3.9.1 states.
    */
-  async vaultInfo(vaultId, ledgerIndex = 'validated') {
-    const r = await this.req({ command: 'vault_info', vault_id: vaultId, ledger_index: ledgerIndex })
+  async vaultInfo(vaultId, ledgerIndex) {
+    const r = await this.req({ command: 'vault_info', vault_id: vaultId, ledger_index: await this.pinned(ledgerIndex) })
     return r.result.vault
   }
 
   /** Read a LoanBroker by its object index, or by {owner, seq}. */
-  async loanBroker(ref) {
-    const param = typeof ref === 'string' ? ref : { loan_broker: ref }
-    const r = await this.req(typeof ref === 'string' ? { command: 'ledger_entry', index: ref, ledger_index: 'validated' } : { command: 'ledger_entry', ...param, ledger_index: 'validated' })
+  async loanBroker(ref, ledgerIndex) {
+    const at = await this.pinned(ledgerIndex)
+    const r = await this.req(typeof ref === 'string' ? { command: 'ledger_entry', index: ref, ledger_index: at } : { command: 'ledger_entry', loan_broker: ref, ledger_index: at })
     return r.result.node
   }
 
   /** Read a Loan by object index, or by {loan_broker_id, loan_seq}. */
-  async loan(ref, ledgerIndex = 'validated') {
+  async loan(ref, ledgerIndex) {
+    const at = await this.pinned(ledgerIndex)
     const r = await this.req(
-      typeof ref === 'string' ? { command: 'ledger_entry', index: ref, ledger_index: ledgerIndex } : { command: 'ledger_entry', loan: ref, ledger_index: ledgerIndex },
+      typeof ref === 'string' ? { command: 'ledger_entry', index: ref, ledger_index: at } : { command: 'ledger_entry', loan: ref, ledger_index: at },
     )
     return r.result.node
   }
@@ -136,13 +163,15 @@ export class Xrpl {
    * vault shares as collateral has an issuance id and nothing else, and everything they
    * need to value it has to be reachable from here.
    */
-  async mptIssuance(issuanceId) {
-    const r = await this.req({ command: 'ledger_entry', mpt_issuance: String(issuanceId).toUpperCase(), ledger_index: 'validated' })
+  async mptIssuance(issuanceId, ledgerIndex) {
+    const at = await this.pinned(ledgerIndex)
+    const r = await this.req({ command: 'ledger_entry', mpt_issuance: String(issuanceId).toUpperCase(), ledger_index: at })
     return r.result.node
   }
 
   /**
-   * Transaction history for an account, newest first, with the window it covers.
+   * Transaction history for an account, newest first, with the window it covers. Not pinned to L: it
+   * reads a window of ledgers (the one documented exception, see the head of this file).
    * Devnet keeps only a window of recent ledgers (about a month on 13 October 2026, varying by server),
    * which covers brokers created during an event but would not hold a real track record.
    * Paginates on `marker`. `ledgerMin`-`ledgerMax` is the range the server says it searched, null
@@ -174,8 +203,8 @@ export class Xrpl {
   }
 
   /** Objects owned by an account, optionally filtered. Used to discover a vault's brokers. */
-  async accountObjects(account, type, ledgerIndex = 'validated') {
-    const r = await this.req({ command: 'account_objects', account, type, limit: 400, ledger_index: ledgerIndex })
+  async accountObjects(account, type, ledgerIndex) {
+    const r = await this.req({ command: 'account_objects', account, type, limit: 400, ledger_index: await this.pinned(ledgerIndex) })
     return r.result.account_objects ?? []
   }
 }
@@ -219,6 +248,8 @@ export function normaliseVault(v, closeTime) {
     assetsTotal,
     assetsAvailable: num(v.AssetsAvailable),
     lossUnrealized,
+    // Shares held in escrow: on the share issuance, which vault_info returns as `shares`.
+    lockedAmount: num(v.LockedAmount ?? v.shares?.LockedAmount),
     sharesOutstanding: shares,
     scale: Number(v.Scale ?? 0),
     withdrawalPolicy: Number(v.WithdrawalPolicy ?? 1) === 1 ? 'FirstComeFirstServe' : String(v.WithdrawalPolicy),
