@@ -172,24 +172,29 @@ export function BalanceBar({ total, available, loss }: { total: string; availabl
     { k: 'Lent out, impaired', v: D(loss), solid: null as null },
   ].filter((p) => p.v.gt(0))
   const label = `The vault holds ${formatXrp(total)} XRP: ${parts.map((p) => `${p.k} ${formatXrp(p.v.toFixed(0))} XRP`).join('; ')}.`
+  // A segment too narrow for its two label lines, with a neighbour after it, puts them on a second row: two labels never share a line.
+  const width = (p: { v: Decimal }, w: number) => w * num(p.v.div(total))
+  const needsRow = parts.some((p, i) => i < parts.length - 1 && num(p.v.div(total)) < 0.16)
   return (
-    <Chart label={label} height={92}>
+    <Chart label={label} height={needsRow ? 132 : 92}>
       {(w, hatch) => {
         const x0 = 0, bw = w
         let x = x0
         return (
           <g className="ch">
             {parts.map((p, i) => {
-              const pw = bw * num(p.v.div(total))
+              const pw = width(p, bw)
               const last = i === parts.length - 1
               const narrow = pw < 150
+              const second = narrow && !last
               const tx = narrow && last ? w : x
               const anchor = narrow && last ? 'end' : 'start'
+              const dy = second ? 40 : 0
               const seg = (
                 <g key={p.k}>
                   <rect x={x} y={8} width={Math.max(0, pw - 2)} height={34} className={p.solid === true ? 'ch-bar-solid' : p.solid === false ? 'ch-bar' : 'ch-gap'} style={p.solid === null ? { fill: `url(#${hatch})` } : undefined} />
-                  <text x={tx} y={62} textAnchor={anchor} className="ch-label">{p.k}</text>
-                  <text x={tx} y={82} textAnchor={anchor} className="ch-value">{`${formatXrp(p.v.toFixed(0))} XRP`}</text>
+                  <text x={tx} y={62 + dy} textAnchor={anchor} className="ch-label">{p.k}</text>
+                  <text x={tx} y={82 + dy} textAnchor={anchor} className="ch-value">{`${formatXrp(p.v.toFixed(0))} XRP`}</text>
                 </g>
               )
               x += pw
