@@ -283,7 +283,7 @@ export function LedgerDetail({ figure }: { figure: FigureDoc }) {
       <p className="ld-meaning t-body-m">{figure.meaning}</p>
       <dl className="ld-calc">
         <div><dt>Formula</dt><dd><code>{figure.formula}</code></dd></div>
-        <div><dt>Result</dt><dd><code className="t-fig-m">{figure.value}</code><span className="dim">{` (${f.text}${f.unit ? ' ' + f.unit : ''})`}</span></dd></div>
+        <div><dt>Result</dt><dd><code>{figure.value}</code><span className="dim">{` (${f.text}${f.unit ? ' ' + f.unit : ''})`}</span></dd></div>
       </dl>
       <div className="table-scroll">
         <table className="ld-inputs">
