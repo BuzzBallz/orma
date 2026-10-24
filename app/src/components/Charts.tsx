@@ -312,6 +312,8 @@ export function Dumbbell({ rows }: { rows: { label: string; held: string; naive:
 
 const EV_SHORT: Record<FeedEvent['type'], string> = {
   LOAN_LATE: 'Late', IMPAIRMENT: 'Impaired', DEFAULT: 'Default', COVER_DRAWN: 'Cover', SHARES_PLEDGED: 'Pledge', LOAN_ORIGINATED: 'Loan', STATEMENT: 'Statement',
+  // Step 20: a desk decision, DECLARED, drawn as the other declared events (the neutral diamond).
+  MARGIN_CALL_ISSUED: 'Margin call', MARGIN_CALL_CURED: 'Call cured', MARGIN_CALL_EXPIRED: 'Call expired',
 }
 
 export function EventTimeline({ events }: { events: FeedEvent[] }) {

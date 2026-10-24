@@ -16,6 +16,10 @@ import { buildTicket, buildPositions } from '../ticket/engine.mjs'
 import { createSigner, registerDeskActions, withDeskErrors } from '../desk/signer.mjs'
 import { watchVaults, readUniverse, createUniverseCache, demoVaultIds } from '../universe/scan.mjs'
 import { clientKeyOf } from '../api.mjs'
+import { judgeMarginCall, isLoggedTransition, pct } from '../desk/margin-call.mjs'
+import { marginPolicyHash, MARGIN_FEED_TYPES } from './contracts.mjs'
+import { Reader } from '../poll.mjs'
+import { normaliseVault } from '../xrpl.mjs'
 import { createFeed, CURSOR } from '../feed/derive.mjs'
 
 /**
@@ -453,6 +457,166 @@ export function createNyc({ reader, env, fetchImpl = fetch }) {
     keeps: (res) => res.statusCode === 200 && !res.writableEnded,
   })
 
+  // --- step 20: margin-call ---
+  // Orma computes, the desk decides (addendum A11). On the Reader's ledgers, at most once per
+  // MARGIN_EVERY_MS, the desk's positions are judged against the risk officer's declared margin policy
+  // (demo/margin-policy-desk-1.json) by judgeMarginCall. A transition into ISSUED, CURED or EXPIRED is read
+  // again at the same ledger (I2) before it is appended to the chained decision log, which is the memory: a
+  // restart re-reads it and never writes a duplicate. Each logged transition goes to the Feed as a DECLARED
+  // event. GET /api/desk/margin-calls answers the calls at L; each position of /api/desk/positions gains its
+  // marginCall. Reads go through step 7's cache and its cap of four desk ledger walks.
+  const marginLog = logger('desk:margin')
+  const MARGIN_EVERY_MS = 15_000
+  function marginPolicy() {
+    try {
+      return readDemo('margin-policy-desk-1', TICKET_DEMO)
+    } catch {
+      return null
+    }
+  }
+  /** loan id -> the call as it stands; the withdrawal value per share last seen, for the reasons */
+  const marginCalls = new Map()
+  const perShareSeen = new Map()
+  try {
+    for (const e of signer.decisions().entries()) {
+      if (e?.kind !== 'margin-call' || typeof e.loanId !== 'string') continue
+      marginCalls.set(e.loanId.toUpperCase(), {
+        status: e.status, loanId: e.loanId, issuedLedger: e.issuedLedger, issuedAt: e.issuedAt, cureBy: e.cureBy,
+        ltvHeldBps: e.ltvHeldBps, maxLtvBps: e.maxLtvBps, shortfall: null, reasons: [], provenance: 'DECLARED',
+        ledgerIndex: e.ledgerIndex, ledgerHash: e.ledgerHash, entryHash: e.hash,
+      })
+    }
+  } catch (e) {
+    marginLog.warn('decision log unreadable at start: margin calls start from none', { err: String(e?.message ?? e).slice(0, 120) })
+  }
+  const lender = (m) => m.desk ?? 'The desk'
+  const bpsText = (b) => (b === null || b === undefined ? 'unknown' : pct(b))
+  function whyOf(call, m) {
+    if (call.status === 'ISSUED') return `${lender(m)} issued a margin call: LTV at withdrawal value ${bpsText(call.ltvHeldBps)} against the mandate's ${pct(call.maxLtvBps)}; cure by ${call.cureBy}: pledge ${call.shortfall?.sharesToAdd ?? '0'} more share units.`
+    if (call.status === 'CURED') return `${lender(m)} recorded its margin call as cured: LTV at withdrawal value ${bpsText(call.ltvHeldBps)}, back within the mandate's ${pct(call.maxLtvBps)}.`
+    return `The cure window of the margin call of ${lender(m)} closed at ${call.cureBy} with the LTV at withdrawal value at ${bpsText(call.ltvHeldBps)}, above the mandate's ${pct(call.maxLtvBps)}.`
+  }
+  /** Every desk loan of a positions read, judged at its ledger. */
+  function judgeAll(p, m, policy) {
+    const doc = buildPositions(p, m)
+    return doc.positions.map((pos, i) => {
+      const ti = p.loans[i]?.collateral?.[0]?.ticketInputs ?? null
+      const perShare = ti ? Reader.nav(normaliseVault(ti.vault.raw, ti.closeTime)).navCorrect : null
+      const scale = Number.isSafeInteger(ti?.vault.fields.Scale) ? ti.vault.fields.Scale : 0
+      const id = pos.loanId.toUpperCase()
+      const trigger = ti && feed
+        ? feed.after(null).filter((e) => (e.type === 'IMPAIRMENT' || e.type === 'DEFAULT') && e.vaultId === ti.vault.id && e.txHash).at(-1)?.txHash ?? null
+        : null
+      const call = judgeMarginCall({
+        position: { ...pos, withdrawalValuePerShare: perShare, shareScale: scale }, policy, mandate: m,
+        snapshot: { ledgerIndex: p.ledgerIndex, ledgerHash: p.ledgerHash, closeTime: p.closeTime },
+        previous: marginCalls.get(id) ?? null, moved: { perShareBefore: perShareSeen.get(id) ?? null, triggerTx: trigger },
+      })
+      return { id, pos, call, perShare }
+    })
+  }
+  let marginRun = null
+  /** One judgment at a time: the calls at the ledger read, each transition re-read, logged and pushed; null without a policy. */
+  function judgeMargins() {
+    marginRun ??= (async () => {
+      const policy = marginPolicy()
+      const m = mandateOf('desk-1')
+      if (!policy || !m) return null
+      if (policy.hash !== marginPolicyHash(policy) || policy.mandateHash !== m.hash) {
+        marginLog.error('margin policy refused: it does not hash to its own hash, or names another mandate', { id: policy.id, hash: policy.hash })
+        return null
+      }
+      const L = lastLedger()
+      const p = await deskFlight(`positions@${L}`, typeof L === 'number', () => walk(() => readPositions(reader.xrpl, { reader, demoDir: TICKET_DEMO })))
+      const judged = judgeAll(p, m, policy)
+      for (const j of judged) {
+        const before = marginCalls.get(j.id) ?? null
+        let call = j.call
+        if (isLoggedTransition(before, call)) {
+          // I2: the same ledger read again; only what the second read confirms is the desk's decision
+          const at = { ledgerIndex: p.ledgerIndex, ledgerHash: p.ledgerHash, closeTime: p.closeTime }
+          const again = judgeAll(await walk(() => readPositions(reader.xrpl, { reader, demoDir: TICKET_DEMO, at })), m, policy).find((x) => x.id === j.id)
+          if (again?.call.status !== call.status) {
+            marginLog.warn('margin call not logged: the re-read at the same ledger disagrees', { loanId: j.id, ledgerIndex: p.ledgerIndex, first: call.status, second: again?.call.status ?? null })
+            // nothing decided: the status as it stood, or none, saying why
+            const why = `A second read of ledger ${p.ledgerIndex} disagreed with the first: no margin-call decision was taken.`
+            marginCalls.set(j.id, before
+              ? { ...before, reasons: [...before.reasons.filter((x) => !x.startsWith('A second read of ledger')), why] }
+              : { ...call, status: 'NONE', issuedLedger: null, issuedAt: null, cureBy: null, shortfall: null, reasons: [...call.reasons.slice(0, 2), why] })
+            continue
+          }
+          const entry = signer.decisions().appendMarginCall({
+            status: call.status, loanId: j.id, mandateHash: m.hash, policyHash: policy.hash, issuedLedger: call.issuedLedger,
+            issuedAt: call.issuedAt, cureBy: call.cureBy, ltvHeldBps: call.ltvHeldBps, maxLtvBps: call.maxLtvBps,
+            ledgerIndex: p.ledgerIndex, ledgerHash: p.ledgerHash,
+          })
+          call = { ...call, entryHash: entry.hash }
+          marginLog.info(`margin call ${call.status}`, { loanId: j.id, ledgerIndex: p.ledgerIndex, ledgerHash: p.ledgerHash, entry: entry.hash })
+          feed?.push({
+            type: MARGIN_FEED_TYPES[call.status], provenance: 'DECLARED', vaultId: j.pos.vaultId, loanId: j.id,
+            ledgerIndex: p.ledgerIndex, ledgerHash: p.ledgerHash, entryHash: entry.hash, ...(call.triggerTx && { txHash: call.triggerTx }),
+            why: whyOf(call, m), moneyEffect: null,
+            receipts: [{ object: 'Position', field: 'ltvHeldBps', before: before?.ltvHeldBps ?? null, after: call.ltvHeldBps }],
+          })
+        } else if (call.status !== 'NONE' && before?.entryHash) {
+          call = { ...call, entryHash: before.entryHash }
+        }
+        marginCalls.set(j.id, call)
+        if (j.perShare) perShareSeen.set(j.id, j.perShare)
+      }
+      return { ledgerIndex: p.ledgerIndex, ledgerHash: p.ledgerHash, policy, marginCalls: judged.map((j) => marginCalls.get(j.id)) }
+    })().finally(() => {
+      marginRun = null
+    })
+    return marginRun
+  }
+  let marginLast = 0
+  if (typeof reader?.subscribe === 'function') {
+    reader.subscribe(() => {
+      if (marginRun || Date.now() - marginLast < MARGIN_EVERY_MS || !marginPolicy()) return
+      marginLast = Date.now()
+      judgeMargins().catch((e) => {
+        if (!(e instanceof BusyError)) marginLog.warn('margin calls not judged on this ledger', { ledgerIndex: lastLedger() ?? null, err: String(e?.message ?? e).slice(0, 160) })
+      })
+    })
+  }
+  /** A position the judgment did not reach (no policy, or the walks were busy): NONE, saying why. */
+  const unjudged = (p, body, why) => ({
+    status: 'NONE', loanId: p.loanId, issuedLedger: null, issuedAt: null, cureBy: null, ltvHeldBps: p.ltvHeldBps,
+    maxLtvBps: JSON.parse(String(p.usage?.find((u) => u.limit === 'maxLtvBps')?.threshold ?? '0')), shortfall: null,
+    reasons: [why], provenance: 'DECLARED', ledgerIndex: body.ledgerIndex, ledgerHash: body.ledgerHash,
+  })
+  // /api/desk/positions: step 7's route, each position given its margin call (an addition).
+  const positionsRoute = handleTicket
+  handleTicket = async (req, res, url, helpers) => {
+    if (url.pathname !== '/api/desk/positions') return positionsRoute(req, res, url, helpers)
+    const configured = Boolean(marginPolicy())
+    const judged = configured ? await judgeMargins().catch(() => null) : null
+    const byId = new Map((judged?.marginCalls ?? []).map((c) => [c.loanId.toUpperCase(), c]))
+    const send = (code, body) => helpers.send(code, code === 200 && Array.isArray(body?.positions)
+      ? { ...body, positions: body.positions.map((p) => ({ ...p, marginCall: byId.get(p.loanId.toUpperCase()) ?? unjudged(p, body, configured ? 'No margin call could be judged at this ledger; retry shortly.' : 'No margin policy is on this server.') })) }
+      : body)
+    return positionsRoute(req, res, url, { ...helpers, send })
+  }
+  async function handleMarginCalls(req, res, url, { send, fail, stamp }) {
+    if (url.pathname !== '/api/desk/margin-calls' || (req.method !== 'GET' && req.method !== 'HEAD')) return false
+    if (!firstPassDone()) {
+      fail(503, 'WARMING_UP', 'The reader has not finished its first pass over the facilities; retry shortly', true)
+      return true
+    }
+    try {
+      const out = await judgeMargins()
+      if (!out) fail(503, 'NOT_CONFIGURED', 'Margin calls are not configured on this server: demo/margin-policy-desk-1.json is missing, does not hash to its own hash, or names another mandate', true)
+      else send(200, stamp(out))
+    } catch (e) {
+      if (e instanceof BusyError) fail(503, 'BUSY', 'Four desk ledger walks are already running; retry shortly', true)
+      else if (e instanceof SnapshotError) refuseSnapshot(e, fail)
+      else if (e?.code === 'ENOENT') fail(503, 'NOT_CONFIGURED', 'The desk is not baked on this server (demo/desk.json or demo/spare.json is missing)', true)
+      else throw e
+    }
+    return true
+  }
+
   return {
     async handle(req, res, url, helpers) {
       if (await handleHarness(req, res, url, helpers)) return true
@@ -461,6 +625,7 @@ export function createNyc({ reader, env, fetchImpl = fetch }) {
       if (await handleDeskSigner(req, res, url, helpers)) return true
       if (await handleUniverse(req, res, url, helpers)) return true
       if (await handleFeed(req, res, url, helpers)) return true
+      if (await handleMarginCalls(req, res, url, helpers)) return true
       return false
     },
     missing,

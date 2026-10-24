@@ -1,0 +1,13 @@
+{
+  "schema": "orma.marginpolicy/1",
+  "id": "desk-1",
+  "mandateHash": "958688edb796a9dcc09c68521b1e90aca6c55e4a8ee1f98f97fd44abff80ffd5",
+  "trigger": "maxLtvBps",
+  "cureSeconds": 600,
+  "realWorldNote": "Institutional desks usually give 12 to 24 hours; 600 seconds on Devnet so a full cycle can be shown.",
+  "cureAction": "pledgeEscrow",
+  "afterExpiry": "The desk may act under its escrow policy (finish only after a default). No automatic seizure.",
+  "issuedAt": "2026-10-24T20:47:33.162Z",
+  "hash": "71ccb47841695162752ca87baf4f964ae6e26eef19746ef4a66300d4700568cc",
+  "anchorTx": "56AA6916014C62E2BD8976B9FDD2B6D647D8AD2131CE97F3609B67B87CC41F32"
+}

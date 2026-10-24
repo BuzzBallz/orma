@@ -1,4 +1,4 @@
-import type { ChangeRow, CollateralAccount } from './types'
+import type { ChangeRow, CollateralAccount, MarginCall } from './types'
 
 export const API_BASE = (import.meta.env?.VITE_API_BASE ?? 'http://localhost:8787').replace(/\/+$/, '')
 
@@ -81,6 +81,8 @@ export interface Position {
   loanId: string; loanSetTxHash: string | null; vaultId: string; borrower: string; principalOutstanding: string
   collateral: PositionCollateral[]; collateralHeldDrops: string; ltvHeldBps: number
   usage: { limit: string; value: string; threshold: string }[]
+  /** Step 20: the desk's margin call on this loan, judged at the ledger of the answer. */
+  marginCall?: MarginCall
 }
 export interface Positions { ledgerIndex: number; ledgerHash: string; positions: Position[] }
 
@@ -111,6 +113,25 @@ export function demoLoanFor(positions: Positions | null, deskPlan: DeskPlan, fac
     && p.collateral.some((c) => c.shareMptId.toUpperCase() === harbor.shareMptId.toUpperCase()))
   const desk = deskPlan.vaults.find((v) => v.label === 'desk')
   return backed.find((p) => desk && p.vaultId.toUpperCase() === desk.vaultId.toUpperCase()) ?? backed[0] ?? null
+}
+
+// --- step 20, the cure of a margin call ------------------------------------------------------------
+
+/** The pledge ticket a cure rests on: the shortfall's units of the pledged share, under mandate desk-1. */
+export function cureTicketPath(share: string, units: string): string {
+  return `/api/tickets?share=${share}&op=pledge&units=${units}&mandate=desk-1`
+}
+
+/** The lending vault of a desk loan: the plan's label for the loan's vaultId when it is `desk` or `spare`, else null. */
+export function lendingVaultOf(deskPlan: DeskPlan, vaultId: string): 'desk' | 'spare' | null {
+  const label = deskPlan.vaults.find((v) => v.vaultId.toUpperCase() === vaultId.toUpperCase())?.label
+  return label === 'desk' || label === 'spare' ? label : null
+}
+
+/** The pledgeEscrow body of a cure: a normal pledge of `units`, plus the loan it cures, so the escrow carries an orma.cure memo. */
+export interface CureBody { vault: 'desk' | 'spare'; share: string; ticketId: string; inputsDigest: string; units: string; cureLoanId: string }
+export function cureBody(a: { lending: 'desk' | 'spare'; share: string; ticketId: string; inputsDigest: string; units: string; loanId: string }): CureBody {
+  return { vault: a.lending, share: a.share, ticketId: a.ticketId, inputsDigest: a.inputsDigest, units: a.units, cureLoanId: a.loanId }
 }
 
 export function buildActionRequest(action: string, role: string, runId: string, token: string, body?: object): { url: string; init: RequestInit } {

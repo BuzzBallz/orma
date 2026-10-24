@@ -96,6 +96,7 @@ export const NYC_ROUTES = Object.freeze([
   { method: 'GET', path: '/api/universe' },
   { method: 'GET', path: '/api/feed' },
   { method: 'GET', path: '/api/feed/stream' },
+  { method: 'GET', path: '/api/desk/margin-calls' }, // step 20, addendum A11
 ].map((r) => Object.freeze(r)))
 
 /**
@@ -245,6 +246,44 @@ export function decisionHash(entry) {
   const { hash: _ignored, ...rest } = /** @type {any} */ (entry)
   void _ignored
   return sha256Hex(canonical(rest))
+}
+
+// --- margin calls (step 20, addendum A11) -------------------------------------------------------------
+
+/**
+ * @typedef {{
+ *   schema: 'orma.marginpolicy/1', id: string, mandateHash: string, trigger: 'maxLtvBps', cureSeconds: number,
+ *   realWorldNote: string, cureAction: 'pledgeEscrow', afterExpiry: string, issuedAt: string, hash: string, anchorTx: string
+ * }} MarginPolicy
+ * @typedef {{
+ *   status: 'NONE'|'ISSUED'|'CURED'|'EXPIRED', loanId: string,
+ *   issuedLedger: number|null, issuedAt: string|null, cureBy: string|null,
+ *   ltvHeldBps: number|null, maxLtvBps: number,
+ *   shortfall: { collateralValueDrops: string, sharesToAdd: string, withdrawalValuePerShare: string }|null,
+ *   reasons: string[], provenance: 'DECLARED', ledgerIndex: number, ledgerHash: string,
+ *   entryHash?: string, triggerTx?: string
+ * }} MarginCall
+ * @typedef {{
+ *   seq: number, prevHash: string, kind: 'margin-call', status: 'ISSUED'|'CURED'|'EXPIRED', loanId: string,
+ *   mandateHash: string, policyHash: string, issuedLedger: number, issuedAt: string, cureBy: string, ltvHeldBps: number|null, maxLtvBps: number,
+ *   ledgerIndex: number, ledgerHash: string, hash: string
+ * }} MarginCallEntry
+ */
+
+export const MARGIN_STATUSES = Object.freeze(['NONE', 'ISSUED', 'CURED', 'EXPIRED'])
+/** The three Feed types a margin call adds to the closed set: DECLARED, one per logged transition. */
+export const MARGIN_FEED_TYPES = Object.freeze({ ISSUED: 'MARGIN_CALL_ISSUED', CURED: 'MARGIN_CALL_CURED', EXPIRED: 'MARGIN_CALL_EXPIRED' })
+
+const MARGIN_POLICY_KEYS = ['schema', 'id', 'mandateHash', 'trigger', 'cureSeconds', 'realWorldNote', 'cureAction', 'afterExpiry', 'issuedAt']
+
+/**
+ * The hash of a margin policy, as for the mandate: over its orma.marginpolicy/1 keys only, without hash,
+ * anchorTx or an envelope.
+ * @param {Partial<MarginPolicy>} p
+ * @returns {string}
+ */
+export function marginPolicyHash(p) {
+  return sha256Hex(canonical(Object.fromEntries(MARGIN_POLICY_KEYS.map((k) => [k, /** @type {any} */ (p)[k]]))))
 }
 
 // --- manager statements (orma.stmt/1 in Vault.Data) ----------------------------------------------------
@@ -762,7 +801,8 @@ function validateMark(doc) {
   return out
 }
 
-const FEED_TYPES = ['LOAN_LATE', 'IMPAIRMENT', 'DEFAULT', 'COVER_DRAWN', 'SHARES_PLEDGED', 'LOAN_ORIGINATED', 'STATEMENT']
+const MARGIN_TYPES = Object.values(MARGIN_FEED_TYPES)
+const FEED_TYPES = ['LOAN_LATE', 'IMPAIRMENT', 'DEFAULT', 'COVER_DRAWN', 'SHARES_PLEDGED', 'LOAN_ORIGINATED', 'STATEMENT', ...MARGIN_TYPES]
 
 /** @param {unknown} doc @returns {string[]} */
 function validateFeedEvent(doc) {
@@ -775,13 +815,19 @@ function validateFeedEvent(doc) {
   if (!cursor) r.fail('id', 'is not a cursor <ledger on 19 digits>-<counter>')
   else if (Number(cursor[1]) !== e.ledgerIndex) r.fail('id', 'does not start with the event ledger')
   r.oneOf(e.type, FEED_TYPES, 'type')
-  r.eq(e.provenance, e.type === 'STATEMENT' ? 'DECLARED' : 'REAL', 'provenance')
+  const margin = MARGIN_TYPES.includes(e.type)
+  r.eq(e.provenance, e.type === 'STATEMENT' || margin ? 'DECLARED' : 'REAL', 'provenance')
   hex64(r, e.vaultId, 'vaultId')
-  if ('loanId' in e) hex64(r, e.loanId, 'loanId')
+  if ('loanId' in e || margin) hex64(r, e.loanId, 'loanId')
   ledgerAt(r, e, '')
   if ('txHash' in e) hex64(r, e.txHash, 'txHash')
   r.str(e.why, 'why')
-  if (e.type === 'STATEMENT') {
+  if (margin) {
+    // a desk decision: no money moved, the decision-log entry that records it
+    r.eq(e.moneyEffect, null, 'moneyEffect')
+    hex64(r, e.entryHash, 'entryHash')
+    r.absent(e, 'statement', '', 'outside a STATEMENT event')
+  } else if (e.type === 'STATEMENT') {
     r.eq(e.moneyEffect, null, 'moneyEffect')
     statementInto(out, e.statement, 'statement')
   } else {
@@ -851,6 +897,8 @@ function validateDecision(doc) {
   const r = rules(out)
   if (!r.obj(doc, '')) return out
   const d = /** @type {any} */ (doc)
+  // The second kind of entry of the same log (step 20): its own rules, the same chain.
+  if (d.kind === 'margin-call') return validateMarginCallEntry(doc)
   if (!Number.isSafeInteger(d.seq) || d.seq < 1) r.fail('seq', 'is not 1, 2, …')
   hex64(r, d.prevHash, 'prevHash')
   if (d.seq === 1 && d.prevHash !== '0'.repeat(64)) r.fail('prevHash', 'of the first entry is not 64 zeros')
@@ -864,6 +912,110 @@ function validateDecision(doc) {
   ledgerAt(r, d, '')
   hex64(r, d.hash, 'hash')
   if (out.length === 0 && d.hash !== decisionHash(d)) r.fail('hash', 'is not sha256Hex(canonical(entry without hash))')
+  return out
+}
+
+const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/
+
+/** @param {unknown} doc @returns {string[]} */
+function validateMarginPolicy(doc) {
+  const out = []
+  deepProblems(doc, '', out)
+  const r = rules(out)
+  if (!r.obj(doc, '')) return out
+  const p = /** @type {any} */ (doc)
+  r.eq(p.schema, 'orma.marginpolicy/1', 'schema')
+  r.str(p.id, 'id')
+  hex64(r, p.mandateHash, 'mandateHash')
+  r.eq(p.trigger, 'maxLtvBps', 'trigger')
+  if (!Number.isSafeInteger(p.cureSeconds) || p.cureSeconds < 1) r.fail('cureSeconds', 'is not a whole number of seconds')
+  r.str(p.realWorldNote, 'realWorldNote')
+  r.eq(p.cureAction, 'pledgeEscrow', 'cureAction')
+  r.str(p.afterExpiry, 'afterExpiry')
+  r.re(p.issuedAt, ISO, 'issuedAt', 'an ISO 8601 UTC time')
+  hex64(r, p.hash, 'hash')
+  hex64(r, p.anchorTx, 'anchorTx')
+  if (out.length === 0 && p.hash !== marginPolicyHash(p)) r.fail('hash', 'is not sha256Hex(canonical(policy without hash and anchorTx))')
+  return out
+}
+
+/** @param {unknown} doc @returns {string[]} */
+function validateMarginCall(doc) {
+  const out = []
+  deepProblems(doc, '', out)
+  const r = rules(out)
+  if (!r.obj(doc, '')) return out
+  const c = /** @type {any} */ (doc)
+  r.oneOf(c.status, MARGIN_STATUSES, 'status')
+  hex64(r, c.loanId, 'loanId')
+  if (c.ltvHeldBps !== null) r.int(c.ltvHeldBps, 'ltvHeldBps')
+  r.int(c.maxLtvBps, 'maxLtvBps')
+  r.eq(c.provenance, 'DECLARED', 'provenance')
+  ledgerAt(r, c, '')
+  if (r.arr(c.reasons, 'reasons')) c.reasons.forEach((/** @type {unknown} */ x, /** @type {number} */ i) => r.str(x, `reasons[${i}]`))
+  if (c.status === 'NONE') {
+    for (const k of ['issuedLedger', 'issuedAt', 'cureBy', 'shortfall']) if (c[k] !== null) r.fail(k, 'is not null without a margin call')
+    r.absent(c, 'entryHash', '', 'without a margin call')
+  } else {
+    r.int(c.issuedLedger, 'issuedLedger')
+    r.re(c.issuedAt, ISO, 'issuedAt', 'an ISO 8601 UTC time')
+    r.re(c.cureBy, ISO, 'cureBy', 'an ISO 8601 UTC time')
+    if (ISO.test(c.issuedAt ?? '') && ISO.test(c.cureBy ?? '') && !(Date.parse(c.cureBy) > Date.parse(c.issuedAt))) r.fail('cureBy', 'is not after issuedAt')
+    hex64(r, c.entryHash, 'entryHash')
+    if (c.status === 'CURED') {
+      if (c.shortfall !== null) r.fail('shortfall', 'is not null on a cured call')
+    } else if (r.obj(c.shortfall, 'shortfall')) {
+      r.re(c.shortfall.collateralValueDrops, UINT, 'shortfall.collateralValueDrops', 'a whole number of drops')
+      r.re(c.shortfall.sharesToAdd, UINT, 'shortfall.sharesToAdd', 'a whole number of share units')
+      r.dec(c.shortfall.withdrawalValuePerShare, 'shortfall.withdrawalValuePerShare')
+    }
+  }
+  if ('triggerTx' in c) hex64(r, c.triggerTx, 'triggerTx')
+  return out
+}
+
+/** @param {unknown} doc @returns {string[]} */
+function validateMarginCallEntry(doc) {
+  const out = []
+  deepProblems(doc, '', out)
+  const r = rules(out)
+  if (!r.obj(doc, '')) return out
+  const e = /** @type {any} */ (doc)
+  if (!Number.isSafeInteger(e.seq) || e.seq < 1) r.fail('seq', 'is not 1, 2, …')
+  hex64(r, e.prevHash, 'prevHash')
+  if (e.seq === 1 && e.prevHash !== '0'.repeat(64)) r.fail('prevHash', 'of the first entry is not 64 zeros')
+  r.eq(e.kind, 'margin-call', 'kind')
+  r.oneOf(e.status, ['ISSUED', 'CURED', 'EXPIRED'], 'status')
+  hex64(r, e.loanId, 'loanId')
+  hex64(r, e.mandateHash, 'mandateHash')
+  hex64(r, e.policyHash, 'policyHash')
+  r.int(e.issuedLedger, 'issuedLedger')
+  r.re(e.issuedAt, ISO, 'issuedAt', 'an ISO 8601 UTC time')
+  r.re(e.cureBy, ISO, 'cureBy', 'an ISO 8601 UTC time')
+  if (e.ltvHeldBps !== null) r.int(e.ltvHeldBps, 'ltvHeldBps')
+  r.int(e.maxLtvBps, 'maxLtvBps')
+  r.absent(e, 'decision', '', 'on a margin-call entry')
+  ledgerAt(r, e, '')
+  hex64(r, e.hash, 'hash')
+  if (out.length === 0 && e.hash !== decisionHash(e)) r.fail('hash', 'is not sha256Hex(canonical(entry without hash))')
+  return out
+}
+
+/** GET /api/desk/margin-calls: the policy and one call per desk loan, all at the document's ledger. */
+function validateMarginCalls(doc) {
+  const out = []
+  deepProblems(doc, '', out)
+  const r = rules(out)
+  if (!r.obj(doc, '')) return out
+  const d = /** @type {any} */ (doc)
+  ledgerAt(r, d, '')
+  out.push(...validateMarginPolicy(d.policy).map((p) => `policy.${p}`))
+  if (r.arr(d.marginCalls, 'marginCalls')) {
+    d.marginCalls.forEach((/** @type {any} */ c, /** @type {number} */ i) => {
+      out.push(...validateMarginCall(c).map((p) => `marginCalls[${i}].${p}`))
+      if (c?.ledgerIndex !== d.ledgerIndex) r.fail(`marginCalls[${i}].ledgerIndex`, "is not the document's ledger")
+    })
+  }
   return out
 }
 
@@ -983,6 +1135,10 @@ export const SCHEMAS = Object.freeze({
   collateralAccount: validateCollateralAccount,
   action: validateAction,
   error: validateError,
+  marginPolicy: validateMarginPolicy, // step 20
+  marginCall: validateMarginCall,
+  marginCallEntry: validateMarginCallEntry,
+  marginCalls: validateMarginCalls,
 })
 
 // --- examples --------------------------------------------------------------------------------------
@@ -1067,6 +1223,33 @@ const MANDATE = { ...MANDATE_BODY, hash: mandateHash(MANDATE_BODY), anchorTx: AN
 const DECISION_BODY = {
   seq: 1, prevHash: '0'.repeat(64), ticketId: 'C'.repeat(64), mandateHash: MANDATE.hash,
   decision: /** @type {const} */ ('approved'), txHash: TX, ledgerIndex: L, ledgerHash: H,
+}
+
+// Step 20: the risk officer's margin policy and an open call on L1 of the desk, issued two ledgers ago.
+const MARGIN_POLICY_BODY = {
+  schema: /** @type {const} */ ('orma.marginpolicy/1'), id: 'desk-1', mandateHash: MANDATE.hash,
+  trigger: /** @type {const} */ ('maxLtvBps'), cureSeconds: 600,
+  realWorldNote: 'Institutional desks usually give 12 to 24 hours; 600 seconds on Devnet so a full cycle can be shown.',
+  cureAction: /** @type {const} */ ('pledgeEscrow'),
+  afterExpiry: 'The desk may act under its escrow policy (finish only after a default). No automatic seizure.',
+  issuedAt: '2026-10-24T21:00:00.000Z',
+}
+const MARGIN_POLICY = { ...MARGIN_POLICY_BODY, hash: marginPolicyHash(MARGIN_POLICY_BODY), anchorTx: ANCHOR }
+const MARGIN_ENTRY_BODY = {
+  seq: 2, prevHash: 'D'.repeat(64), kind: /** @type {const} */ ('margin-call'), status: /** @type {const} */ ('ISSUED'), loanId: LOAN1,
+  mandateHash: MANDATE.hash, policyHash: MARGIN_POLICY.hash, issuedLedger: L - 2, issuedAt: '2026-10-25T14:00:00Z', cureBy: '2026-10-25T14:10:00Z',
+  ltvHeldBps: 6100, maxLtvBps: 5000, ledgerIndex: L - 2, ledgerHash: H,
+}
+const MARGIN_ENTRY = { ...MARGIN_ENTRY_BODY, hash: decisionHash(MARGIN_ENTRY_BODY) }
+const MARGIN_CALL = {
+  status: /** @type {const} */ ('ISSUED'), loanId: LOAN1, issuedLedger: L - 2, issuedAt: '2026-10-25T14:00:00Z', cureBy: '2026-10-25T14:10:00Z',
+  ltvHeldBps: 6100, maxLtvBps: 5000,
+  shortfall: { collateralValueDrops: '178525', sharesToAdd: '222068', withdrawalValuePerShare: '0.803922' },
+  reasons: [
+    'The mandate desk-1 limits the LTV at withdrawal value to 50.00 %.',
+    'The LTV at withdrawal value is 61.00 %, above it.',
+  ],
+  provenance: /** @type {const} */ ('DECLARED'), ledgerIndex: L, ledgerHash: H, entryHash: MARGIN_ENTRY.hash,
 }
 
 const pad19 = (/** @type {number} */ n) => String(n).padStart(19, '0')
@@ -1203,10 +1386,21 @@ export const EXAMPLES = deepFreeze({
   },
   action: { actionId: 'act-3', runId: 'run-1', role: 'riskOfficer', action: 'approve', vault: 'desk', state: 'approving' },
   error: { error: { code: 'BUSY', message: 'Four desk ledger walks are already running; retry shortly.', retryable: true } },
+  marginPolicy: MARGIN_POLICY,
+  marginCall: MARGIN_CALL,
+  marginCallEntry: MARGIN_ENTRY,
+  marginCalls: { ledgerIndex: L, ledgerHash: H, policy: MARGIN_POLICY, marginCalls: [MARGIN_CALL] },
+  feedEventMarginCall: {
+    id: `${pad19(L - 2)}-0`, type: 'MARGIN_CALL_ISSUED', provenance: 'DECLARED',
+    vaultId: VAULT, loanId: LOAN1, ledgerIndex: L - 2, ledgerHash: H, entryHash: MARGIN_ENTRY.hash,
+    why: 'Hudson Credit Desk (fictional) issued a margin call: LTV at withdrawal value 61.00 % against the mandate\'s 50.00 %; cure by 2026-10-25T14:10:00Z.',
+    moneyEffect: null,
+    receipts: [{ object: 'Position', field: 'ltvHeldBps', before: null, after: 6100 }],
+  },
 })
 
-/** Which schema validates each example (the two tickets share one, as do the two feed events). */
-export const EXAMPLE_SCHEMA = Object.freeze(Object.fromEntries(Object.keys(EXAMPLES).map((k) => [k, ({ feedEventStatement: 'feedEvent', ticketBuy: 'ticket' })[k] ?? k])))
+/** Which schema validates each example (the two tickets share one, as do the three feed events). */
+export const EXAMPLE_SCHEMA = Object.freeze(Object.fromEntries(Object.keys(EXAMPLES).map((k) => [k, ({ feedEventStatement: 'feedEvent', feedEventMarginCall: 'feedEvent', ticketBuy: 'ticket' })[k] ?? k])))
 
 /** @template T @param {T} o @returns {T} */
 function deepFreeze(o) {

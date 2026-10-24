@@ -9,7 +9,7 @@ import {
   SCHEMAS, EXAMPLES, EXAMPLE_SCHEMA, NYC_ROUTES, FORMULAS, AMOUNT_FIELDS, MARK_STEPS, NYC_ERRORS, ACTION_STATES,
   DECISION_CODES, canonical, sha256Hex, mandateHash, decisionHash, encodeStatement, parseStatement,
   statementConsistency, COLLATERAL_POLICY, COLLATERAL_STAGES, collateralStageOf, judgeCollateralAccount,
-  judgeCollateralShare,
+  judgeCollateralShare, marginPolicyHash,
 } from '../nyc/contracts.mjs'
 
 let bad = 0
@@ -93,6 +93,30 @@ function main() {
   eq('a STATEMENT event labelled REAL', SCHEMAS.feedEvent({ ...clone(EXAMPLES.feedEventStatement), provenance: 'REAL' }).length > 0, true)
   eq('an approving action passes, a previewing one is never served', [SCHEMAS.action(EXAMPLES.action).length, SCHEMAS.action({ ...EXAMPLES.action, state: 'previewing' }).length > 0], [0, true])
   eq('BUSY is retryable', SCHEMAS.error({ error: { code: 'BUSY', message: 'x', retryable: false } }).length > 0, true)
+
+  console.log('margin calls (step 20)')
+  eq('the margin policy example hash is over its own keys, not the envelope', [EXAMPLES.marginPolicy.hash, marginPolicyHash({ ...EXAMPLES.marginPolicy, serverTime: 'x', ledgerIndex: 1 })], [marginPolicyHash(EXAMPLES.marginPolicy), EXAMPLES.marginPolicy.hash])
+  eq('a margin policy whose cure window changed after hashing', SCHEMAS.marginPolicy({ ...EXAMPLES.marginPolicy, cureSeconds: 43200 }).some((p) => p.startsWith('hash')), true)
+  eq('a margin policy whose cure action is not pledgeEscrow', SCHEMAS.marginPolicy({ ...EXAMPLES.marginPolicy, cureAction: 'seize' }).some((p) => p.startsWith('cureAction')), true)
+  const none = { ...clone(EXAMPLES.marginCall), status: 'NONE', issuedLedger: null, issuedAt: null, cureBy: null, shortfall: null, entryHash: undefined }
+  delete none.entryHash
+  eq('a NONE call carries no deadline, no shortfall and no log entry', SCHEMAS.marginCall(none), [])
+  eq('a NONE call with a cureBy is refused', SCHEMAS.marginCall({ ...none, cureBy: '2026-10-25T14:10:00Z' }).some((p) => p.startsWith('cureBy')), true)
+  eq('an ISSUED call without its log entry is refused', SCHEMAS.marginCall({ ...clone(EXAMPLES.marginCall), entryHash: undefined }).some((p) => p.startsWith('entryHash')), true)
+  eq('an ISSUED call whose deadline is not after its issue is refused', SCHEMAS.marginCall({ ...clone(EXAMPLES.marginCall), cureBy: EXAMPLES.marginCall.issuedAt }).some((p) => p.startsWith('cureBy')), true)
+  eq('a CURED call keeps no shortfall', SCHEMAS.marginCall({ ...clone(EXAMPLES.marginCall), status: 'CURED' }).some((p) => p.startsWith('shortfall')), true)
+  eq('shares to add as a fraction are refused', SCHEMAS.marginCall({ ...clone(EXAMPLES.marginCall), shortfall: { ...EXAMPLES.marginCall.shortfall, sharesToAdd: '1.5' } }).some((p) => p.startsWith('shortfall.sharesToAdd')), true)
+  eq('a margin call is DECLARED, a desk decision', SCHEMAS.marginCall({ ...clone(EXAMPLES.marginCall), provenance: 'REAL' }).some((p) => p.startsWith('provenance')), true)
+  eq('a margin-call entry is accepted by the decision schema, by its own rules', SCHEMAS.decision(EXAMPLES.marginCallEntry), [])
+  eq('a margin-call entry whose hash was not recomputed', SCHEMAS.marginCallEntry({ ...EXAMPLES.marginCallEntry, ltvHeldBps: 1 }).some((p) => p.startsWith('hash')), true)
+  eq('a margin-call entry that carries a decision is refused', SCHEMAS.decision({ ...EXAMPLES.marginCallEntry, decision: 'approved' }).some((p) => p.startsWith('decision')), true)
+  eq('a MARGIN_CALL_ISSUED event labelled REAL', SCHEMAS.feedEvent({ ...clone(EXAMPLES.feedEventMarginCall), provenance: 'REAL' }).some((p) => p.startsWith('provenance')), true)
+  eq('a MARGIN_CALL_ISSUED event with a money effect', SCHEMAS.feedEvent({ ...clone(EXAMPLES.feedEventMarginCall), moneyEffect: { value: '1', unit: 'drops' } }).length > 0, true)
+  eq('a MARGIN_CALL_ISSUED event without its log entry', SCHEMAS.feedEvent({ ...clone(EXAMPLES.feedEventMarginCall), entryHash: undefined }).some((p) => p.startsWith('entryHash')), true)
+  eq('the seven earlier feed types are unchanged: an IMPAIRMENT stays REAL', SCHEMAS.feedEvent({ ...clone(EXAMPLES.feedEvent), provenance: 'DECLARED' }).some((p) => p.startsWith('provenance')), true)
+  const otherLedger = clone(EXAMPLES.marginCalls)
+  otherLedger.marginCalls[0].ledgerIndex += 1
+  eq('a margin-calls document with a call read at another ledger', SCHEMAS.marginCalls(otherLedger).some((p) => p.includes("document's ledger")), true)
   eq('the hardening values are in the contract', [ACTION_STATES.includes('approving'), DECISION_CODES.includes('SUBMIT_UNCONFIRMED'), NYC_ERRORS.BUSY], [true, true, { status: 503, retryable: true }])
 
   console.log('canonical and sha256Hex')
@@ -107,7 +131,7 @@ function main() {
   eq('fourteen formulas', Object.keys(FORMULAS).length, 14)
 
   console.log('routes')
-  eq('fifteen NYC routes', NYC_ROUTES.length, 15)
+  eq('sixteen NYC routes: fifteen at step 1, GET /api/desk/margin-calls at step 20', [NYC_ROUTES.length, NYC_ROUTES.at(-1).path], [16, '/api/desk/margin-calls'])
   const spec = JSON.parse(readFileSync(new URL('../openapi.json', import.meta.url), 'utf8'))
   const doc = readFileSync(new URL('../../documentation/pages/http-api.mdx', import.meta.url), 'utf8')
   eq('every NYC route is in openapi.json, with a summary and a described 200', NYC_ROUTES.filter((r) => {

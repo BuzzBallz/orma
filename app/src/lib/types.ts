@@ -407,12 +407,38 @@ export interface CollateralAccount {
 export interface FeedEvent {
   id: string
   type: 'LOAN_LATE' | 'IMPAIRMENT' | 'DEFAULT' | 'COVER_DRAWN' | 'SHARES_PLEDGED' | 'LOAN_ORIGINATED' | 'STATEMENT'
+    | 'MARGIN_CALL_ISSUED' | 'MARGIN_CALL_CURED' | 'MARGIN_CALL_EXPIRED' // step 20, DECLARED
   provenance: 'REAL' | 'DECLARED'
   vaultId: string; loanId?: string; ledgerIndex: number; ledgerHash: string; txHash?: string
   why: string; moneyEffect: { value: string; unit: string } | null
   receipts: { object: string; field: string; before: unknown; after: unknown }[]
   statement?: Statement
+  /** On a MARGIN_CALL_* event: the decision-log entry that records it. */
+  entryHash?: string
 }
+
+// --- step 20, margin call (addendum A11): mirrors of src/nyc/contracts.mjs --------------------------------
+
+export interface MarginPolicy {
+  schema: 'orma.marginpolicy/1'; id: string; mandateHash: string; trigger: 'maxLtvBps'; cureSeconds: number
+  realWorldNote: string; cureAction: 'pledgeEscrow'; afterExpiry: string; issuedAt: string; hash: string; anchorTx: string
+}
+export type MarginStatus = 'NONE' | 'ISSUED' | 'CURED' | 'EXPIRED'
+export interface MarginCall {
+  status: MarginStatus; loanId: string
+  issuedLedger: number | null; issuedAt: string | null; cureBy: string | null
+  ltvHeldBps: number | null; maxLtvBps: number
+  shortfall: { collateralValueDrops: string; sharesToAdd: string; withdrawalValuePerShare: string } | null
+  reasons: string[]; provenance: 'DECLARED'; ledgerIndex: number; ledgerHash: string
+  entryHash?: string; triggerTx?: string
+}
+export interface MarginCallEntry {
+  seq: number; prevHash: string; kind: 'margin-call'; status: 'ISSUED' | 'CURED' | 'EXPIRED'; loanId: string
+  mandateHash: string; policyHash: string; issuedLedger: number; issuedAt: string; cureBy: string; ltvHeldBps: number | null; maxLtvBps: number
+  ledgerIndex: number; ledgerHash: string; hash: string
+}
+/** GET /api/desk/margin-calls */
+export interface MarginCalls { ledgerIndex: number; ledgerHash: string; policy: MarginPolicy; marginCalls: MarginCall[] }
 
 export interface UniverseVault {
   vaultId: string
@@ -439,3 +465,6 @@ export interface RoleAction { actionId: string; runId: string; role: string; act
 // Fails tsc -b if any of the twelve is missing: an export that is absent or unused compiles otherwise.
 const _typeProbe: [Ticket, Change, Mandate, Mark, FeedEvent, Universe, Decision, Figure, Provenance, FormulaId, Statement, CollateralAccount] | null = null
 void _typeProbe
+// The four of step 20, the same way.
+const _marginProbe: [MarginPolicy, MarginCall, MarginCallEntry, MarginCalls] | null = null
+void _marginProbe

@@ -186,5 +186,28 @@ export function createFeed(reader, { xrpl = reader.xrpl, escrowAccounts }) {
       listeners.add(fn)
       return () => listeners.delete(fn)
     },
+    /**
+     * A desk event from outside the snapshots (step 20: the three MARGIN_CALL_* types, DECLARED), through the
+     * same chain. Its id starts with the ledger it was decided at, with the next counter free on that ledger,
+     * and it takes its place in cursor order. Limit: a client whose cursor is already past that ledger gets
+     * it from the stream and from /api/desk/margin-calls, not from /api/feed?after=.
+     */
+    push(ev) {
+      chain = chain.then(() => {
+        const L = ev.ledgerIndex
+        const used = events.map((e) => cursorKey(e.id)).filter((k) => k && k[0] === L).map((k) => k[1])
+        const counter = Math.max(counters.get(L) ?? 0, used.length ? Math.max(...used) + 1 : 0)
+        const full = { id: `${pad(L)}-${counter}`, ...ev }
+        counters.set(L, counter + 1)
+        const key = [L, counter]
+        let i = events.length
+        while (i > 0 && before(key, cursorKey(events[i - 1].id))) i--
+        events.splice(i, 0, full)
+        if (events.length > KEEP) events.shift()
+        for (const fn of listeners) fn(full)
+        log.info('desk event', { type: full.type, loanId: full.loanId?.slice(0, 12), ledgerIndex: full.ledgerIndex })
+      }).catch((e) => log.error('feed failed on a desk event', { err: String(e).slice(0, 200) }))
+      return chain
+    },
   }
 }

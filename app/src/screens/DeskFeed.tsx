@@ -22,7 +22,14 @@ export interface FeedDoc {
 const LABELS: Record<FeedEvent['type'], string> = {
   LOAN_LATE: 'Loan late', IMPAIRMENT: 'Loan impaired by the broker', DEFAULT: 'Loan defaulted', COVER_DRAWN: 'First-loss cover drawn',
   SHARES_PLEDGED: 'Shares pledged as collateral', LOAN_ORIGINATED: 'Loan originated', STATEMENT: 'Curator statement',
+  MARGIN_CALL_ISSUED: 'Margin call issued', MARGIN_CALL_CURED: 'Margin call cured', MARGIN_CALL_EXPIRED: 'Margin call expired',
 }
+
+/** Step 20: the three events a desk decision makes, DECLARED by the desk, each recorded in the decision log. */
+const MARGIN_TYPES: FeedEvent['type'][] = ['MARGIN_CALL_ISSUED', 'MARGIN_CALL_CURED', 'MARGIN_CALL_EXPIRED']
+const isMarginCall = (ev: FeedEvent) => MARGIN_TYPES.includes(ev.type)
+/** Who stated a DECLARED event: the desk for a margin call, the vault owner for a statement. */
+const sourceOf = (ev: FeedEvent) => (ev.provenance === 'REAL' ? 'REAL · ledger' : isMarginCall(ev) ? 'DECLARED · desk' : 'DECLARED · vault owner')
 
 const order = (id: string) => id.split('-').map((x) => x.replace(/^0+(?=\d)/, '').padStart(20, '0')).join('-')
 const effect = (m: FeedEvent['moneyEffect']) => (m === null ? null : m.unit === 'drops' ? `${dropsToXrp(m.value)} XRP` : `${m.value} ${m.unit}`)
@@ -37,6 +44,7 @@ function receiptValue(v: unknown): string {
 function EventRow({ ev }: { ev: FeedEvent }) {
   const st = ev.statement
   const m = effect(ev.moneyEffect)
+  const margin = isMarginCall(ev)
   return (
     <li className="feed-row">
       <span className="t-fig-m">{ev.ledgerIndex}</span>
@@ -53,8 +61,9 @@ function EventRow({ ev }: { ev: FeedEvent }) {
           <summary>Receipts</summary>
           <div className="pop-body receipts">
             {ev.txHash && <p className="t-body-s">Transaction <HashLink hash={ev.txHash} /></p>}
+            {ev.entryHash && <p className="t-body-s">Decision-log entry <HashLink hash={ev.entryHash} noLink /></p>}
             <p className="t-fig-s dim">{ev.type}</p>
-            <table className="ld-inputs">
+            {(!margin || ev.receipts.length > 0) && <table className="ld-inputs">
               <thead><tr><th scope="col">Ledger field</th><th scope="col">Before</th><th scope="col">After</th></tr></thead>
               <tbody>
                 {ev.receipts.map((r, i) => (
@@ -65,12 +74,12 @@ function EventRow({ ev }: { ev: FeedEvent }) {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table>}
           </div>
         </details>
       </div>
       <span className="t-fig-m">{m ?? '—'}</span>
-      <span><span className="prov" data-prov={ev.provenance}>{ev.provenance === 'REAL' ? 'REAL · ledger' : 'DECLARED · vault owner'}</span></span>
+      <span><span className="prov" data-prov={ev.provenance}>{sourceOf(ev)}</span></span>
     </li>
   )
 }
@@ -104,7 +113,7 @@ export function DeskFeed({ data }: { data: FeedDoc }) {
         : (
           <>
             <section className="panel" aria-label="Events along the ledger">
-              <header className="panel-head"><h2 className="t-heading-s">{`${events.length} events along the ledger`}</h2><span className="t-body-s dim">Filled dot: read from the ledger. Diamond: stated by the curator.</span></header>
+              <header className="panel-head"><h2 className="t-heading-s">{`${events.length} events along the ledger`}</h2><span className="t-body-s dim">{`Filled dot: read from the ledger. Diamond: stated by the curator${events.some(isMarginCall) ? ', or decided by the desk' : ''}.`}</span></header>
               <EventTimeline events={events} />
             </section>
             <ul className="feed">

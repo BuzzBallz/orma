@@ -294,8 +294,9 @@ function ledgerInt(v) {
  * collateral account it pays into, and the ticket inputs of the pledged share at the same L. An escrow is
  * attached only to the loan whose LoanSet names it, never by borrower, amount or share.
  */
-export async function readPositions(xrpl, { reader, demoDir = 'demo' }) {
-  const at = await ledgerOf(xrpl, null)
+export async function readPositions(xrpl, { reader, demoDir = 'demo', at: pinned = null }) {
+  // `at` (step 20): read again at a ledger already read, the margin call's I2 re-read; absent, the validated ledger now
+  const at = await ledgerOf(xrpl, pinned)
   const L = at.ledgerIndex
   const lenders = ['desk', 'spare'].map((label) => readDemo(label, demoDir))
   const brokerIds = new Set(lenders.map((f) => f.loanBrokerId))
@@ -311,10 +312,23 @@ export async function readPositions(xrpl, { reader, demoDir = 'demo' }) {
   // the LoanSets that created the desk's loans, and the escrow each one names
   const createdBy = new Map()
   const MEMO_ESCROW = Buffer.from('orma.escrow', 'utf8').toString('hex').toUpperCase()
+  // step 20: a pledge that cures a margin call names its loan in an orma.cure Memo of its EscrowCreate
+  const MEMO_CURE = Buffer.from('orma.cure', 'utf8').toString('hex').toUpperCase()
+  /** loan id -> the cure escrows that name it: { index, borrower } */
+  const cures = new Map()
   for (const borrower of [...new Set(loans.map((l) => l.loan.Borrower))]) {
     const txs = await allPages(xrpl, { command: 'account_tx', account: borrower, ledger_index_min: -1, ledger_index_max: L, limit: 400 }, 'transactions', null, `the history of ${borrower}`)
     for (const e of txs) {
       const t = e.tx_json ?? e.tx ?? {}
+      if (t.TransactionType === 'EscrowCreate' && e.meta?.TransactionResult === 'tesSUCCESS' && t.Account === borrower) {
+        const cure = (t.Memos ?? []).map((m) => m.Memo).find((m) => same(m?.MemoType, MEMO_CURE))
+        const seq = ledgerInt(t.Sequence) || ledgerInt(t.TicketSequence)
+        if (cure?.MemoData && seq) {
+          const loanId = String(cure.MemoData).toUpperCase()
+          cures.set(loanId, [...(cures.get(loanId) ?? []), { index: hashes.hashEscrow(t.Account, seq).toUpperCase(), borrower }])
+        }
+        continue
+      }
       if (t.TransactionType !== 'LoanSet' || e.meta?.TransactionResult !== 'tesSUCCESS') continue
       const node = (e.meta.AffectedNodes ?? []).map((a) => a.CreatedNode).find((c) => c?.LedgerEntryType === 'Loan')
       if (!node || !brokerIds.has(node.NewFields?.LoanBrokerID ?? t.LoanBrokerID)) continue
@@ -334,6 +348,16 @@ export async function readPositions(xrpl, { reader, demoDir = 'demo' }) {
         const ticketInputs = await readTicketInputs(xrpl, { shareMptId, reader, at })
         collateral.push({ escrowId: made.escrowIndex, shareMptId, units: String(escrow.Amount.value), account, ticketInputs })
       }
+    }
+    // step 20: every live cure escrow of the borrower that names this loan, each in its own 2-of-3 account
+    for (const c of made ? cures.get(String(loan.index).toUpperCase()) ?? [] : []) {
+      if (c.borrower !== loan.Borrower) continue
+      const escrow = await entryAt(xrpl, { index: c.index }, L)
+      if (!escrow?.Amount?.mpt_issuance_id || escrow.Account !== loan.Borrower) continue
+      const shareMptId = String(escrow.Amount.mpt_issuance_id).toUpperCase()
+      const account = await readCollateralAccount(xrpl, { address: escrow.Destination, shareMptId, at, namedEscrow: c.index, demoDir })
+      const ticketInputs = await readTicketInputs(xrpl, { shareMptId, reader, at })
+      collateral.push({ escrowId: c.index, shareMptId, units: String(escrow.Amount.value), account, ticketInputs, cure: true })
     }
     out.push({
       loanId: loan.index, loanSetTxHash: made?.txHash ?? null, vaultId, borrower: loan.Borrower,

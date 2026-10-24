@@ -16,7 +16,7 @@ const GENESIS = '0'.repeat(64)
 
 /**
  * @param {string} [path]
- * @returns {{ append(entry: object): object, entries(): object[], verifyChain(): { ok: true } | { ok: false, firstBadSeq: number } }}
+ * @returns {{ append(entry: object): object, appendMarginCall(entry: object): object, entries(): object[], verifyChain(): { ok: true } | { ok: false, firstBadSeq: number } }}
  */
 export function openLog(path = process.env.DESK_LOG_PATH ?? '.demo/decisions.jsonl') {
   mkdirSync(dirname(path), { recursive: true })
@@ -66,5 +66,24 @@ export function openLog(path = process.env.DESK_LOG_PATH ?? '.demo/decisions.jso
     return entry
   }
 
-  return { append, entries: () => lines(), verifyChain }
+  /**
+   * Append one margin-call transition (step 20, addendum A11): the second kind of entry of the same log,
+   * chained by the same rule, the desk's decision and the ledger it was read at.
+   * @param {{ status: 'ISSUED'|'CURED'|'EXPIRED', loanId: string, mandateHash: string, policyHash: string, issuedLedger: number, issuedAt: string, cureBy: string, ltvHeldBps: number|null, maxLtvBps: number, ledgerIndex: number, ledgerHash: string }} entry
+   */
+  function appendMarginCall({ status, loanId, mandateHash, policyHash, issuedLedger, issuedAt, cureBy, ltvHeldBps, maxLtvBps, ledgerIndex, ledgerHash }) {
+    const all = lines()
+    const last = all.at(-1)
+    const body = {
+      seq: all.length + 1,
+      prevHash: last?.hash ?? GENESIS,
+      kind: 'margin-call', status, loanId, mandateHash, policyHash, issuedLedger, issuedAt, cureBy, ltvHeldBps, maxLtvBps,
+      ledgerIndex, ledgerHash,
+    }
+    const entry = { ...body, hash: sha256Hex(canonical(body)) }
+    appendFileSync(path, JSON.stringify(entry) + '\n')
+    return entry
+  }
+
+  return { append, appendMarginCall, entries: () => lines(), verifyChain }
 }

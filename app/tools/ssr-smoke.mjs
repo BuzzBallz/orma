@@ -158,6 +158,10 @@ for (const tab of DESK_TABS) {
     check('positions: every loanSetTxHash', data.positions.every((p) => !p.loanSetTxHash || html.includes(p.loanSetTxHash)))
     check('positions: a 64-hex LoanSet backed by Harbor-1 shares', data.positions.some((p) => /^[0-9A-F]{64}$/i.test(p.loanSetTxHash ?? '')
       && p.collateral.some((c) => c.shareMptId.toUpperCase() === harbor.shareMptId.toUpperCase())))
+    // Step 20: an open margin call (ISSUED or EXPIRED) on a live position puts the desk's banner on the tab.
+    const open = data.positions.filter((p) => p.marginCall?.status === 'ISSUED' || p.marginCall?.status === 'EXPIRED')
+    check('positions: ' + (open.length ? open.length + ' open margin call(s), "Margin call issued by" on the tab' : 'no open margin call, no banner required'),
+      open.length === 0 || html.includes('Margin call issued by'))
   }
 }
 for (const tab of DESK_TABS.filter((t) => t.id !== 'ticket')) {
@@ -198,6 +202,14 @@ check('buildActionRequest approve: POST /api/roles/r1/riskOfficer/approve, Beare
   approveReq.url.endsWith('/api/roles/r1/riskOfficer/approve') && approveReq.init.method === 'POST' && approveReq.init.headers.Authorization === 'Bearer t0')
 const defaultReq = api.buildActionRequest('defaultL2', 'broker', 'r1', 't0', { vault: 'harbor-1' })
 check('buildActionRequest defaultL2: /api/roles/r1/broker/defaultL2, body {"vault":"harbor-1"}', defaultReq.url.endsWith('/api/roles/r1/broker/defaultL2') && defaultReq.init.body === '{"vault":"harbor-1"}')
+// Step 20: the cure of a margin call is a pledgeEscrow of the shortfall's units, with the loan it cures.
+const cure = api.cureBody({ lending: 'desk', share: 'AB'.repeat(24), ticketId: 'E'.repeat(64), inputsDigest: 'F'.repeat(64), units: '197938', loanId: 'C1'.repeat(32) })
+check('cureBody: { vault, share, ticketId, inputsDigest, units, cureLoanId }', JSON.stringify(cure)
+  === JSON.stringify({ vault: 'desk', share: 'AB'.repeat(24), ticketId: 'E'.repeat(64), inputsDigest: 'F'.repeat(64), units: '197938', cureLoanId: 'C1'.repeat(32) }))
+check('cureTicketPath: a pledge ticket of those units under desk-1', api.cureTicketPath('AB'.repeat(24), '197938') === '/api/tickets?share=' + 'AB'.repeat(24) + '&op=pledge&units=197938&mandate=desk-1')
+const lenders = { vaults: [{ label: 'desk', vaultId: 'aa'.repeat(32) }, { label: 'spare', vaultId: 'BB'.repeat(32) }, { label: 'harbor-1', vaultId: 'CC'.repeat(32) }] }
+check('lendingVaultOf: desk and spare in any case, null for a Harbor or an unknown vault', api.lendingVaultOf(lenders, 'AA'.repeat(32)) === 'desk'
+  && api.lendingVaultOf(lenders, 'bb'.repeat(32)) === 'spare' && api.lendingVaultOf(lenders, 'CC'.repeat(32)) === null && api.lendingVaultOf(lenders, '00'.repeat(32)) === null)
 
 // The desk's channel, the path App takes in production.
 if (deskPlan) {

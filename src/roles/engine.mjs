@@ -195,6 +195,8 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
         TransactionType: 'EscrowCreate', Account: accounts.borrower.address, Destination: destination,
         Amount: { mpt_issuance_id: act.ticket.share, value: act.ticket.units },
         FinishAfter: finishAfter, CancelAfter: finishAfter + policy.cancelAfterOffsetSeconds,
+        // step 20: a pledge that cures a margin call names its loan, which is how the positions count it
+        ...(act.cureLoanId && { Memos: [{ Memo: { MemoType: hex('orma.cure'), MemoData: act.cureLoanId } }] }),
       },
     }
   }
@@ -422,6 +424,7 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
           if (!harbor) throw bad('The pledged share is not the share of a Harbor vault')
           internals.set(act.actionId, { harbor })
           act.ticket = pick(body)
+          if (body.cureLoanId) act.cureLoanId = body.cureLoanId.toUpperCase()
           const { tx } = await pledgeTx(act)
           if (!tx.Destination) {
             return { tx, preview: { engineResult: 'not-simulated (collateral account created at confirm)', provenance: 'DECLARED', money: { reserveDrops: RESERVE_DROPS, payer: 'deskOwner' } } }
@@ -494,6 +497,8 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
     if (ticketed && !(HEX64.test(body.ticketId ?? '') && HEX64.test(body.inputsDigest ?? ''))) throw bad('ticketId and inputsDigest must be 64 hex characters')
     if (ticketed && !UNITS.test(body.units ?? '')) throw bad('units must be 1 to 30 digits')
     if (action === 'requestLoan' && typeof body.pledgeActionId !== 'string') throw bad('pledgeActionId is required')
+    // step 20: the one optional parameter of pledgeEscrow, the loan a cure pledge names
+    if ('cureLoanId' in body && (action !== 'pledgeEscrow' || !HEX64.test(body.cureLoanId ?? ''))) throw bad('cureLoanId is the 64-hex id of a desk loan, on pledgeEscrow only')
     if (['approve', 'decline', 'rerequest'].includes(action)) {
       if (typeof body.requestActionId !== 'string') throw bad('requestActionId is required')
       const request = run.actions.get(body.requestActionId)

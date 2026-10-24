@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import Decimal from 'decimal.js'
-import type { ChangeRow, Figure as FigureDoc, Mandate, Mark, Ticket } from '../lib/types'
+import type { ChangeRow, CollateralAccount, FeedEvent, Figure as FigureDoc, Mandate, MarginCall, Mark, Ticket } from '../lib/types'
 import { AuditTable, FigureValue, HashLink, Panel, ProvenanceKey, ReadAt, Recompute, ShowWork, TestNetBanner, Verdict, Figure, formatBps, formatXrp, type VerdictStatus } from '../components/Ledger'
 import { BalanceBar, DefaultDots, LockBar, LtvGauge, PriceBars } from '../components/Charts'
 import {
-  confirmAction, deskPlanPath, deskTicketPaths, demoLoanFor, errorSentence, postAction, readOperatorSession,
-  sessionFromFragment, writeOperatorSession,
+  API_BASE, ApiFailure, confirmAction, cureBody, cureTicketPath, deskPlanPath, deskTicketPaths, demoLoanFor, errorSentence, getJson, lendingVaultOf,
+  postAction, readOperatorSession, sessionFromFragment, writeOperatorSession,
   type ActionError, type ActionPreview, type DeskPlan, type DeskPlanVault, type OperatorSession, type Position, type Positions,
 } from '../lib/api'
 import { usePoll } from '../lib/usePoll'
@@ -349,6 +349,10 @@ function Mini({ value, limit }: { value: string; limit: string }) {
 }
 
 function PositionsTab({ doc, deskPlan, harbor }: { doc: Positions; deskPlan?: DeskPlan; harbor: DeskPlanVault | null }) {
+  // The cure of a margin call is a borrower action of the operator's run, as in the ticket's operator panel.
+  const [session] = useOperatorSession()
+  // One primary button on the tab: the cure of the first ISSUED call; any other call's cure is secondary.
+  const firstCall = doc.positions.find((p) => p.marginCall?.status === 'ISSUED')?.loanId
   if (doc.positions.length === 0) return <div className="state"><p className="t-body-s dim">The desk has no loan yet.</p></div>
   return (
     <>
@@ -360,7 +364,8 @@ function PositionsTab({ doc, deskPlan, harbor }: { doc: Positions; deskPlan?: De
             {doc.positions.map((p) => {
               const ltvLimit = p.usage.find((u) => u.limit === 'maxLtvBps')?.threshold
               return (
-                <tr key={p.loanId}>
+                <Fragment key={p.loanId}>
+                <tr>
                   <td>{p.loanSetTxHash ? <HashLink hash={p.loanSetTxHash} /> : <span className="dim">LoanSet not found in the history</span>}<span className="t-fig-s dim block">{`loan ${p.loanId.slice(0, 8)}`}</span><span className="t-body-s block">{`${BORROWER_NAME} `}<HashLink hash={p.borrower} kind="accounts" /></span></td>
                   <td>
                     {p.collateral.map((c) => {
@@ -382,6 +387,8 @@ function PositionsTab({ doc, deskPlan, harbor }: { doc: Positions; deskPlan?: De
                     </details>
                   </td>
                 </tr>
+                {p.marginCall && <MarginCallRow position={p} call={p.marginCall} deskPlan={deskPlan} session={session} primary={p.loanId === firstCall} />}
+                </Fragment>
               )
             })}
           </tbody>
@@ -605,10 +612,15 @@ function MoneyPreview({ action, preview, units }: { action: string; preview: Act
   )
 }
 
-function ActionRow({ entry, ctx, session, remember, onChange, units, initial }: {
-  entry: OperatorAction; ctx: ActionCtx; session: OperatorSession; units: string
-  remember: (patch: { pledgeActionId: string } | { requestActionId: string }) => void
-  onChange?: (rows: ChangeRow[]) => void; initial?: RowState
+type Remember = (patch: { pledgeActionId: string } | { requestActionId: string }) => void
+
+/**
+ * The life of one role action, shared by the operator rows and the cure of a margin call: preview, confirm,
+ * then the state read back from GET …/actions/{id}. `makeBody` may fetch (the cure reads its ticket first);
+ * a body of null is a document not read yet.
+ */
+function useActionFlow({ role, action, session, remember, onChange, initial }: {
+  role: string; action: string; session: OperatorSession; remember?: Remember; onChange?: (rows: ChangeRow[]) => void; initial?: RowState
 }) {
   const [row, setRow] = useState<RowState>(initial ?? { phase: 'idle' })
   const result = useRef<HTMLDivElement>(null)
@@ -619,34 +631,42 @@ function ActionRow({ entry, ctx, session, remember, onChange, units, initial }: 
   useEffect(() => {
     const a = poll.data
     if (!a || a.actionId !== row.actionId || row.phase !== 'confirming') return
-    if (a.state === 'validated' && !(entry.action === 'defaultL2' && !money(a.preview).realised)) {
-      if (entry.action === 'pledgeEscrow') remember({ pledgeActionId: a.actionId })
+    if (a.state === 'validated' && !(action === 'defaultL2' && !money(a.preview).realised)) {
+      if (action === 'pledgeEscrow') remember?.({ pledgeActionId: a.actionId })
       setRow((r) => ({ ...r, phase: 'validated', action: a }))
     } else if (a.state === 'failed' || a.state === 'pending-approval') {
       setRow((r) => ({ ...r, phase: a.state as Phase, action: a }))
     } else {
       setRow((r) => ({ ...r, action: a }))
     }
-  }, [poll.data, row.actionId, row.phase, entry.action, remember])
+  }, [poll.data, row.actionId, row.phase, action, remember])
 
   // After a preview and after a refusal the reader is taken to the row's result, never left on BODY.
   useEffect(() => {
     if (row.phase === 'previewed' || row.phase === 'refused') result.current?.focus()
   }, [row.phase])
 
-  async function preview() {
-    const body = entry.body(ctx)
-    if (!session.runId || !session.token) return setRow({ phase: 'refused', error: { code: 'UNAUTHORIZED' } })
-    if (!body) return setRow({ phase: 'refused', error: { code: 'WARMING_UP' } })
+  async function preview(makeBody: () => object | null | Promise<object>) {
+    const { runId, token } = session
+    if (!runId || !token) return setRow({ phase: 'refused', error: { code: 'UNAUTHORIZED' } })
+    const made = makeBody()
+    if (!made) return setRow({ phase: 'refused', error: { code: 'WARMING_UP' } })
     setRow({ phase: 'previewing' })
-    const a = await postAction(entry.action, entry.role, session.runId, session.token, body)
+    let body: object
+    try {
+      body = await made
+    } catch (e: unknown) {
+      // Only the cure fetches before it posts: its ticket read failed, and nothing was sent.
+      return setRow({ phase: 'refused', error: { code: e instanceof ApiFailure && e.code ? e.code : 'UNREACHABLE' } })
+    }
+    const a = await postAction(action, role, runId, token, body)
     const err = a.body.error
     if (a.status === 202 && a.body.actionId && a.body.preview) {
-      if (entry.action === 'requestLoan') remember({ requestActionId: a.body.actionId })
+      if (action === 'requestLoan') remember?.({ requestActionId: a.body.actionId })
       if (a.body.preview.schema === 'orma.change/1') onChange?.(a.body.preview.rows ?? [])
       return setRow({ phase: 'previewed', actionId: a.body.actionId, preview: a.body.preview })
     }
-    if (entry.action === 'requestLoan' && err?.code === 'ESCROW_POLICY' && err.requestActionId) remember({ requestActionId: err.requestActionId })
+    if (action === 'requestLoan' && err?.code === 'ESCROW_POLICY' && err.requestActionId) remember?.({ requestActionId: err.requestActionId })
     setRow({ phase: 'refused', error: err ?? { code: 'UNREACHABLE' } })
   }
 
@@ -662,40 +682,55 @@ function ActionRow({ entry, ctx, session, remember, onChange, units, initial }: 
     if (state === 'refused') return setRow((r) => ({ ...r, phase: 'refused', error: a.body.error ?? { code: 'BREACHED' } }))
   }
 
+  return { row, result, preview, confirm }
+}
+
+/** The result region of an action: its money preview, then what the ledger did with it, in the action's own verb. */
+function ActionStatus({ action, verb, row, units, focus }: { action: string; verb: string; row: RowState; units: string; focus: RefObject<HTMLDivElement | null> }) {
   const realised = money(row.action?.preview ?? row.preview).realised as { predicted?: string; realised?: string; verdict?: string; error?: string } | undefined
+  return (
+    <div role="status" tabIndex={-1} ref={focus}>
+      {row.preview && <MoneyPreview action={action} preview={row.preview} units={units} />}
+      {row.phase === 'confirming' && (
+        <p className="caption">{row.action?.state === 'validated' ? 'Realising… reading the vault at the validation ledger' : 'Submitting to the ledger…'}</p>
+      )}
+      {row.phase === 'validated' && (
+        <div>
+          {action === 'defaultL2' && realised && (realised.error
+            ? <p className="caption">{`The realised value could not be read: ${realised.error}`}</p>
+            : <>
+                <p className="caption">{`Predicted: ${text(realised.predicted)} drops per share`}</p>
+                <p className="caption">{`Realised: ${text(realised.realised)} drops per share`}</p>
+                <p><Verdict status={statusOf(realised.verdict)} /></p>
+              </>)}
+          <p className="caption">{`${verb} — validated on the ledger${row.action?.txHash ? `, transaction ${row.action.txHash}` : ''}.`}</p>
+          <p className="caption"><code>{row.actionId}</code></p>
+        </div>
+      )}
+      {row.phase === 'pending-approval' && (
+        <p className="caption">{`Signed by the borrower; awaiting the desk's countersignature · `}<code>{row.actionId}</code></p>
+      )}
+      {row.phase === 'done' && <p className="caption">Recorded as a preview only: this action builds no transaction to submit.</p>}
+      {row.phase === 'failed' && <p role="alert" className="caption">{`The ledger did not apply it: ${text(row.action?.engineResult)}.`}</p>}
+      {row.phase === 'refused' && row.error && <ErrorBlock code={row.error.code} message={action === 'requestLoan' && row.error.requestActionId ? row.error.message : undefined} />}
+    </div>
+  )
+}
+
+function ActionRow({ entry, ctx, session, remember, onChange, units, initial }: {
+  entry: OperatorAction; ctx: ActionCtx; session: OperatorSession; units: string
+  remember: Remember; onChange?: (rows: ChangeRow[]) => void; initial?: RowState
+}) {
+  const { row, result, preview, confirm } = useActionFlow({ role: entry.role, action: entry.action, session, remember, onChange, initial })
   return (
     <div style={{ borderTop: '1px solid var(--color-line)', paddingBlock: 'var(--space-2)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
       <p className="caption"><b>{entry.role}</b>{` · ${entry.action}`}</p>
       <div>
-        <button type="button" className="btn btn-secondary" onClick={preview} disabled={row.phase === 'previewing'}>
+        <button type="button" className="btn btn-secondary" onClick={() => preview(() => entry.body(ctx))} disabled={row.phase === 'previewing'}>
           {row.phase === 'previewing' ? 'Previewing…' : 'Preview'}
         </button>
       </div>
-      <div role="status" tabIndex={-1} ref={result}>
-        {row.preview && <MoneyPreview action={entry.action} preview={row.preview} units={units} />}
-        {row.phase === 'confirming' && (
-          <p className="caption">{row.action?.state === 'validated' ? 'Realising… reading the vault at the validation ledger' : 'Submitting to the ledger…'}</p>
-        )}
-        {row.phase === 'validated' && (
-          <div>
-            {entry.action === 'defaultL2' && realised && (realised.error
-              ? <p className="caption">{`The realised value could not be read: ${realised.error}`}</p>
-              : <>
-                  <p className="caption">{`Predicted: ${text(realised.predicted)} drops per share`}</p>
-                  <p className="caption">{`Realised: ${text(realised.realised)} drops per share`}</p>
-                  <p><Verdict status={statusOf(realised.verdict)} /></p>
-                </>)}
-            <p className="caption">{`${entry.verb} — validated on the ledger${row.action?.txHash ? `, transaction ${row.action.txHash}` : ''}.`}</p>
-            <p className="caption"><code>{row.actionId}</code></p>
-          </div>
-        )}
-        {row.phase === 'pending-approval' && (
-          <p className="caption">{`Signed by the borrower; awaiting the desk's countersignature · `}<code>{row.actionId}</code></p>
-        )}
-        {row.phase === 'done' && <p className="caption">Recorded as a preview only: this action builds no transaction to submit.</p>}
-        {row.phase === 'failed' && <p role="alert" className="caption">{`The ledger did not apply it: ${text(row.action?.engineResult)}.`}</p>}
-        {row.phase === 'refused' && row.error && <ErrorBlock code={row.error.code} message={entry.action === 'requestLoan' && row.error.requestActionId ? row.error.message : undefined} />}
-      </div>
+      <ActionStatus action={entry.action} verb={entry.verb} row={row} units={units} focus={result} />
       {row.phase === 'previewed' && (
         <div><button type="button" className="btn btn-primary" onClick={confirm}>{entry.verb}</button></div>
       )}
@@ -703,12 +738,13 @@ function ActionRow({ entry, ctx, session, remember, onChange, units, initial }: 
   )
 }
 
-function OperatorPanel({ ticket, buyTicket, harbor, units, onChange }: {
-  ticket: Ticket; buyTicket: Ticket | null; harbor: DeskPlanVault | null; units: string; onChange: (rows: ChangeRow[]) => void
-}) {
+/**
+ * The operator's run: read from sessionStorage, adopted once from the operator link's fragment (then wiped from
+ * the address bar), and the memory of a validated pledge or a requested loan. One per screen: the ticket's
+ * operator panel, or the Positions tab for the cure of a margin call.
+ */
+function useOperatorSession(): [OperatorSession, Remember] {
   const [session, setSession] = useState<OperatorSession>(readOperatorSession)
-  const [lending, setLending] = useState<'desk' | 'spare'>('desk')
-  // The operator link carries the run in its fragment once; the screen adopts it and wipes it from the address bar.
   useEffect(() => {
     const s = sessionFromFragment(location.hash)
     if (!s) return
@@ -723,6 +759,15 @@ function OperatorPanel({ ticket, buyTicket, harbor, units, onChange }: {
       return next
     })
   }, [])
+  return [session, remember]
+}
+
+function OperatorPanel({ ticket, buyTicket, harbor, units, onChange }: {
+  ticket: Ticket; buyTicket: Ticket | null; harbor: DeskPlanVault | null; units: string; onChange: (rows: ChangeRow[]) => void
+}) {
+  // The operator link carries the run in its fragment once; the screen adopts it and wipes it from the address bar.
+  const [session, remember] = useOperatorSession()
+  const [lending, setLending] = useState<'desk' | 'spare'>('desk')
   const label = harbor?.label ?? 'harbor-1'
   const ctx: ActionCtx = { harbor: label, lending, ticket, buyTicket, pledgeActionId: session.pledgeActionId, requestActionId: session.requestActionId }
   const line = (e: OperatorAction) => <ActionRow key={e.action} entry={e} ctx={ctx} session={session} remember={remember} onChange={onChange} units={units} />
@@ -744,6 +789,132 @@ function OperatorPanel({ ticket, buyTicket, harbor, units, onChange }: {
         </details>
       )}
     </section>
+  )
+}
+
+// --- the margin call (step 20, addendum A11) ---------------------------------------------------------
+// A desk decision, DECLARED: the desk issues the call and the desk may act. Orma is never its subject.
+
+const CURE_VERB = 'Pledge more shares'
+const cureConfirmVerb = (units: string) => `Confirm: pledge ${units} more shares into escrow`
+const NEEDS_RUN = 'The operator controls need a run: open the operator link of the run to pledge from this page.'
+const NOT_A_LENDER = 'This loan is not lent from the desk or spare vault, so no pledge can be played from this page.'
+const EXPIRED_LINE = 'The cure window has passed. The desk may act under its escrow policy, which finishes an escrow only after a default.'
+
+/** HH:MM:SS of an ISO time in UTC; the string itself when it does not parse. */
+function utcClock(iso: string | null): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? iso : d.toISOString().slice(11, 19)
+}
+
+/** A duration as HH:MM:SS, never below zero. A time, not an amount. */
+function hms(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000))
+  return [Math.floor(s / 3600), Math.floor((s % 3600) / 60), s % 60].map((n) => String(n).padStart(2, '0')).join(':')
+}
+
+function marginCallSentence(call: MarginCall): string {
+  const held = call.ltvHeldBps === null ? '—' : formatBps(String(call.ltvHeldBps))
+  return `Margin call issued by ${LENDER_NAME} at ledger ${call.issuedLedger ?? '—'}: LTV at withdrawal value ${held} against the mandate's ${formatBps(String(call.maxLtvBps))}. `
+    + `Cure by ${utcClock(call.cureBy)} UTC: pledge ${call.shortfall?.sharesToAdd ?? '—'} more shares, or the desk may act under its escrow policy.`
+}
+
+/** The time left to cure, from the client clock every second; the first render computes it once. */
+function CureCountdown({ cureBy }: { cureBy: string }) {
+  const end = new Date(cureBy).getTime()
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [])
+  if (Number.isNaN(end)) return null
+  return (
+    <p className="t-body-m">
+      <span className="t-label-m">Time left to cure </span>
+      <span className="t-fig-m" role="timer" aria-live="off">{hms(end - now)}</span>
+      {end <= now && <span className="t-body-s dim"> · the desk records the expiry at the next ledger close</span>}
+    </p>
+  )
+}
+
+/**
+ * The cure: the operator's pledgeEscrow, played for the shortfall's units of the position's own share, from the
+ * loan's lending vault, with `cureLoanId` so the escrow names the loan it cures. A ticket for those units first,
+ * then the preview and its money, then the confirm: the flow of the operator panel's rows.
+ */
+function CureAction({ position, call, deskPlan, session, primary, initial }: {
+  position: Position; call: MarginCall; deskPlan?: DeskPlan; session: OperatorSession; primary: boolean; initial?: RowState
+}) {
+  const { row, result, preview, confirm } = useActionFlow({ role: 'borrower', action: 'pledgeEscrow', session, initial })
+  const units = call.shortfall?.sharesToAdd ?? null
+  const share = position.collateral[0]?.shareMptId ?? null
+  const lending = deskPlan ? lendingVaultOf(deskPlan, position.vaultId) : null
+  if (!units || !share) return null
+  const facility = deskPlan?.vaults.find((v) => same(v.shareMptId, share))
+  const blocked = !session.runId || !session.token ? NEEDS_RUN : !lending ? NOT_A_LENDER : null
+  const cls = primary ? 'btn btn-primary' : 'btn btn-secondary'
+  const start = () => preview(() => {
+    if (!lending) return null
+    const vault = lending
+    return getJson<Ticket>(cureTicketPath(share, units)).then((t) => cureBody({ lending: vault, share, ticketId: t.ticketId, inputsDigest: t.inputsDigest, units, loanId: call.loanId }))
+  })
+  return (
+    <div style={{ borderTop: '1px solid var(--color-line)', paddingTop: 'var(--space-2)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+      <p className="caption">{`Pledges ${units} more shares of ${facility ? cap(harborName(facility.label)) : 'the pledged vault'} into escrow for loan ${call.loanId.slice(0, 8)}, from the ${lending ?? 'unknown'} lending vault. The escrow names the loan it cures.`}</p>
+      <ActionStatus action="pledgeEscrow" verb={CURE_VERB} row={row} units={units} focus={result} />
+      {row.phase === 'validated' && <p className="caption">The desk re-reads the loan at the next ledger: the call is cured once the LTV at withdrawal value is back within the mandate&apos;s limit.</p>}
+      {row.phase === 'previewed'
+        ? <div><button type="button" className={cls} onClick={confirm}>{cureConfirmVerb(units)}</button></div>
+        : row.phase !== 'confirming' && row.phase !== 'validated' && (
+          <div><button type="button" className={cls} disabled={blocked !== null || row.phase === 'previewing'} onClick={start}>{row.phase === 'previewing' ? 'Previewing…' : CURE_VERB}</button></div>
+        )}
+      {blocked && <p className="t-body-s">{blocked}</p>}
+    </div>
+  )
+}
+
+function MarginCallBanner({ position, call, deskPlan, session, primary, initial }: {
+  position: Position; call: MarginCall; deskPlan?: DeskPlan; session: OperatorSession; primary: boolean; initial?: RowState
+}) {
+  return (
+    <Panel provenance="DECLARED" title={`Margin call on loan ${call.loanId.slice(0, 8)}`} source={LENDER_NAME}>
+      <p className="t-body-m"><strong>{marginCallSentence(call)}</strong></p>
+      {call.status === 'EXPIRED' && <p className="t-body-m">{EXPIRED_LINE}</p>}
+      {call.status === 'ISSUED' && call.cureBy && <CureCountdown cureBy={call.cureBy} />}
+      {call.reasons.length > 0 && <ul className="t-body-s">{call.reasons.map((r, i) => <li key={i}>{r}</li>)}</ul>}
+      {(call.entryHash || call.triggerTx) && (
+        <dl className="kv">
+          {call.entryHash && (
+            <div><dt>Decision-log entry</dt><dd><HashLink hash={call.entryHash} noLink />{' '}<a className="lnk" href={`${API_BASE}/api/desk/decisions`} target="_blank" rel="noreferrer noopener">Decision log</a></dd></div>
+          )}
+          {call.triggerTx && <div><dt>Impairment or default on the pledged vault</dt><dd><HashLink hash={call.triggerTx} /></dd></div>}
+        </dl>
+      )}
+      {call.status === 'ISSUED' && <CureAction position={position} call={call} deskPlan={deskPlan} session={session} primary={primary} initial={initial} />}
+    </Panel>
+  )
+}
+
+/** Under a position's row: the banner of an open call (ISSUED or EXPIRED), one line for a cured call, nothing otherwise. */
+function MarginCallRow({ position, call, deskPlan, session, primary }: {
+  position: Position; call: MarginCall; deskPlan?: DeskPlan; session: OperatorSession; primary: boolean
+}) {
+  if (call.status !== 'ISSUED' && call.status !== 'EXPIRED' && call.status !== 'CURED') return null
+  return (
+    <tr>
+      <td colSpan={4}>
+        {call.status === 'CURED'
+          ? (
+            <p className="t-body-s">
+              <span className="prov" data-prov="DECLARED">DECLARED</span>
+              {` Margin call cured at ledger ${call.ledgerIndex}: LTV at withdrawal value back within the mandate's limit.`}
+              {call.entryHash && <>{' '}<HashLink hash={call.entryHash} noLink /></>}
+            </p>
+          )
+          : <MarginCallBanner position={position} call={call} deskPlan={deskPlan} session={session} primary={primary} />}
+      </td>
+    </tr>
   )
 }
 
@@ -805,6 +976,64 @@ const PREVIEW_TEXT: Record<string, string> = {
   approve: 'BREACHED', decline: 'Simulated result: not-simulated (no transaction)', rerequest: 'Simulated result: not-simulated (awaiting countersignature)',
   impairL1: 'Simulated result: tecNO_PERMISSION', wait: 'Simulated result: not-simulated (no transaction)', defaultL2: 'Withdrawal value per share now:',
   authorize: 'Simulated result: tesSUCCESS', settle: 'Simulated result: tesSUCCESS',
+}
+
+// Step 20: one desk loan of 2 XRP against Harbor-1 shares, lent from the desk vault, under each status of its call.
+const FIX_SHARE = '11'.repeat(24)
+const FIX_DESK_VAULT = '33'.repeat(32)
+const FIX_LOAN = 'C1'.repeat(32)
+const FIX_ENTRY = 'E1'.repeat(32)
+const FIX_TRIGGER = 'D2'.repeat(32)
+const planVault = (label: string, vaultId: string, shareMptId: string): DeskPlanVault => ({ label, vaultId, shareMptId, loanBrokerId: '44'.repeat(32), impairL1Tx: null, impairL1Hidden: null, statementTx: null })
+const FIX_PLAN: DeskPlan = {
+  plannedLoan: { units: '5000000', principalDrops: '2000000', paymentInterval: 600, gracePeriod: 60 },
+  plannedBuy: { share: '99'.repeat(24), units: '1000' },
+  vaults: [planVault('harbor-1', '22'.repeat(32), FIX_SHARE), planVault('desk', FIX_DESK_VAULT, '77'.repeat(24)), planVault('spare', '66'.repeat(32), '88'.repeat(24))],
+}
+const FIX_ACCOUNT: CollateralAccount = {
+  address: 'rCollateralOfTheFixture', signers: { borrower: 'rB', desk: 'rD', agent: 'rA' }, quorum: 2, masterDisabled: true, regularKey: null, depositAuth: true,
+  mptAuthorized: true, sharesHeld: '5000000', escrowCount: 1, ownerCount: 1, conforming: true, reasons: [], provenance: 'REAL', ledgerIndex: FIX_L, ledgerHash: FIX_HASH,
+}
+const FIX_REASONS = [
+  "The mandate's limit is an LTV at withdrawal value of 53.44%.",
+  'LTV at withdrawal value 55.56% against the limit of 53.44%.',
+  'Withdrawal value per share moved from 0.800000 to 0.720000 drops after the default of loan L2.',
+]
+const FIX_CALL: MarginCall = {
+  status: 'ISSUED', loanId: FIX_LOAN, issuedLedger: FIX_L - 20, issuedAt: '2026-10-25T18:00:00Z', cureBy: '2026-10-25T18:10:00Z', ltvHeldBps: 5556, maxLtvBps: 5344,
+  shortfall: { collateralValueDrops: '142515', sharesToAdd: '197938', withdrawalValuePerShare: '0.720000' }, reasons: FIX_REASONS,
+  provenance: 'DECLARED', ledgerIndex: FIX_L, ledgerHash: FIX_HASH, entryHash: FIX_ENTRY, triggerTx: FIX_TRIGGER,
+}
+const FIX_EXPIRED: MarginCall = { ...FIX_CALL, status: 'EXPIRED', ledgerIndex: FIX_L + 200 }
+const FIX_CURED: MarginCall = { ...FIX_CALL, status: 'CURED', shortfall: null, ltvHeldBps: 5100, reasons: ['LTV at withdrawal value 51.00% against the limit of 53.44%.'], triggerTx: undefined }
+const FIX_NONE: MarginCall = { ...FIX_CALL, status: 'NONE', issuedLedger: null, issuedAt: null, cureBy: null, shortfall: null, reasons: [], entryHash: undefined, triggerTx: undefined }
+const positionWith = (marginCall: MarginCall, loanId = FIX_LOAN): Position => ({
+  loanId, loanSetTxHash: 'B3'.repeat(32), vaultId: FIX_DESK_VAULT, borrower: 'rBorrowerOfTheFixture', principalOutstanding: '2000000',
+  collateral: [{ escrowId: 'A4'.repeat(32), shareMptId: FIX_SHARE, units: '5000000', account: FIX_ACCOUNT }], collateralHeldDrops: '3600000', ltvHeldBps: 5556,
+  usage: [{ limit: 'maxLtvBps', value: '5556', threshold: '5344' }], marginCall: { ...marginCall, loanId },
+})
+const positionsTab = (...positions: Position[]) => <DeskScreen ticket={null} mark={null} tab="positions" data={{ ledgerIndex: FIX_L, ledgerHash: FIX_HASH, positions }} deskPlan={FIX_PLAN} />
+const banner = (session: OperatorSession, initial?: RowState) => <MarginCallBanner position={positionWith(FIX_CALL)} call={FIX_CALL} deskPlan={FIX_PLAN} session={session} primary initial={initial} />
+// Written out, not built by marginCallSentence: the case fails if the sentence drifts from the addendum.
+const ISSUED_LINE = "Margin call issued by Harbor Credit Desk (fictional) at ledger 6389980: LTV at withdrawal value 55.56% against the mandate's 53.44%. Cure by 18:10:00 UTC: pledge 197938 more shares, or the desk may act under its escrow policy."
+const CURE_MONEY = 'Pledges 197938 more shares of Harbor-1 into escrow for loan C1C1C1C1, from the desk lending vault.'
+const NEVER_SAID = ['iquidat', 'eize', 'Orma decide', 'Orma issue']
+const marginEvent = (type: FeedEvent['type'], n: number, why: string, entryHash: string): FeedEvent => ({
+  id: `${String(FIX_L + n).padStart(19, '0')}-0`, type, provenance: 'DECLARED', vaultId: FIX_DESK_VAULT, loanId: FIX_LOAN, ledgerIndex: FIX_L + n, ledgerHash: FIX_HASH,
+  why, moneyEffect: null, receipts: [], entryHash,
+})
+const MARGIN_WHYS = [
+  "Harbor Credit Desk (fictional) issued a margin call on loan C1C1C1C1: LTV at withdrawal value 55.56% against the mandate's 53.44%.",
+  'Harbor Credit Desk (fictional) recorded the margin call on loan C1C1C1C1 as cured: LTV at withdrawal value 51.00%.',
+  'Harbor Credit Desk (fictional) recorded the margin call on loan C1C1C1C1 as expired: the cure window passed with the loan still above the limit.',
+]
+const FIX_MARGIN_FEED: FeedDoc = {
+  ledgerIndex: FIX_L + 300, nextCursor: null, amendments: { source: 'xrpscan', fetchedAt: '2026-10-25T12:00:00Z', status: 'unavailable', items: [] },
+  events: [
+    marginEvent('MARGIN_CALL_ISSUED', 10, MARGIN_WHYS[0], 'F1'.repeat(32)),
+    marginEvent('MARGIN_CALL_CURED', 20, MARGIN_WHYS[1], 'F2'.repeat(32)),
+    marginEvent('MARGIN_CALL_EXPIRED', 30, MARGIN_WHYS[2], 'F3'.repeat(32)),
+  ],
 }
 
 export interface SmokeCase { name: string; element: ReactNode; mustContain?: string[]; before?: string[]; enabledButton?: string; mustNotContain?: string[] }
@@ -880,4 +1109,56 @@ export const SMOKE_CASES: SmokeCase[] = [
     return { name: 'feed-statement', element: <DeskFeed data={doc} />, mustContain: ['DECLARED', 'REAL', text, 'Amendment votes could not be fetched'] }
   })(),
   ...['simulateWithdraw', 'wait'].map((a) => ({ name: `${a} after its button`, element: row(a, { phase: 'done', actionId: FIX_ACTION, preview: PREVIEWS[a] }), mustContain: ['Recorded as a preview only'], mustNotContain: ['Sent.'] })),
+  // Step 20, the margin call. Without an operator run (the server render): the banner, the button disabled.
+  {
+    name: 'positions with an ISSUED margin call', element: positionsTab(positionWith(FIX_CALL)),
+    mustContain: [
+      ISSUED_LINE, 'Time left to cure', 'role="timer"', CURE_VERB, LENDER_NAME, `Source: ${LENDER_NAME}`, 'DECLARED', ...FIX_REASONS, FIX_ENTRY, FIX_TRIGGER,
+      `/transactions/${FIX_TRIGGER}`, '/api/desk/decisions', NEEDS_RUN, `class="btn btn-primary" disabled="">${CURE_VERB}</button>`, 'Collateral at withdrawal value',
+    ],
+    before: ['LTV at withdrawal value', ISSUED_LINE, 'Time left to cure', FIX_REASONS[0], 'Decision-log entry', CURE_MONEY, CURE_VERB, NEEDS_RUN],
+    mustNotContain: [...NEVER_SAID, EXPIRED_LINE, 'Margin call cured'],
+  },
+  {
+    name: 'margin call banner with an operator run: the button enabled', element: banner(FIX_SESSION),
+    before: [ISSUED_LINE, CURE_MONEY, CURE_VERB], enabledButton: CURE_VERB, mustContain: ['btn btn-primary'], mustNotContain: [NEEDS_RUN, cureConfirmVerb('197938')],
+  },
+  {
+    name: 'margin call cure previewed: its money before its confirm', element: banner(FIX_SESSION, { phase: 'previewed', actionId: FIX_ACTION, preview: PREVIEWS.pledgeEscrow }),
+    before: [CURE_MONEY, 'Simulated result: tesSUCCESS', cureConfirmVerb('197938')], enabledButton: cureConfirmVerb('197938'), mustNotContain: [`>${CURE_VERB}</button>`],
+  },
+  {
+    name: 'margin call cure refused: the sentence, then the button again', element: banner(FIX_SESSION, { phase: 'refused', error: { code: 'STALE' } }),
+    before: [errorSentence('STALE'), CURE_VERB], mustContain: ['role="alert"'], enabledButton: CURE_VERB,
+  },
+  {
+    name: 'margin call cure validated', element: banner(FIX_SESSION, { phase: 'validated', actionId: FIX_ACTION, preview: PREVIEWS.pledgeEscrow, action: { actionId: FIX_ACTION, state: 'validated', txHash: 'AC'.repeat(32) } }),
+    before: [`${CURE_VERB} — validated on the ledger, transaction ${'AC'.repeat(32)}`, 'The desk re-reads the loan at the next ledger'], mustNotContain: [`>${CURE_VERB}</button>`],
+  },
+  {
+    name: 'positions with an EXPIRED margin call', element: positionsTab(positionWith(FIX_EXPIRED)),
+    before: [ISSUED_LINE, EXPIRED_LINE, FIX_REASONS[0]], mustContain: [`Source: ${LENDER_NAME}`, FIX_ENTRY, FIX_TRIGGER],
+    mustNotContain: [...NEVER_SAID, 'Time left to cure', CURE_VERB],
+  },
+  {
+    name: 'positions with a CURED margin call', element: positionsTab(positionWith(FIX_CURED)),
+    mustContain: ["Margin call cured at ledger 6390000: LTV at withdrawal value back within the mandate's limit.", FIX_ENTRY],
+    mustNotContain: ['Margin call issued by', CURE_VERB, 'Time left to cure'],
+  },
+  {
+    name: 'positions with no margin call', element: positionsTab(positionWith(FIX_NONE)),
+    mustContain: ['Collateral at withdrawal value', 'LTV at withdrawal value'], mustNotContain: ['Margin call', CURE_VERB, 'Time left to cure'],
+  },
+  {
+    name: 'positions with two ISSUED margin calls: the first cure primary, the second secondary', element: positionsTab(positionWith(FIX_CALL), positionWith(FIX_CALL, 'C2'.repeat(32))),
+    mustContain: [`class="btn btn-primary" disabled="">${CURE_VERB}</button>`, `class="btn btn-secondary" disabled="">${CURE_VERB}</button>`, 'Margin call on loan C1C1C1C1', 'Margin call on loan C2C2C2C2'],
+  },
+  {
+    name: 'feed with the three margin-call events', element: <DeskFeed data={FIX_MARGIN_FEED} />,
+    mustContain: [
+      'Margin call issued', 'Margin call cured', 'Margin call expired', ...MARGIN_WHYS, 'F1'.repeat(32), 'F2'.repeat(32), 'F3'.repeat(32),
+      'DECLARED · desk', 'Decision-log entry', 'or decided by the desk', 'Margin call, Call cured, Call expired',
+    ],
+    mustNotContain: ['vault owner', 'Ledger field', ...NEVER_SAID],
+  },
 ]

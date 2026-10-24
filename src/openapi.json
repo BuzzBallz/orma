@@ -1005,6 +1005,26 @@
         }
       }
     },
+    "/api/desk/margin-calls": {
+      "get": {
+        "summary": "The desk's margin calls at one ledger: the risk officer's declared policy and one call per desk loan (step 20)",
+        "responses": {
+          "200": {
+            "description": "The policy (orma.marginpolicy/1) and one MarginCall per desk loan, NONE when the loan is within the mandate's LTV at withdrawal value.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarginCalls"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "NOT_CONFIGURED (the desk or its margin policy is not on this server), BUSY or WARMING_UP; retry."
+          }
+        }
+      }
+    },
     "/api/universe": {
       "get": {
         "summary": "The known vaults and those seen live since start, read at one ledger (orma.universe/1)",
@@ -2006,7 +2026,10 @@
               "COVER_DRAWN",
               "SHARES_PLEDGED",
               "LOAN_ORIGINATED",
-              "STATEMENT"
+              "STATEMENT",
+              "MARGIN_CALL_ISSUED",
+              "MARGIN_CALL_CURED",
+              "MARGIN_CALL_EXPIRED"
             ]
           },
           "provenance": {
@@ -2049,7 +2072,69 @@
           },
           "statement": {
             "type": "object"
+          },
+          "entryHash": {
+            "type": "string",
+            "pattern": "^[A-Fa-f0-9]{64}$",
+            "description": "On a MARGIN_CALL_* event (step 20): the decision-log entry that records it."
           }
+        }
+      },
+      "MarginPolicy": {
+        "type": "object",
+        "description": "orma.marginpolicy/1 (step 20): the risk officer's declared margin policy, hashed and anchored like the mandate.",
+        "required": ["schema", "id", "mandateHash", "trigger", "cureSeconds", "realWorldNote", "cureAction", "afterExpiry", "issuedAt", "hash", "anchorTx"],
+        "properties": {
+          "schema": { "type": "string", "enum": ["orma.marginpolicy/1"] },
+          "id": { "type": "string" },
+          "mandateHash": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+          "trigger": { "type": "string", "enum": ["maxLtvBps"] },
+          "cureSeconds": { "type": "integer" },
+          "realWorldNote": { "type": "string" },
+          "cureAction": { "type": "string", "enum": ["pledgeEscrow"] },
+          "afterExpiry": { "type": "string" },
+          "issuedAt": { "type": "string" },
+          "hash": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+          "anchorTx": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" }
+        }
+      },
+      "MarginCall": {
+        "type": "object",
+        "description": "A desk loan's margin call at one ledger (step 20), DECLARED: NONE, ISSUED, CURED or EXPIRED.",
+        "required": ["status", "loanId", "issuedLedger", "issuedAt", "cureBy", "ltvHeldBps", "maxLtvBps", "shortfall", "reasons", "provenance", "ledgerIndex", "ledgerHash"],
+        "properties": {
+          "status": { "type": "string", "enum": ["NONE", "ISSUED", "CURED", "EXPIRED"] },
+          "loanId": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+          "issuedLedger": { "type": ["integer", "null"] },
+          "issuedAt": { "type": ["string", "null"] },
+          "cureBy": { "type": ["string", "null"] },
+          "ltvHeldBps": { "type": ["integer", "null"] },
+          "maxLtvBps": { "type": "integer" },
+          "shortfall": {
+            "type": ["object", "null"],
+            "properties": {
+              "collateralValueDrops": { "type": "string" },
+              "sharesToAdd": { "type": "string" },
+              "withdrawalValuePerShare": { "type": "string" }
+            }
+          },
+          "reasons": { "type": "array", "items": { "type": "string" } },
+          "provenance": { "type": "string", "enum": ["DECLARED"] },
+          "ledgerIndex": { "type": "integer" },
+          "ledgerHash": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+          "entryHash": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+          "triggerTx": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" }
+        }
+      },
+      "MarginCalls": {
+        "type": "object",
+        "description": "GET /api/desk/margin-calls (step 20): the policy and one call per desk loan, at one ledger.",
+        "required": ["ledgerIndex", "ledgerHash", "policy", "marginCalls"],
+        "properties": {
+          "ledgerIndex": { "type": "integer" },
+          "ledgerHash": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+          "policy": { "$ref": "#/components/schemas/MarginPolicy" },
+          "marginCalls": { "type": "array", "items": { "$ref": "#/components/schemas/MarginCall" } }
         }
       },
       "Universe": {

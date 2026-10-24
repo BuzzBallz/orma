@@ -270,7 +270,7 @@ export function buildPositions(p, mandate) {
       lockedUntil = lockedUntil === null ? lock : Decimal.max(lockedUntil, lock)
       const { raw: _raw, ...account } = c.account
       void _raw
-      return { escrowId: c.escrowId, shareMptId: c.shareMptId, units: c.units, account }
+      return { escrowId: c.escrowId, shareMptId: c.shareMptId, units: c.units, account, ...(c.cure && { cure: true }) }
     })
     const principal = num(loan.principalOutstanding)
     const ltvHeldBps = collateral.length && held.gt(0) ? bpsOf(principal.times(10000).div(held)) : null
