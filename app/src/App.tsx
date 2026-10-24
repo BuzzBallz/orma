@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import './app.css'
-import { API_MIXED_ORIGIN, SUSPECT_AFTER_FAILS, SUSPECT_BACKOFF_MS } from './lib/api'
+import { API_MIXED_ORIGIN, SUSPECT_AFTER_FAILS, SUSPECT_BACKOFF_MS, deskPlanPath, deskTicketPaths, type DeskPlan, type Positions } from './lib/api'
 import { usePoll } from './lib/usePoll'
 import { facilityName } from './lib/credit'
 import { DESKS, follow, hrefFor, useRoute, type RoutePath } from './lib/useRoute'
-import type { BrokerHistory, Collateral, Gate, Health, IndexerRace, MethodRules, NavHistory, OracleContest, Resolution, VaultDetail as Detail, VaultRow, VaultsResponse } from './lib/types'
+import type { BrokerHistory, Collateral, Gate, Health, IndexerRace, Mark, MethodRules, NavHistory, OracleContest, Resolution, Ticket, VaultDetail as Detail, VaultRow, VaultsResponse } from './lib/types'
 import { GradeLetter } from './components/GradeLetter'
 import { HeaderBar } from './components/HeaderBar'
 import { Footer } from './components/Footer'
@@ -15,6 +15,7 @@ import { Facility, FacilityPlaceholder } from './screens/Facility'
 import { Event, EventPlaceholder } from './screens/Event'
 import { Methodology } from './screens/Methodology'
 import { Evidence } from './screens/Evidence'
+import { DESK_TABS, DeskScreen, deskTitle } from './screens/Desk'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Toaster } from '@/components/ui/sonner'
 import { toast } from 'sonner'
@@ -76,7 +77,7 @@ function Note({ heading, watch, said, facts, choices, onBack }: {
 const NO_ROWS: VaultRow[] = []
 
 function Desk() {
-  const { path, vaultId, navigate } = useRoute()
+  const { path, vaultId, tab, navigate } = useRoute()
 
   // A desk rises into place when a reader clicks to it, but not on the first paint and
   // not when the keyboard took them there: a shortcut is used too often to be animated.
@@ -95,10 +96,28 @@ function Desk() {
     addEventListener('popstate', still, true)
     return () => removeEventListener('popstate', still, true)
   }, [])
+  // The lending desk. Its reads live here, never in body(): a hook may not sit behind a branch. Every
+  // path is null off /desk, as `detail`'s is without a facility.
+  const onDesk = path === '/desk'
+  const facility = onDesk ? vaultId ?? undefined : undefined
+  const plan = usePoll<{ deskPlan: DeskPlan }>(onDesk ? deskPlanPath : null, 60000)
+  const deskPlan = plan.data?.deskPlan
+  const deskPaths = deskPlan ? deskTicketPaths(deskPlan, facility) : null
+  const deskTicket = usePoll<Ticket>(onDesk ? deskPaths?.pledge ?? null : null, POLL_MS)
+  const buyTicket = usePoll<Ticket>(onDesk ? deskPaths?.buy ?? null : null, POLL_MS)
+  // The mark opens a Devnet connection and follows the pointer: every 15 s, the ticket keeps its 3 s.
+  const mark = usePoll<Mark>(onDesk && deskPaths?.harbor ? `/api/mark/${deskPaths.harbor.shareMptId}` : null, 15000)
+  const positions = usePoll<Positions>(onDesk ? '/api/desk/positions' : null, POLL_MS)
+  const deskTab = DESK_TABS.find((x) => x.id === tab) ?? DESK_TABS[0]
+  // The ticket tab draws from its own props; every other tab from the answer of its own source.
+  const tabRead = usePoll<unknown>(onDesk && deskTab.id !== 'ticket' ? deskTab.source({ deskPlan, facility }) : null, deskTab.pollMs ?? POLL_MS)
+
   // One title per desk, so a tab, a history entry and a screen reader say where the reader is.
   useEffect(() => {
-    document.title = `${DESKS.find(([p]) => p === path)?.[1] ?? 'Portfolio'} · Orma`
-  }, [path])
+    document.title = path === '/desk'
+      ? `${deskTitle(deskPlan ? deskPaths?.harbor?.label ?? null : 'harbor-1', deskTab.label)} · Orma`
+      : `${DESKS.find(([p]) => p === path)?.[1] ?? 'Portfolio'} · Orma`
+  }, [path, deskPlan, deskPaths?.harbor?.label, deskTab.label])
 
   const slow = API_MIXED_ORIGIN
     ? { slowAfter: SUSPECT_AFTER_FAILS, slowCapMs: SUSPECT_BACKOFF_MS }
@@ -119,6 +138,8 @@ function Desk() {
       const t = e.target as HTMLElement | null
       if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.closest('[data-picker], [role="dialog"]'))) return
       if (e.metaKey || e.ctrlKey || e.altKey) return
+      // On the desk a key a judge strikes changes neither the facility nor the screen.
+      if (path === '/desk') return
       const n = Number(e.key)
       if (n >= 1 && n <= 5 && rows[n - 1]) {
         setQuiet(true)
@@ -205,6 +226,17 @@ function Desk() {
   const picker = <FacilityPicker vaults={rows} activeVaultId={vaultId} onSelect={select} variant="block" />
 
   function body() {
+    // First of all: the no-facility note further down draws a grade letter per facility.
+    if (path === '/desk') {
+      return (
+        <DeskScreen
+          ticket={deskTicket.data} mark={mark.data} tab={deskTab.id} data={tabRead.data}
+          error={deskTab.id === 'ticket' ? deskTicket.code : tabRead.code}
+          buyTicket={buyTicket.data} deskPlan={deskPlan} positions={positions.data} facility={facility}
+        />
+      )
+    }
+
     if (path === '/evidence') {
       // The capture names its own facility, so nothing here does. Passing the picked
       // facility's name put one facility's name over another's figures.

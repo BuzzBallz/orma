@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState, type MouseEvent } from 'react'
 
-export type RoutePath = '/' | '/facility' | '/event' | '/methodology' | '/evidence'
-const ROUTES: RoutePath[] = ['/', '/facility', '/event', '/methodology', '/evidence']
+export type RoutePath = '/' | '/facility' | '/event' | '/methodology' | '/evidence' | '/desk'
+const ROUTES: RoutePath[] = ['/', '/facility', '/event', '/methodology', '/evidence', '/desk']
 
-// 'Evidence' last, and named for what it proves rather than for how it works: it is the
-// only desk addressed to an engineer, and it should not be the first thing an analyst
-// reaches for.
+// 'Evidence' last of the reading desks, and named for what it proves rather than for how it
+// works: it is the only desk addressed to an engineer, and it should not be the first thing an
+// analyst reaches for. 'Desk', the lending desk, comes after them.
 export const DESKS: [RoutePath, string][] = [
   ['/', 'Portfolio'], ['/facility', 'Facility'], ['/event', 'Event'], ['/methodology', 'Methodology'],
-  ['/evidence', 'Evidence'],
+  ['/evidence', 'Evidence'], ['/desk', 'Desk'],
 ]
 
 /** Protocol documentation. Overridable so a preview build can point at its own copy. */
@@ -34,19 +34,29 @@ function readId(): string | null {
   return q.get('facility')
 }
 
-function read(): { path: RoutePath; vaultId: string | null } {
+/** The desk's tab, raw: App.tsx resolves it against DESK_TABS, so this module never imports Desk.tsx. */
+const readTab = () => new URLSearchParams(location.search).get('tab') ?? 'ticket'
+
+function read(): { path: RoutePath; vaultId: string | null; tab: string } {
   const raw = location.pathname.replace(/\/+$/, '') || '/'
   const moved = MOVED[raw]
   if (moved) {
     history.replaceState(null, '', moved + location.search)
-    return { path: moved, vaultId: readId() }
+    return { path: moved, vaultId: readId(), tab: readTab() }
   }
   const known = (ROUTES as string[]).includes(raw)
   // An unknown path renders the book, so the address bar must say so too — otherwise
   // /nope shows the book while the URL claims something else, which is confusing to
   // anyone reading over a shoulder.
   if (!known) history.replaceState(null, '', '/' + location.search)
-  return { path: known ? (raw as RoutePath) : '/', vaultId: readId() }
+  return { path: known ? (raw as RoutePath) : '/', vaultId: readId(), tab: readTab() }
+}
+
+/** A desk tab's address: only `tab` changes, every other key of the query is kept, `facility` first of all. */
+export function tabHref(search: string, id: string): string {
+  const q = new URLSearchParams(search)
+  q.set('tab', id)
+  return '/desk?' + q
 }
 
 /** The address a desk link points at: the same one `navigate` pushes. */

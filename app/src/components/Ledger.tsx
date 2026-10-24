@@ -174,7 +174,7 @@ export function ShowWork({ rows }: { rows: ChangeRow[] }) {
       <div className="exh-body">
         <div className="tbl-wrap">
           <table className="op-tbl">
-            <thead><tr><th>Object</th><th>Field</th><th>Before</th><th>After</th><th>Admitted</th><th>Rule</th><th>Effect</th></tr></thead>
+            <thead><tr><th scope="col">Object</th><th scope="col">Field</th><th scope="col">Before</th><th scope="col">After</th><th scope="col">Admitted</th><th scope="col">Rule</th><th scope="col">Effect</th></tr></thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={`${r.object.index}:${r.field}`}>
