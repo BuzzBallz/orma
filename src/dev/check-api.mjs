@@ -16,8 +16,8 @@ const eq = (name, got, want) => {
   if (!ok) bad++
   console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${name}${ok ? '' : `\n         got  ${JSON.stringify(got)}\n         want ${JSON.stringify(want)}`}`)
 }
-const call = async (method, path) => {
-  const r = await fetch(base + path, { method })
+const call = async (method, path, headers) => {
+  const r = await fetch(base + path, { method, headers })
   const text = await r.text()
   return { status: r.status, code: text ? JSON.parse(text).error?.code ?? null : null, bytes: text.length }
 }
@@ -81,6 +81,12 @@ reader.xrpl = { mptIssuance: () => new Promise((_, reject) => setTimeout(() => r
 const burst = await Promise.all(Array.from({ length: 5 }, () => call('GET', `/api/mpt/${MPT}/resolve`)))
 eq('a burst of ledger walks is capped', burst.map((r) => r.status).sort(), [200, 200, 200, 200, 503])
 eq('and the cap lets go once they finish', (await call('GET', `/api/mpt/${MPT}/resolve`)).status, 200)
+// The part of each client (D-A5): its key is the last entry of x-forwarded-for, two walks at most.
+const oneClient = await Promise.all(Array.from({ length: 5 }, (_, i) => call('GET', `/api/mpt/${MPT}/resolve`, { 'x-forwarded-for': `9.9.9.${i + 1}, 203.0.113.7` })))
+eq('five walks of one client, whose last x-forwarded-for entry is the same: two run, three are told to retry', oneClient.map((r) => r.status).sort(), [200, 200, 503, 503, 503])
+const fiveClients = await Promise.all(Array.from({ length: 5 }, (_, i) => call('GET', `/api/mpt/${MPT}/resolve`, { 'x-forwarded-for': `203.0.113.${i + 1}` })))
+eq('five clients at once: the global cap of four still holds', fiveClients.map((r) => r.status).sort(), [200, 200, 200, 200, 503])
+eq('then a walk of the first client passes, every walk given back', (await call('GET', `/api/mpt/${MPT}/resolve`, { 'x-forwarded-for': '203.0.113.7' })).status, 200)
 
 await api.close()
 console.log(bad ? `\n  ${bad} FAILED` : '\n  all ok')

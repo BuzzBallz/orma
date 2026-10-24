@@ -25,6 +25,26 @@ const UNITS = /^[0-9]{1,30}$/
  * no cache. Past this many at once a caller is told to retry, so a flood cannot starve the poll.
  */
 const MAX_LEDGER_WALKS = 4
+/** Of those, at most this many per client (D-A5): one client cannot hold the whole cap and starve the others. */
+const MAX_WALKS_PER_CLIENT = 2
+const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1'])
+
+/**
+ * The client a request comes from, for the per-client limits: the last entry of x-forwarded-for (the
+ * one the Tailscale Funnel proxy adds on the VPS, the address it sees), else null for a loopback socket
+ * (with-api, the checks and npm start see the global caps only), else the socket's address. A forged
+ * x-forwarded-for only buys fairness, never past the global caps.
+ * @param {import('node:http').IncomingMessage} req
+ * @returns {string|null}
+ */
+export function clientKeyOf(req) {
+  const fwd = req.headers?.['x-forwarded-for']
+  const last = (Array.isArray(fwd) ? fwd.join(',') : fwd ?? '').split(',').map((s) => s.trim()).filter(Boolean).at(-1)
+  if (last) return last
+  const address = req.socket?.remoteAddress ?? null
+  return address === null || LOOPBACK.has(address) ? null : address
+}
+
 const OPENAPI = JSON.parse(readFileSync(new URL('./openapi.json', import.meta.url), 'utf8'))
 const CONTRACT_VERSION = '1.0.0'
 
@@ -40,6 +60,16 @@ export function createApi(reader, opts = {}) {
   /** a domain changes when someone edits it, not every four seconds */
   const gateCache = new Map()
   let ledgerWalks = 0
+  /** client key -> ledger walks it holds; a key leaves at zero, the loopback (key null) is never counted */
+  const walksByClient = new Map()
+  const overClientWalks = (key) => key !== null && (walksByClient.get(key) ?? 0) >= MAX_WALKS_PER_CLIENT
+  const takeClientWalk = (key) => { if (key !== null) walksByClient.set(key, (walksByClient.get(key) ?? 0) + 1) }
+  const giveClientWalk = (key) => {
+    if (key === null) return
+    const n = (walksByClient.get(key) ?? 1) - 1
+    if (n <= 0) walksByClient.delete(key)
+    else walksByClient.set(key, n)
+  }
 
   const stamp = (body) => ({
     serverTime: reader.serverTime ?? new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
@@ -180,13 +210,16 @@ export function createApi(reader, opts = {}) {
         if (!Number.isFinite(haircut) || haircut < 0 || haircut > 100) {
           return fail(400, 'BAD_HAIRCUT', 'haircut: a percentage from 0 to 100', false)
         }
-        if (ledgerWalks >= MAX_LEDGER_WALKS) return fail(503, 'BUSY', 'Too many ledger reads in flight; retry shortly', true)
+        const walker = clientKeyOf(req)
+        if (ledgerWalks >= MAX_LEDGER_WALKS || overClientWalks(walker)) return fail(503, 'BUSY', 'Too many ledger reads in flight; retry shortly', true)
         ledgerWalks++
+        takeClientWalk(walker)
         try {
           const escrows = await findShareEscrows(reader.xrpl, shareMptId, accounts)
           return send(200, stamp(presentCollateral(escrows, snap, haircut)))
         } finally {
           ledgerWalks--
+          giveClientWalk(walker)
         }
       }
 
@@ -345,8 +378,10 @@ export function createApi(reader, opts = {}) {
       if (rm && method === 'GET') {
         const units = url.searchParams.get('units')
         if (units && !UNITS.test(units)) return fail(400, 'BAD_UNITS', 'units: a whole number of share units, at most 30 digits', false)
-        if (ledgerWalks >= MAX_LEDGER_WALKS) return fail(503, 'BUSY', 'Too many ledger reads in flight; retry shortly', true)
+        const walker = clientKeyOf(req)
+        if (ledgerWalks >= MAX_LEDGER_WALKS || overClientWalks(walker)) return fail(503, 'BUSY', 'Too many ledger reads in flight; retry shortly', true)
         ledgerWalks++
+        takeClientWalk(walker)
         try {
           const resolve = url.searchParams.get('resolve') !== 'false'
           const out = await resolveFromIssuance(reader.xrpl, rm[1].toUpperCase(), { resolve })
@@ -354,6 +389,7 @@ export function createApi(reader, opts = {}) {
           return send(200, stamp(out), { cors: true })
         } finally {
           ledgerWalks--
+          giveClientWalk(walker)
         }
       }
 

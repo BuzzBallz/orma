@@ -15,6 +15,7 @@ import { readTicketInputs, readPositions, readDemo, SnapshotError, ShareNotTrack
 import { buildTicket, buildPositions } from '../ticket/engine.mjs'
 import { createSigner, registerDeskActions, withDeskErrors } from '../desk/signer.mjs'
 import { watchVaults, readUniverse, createUniverseCache, demoVaultIds } from '../universe/scan.mjs'
+import { clientKeyOf } from '../api.mjs'
 import { createFeed, CURSOR } from '../feed/derive.mjs'
 
 /**
@@ -405,6 +406,52 @@ export function createNyc({ reader, env, fetchImpl = fetch }) {
     req.on('close', stream.end)
     return true
   }
+
+  // --- step 15: hardening ---
+  // A part per client under the global caps (D-A5), keyed by clientKeyOf of src/api.mjs: at most 2
+  // /api/mark verifications in flight (cap 4, step 6) and 4 open /api/feed/stream (cap 100, step 14) per
+  // non-null key, each refused by 503 BUSY and given back when the verification ends or the stream
+  // closes. The loopback without x-forwarded-for (key null) has the global caps only. The handlers of
+  // steps 6 and 14 are wrapped, not rewritten.
+  function perClient(handler, { matches, max, sentence, keeps }) {
+    const held = new Map()
+    const give = (key) => {
+      const n = (held.get(key) ?? 1) - 1
+      if (n <= 0) held.delete(key)
+      else held.set(key, n)
+    }
+    return async (req, res, url, helpers) => {
+      const key = clientKeyOf(req)
+      if (key === null || !matches(req, url)) return handler(req, res, url, helpers)
+      if ((held.get(key) ?? 0) >= max) {
+        helpers.fail(503, 'BUSY', sentence, true)
+        return true
+      }
+      held.set(key, (held.get(key) ?? 0) + 1)
+      let kept = false
+      try {
+        const out = await handler(req, res, url, helpers)
+        kept = keeps(res)
+        if (kept) res.once('close', () => give(key))
+        return out
+      } finally {
+        if (!kept) give(key)
+      }
+    }
+  }
+  const isRead = (req) => req.method === 'GET' || req.method === 'HEAD'
+  handleOrmaMark = perClient(handleOrmaMark, {
+    matches: (req, url) => isRead(req) && /^\/api\/mark\/[^/]+$/.test(url.pathname),
+    max: 2,
+    sentence: 'This client already has two verifications in flight; retry shortly',
+    keeps: () => false,
+  })
+  handleFeed = perClient(handleFeed, {
+    matches: (req, url) => isRead(req) && url.pathname === '/api/feed/stream',
+    max: 4,
+    sentence: 'This client already has four live feeds open; poll /api/feed or retry shortly',
+    keeps: (res) => res.statusCode === 200 && !res.writableEnded,
+  })
 
   return {
     async handle(req, res, url, helpers) {
