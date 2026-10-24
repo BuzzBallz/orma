@@ -1,5 +1,7 @@
-import type { ReactNode } from 'react'
+import { Fragment, useState, type ReactNode } from 'react'
 import Decimal from 'decimal.js'
+import { Check, Clock, X } from 'lucide-react'
+import { useFlash } from '../lib/useFlash'
 import type { ChangeRow, Figure as FigureDoc, FormulaId, Provenance } from '../lib/types'
 import { dropsToXrp, ratioToPct } from '../lib/format'
 
@@ -13,6 +15,39 @@ import { dropsToXrp, ratioToPct } from '../lib/format'
 Decimal.set({ precision: 40, toExpNeg: -9e15, toExpPos: 9e15 })
 
 const LSF_LOAN_IMPAIRED = 0x00020000n
+
+const D = (x: Decimal.Value) => new Decimal(x)
+const EXPLORER = 'https://devnet.xrpl.org'
+
+export function formatXrp(drops: string): string {
+  return D(drops).div(1_000_000).toFixed(6)
+}
+
+function formatDuration(seconds: string): string {
+  const s = D(seconds)
+  const days = s.div(86400).floor()
+  const hours = s.minus(days.mul(86400)).div(3600).floor()
+  return days.isZero() ? `${hours.toFixed(0)} h` : `${days.toFixed(0)} days ${hours.toFixed(0)} h`
+}
+
+export function figureParts(f: Pick<FigureDoc, 'value' | 'unit'>): { text: string; unit: string } {
+  switch (f.unit) {
+    case 'drops': return { text: formatXrp(f.value), unit: 'XRP' }
+    case 'bps': return { text: formatBps(f.value), unit: '' }
+    case 'ratio': return { text: D(f.value).mul(100).toFixed(2) + '%', unit: 'of par' }
+    case 'seconds': return { text: formatDuration(f.value), unit: '' }
+    case 'share-units': return { text: D(f.value).toFixed(0), unit: 'shares' }
+  }
+}
+
+
+/** A money effect names its own unit (drops for XRP, share-units for shares). */
+export function formatEffect(e: { value: string; unit: string }): string {
+  if (e.unit === 'drops') return `${formatXrp(e.value)} XRP`
+  if (e.unit === 'share-units') return `${D(e.value).toFixed(0)} shares`
+  return `${e.value} ${e.unit}`
+}
+
 
 /** 5345 bps -> "53.45%", divided by 100 with decimal.js, never multiplied. */
 export function formatBps(bps: string): string {
@@ -77,31 +112,33 @@ export function Figure({ label, meaning, figure }: { label: string; meaning: str
   )
 }
 
-/** A panel, its provenance always shown, in the neutral register: never a colour. */
-export function Panel({ provenance, title, source, children }: { provenance: Provenance; title: string; source?: string; children?: ReactNode }) {
+export function Panel({ provenance, title, source, children, className }: {
+  provenance: Provenance; title: string; source?: string; children: ReactNode; className?: string
+}) {
   return (
-    <section style={{ borderTop: '1px solid var(--color-line)', paddingBlock: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 'var(--space-4)' }}>
-        <div>
-          <h2 className="exh-title">{title}</h2>
-          {source && <p className="caption" style={{ color: 'var(--color-text-2)' }}>Source: {source}</p>}
-        </div>
-        <span style={{ color: 'var(--color-text-2)', border: '1px solid var(--color-line)', padding: '2px 8px', font: '500 12px/1.5 var(--font-sans)' }}>{provenance}</span>
+    <section className={'panel' + (className ? ' ' + className : '')} aria-label={title}>
+      <header className="panel-head">
+        <h2 className="t-heading-s">{title}</h2>
+        <span className="panel-meta">
+          {source && <span className="panel-source t-label-s">{`Source: ${source}`}</span>}
+          <span className="prov" data-prov={provenance}>{provenance}</span>
+        </span>
       </header>
       {children}
     </section>
   )
 }
 
-export type VerdictStatus = 'PASS' | 'BREACHED' | 'STALE' | 'MATCH' | 'MISMATCH'
 
-/** The only component that may use a verdict colour, and it always prints the word beside it. */
-export function Verdict({ status }: { status: VerdictStatus }) {
-  const color = status === 'PASS' || status === 'MATCH' ? 'var(--color-ok)' : status === 'STALE' ? 'var(--color-watch)' : 'var(--color-loss)'
+export type VerdictStatus = 'PASS' | 'BREACHED' | 'STALE' | 'MATCH' | 'MISMATCH'
+const ICON = { PASS: Check, MATCH: Check, BREACHED: X, MISMATCH: X, STALE: Clock }
+
+export function Verdict({ status, big }: { status: VerdictStatus; big?: boolean }) {
+  const Icon = ICON[status]
+  const flash = useFlash(status)
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, font: '600 13px/1.5 var(--font-sans)' }}>
-      <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 4, background: color }} />
-      {status}
+    <span className={'verdict' + (big ? ' verdict-big' : '') + (flash ? ' flash' : '')} data-status={status} aria-live={big ? 'polite' : undefined}>
+      <Icon size={big ? 20 : 16} strokeWidth={2} aria-hidden /> <span className="verdict-word">{status}</span>
     </span>
   )
 }
@@ -149,18 +186,21 @@ export const RECOMPUTE: Record<FormulaId, (inputs: Inputs) => string> = {
   lockedUntil: (i) => { const r = reader(i); return r.v('RedemptionDate').minus(r.v('close_time')).toFixed(0) },
 }
 
-/** Replays the figure's formula on its own inputs. MATCH if and only if the result equals the served value. */
-export function Recompute({ figure }: { figure: FigureDoc }) {
-  let status: VerdictStatus = 'MISMATCH'
+/** MATCH if and only if replaying the figure's formula on its own inputs gives the served value. */
+export function recomputeStatus(figure: FigureDoc): 'MATCH' | 'MISMATCH' {
   const fn = Object.hasOwn(RECOMPUTE, figure.formulaId) ? RECOMPUTE[figure.formulaId] : null
-  if (fn) {
-    try {
-      const result = fn(Object.fromEntries(figure.inputs.map((i) => [i.name, i.value])))
-      if (new Decimal(result).eq(figure.value)) status = 'MATCH'
-    } catch {
-      status = 'MISMATCH' // a missing input, or a figure no formula can produce
-    }
+  if (!fn) return 'MISMATCH'
+  try {
+    return new Decimal(fn(Object.fromEntries(figure.inputs.map((i) => [i.name, i.value])))).eq(figure.value) ? 'MATCH' : 'MISMATCH'
+  } catch {
+    return 'MISMATCH' // a missing input, or a figure no formula can produce
   }
+}
+
+/** The figure replayed in the reader's browser; `bare` prints the verdict alone, for a table column that already says what it is. */
+export function Recompute({ figure, bare }: { figure: FigureDoc; bare?: boolean }) {
+  const status = recomputeStatus(figure)
+  if (bare) return <Verdict status={status} />
   return <span className="caption">Recomputed in your browser: <Verdict status={status} /></span>
 }
 
@@ -197,12 +237,160 @@ export function ShowWork({ rows }: { rows: ChangeRow[] }) {
 }
 
 export function TestNetBanner() {
+  return <p className="testnet t-label-s" role="note">Test network — XRPL Devnet. Nothing here moves real money.</p>
+}
+
+
+export function HashLink({ hash, kind = 'transactions', noLink }: { hash: string; kind?: 'transactions' | 'accounts'; noLink?: boolean }) {
+  const [copied, setCopied] = useState(false)
+  const short = hash.length > 20 ? `${hash.slice(0, 8)}…${hash.slice(-6)}` : hash
   return (
-    <p className="caption" role="note" style={{ borderBottom: '1px solid var(--color-line)', paddingBlock: 'var(--space-2)', color: 'var(--color-text-2)' }}>
-      Test network — XRPL Devnet. Nothing here moves real money.
-    </p>
+    <span className="hash">
+      {noLink
+        ? <span className="t-fig-m" title={hash}>{short}</span>
+        : <a className="lnk t-fig-m" href={`${EXPLORER}/${kind}/${hash}`} target="_blank" rel="noreferrer noopener" aria-label={`${short}, full ${kind === 'transactions' ? 'transaction hash' : 'account'} ${hash}, opens the Devnet explorer`}>{short}</a>}
+      <button
+        type="button" className="btn btn-secondary"
+        onClick={() => { navigator.clipboard?.writeText(hash).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1200) }) }}
+      >{copied ? 'Copied' : 'Copy'}</button>
+    </span>
   )
 }
+
+
+/** The leading characters a price shares with the others: muted on screen, so the digits that differ stand out. */
+export function sharedPrefix(text: string, others: string[]): string {
+  let i = 0
+  while (i < text.length - 1 && others.every((t) => t[i] === text[i])) i++
+  return text.slice(0, i)
+}
+
+
+const FRIENDLY: Record<string, string> = {
+  AssetsTotal: 'Total assets', LossUnrealized: 'Recognised loss', AssetsAvailable: 'Cash available', OutstandingAmount: 'Shares outstanding', Scale: 'Share scale',
+  units: 'Shares in this ticket', DebtTotal: "Broker's total debt", CoverRateMinimum: 'Minimum cover rate', CoverRateLiquidation: 'Liquidation cover rate',
+  CoverAvailable: 'First-loss cover available', LEVersion: 'Loan engine version', PrincipalOutstanding: 'Loan principal outstanding',
+  TotalValueOutstanding: 'Loan total value outstanding', ManagementFeeOutstanding: 'Management fee outstanding', Flags: 'Loan flags',
+  RedemptionDate: 'Redemption date', close_time: 'Ledger close time', maxLtvBps: 'Mandate: max LTV', maxSingleLoanDrops: 'Mandate: max single loan', principalDrops: 'Planned loan principal',
+}
+const DROP_FIELDS = new Set(['AssetsTotal', 'LossUnrealized', 'AssetsAvailable', 'DebtTotal', 'CoverAvailable', 'PrincipalOutstanding', 'TotalValueOutstanding', 'ManagementFeeOutstanding', 'maxSingleLoanDrops', 'principalDrops'])
+
+/** One figure's trace, readable in a full-width row: what it means, how it is computed, and each ledger value it used. */
+export function LedgerDetail({ figure }: { figure: FigureDoc }) {
+  const f = figureParts(figure)
+  return (
+    <div className="ld">
+      <p className="ld-meaning t-body-m">{figure.meaning}</p>
+      <dl className="ld-calc">
+        <div><dt>Formula</dt><dd><code>{figure.formula}</code></dd></div>
+        <div><dt>Result</dt><dd><code className="t-fig-m">{figure.value}</code><span className="dim">{` (${f.text}${f.unit ? ' ' + f.unit : ''})`}</span></dd></div>
+      </dl>
+      <div className="table-scroll">
+        <table className="ld-inputs">
+          <thead><tr><th scope="col">Input</th><th scope="col" className="num">Value</th><th scope="col">Ledger object</th><th scope="col">Read at</th></tr></thead>
+          <tbody>
+            {figure.inputs.map((x) => (
+              <tr key={x.name + x.id}>
+                <td><span className="block">{FRIENDLY[x.name] ?? x.name}</span><span className="t-fig-s dim">{`${x.object}.${x.field}`}</span></td>
+                <td className="t-fig-m num">{x.value}{DROP_FIELDS.has(x.name) && <span className="block t-fig-s dim">{`${formatXrp(x.value)} XRP`}</span>}</td>
+                <td className="t-fig-s" title={x.id}>{x.id.length > 16 ? `${x.id.slice(0, 8)}…${x.id.slice(-6)}` : x.id}</td>
+                <td className="t-fig-s">{`ledger ${x.ledgerIndex}`}<span className="block dim" title={x.ledgerHash}>{`${x.ledgerHash.slice(0, 8)}…`}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+/** Value only: label, number, optional gloss. Its recompute and ledger inputs live once, in the AuditTable. */
+export function FigureValue({ label, figure, size = 'l', mention, against, shown }: {
+  label: string; figure: FigureDoc; size?: 'display' | 'l' | 'm'; mention?: string; against?: string[]; shown?: string
+}) {
+  const f = figureParts(figure)
+  const flash = useFlash(['heldValue', 'ltvHeld', 'lender1to1'].includes(figure.formulaId) ? figure.value : null)
+  const same = shown || !against?.length ? '' : sharedPrefix(f.text, against)
+  return (
+    <div className="fv">
+      <p className="fig-label t-label-m">{label}</p>
+      <p className={'fig-value fig-' + size + (flash ? ' flash' : '')}>
+        {shown ?? <>{same && <span className="fig-same">{same}</span>}{f.text.slice(same.length)}</>}
+        {!shown && f.unit && <span className="fig-unit"> {f.unit}</span>}
+      </p>
+      {mention && <p className="fig-mention t-body-s">{mention}</p>}
+      <details className="fig-ledger">
+        <summary>Ledger field</summary>
+        <div className="pop-body pop-wide"><LedgerDetail figure={figure} /></div>
+      </details>
+    </div>
+  )
+}
+
+/** Every figure of the ticket once: value, provenance, the recompute done in this browser, and its ledger trace in a full-width row. */
+export function AuditTable({ entries }: { entries: { label: string; figure: FigureDoc }[] }) {
+  const [open, setOpen] = useState<Set<string>>(new Set())
+  const toggle = (k: string) => setOpen((o) => { const n = new Set(o); if (n.has(k)) n.delete(k); else n.add(k); return n })
+  return (
+    <details className="exh audit" open>
+      <summary>
+        <span className="exh-title">Audit: every figure, recomputed</span>
+        <span className="exh-meta"><span className="exh-meta-text">{entries.length} figures, each replayed in this browser from its ledger inputs</span></span>
+      </summary>
+      <div className="exh-body">
+        <div className="table-scroll">
+          <table className="op-tbl audit-tbl">
+            <thead><tr>{['Figure', 'Value', 'Source', 'Recomputed', 'Inputs'].map((h, i) => <th key={i} scope="col" className={h === 'Value' ? 'num' : undefined}>{h === 'Inputs' ? <span className="sr-only">{h}</span> : h}</th>)}</tr></thead>
+            <tbody>
+              {entries.map(({ label, figure }) => {
+                const f = figureParts(figure)
+                const k = label + figure.formulaId
+                const isOpen = open.has(k)
+                return (
+                  <Fragment key={k}>
+                    <tr>
+                      <td>{label}</td>
+                      <td className="t-fig-m num">{f.text}{f.unit && ` ${f.unit}`}</td>
+                      <td><span className="prov" data-prov={figure.provenance}>{figure.provenance}</span></td>
+                      <td><Recompute figure={figure} bare /></td>
+                      <td><button type="button" className="btn btn-secondary" aria-expanded={isOpen} onClick={() => toggle(k)}>Ledger field</button></td>
+                    </tr>
+                    <tr className="ld-row" hidden={!isOpen}><td colSpan={5}><LedgerDetail figure={figure} /></td></tr>
+                  </Fragment>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </details>
+  )
+}
+
+
+export function ReadAt({ ledger, at }: { ledger: number | string; at?: string }) {
+  return <p className="read-at t-fig-s">{`Read at ledger ${ledger}`}{at && ` · ${formatWhen(at)}`}</p>
+}
+
+/** "22 Oct 2026, 20:41 UTC": the time a reading was taken, in one fixed zone. */
+export function formatWhen(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) + ' UTC'
+}
+
+/** What the four provenance labels mean, once, at the foot of every tab. */
+export function ProvenanceKey() {
+  return (
+    <dl className="prov-key" aria-label="How to read the labels">
+      {([['REAL', 'read from the ledger'], ['DECLARED', 'stated by a party, not computed'], ['MODELLED', 'computed by Orma from ledger values'], ['SIMULATED', 'a preview: nothing is sent']] as const).map(([k, v]) => (
+        <div key={k}><dt><span className="prov" data-prov={k}>{k}</span></dt><dd className="t-body-s">{v}</dd></div>
+      ))}
+      <div><dt><span className="prov">MATCH</span></dt><dd className="t-body-s">the figure was recomputed in this browser from its ledger inputs</dd></div>
+    </dl>
+  )
+}
+
 
 /** The contract of the kit, held by the compiler: each line stops compiling the day a prop turns optional. */
 function _contractProbes(f: FigureDoc) {
