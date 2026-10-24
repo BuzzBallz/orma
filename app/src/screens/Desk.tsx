@@ -9,6 +9,7 @@ import {
 import { usePoll } from '../lib/usePoll'
 import { tabHref } from '../lib/useRoute'
 import { dropsToXrp } from '../lib/format'
+import { DeskUniverse } from './DeskUniverse'
 
 /**
  * Orma Desk: the ticket (the risk report, the default tab and the central screen), the desk's positions
@@ -53,6 +54,7 @@ export const DESK_TABS: DeskTab[] = [
     mustContain: ['Mandate desk-1', 'Maximum loan-to-value at withdrawal value'],
     mustShowKeys: ['hash', 'anchorTx'],
   },
+  { id: 'universe', label: 'Universe', source: () => '/api/universe', pollMs: 60000, mustContain: ['not live on mainnet', 'Not a full ledger scan.'], accepts: hasSchema('orma.universe/1') },
 ]
 
 /** harbor-2 -> Harbor-2. */
@@ -332,6 +334,7 @@ function DataTab({ tab, data, error, positions, deskPlan, harbor }: {
       {failure}
       <p className="caption">{`Read at ledger ${String((doc as { ledgerIndex?: number }).ledgerIndex)}`}</p>
       {tab.id === 'positions' && <PositionsTab doc={doc as Positions} deskPlan={deskPlan} harbor={harbor} />}
+      {tab.id === 'universe' && <DeskUniverse data={data} error={error} />}
       {tab.id === 'mandate' && <MandateTab doc={doc as Mandate} />}
     </>
   )

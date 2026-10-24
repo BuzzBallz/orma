@@ -14,6 +14,7 @@ import { mandateHash } from './contracts.mjs'
 import { readTicketInputs, readPositions, readDemo, SnapshotError, ShareNotTrackedError } from '../ticket/inputs.mjs'
 import { buildTicket, buildPositions } from '../ticket/engine.mjs'
 import { createSigner, registerDeskActions, withDeskErrors } from '../desk/signer.mjs'
+import { watchVaults, readUniverse, createUniverseCache, demoVaultIds } from '../universe/scan.mjs'
 
 /**
  * @param {{ reader: import('../poll.mjs').Reader, env: NodeJS.ProcessEnv }} deps
@@ -315,12 +316,36 @@ export function createNyc({ reader, env }) {
     return true
   }
 
+  // --- step 13: universe ---
+  // GET /api/universe: the vaults on file (demo/*.json, then the Reader's portfolio) and those the
+  // transactions stream showed since this process started, each read at the Reader's last validated
+  // ledger, cached 60 s, one read at a time. The stream is watched only when the Reader has an xrpl.js
+  // client: the in-memory APIs of check-mark and check-ticket have none.
+  const universeOnFile = demoVaultIds('demo')
+  const universeLive = reader.xrpl?.client
+    ? watchVaults(reader.xrpl.client)
+    : { ids: () => [], liveSinceLedger: () => null, stop() {} }
+  const universe = createUniverseCache({
+    read: () => readUniverse({ xrpl: reader.xrpl, known: [...universeOnFile, ...(reader.vaultIds ?? [])], live: universeLive }),
+  })
+  async function handleUniverse(req, res, url, { send, stamp, fail }) {
+    if (url.pathname !== '/api/universe' || (req.method !== 'GET' && req.method !== 'HEAD')) return false
+    try {
+      send(200, stamp(await universe.get()))
+    } catch (e) {
+      logger('universe').warn('universe not read at one ledger', { ledgerIndex: reader.xrpl?.lastLedger ?? null, err: String(e?.message ?? e).slice(0, 200) })
+      fail(503, 'WARMING_UP', 'The universe could not be read at one ledger yet.', true)
+    }
+    return true
+  }
+
   return {
     async handle(req, res, url, helpers) {
       if (await handleHarness(req, res, url, helpers)) return true
       if (await handleOrmaMark(req, res, url, helpers)) return true
       if (await handleTicket(req, res, url, helpers)) return true
       if (await handleDeskSigner(req, res, url, helpers)) return true
+      if (await handleUniverse(req, res, url, helpers)) return true
       return false
     },
     missing,
