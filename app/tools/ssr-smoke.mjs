@@ -91,5 +91,105 @@ if (!id) {
   }
 }
 
+// --- Orma Desk, layer 1 of the ticket ----------------------------------------
+// renderToString puts <!-- --> between adjacent text nodes ({pct}% renders 53.45<!-- -->%): every
+// string is looked for in the HTML with them taken out.
+const { readFileSync, readdirSync } = await import('node:fs')
+const plain = (h) => h.replaceAll('<!-- -->', '')
+const check = (what, ok) => {
+  if (!ok) bad++
+  console.log('  ' + (ok ? 'ok  ' : 'MISS') + ' ' + what)
+}
+const { DeskScreen, DESK_TABS } = await import('../src/screens/Desk.tsx')
+const { Figure, Recompute } = await import('../src/components/Ledger.tsx')
+
+const harbor = JSON.parse(readFileSync('../demo/harbor-1.json', 'utf8'))
+const desk = JSON.parse(readFileSync('../demo/desk.json', 'utf8'))
+const ticket = await grab('/api/tickets?share=' + harbor.shareMptId + '&op=pledge&units=' + desk.plannedLoan.units + '&mandate=desk-1')
+console.log(NL + '  desk')
+if (!ticket) {
+  check('/api/tickets returned a Harbor-1 ticket', false)
+} else {
+  for (const tab of DESK_TABS) {
+    const html = plain(renderToString(createElement(DeskScreen, { ticket, mark: null, tab: tab.id })))
+    for (const s of tab.mustContain) check('tab ' + tab.id + ': ' + s, html.includes(s))
+  }
+  const html = plain(renderToString(createElement(DeskScreen, { ticket, mark: null, tab: 'ticket' })))
+  const held = ticket.figures.heldValue.value
+  const label = html.indexOf('Withdrawal value')
+  const field = html.indexOf('Ledger field', label)
+  const verbatim = html.indexOf('<code>' + held + '</code>', field)
+  check('the served heldValue ' + held + ' verbatim in Ledger field, under Withdrawal value',
+    label >= 0 && field > label && verbatim > field && verbatim < html.indexOf('Value read by all'))
+  for (const s of ['XLS-65 withdraw rate', 'Value read by all', 'Test network', 'Source: Orma']) check(s, html.includes(s))
+  const served = []
+  const walk = (o) => {
+    if (o && typeof o === 'object') {
+      if (typeof o.formulaId === 'string' && Array.isArray(o.inputs)) served.push(o)
+      else Object.values(o).forEach(walk)
+    }
+  }
+  walk(ticket.figures)
+  const off = served.filter((f) => !plain(renderToString(createElement(Recompute, { figure: f }))).includes('>MATCH'))
+  check('every served figure (' + served.length + ') recomputes MATCH in the browser' + (off.length ? ': not ' + off.map((f) => f.formulaId).join(', ') : ''), served.length > 0 && off.length === 0)
+}
+
+// Recompute on fixed figures: MATCH as served, MISMATCH once the last digit moves.
+const meridian = (name, value) => ({ name, value, object: 'Vault', field: name, id: 'AB'.repeat(32), ledgerIndex: 1, ledgerHash: 'CD'.repeat(32) })
+const heldInputs = [meridian('AssetsTotal', '51000000'), meridian('LossUnrealized', '10000000'), meridian('OutstandingAmount', '51000000'), meridian('Scale', '0'), meridian('units', '1000000')]
+const fig = (formulaId, unit, value, inputs) => ({ value, unit, meaning: 'x', formula: 'x', formulaId, inputs, provenance: 'MODELLED' })
+const verdictOf = (f) => {
+  const h = plain(renderToString(createElement(Recompute, { figure: f })))
+  return h.includes('MISMATCH') ? 'MISMATCH' : h.includes('MATCH') ? 'MATCH' : 'none'
+}
+const heldFig = fig('heldValue', 'drops', '803922', heldInputs)
+const ltvFig = fig('ltvHeld', 'bps', '4975', [...heldInputs, meridian('principalDrops', '400000')])
+check('Recompute heldValue in drops: MATCH, then MISMATCH', verdictOf(heldFig) === 'MATCH' && verdictOf({ ...heldFig, value: '803923' }) === 'MISMATCH')
+check('Recompute ltvHeld in bps: MATCH, then MISMATCH', verdictOf(ltvFig) === 'MATCH' && verdictOf({ ...ltvFig, value: '4976' }) === 'MISMATCH')
+check('Recompute on an unknown formulaId: MISMATCH', verdictOf({ ...heldFig, formulaId: 'noSuchFormula' }) === 'MISMATCH')
+const bpsHtml = plain(renderToString(createElement(Figure, { label: 'LTV', meaning: 'x', figure: { ...ltvFig, value: '5345' } })))
+check('Figure in bps: 5345 renders 53.45%, and 5345 verbatim in Ledger field', bpsHtml.includes('53.45%') && bpsHtml.includes('<code>5345</code>'))
+
+// No grade and no verdict colour outside Verdict, on the NYC surfaces. The reserved set is read from
+// app.css: the four tokens, and every class and data-* attribute of a rule that uses one of them.
+const TOKENS = ['--color-ok', '--color-loss', '--color-watch', '--destructive']
+const css = readFileSync('src/app.css', 'utf8')
+const classes = new Set()
+const attrs = new Set()
+for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+  if (!TOKENS.some((t) => m[2].includes('var(' + t))) continue
+  for (const c of m[1].matchAll(/\.([A-Za-z_][\w-]*)/g)) classes.add(c[1])
+  for (const a of m[1].matchAll(/\[(data-[\w-]+)/g)) attrs.add(a[1])
+}
+check('the reserved set read from app.css holds ok, loss and data-danger', classes.has('ok') && classes.has('loss') && attrs.has('data-danger'))
+const surfaces = [
+  'src/components/Ledger.tsx',
+  ...readdirSync('src/screens').filter((n) => /^(Desk|Role).*\.tsx$/.test(n)).map((n) => 'src/screens/' + n),
+]
+for (const file of surfaces) {
+  let src = readFileSync(file, 'utf8')
+  const verdict = src.indexOf('export function Verdict')
+  if (verdict >= 0) src = src.slice(0, verdict) + src.slice(src.indexOf(NL + '}' + NL, verdict) + 3)
+  const found = []
+  if (/from\s+['"][^'"]*grades['"]|GradeLetter/.test(src)) found.push('grades or GradeLetter')
+  for (const t of TOKENS) if (src.includes(t)) found.push(t)
+  if (/destructive/.test(src)) found.push('destructive')
+  for (const m of src.matchAll(/className=(?:"([^"]*)"|\{\s*[`'"]([^`'"]*)[`'"]\s*\})/g)) {
+    for (const w of (m[1] ?? m[2]).split(/\s+/)) if (classes.has(w)) found.push('.' + w)
+  }
+  for (const a of attrs) if (src.includes(a + '=')) found.push(a)
+  check(file + ': no grade, no verdict colour outside Verdict' + (found.length ? ' (' + found.join(', ') + ')' : ''), found.length === 0)
+}
+
+// Each screen that declares SMOKE_CASES renders them, and each must show its strings.
+for (const n of readdirSync('src/screens').filter((x) => x.endsWith('.tsx'))) {
+  if (!readFileSync('src/screens/' + n, 'utf8').includes('export const SMOKE_CASES')) continue
+  const { SMOKE_CASES } = await import('../src/screens/' + n)
+  for (const c of SMOKE_CASES) {
+    const html = plain(renderToString(c.element))
+    for (const s of c.mustContain ?? []) check(n + ' / ' + c.name + ': ' + s, html.includes(s))
+  }
+}
+
 console.log(NL + '  ' + bad + ' problem(s)')
-process.exit(bad ? 1 : 0)
+process.exitCode = bad ? 1 : 0
