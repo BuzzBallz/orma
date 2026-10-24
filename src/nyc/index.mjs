@@ -15,11 +15,12 @@ import { readTicketInputs, readPositions, readDemo, SnapshotError, ShareNotTrack
 import { buildTicket, buildPositions } from '../ticket/engine.mjs'
 import { createSigner, registerDeskActions, withDeskErrors } from '../desk/signer.mjs'
 import { watchVaults, readUniverse, createUniverseCache, demoVaultIds } from '../universe/scan.mjs'
+import { createFeed, CURSOR } from '../feed/derive.mjs'
 
 /**
- * @param {{ reader: import('../poll.mjs').Reader, env: NodeJS.ProcessEnv }} deps
+ * @param {{ reader: import('../poll.mjs').Reader, env: NodeJS.ProcessEnv, fetchImpl?: typeof fetch }} deps
  */
-export function createNyc({ reader, env }) {
+export function createNyc({ reader, env, fetchImpl = fetch }) {
   const missing = ['ROLES_FILE', 'DESK_SEED', 'ALLOWED_WRITE_ORIGINS', 'PUBLISH_SEED'].filter((k) => !env[k])
 
   // --- step 2: harness ---
@@ -339,6 +340,72 @@ export function createNyc({ reader, env }) {
     return true
   }
 
+  // --- step 14: feed ---
+  // Credit events from full re-reads (src/feed/derive.mjs), polled at /api/feed and pushed on
+  // /api/feed/stream; the amendment votes of xrpscan ride along, read at most once a minute.
+  const feedLog = logger('feed')
+  const escrowAccounts = (() => {
+    try {
+      const borrower = JSON.parse(readFileSync('demo/desk.json', 'utf8')).collateral?.borrower
+      if (borrower) return [borrower]
+      feedLog.warn('demo/desk.json names no collateral borrower: the feed reads no escrow')
+    } catch (e) {
+      feedLog.warn('demo/desk.json unreadable: the feed reads no escrow', { err: e.code ?? e.name })
+    }
+    return []
+  })()
+  const feed = (() => {
+    if (typeof reader?.subscribe !== 'function') return null
+    try {
+      return createFeed(reader, { escrowAccounts })
+    } catch (e) {
+      feedLog.warn('the reader takes no subscriber: the feed stays empty', { err: String(e).slice(0, 120) })
+      return null
+    }
+  })()
+  const amendments = createAmendmentsCache({ read: () => readAmendments({ fetchImpl }) })
+  const STREAMS_MAX = 100
+  const HEARTBEAT_MS = 10_000
+  const streams = new Set()
+  async function handleFeed(req, res, url, { send, fail, stamp }) {
+    const head = req.method === 'HEAD'
+    if (req.method !== 'GET' && !head) return false
+    if (url.pathname === '/api/feed') {
+      const after = url.searchParams.get('after')
+      if (after !== null && !CURSOR.test(after)) {
+        fail(400, 'BAD_CURSOR', 'after must be a cursor <ledger on 19 digits>-<counter>, as nextCursor gives it', false)
+        return true
+      }
+      const events = feed ? feed.after(after) : []
+      send(200, stamp({ events, nextCursor: events.at(-1)?.id ?? after, amendments: await amendments.get() }))
+      return true
+    }
+    if (url.pathname !== '/api/feed/stream') return false
+    if (streams.size >= STREAMS_MAX) {
+      fail(503, 'BUSY', 'Too many live feeds are open; poll /api/feed or retry shortly', true)
+      return true
+    }
+    res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive', 'Access-Control-Allow-Origin': '*' })
+    if (head) {
+      res.end()
+      return true
+    }
+    const stream = { end: null }
+    streams.add(stream)
+    // A write the socket cannot take ends the stream: a slow reader never makes the server buffer for it.
+    const write = (chunk) => { if (!res.write(chunk)) stream.end() }
+    const timer = setInterval(() => write('event: heartbeat\ndata: {}\n\n'), HEARTBEAT_MS)
+    const off = feed ? feed.onEvent((ev) => write(`event: credit\ndata: ${JSON.stringify(ev)}\n\n`)) : () => {}
+    stream.end = () => {
+      if (!streams.delete(stream)) return
+      clearInterval(timer)
+      off()
+      res.end()
+    }
+    req.on('close', stream.end)
+    return true
+  }
+
   return {
     async handle(req, res, url, helpers) {
       if (await handleHarness(req, res, url, helpers)) return true
@@ -346,9 +413,44 @@ export function createNyc({ reader, env }) {
       if (await handleTicket(req, res, url, helpers)) return true
       if (await handleDeskSigner(req, res, url, helpers)) return true
       if (await handleUniverse(req, res, url, helpers)) return true
+      if (await handleFeed(req, res, url, helpers)) return true
       return false
     },
     missing,
     demoActions,
+    close: async () => { for (const st of [...streams]) st.end() },
+  }
+}
+
+// --- step 14: feed ---
+const amendmentsLog = logger('feed')
+
+/**
+ * The amendment votes, a sourced and timed public fact read from xrpscan. Never an exception: on any
+ * failure the status says so and the measurements are unaffected.
+ * @param {{ fetchImpl?: typeof fetch, now?: () => Date }} [opts]
+ */
+export async function readAmendments({ fetchImpl = fetch, now = () => new Date() } = {}) {
+  const fetchedAt = now().toISOString()
+  try {
+    const res = await fetchImpl('https://api.xrpscan.com/api/v1/amendments', { signal: AbortSignal.timeout(5000) })
+    if (res.status !== 200) throw new Error(`HTTP ${res.status}`)
+    const items = await res.json()
+    if (!Array.isArray(items)) throw new Error('the body is not an array')
+    return { source: 'xrpscan', fetchedAt, status: 'ok', items }
+  } catch (e) {
+    amendmentsLog.warn('amendment votes unavailable', { err: String(e?.message ?? e).slice(0, 120) })
+    return { source: 'xrpscan', fetchedAt, status: 'unavailable', items: [] }
+  }
+}
+
+/** One read at a time, kept `ttlMs` whatever it answered: xrpscan sees at most one request a minute. */
+export function createAmendmentsCache({ read, ttlMs = 60_000, now = Date.now }) {
+  let held = null
+  return {
+    get() {
+      if (!held || now() - held.at >= ttlMs) held = { at: now(), value: read() }
+      return held.value
+    },
   }
 }

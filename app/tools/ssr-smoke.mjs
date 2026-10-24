@@ -22,12 +22,15 @@ const BASE = process.env.API_BASE ?? 'http://localhost:8787'
 const NL = String.fromCharCode(10)
 let bad = 0
 
-const grab = async (path) => {
+// One retry on a network error only: after a long render, fetch can reuse a keep-alive socket the
+// server has just closed. An HTTP error is an answer and is never retried.
+const grab = async (path, retry = 1) => {
   try {
     const r = await fetch(BASE + path)
     return r.ok ? await r.json() : null
-  } catch {
-    return null
+  } catch (e) {
+    console.log('  --   ' + path + ': ' + (e.cause?.code ?? e.message) + (retry ? ', retried once' : ''))
+    return retry ? grab(path, retry - 1) : null
   }
 }
 

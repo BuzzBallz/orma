@@ -10,6 +10,7 @@ import { usePoll } from '../lib/usePoll'
 import { tabHref } from '../lib/useRoute'
 import { dropsToXrp } from '../lib/format'
 import { DeskUniverse } from './DeskUniverse'
+import { DeskFeed, FEED_POLL_MS, type FeedDoc } from './DeskFeed'
 
 /**
  * Orma Desk: the ticket (the risk report, the default tab and the central screen), the desk's positions
@@ -55,6 +56,7 @@ export const DESK_TABS: DeskTab[] = [
     mustShowKeys: ['hash', 'anchorTx'],
   },
   { id: 'universe', label: 'Universe', source: () => '/api/universe', pollMs: 60000, mustContain: ['not live on mainnet', 'Not a full ledger scan.'], accepts: hasSchema('orma.universe/1') },
+  { id: 'feed', label: 'Feed', source: () => '/api/feed', pollMs: FEED_POLL_MS, mustContain: [], accepts: hasArray('events') },
 ]
 
 /** harbor-2 -> Harbor-2. */
@@ -336,6 +338,7 @@ function DataTab({ tab, data, error, positions, deskPlan, harbor }: {
       {tab.id === 'positions' && <PositionsTab doc={doc as Positions} deskPlan={deskPlan} harbor={harbor} />}
       {tab.id === 'universe' && <DeskUniverse data={data} error={error} />}
       {tab.id === 'mandate' && <MandateTab doc={doc as Mandate} />}
+      {tab.id === 'feed' && <DeskFeed data={doc as FeedDoc} />}
     </>
   )
 }
@@ -695,5 +698,21 @@ export const SMOKE_CASES: SmokeCase[] = [
   { name: 'simulateWithdraw result in a status region', element: previewed('simulateWithdraw'), mustContain: ['role="status"', 'tabindex="-1"'] },
   { name: 'decline previewed', element: previewed('decline'), mustContain: ['Decline loan request'], mustNotContain: ['declined'] },
   { name: 'rerequest previewed', element: previewed('rerequest'), mustContain: ['Re-request with a fresh ticket'], mustNotContain: ['LoanSet'] },
+  (() => {
+    const text = 'L1 marked impaired: payment missed by 1 min'
+    const raw = Array.from(new TextEncoder().encode(JSON.stringify({ s: 'orma.stmt/1', kind: 'impaired', text, at: 846180562 }))).map((b) => b.toString(16).padStart(2, '0')).join('').toUpperCase()
+    const doc: FeedDoc = {
+      ledgerIndex: FIX_L, nextCursor: null, amendments: { source: 'xrpscan', fetchedAt: '2026-10-25T12:00:00Z', status: 'unavailable', items: [] },
+      events: [{
+        id: `${String(FIX_L).padStart(19, '0')}-0`, type: 'STATEMENT', provenance: 'DECLARED', vaultId: '22'.repeat(32), ledgerIndex: FIX_L, ledgerHash: FIX_HASH, txHash: FIX_HASH,
+        why: `The vault owner declared on the ledger: "${text}"`, moneyEffect: null, receipts: [{ object: 'Vault', field: 'Data', before: null, after: raw }],
+        statement: {
+          provenance: 'DECLARED', raw, owner: 'rOwner', doc: { s: 'orma.stmt/1', kind: 'impaired', text, at: 846180562 },
+          consistency: { status: 'CONSISTENT', detail: 'L1 carries lsfLoanImpaired', provenance: 'REAL', ledgerIndex: FIX_L, ledgerHash: FIX_HASH },
+        },
+      }],
+    }
+    return { name: 'feed-statement', element: <DeskFeed data={doc} />, mustContain: ['DECLARED', 'REAL', text, 'Amendment votes could not be fetched'] }
+  })(),
   ...['simulateWithdraw', 'wait'].map((a) => ({ name: `${a} after its button`, element: row(a, { phase: 'done', actionId: FIX_ACTION, preview: PREVIEWS[a] }), mustContain: ['Recorded as a preview only'], mustNotContain: ['Sent.'] })),
 ]
