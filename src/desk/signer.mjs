@@ -7,15 +7,16 @@
  * borrower's Sequence still matches (I2). An inconsistent snapshot refuses before any figure (I7). Every
  * outcome, approved, refused or declined, goes to the chained decision log with L and its hash.
  */
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { hashes, signLoanSetByCounterparty } from 'xrpl'
 import { num } from '../num.mjs'
 import { logger } from '../log.mjs'
-import { COLLATERAL_STAGES, judgeCollateralAccount, judgeCollateralShare, NYC_ERRORS } from '../nyc/contracts.mjs'
+import { COLLATERAL_STAGES, judgeCollateralAccount, judgeCollateralShare, NYC_ERRORS, usdTermsHash, SCHEMAS } from '../nyc/contracts.mjs'
 import { readTicketInputs, readCollateralAccount, allPages, PageLimitError, SnapshotError } from '../ticket/inputs.mjs'
 import { buildTicket } from '../ticket/engine.mjs'
 import { openLog } from './decision-log.mjs'
+import { readXrpUsd, PriceUnavailableError } from '../fx/price.mjs'
 
 const log = logger('desk:signer')
 const MEMO_ESCROW = Buffer.from('orma.escrow', 'utf8').toString('hex').toUpperCase()
@@ -62,15 +63,44 @@ const notConfigured = (why) => new DeskError(503, 'NOT_CONFIGURED', `${why}; des
  *   xrpl: any, reader: any, wallet: any,
  *   submit?: (blob: string) => Promise<{ txHash: string|null, engineResult: string, ledgerIndex: number|null }>,
  *   lookupTx?: (hash: string) => Promise<any|null>,
- *   readDesk?: () => any, readSpare?: () => any, readMandate?: () => any,
+ *   readDesk?: () => any, readSpare?: () => any, readMandate?: () => any, readDeskUsd?: () => any|null, readUsdTerms?: () => any,
  *   decisions?: ReturnType<typeof openLog>, logPath?: string, loanSetOf?: (actionId: string) => any, confirmWindowMs?: number, demoDir?: string,
  * }} deps
  */
-export function createSigner({ xrpl, reader, wallet, submit, lookupTx, readDesk, readSpare, readMandate, decisions, logPath, loanSetOf, confirmWindowMs = 60_000, demoDir = 'demo' }) {
+export function createSigner({ xrpl, reader, wallet, submit, lookupTx, readDesk, readSpare, readMandate, readDeskUsd, readUsdTerms, decisions, logPath, loanSetOf, confirmWindowMs = 60_000, demoDir = 'demo' }) {
   const readDemo = (label) => JSON.parse(readFileSync(join(demoDir, `${label}.json`), 'utf8'))
   readDesk ??= () => readDemo('desk')
   readSpare ??= () => readDemo('spare')
   readMandate ??= () => readDemo('mandate-desk-1')
+  // step 21: the dollar pool and its terms, read at each decision; no dollar pool on this server reads null
+  readDeskUsd ??= () => (existsSync(join(demoDir, 'desk-usd.json')) ? readDemo('desk-usd') : null)
+  readUsdTerms ??= () => readDemo('usd-terms-desk-1')
+
+  /**
+   * The loan's currency, from the LoanBroker its LoanSet names: the dollar pool's lends the test dollar, any
+   * other the XRP the ticket has always priced. `terms(principal)` is what buildTicket takes for it.
+   */
+  function loanAssetOf(tx, mandate) {
+    let usdDesk
+    try {
+      usdDesk = readDeskUsd()
+    } catch {
+      throw notConfigured('demo/desk-usd.json is unreadable')
+    }
+    const isUsd = Boolean(usdDesk) && same(tx.LoanBrokerID, usdDesk.loanBrokerId)
+    if (!isUsd) return { isUsd, usdDesk, terms: async (principal) => ({ principalDrops: principal }) }
+    let terms
+    try {
+      terms = readUsdTerms()
+    } catch {
+      throw notConfigured('demo/usd-terms-desk-1.json is missing or unreadable')
+    }
+    if (SCHEMAS.usdTerms(terms).length || usdTermsHash(terms) !== terms.hash || terms.mandateHash !== mandate?.hash) {
+      throw notConfigured('demo/usd-terms-desk-1.json does not hash to its own hash, or names another mandate')
+    }
+    // the XRP/USD price at the ledger of the decision: the median of the terms' oracles (src/fx/price.mjs)
+    return { isUsd, usdDesk, terms: async (principal, at) => ({ usd: { terms, principalUsd: principal, price: await readXrpUsd(xrpl, terms, at) } }) }
+  }
   let journal = decisions ?? null
   const decisionsLog = () => (journal ??= openLog(logPath)) // opened at the first decision, never at construction
   /** escrow index -> { txHash } of each LoanSet this process countersigned and saw succeed */
@@ -158,6 +188,8 @@ export function createSigner({ xrpl, reader, wallet, submit, lookupTx, readDesk,
     const signed = signedOf(act)
     if (!signed) throw new DeskError(404, 'NOT_FOUND', 'The loan request keeps no signed LoanSet.')
     const tx = signed.tx
+    // step 21: the loan's currency is the broker the signed LoanSet names, and it must be the request's
+    const loan = loanAssetOf(tx, mandate)
     const L = at ?? (await ledgerNow())
     const share = String(act.ticket.share).toUpperCase()
     const escrowIndex = String(act.escrow.index).toUpperCase()
@@ -168,7 +200,7 @@ export function createSigner({ xrpl, reader, wallet, submit, lookupTx, readDesk,
     const escrow = await entryAt({ index: escrowIndex }, L.ledgerIndex)
     if (!escrow) reasons.push('the escrow the request names is no longer on the ledger (finished or cancelled)')
     else {
-      const backs = await backing(escrowIndex, tx.Account, L.ledgerIndex, new Set([desk.loanBrokerId, spare.loanBrokerId].map((b) => String(b).toUpperCase())))
+      const backs = await backing(escrowIndex, tx.Account, L.ledgerIndex, new Set([desk.loanBrokerId, spare.loanBrokerId, ...(loan.usdDesk ? [loan.usdDesk.loanBrokerId] : [])].map((b) => String(b).toUpperCase())))
       if (backs) reasons.push(backs)
       if (escrow.Account !== tx.Account) reasons.push("the escrow is not the borrower's")
       if (!same(escrow.Amount?.mpt_issuance_id, share) || String(escrow.Amount?.value) !== String(act.ticket.units)) reasons.push('the escrow does not hold the shares of the ticket')
@@ -199,8 +231,9 @@ export function createSigner({ xrpl, reader, wallet, submit, lookupTx, readDesk,
       if (cancel.lt(num(L.closeTime).plus(pi.times(total)).plus(gp).plus(policy.approvalSlackSeconds))) reasons.push('loan matures after the escrow can be cancelled')
     }
 
+    if ((act.asset === 'USD') !== loan.isUsd) reasons.push(`the signed LoanSet lends ${loan.isUsd ? 'USD' : 'XRP'}, not the ${act.asset ?? 'XRP'} of the request`)
     const inputs = await readTicketInputs(xrpl, { shareMptId: share, reader, at: L })
-    const ticket = buildTicket(inputs, { op: 'pledge', units: act.ticket.units, mandate, principalDrops: String(tx.PrincipalRequested) })
+    const ticket = buildTicket(inputs, { op: 'pledge', units: act.ticket.units, mandate, ...(await loan.terms(String(tx.PrincipalRequested), L)) })
     const digest = ticket.inputsDigest === act.ticket.inputsDigest ? 'same' : 'STALE'
 
     let sequence = 'ok'
@@ -245,6 +278,11 @@ export function createSigner({ xrpl, reader, wallet, submit, lookupTx, readDesk,
         append(act, mandate, { ledgerIndex: e.ledgerIndex, ledgerHash: e.ledgerHash }, 'refused', { code: 'INCONSISTENT_SNAPSHOT' })
         throw new DeskError(409, 'INCONSISTENT_SNAPSHOT', e.message)
       }
+      // step 21: no usable XRP/USD price at the ledger of the decision, no dollar figure, nothing signed
+      if (e instanceof PriceUnavailableError) {
+        append(act, mandate, L, 'refused', { code: 'PRICE_UNAVAILABLE' })
+        throw new DeskError(409, 'PRICE_UNAVAILABLE', `${e.message} Nothing was signed.`)
+      }
       throw e
     }
     const refuse = (status, code, message, extra = {}) => {
@@ -253,7 +291,7 @@ export function createSigner({ xrpl, reader, wallet, submit, lookupTx, readDesk,
     }
     if (r.escrow !== 'ok') throw refuse(409, 'ESCROW_POLICY', `The escrow does not meet the policy: ${r.escrowReasons.join('; ')}. Nothing was signed.`)
     if (r.digest !== 'same') throw refuse(409, 'STALE', 'A value the ticket read has changed since the request (its inputsDigest differs at this ledger). Nothing was signed. Re-request with a fresh ticket.')
-    if (r.ticket.verdict.status !== 'PASS') throw refuse(409, 'BREACHED', `The mandate is breached at this ledger: ${r.ticket.verdict.breaches.map((b) => `${b.limit} ${b.value} over ${b.threshold}`).join('; ')}. Nothing was signed.`, { breaches: r.ticket.verdict.breaches })
+    if (r.ticket.verdict.status !== 'PASS') throw refuse(409, 'BREACHED', `The mandate is breached at this ledger: ${r.ticket.verdict.breaches.map((b) => breachText(b)).join('; ')}. Nothing was signed.`, { breaches: r.ticket.verdict.breaches })
     if (r.sequence !== 'ok') throw refuse(409, 'SEQUENCE_PASSED', r.sequenceReason)
     if (stopped()) throw refuse(423, 'LOCKED', 'The kill switch is on; nothing was signed.')
 
@@ -320,7 +358,16 @@ export function createSigner({ xrpl, reader, wallet, submit, lookupTx, readDesk,
       throw notConfigured('demo/mandate-desk-1.json is missing or unreadable')
     }
     const share = String(act.ticket.share).toUpperCase()
-    const ticket = buildTicket(await readTicketInputs(xrpl, { shareMptId: share, reader }), { op: 'pledge', units: act.ticket.units, mandate, principalDrops: String(old.tx.PrincipalRequested) })
+    const inputs = await readTicketInputs(xrpl, { shareMptId: share, reader })
+    const at = { ledgerIndex: inputs.ledgerIndex, ledgerHash: inputs.ledgerHash, closeTime: inputs.closeTime }
+    let loanTerms
+    try {
+      loanTerms = await loanAssetOf(old.tx, mandate).terms(String(old.tx.PrincipalRequested), at)
+    } catch (e) {
+      if (e instanceof PriceUnavailableError) throw new DeskError(409, 'PRICE_UNAVAILABLE', `${e.message} Nothing was signed.`)
+      throw e
+    }
+    const ticket = buildTicket(inputs, { op: 'pledge', units: act.ticket.units, mandate, ...loanTerms })
     const signed = await enqueue(borrower.address, async () => {
       await xrpl.closeTime()
       const { TxnSignature: _s, SigningPubKey: _k, Sequence: _q, LastLedgerSequence: _l, Fee: _f, Memos: _m, CounterpartySignature: _c, ...terms } = old.tx
@@ -341,6 +388,38 @@ export function createSigner({ xrpl, reader, wallet, submit, lookupTx, readDesk,
   }
 
   return { approve, previewApprove, decline, rerequest, decisions: () => decisionsLog(), signedOf }
+}
+
+/** One breach as a refusal says it. */
+export function breachText(b) {
+  return `${b.limit} ${b.value} over ${b.threshold}`
+}
+
+/** The money line of a dollar loan's approve preview: the same reads as XRP, in dollars (step 21). */
+function usdApproveMoney(r) {
+  const f = r.ticket.figures
+  const u = r.ticket.usd
+  return {
+    asset: 'USD',
+    loanAsset: u.loanAsset,
+    principalUsd: String(r.tx.PrincipalRequested),
+    collateralHeldDrops: f.heldValue.value,
+    collateralHeldUsd: u.collateralHeldUsd,
+    ltvHeldBps: u.ltvHeldBps,
+    maxLtvBps: r.mandate.limits.maxLtvBps,
+    verdict: r.ticket.verdict,
+    breaches: r.ticket.verdict.breaches,
+    ltv1to1Bps: JSON.parse(f.lender1to1Usd.value),
+    verdict1to1: r.ticket.verdict1to1,
+    reference: u.reference,
+    collateralRule: u.collateralRule,
+    escrow: r.escrow,
+    ...(r.escrowReasons.length && { escrowReasons: r.escrowReasons }),
+    collateral: r.collateral,
+    digest: r.digest,
+    sequence: r.sequence,
+    ledgerIndex: r.L.ledgerIndex,
+  }
 }
 
 /**
@@ -371,9 +450,11 @@ export function registerDeskActions(engine, { signer, deskAddress, borrower }) {
         r = await signer.previewApprove({ actionOfRequest: req })
       } catch (e) {
         if (e instanceof SnapshotError) throw new DeskError(409, 'INCONSISTENT_SNAPSHOT', e.message)
+        if (e instanceof PriceUnavailableError) throw new DeskError(409, 'PRICE_UNAVAILABLE', `${e.message} Nothing was signed.`)
         throw e
       }
       const f = r.ticket.figures
+      if (r.ticket.usd) return { preview: { engineResult: 'not-simulated (awaiting countersignature)', provenance: 'DECLARED', money: usdApproveMoney(r) } }
       return {
         preview: {
           engineResult: 'not-simulated (awaiting countersignature)', provenance: 'DECLARED',

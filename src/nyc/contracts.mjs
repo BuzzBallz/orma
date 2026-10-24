@@ -8,8 +8,8 @@
 /**
  * @typedef {'REAL'|'DECLARED'|'MODELLED'|'SIMULATED'} Provenance
  * @typedef {{ name: string, value: string, object: string, field: string, id: string, ledgerIndex: number, ledgerHash: string }} FigureInput
- * @typedef {'heldValue'|'naiveValue'|'n1Overpayment'|'cover'|'heldPerUnitIfDefault'|'lossAfterCover'|'maxLoan'|'maxUnits'|'requested'|'ltvHeld'|'lender1to1'|'cashAvailable'|'claim'|'lockedUntil'} FormulaId
- * @typedef {{ value: string, unit: 'drops'|'share-units'|'ratio'|'seconds'|'bps', meaning: string, formula: string, formulaId: FormulaId, inputs: FigureInput[], provenance: Provenance }} Figure
+ * @typedef {'heldValue'|'naiveValue'|'n1Overpayment'|'cover'|'heldPerUnitIfDefault'|'lossAfterCover'|'maxLoan'|'maxUnits'|'requested'|'ltvHeld'|'lender1to1'|'cashAvailable'|'claim'|'lockedUntil'|'collateralHeldUsd'|'maxLoanUsd'|'requestedUsd'|'ltvHeldUsd'|'lender1to1Usd'|'priceAge'} FormulaId
+ * @typedef {{ value: string, unit: 'drops'|'share-units'|'ratio'|'seconds'|'bps'|'usd', meaning: string, formula: string, formulaId: FormulaId, inputs: FigureInput[], provenance: Provenance }} Figure
  * @typedef {{ loanId: string, label: string, scenario: string, lossAfterCover: Figure, cover: Figure, heldPerUnitIfDefault: Figure, alreadyInHeld: boolean }} N2Entry
  * @typedef {{
  *   schema: 'orma.ticket/1', ticketId: string, inputsDigest: string, asOf: string, ledgerIndex: number, ledgerHash: string,
@@ -18,12 +18,14 @@
  *   mandate: { id: string, hash: string, anchorTx: string },
  *   figures: { heldValue: Figure, naiveValue: Figure, n1Overpayment: Figure, n2: N2Entry[],
  *              n3: { lockedUntil: Figure, redemptionAt: string, cashAvailable: Figure, claim: Figure },
- *              maxLoan?: Figure, maxUnits?: Figure, requested?: Figure, ltvHeld?: Figure, lender1to1?: Figure },
+ *              maxLoan?: Figure, maxUnits?: Figure, requested?: Figure, ltvHeld?: Figure, lender1to1?: Figure,
+ *              maxLoanUsd?: Figure, requestedUsd?: Figure, collateralHeldUsd?: Figure, ltvHeldUsd?: Figure, lender1to1Usd?: Figure, priceAge?: Figure },
  *   conduct: { recognitionLagSeconds: string[], defaultsWithoutImpairment: number, coverOrderCostDrops: string },
  *   escrowPolicy: { finishAfter: string, cancelAfter: string, text: string },
  *   statement: Statement|null,
  *   verdict: { status: 'PASS'|'BREACHED', breaches: { limit: string, value: string, threshold: string }[] },
- *   verdict1to1?: { status: 'PASS'|'BREACHED', breaches: { limit: string, value: string, threshold: string }[] }
+ *   verdict1to1?: { status: 'PASS'|'BREACHED', breaches: { limit: string, value: string, threshold: string }[] },
+ *   usd?: TicketUsd
  * }} Ticket
  * @typedef {{ object: { type: string, index: string }, field: string, before: unknown, after: unknown,
  *   admitted: 'YES'|'HIDDEN', rule: { source: 'rippled 3.4.1', file: string, line: number },
@@ -109,6 +111,7 @@ export const NYC_ERRORS = Object.freeze({
   UNAUTHORIZED: { status: 401, retryable: false },
   LOCKED: { status: 423, retryable: false },
   STALE: { status: 409, retryable: true },
+  PRICE_UNAVAILABLE: { status: 409, retryable: true }, // step 21: no usable XRP/USD price at this ledger, no dollar figure
   BREACHED: { status: 409, retryable: false },
   ESCROW_POLICY: { status: 409, retryable: false },
   BAD_OP: { status: 400, retryable: false },
@@ -157,6 +160,7 @@ export const MARK_STEPS = Object.freeze(['read MPTokenIssuance', 'decode metadat
 const HELD_INPUTS = ['AssetsTotal', 'LossUnrealized', 'OutstandingAmount', 'Scale', 'units']
 const COVER_INPUTS = ['DebtTotal', 'CoverRateMinimum', 'CoverRateLiquidation', 'CoverAvailable', 'LEVersion', 'PrincipalOutstanding', 'TotalValueOutstanding', 'ManagementFeeOutstanding']
 const IF_DEFAULT_INPUTS = [...HELD_INPUTS.filter((n) => n !== 'units'), ...COVER_INPUTS, 'Flags']
+const USD_HELD_INPUTS = [...HELD_INPUTS, 'xrpUsd', 'fxHaircutBps']
 
 // Notation: s = wholeShares(OutstandingAmount, Scale); u = wholeShares(units, Scale);
 // perUnit(x) = (x / s).toFixed(6) ROUND_HALF_UP, as Reader.nav; value(p) = (u × p).toFixed(0)
@@ -164,6 +168,7 @@ const IF_DEFAULT_INPUTS = [...HELD_INPUTS.filter((n) => n !== 'units'), ...COVER
 // LEVersion is 1, else TotalValueOutstanding − ManagementFeeOutstanding (absent fields read as '0').
 const PER_UNIT = 'perUnit: (x / s).toFixed(6), ROUND_HALF_UP'
 const VALUE = 'value: (u × perUnit).toFixed(0), ROUND_HALF_UP'
+const USD = 'usd: (drops / 10^6 × xrpUsd × (1 − fxHaircutBps / 10000)).toFixed(6), ROUND_DOWN'
 
 /**
  * The closed set of formulas a Figure may carry: its input names, its rounding and its text. Data,
@@ -186,6 +191,14 @@ export const FORMULAS = deepFreeze({
   cashAvailable: { unit: 'drops', inputs: ['AssetsAvailable'], rounding: 'exact', text: 'AssetsAvailable' },
   claim: { unit: 'drops', inputs: HELD_INPUTS, rounding: `${PER_UNIT}; ${VALUE}`, text: 'value(perUnit(AssetsTotal − LossUnrealized)), as heldValue' },
   lockedUntil: { unit: 'seconds', inputs: ['RedemptionDate', 'close_time'], rounding: 'exact (two Ripple times)', text: 'RedemptionDate − close_time' },
+  // step 21 (addendum A11): a loan in the test dollar against the same shares; usd(d) = (d / 10^6 × xrpUsd ×
+  // (1 − fxHaircutBps / 10000)).toFixed(6), ROUND_DOWN, on a whole number of drops d
+  collateralHeldUsd: { unit: 'usd', inputs: USD_HELD_INPUTS, rounding: `${PER_UNIT}; ${VALUE}; ${USD}`, text: 'usd(heldValue)' },
+  maxLoanUsd: { unit: 'usd', inputs: [...USD_HELD_INPUTS, 'maxLtvBps'], rounding: `${PER_UNIT}; ${VALUE}; ${USD}; (maxLtvBps × collateralHeldUsd / 10000).toFixed(6), ROUND_DOWN`, text: 'maxLtvBps × usd(heldValue) / 10000' },
+  requestedUsd: { unit: 'usd', inputs: ['principalUsd'], rounding: 'exact', text: 'principalUsd' },
+  ltvHeldUsd: { unit: 'bps', inputs: [...USD_HELD_INPUTS, 'principalUsd'], rounding: `${PER_UNIT}; ${VALUE}; ${USD}; floor: toFixed(0), ROUND_DOWN`, text: 'floor(principalUsd × 10000 / usd(heldValue))' },
+  lender1to1Usd: { unit: 'bps', inputs: ['principalUsd', 'units', 'Scale', 'xrpUsd', 'fxHaircutBps'], rounding: `${USD}; floor: toFixed(0), ROUND_DOWN`, text: 'floor(principalUsd × 10000 / usd(units / 10^Scale))' },
+  priceAge: { unit: 'seconds', inputs: ['close_time', 'priceAsOf'], rounding: 'exact (two Ripple times)', text: 'close_time − priceAsOf' },
 })
 
 /**
@@ -196,6 +209,8 @@ export const AMOUNT_FIELDS = Object.freeze([
   'value', 'units', 'tolerance', 'perUnitHeld', 'perUnitNaive', 'maxSingleLoanDrops', 'maxN2LossDrops',
   'coverOrderCostDrops', 'sharesHeld', 'principalDrops', 'principalOutstanding', 'collateralHeldDrops',
   'threshold', 'moneyEffect',
+  // step 21
+  'requestedUsd', 'collateralHeldUsd', 'maxSingleLoanUsd', 'principalOutstandingUsd', 'collateralValueUsd',
 ])
 
 // --- canonical form and hashes -----------------------------------------------------------------------
@@ -284,6 +299,98 @@ const MARGIN_POLICY_KEYS = ['schema', 'id', 'mandateHash', 'trigger', 'cureSecon
  */
 export function marginPolicyHash(p) {
   return sha256Hex(canonical(Object.fromEntries(MARGIN_POLICY_KEYS.map((k) => [k, /** @type {any} */ (p)[k]]))))
+}
+
+// --- USD loans (step 21, addendum A11) ---------------------------------------------------------------
+
+/**
+ * The risk officer declares which price sources the desk trusts and how it uses them, never a price: the
+ * XRP/USD price is the median of the XLS-47 Oracle documents the terms name, read at the ledger of the
+ * decision, fresh ones only, and the ledger's own get_aggregate_price over the same documents at that
+ * ledger must agree (src/fx/price.mjs). On Devnet the documents are relayed from public exchange quotes by a
+ * test account of the desk, standing in for independent oracle providers; on mainnet the terms name those
+ * providers and no code changes.
+ * @typedef {{ currency: 'USD', issuer: string, label: string }} LoanAsset
+ * @typedef {{ account: string, documentId: number, provider: string, uri: string }} OracleSource
+ * @typedef {{
+ *   baseAsset: 'XRP', quoteAsset: 'USD', sources: OracleSource[], aggregation: 'median',
+ *   minSources: number, maxAgeSeconds: number, maxSpreadBps: number, note: string
+ * }} XrpUsdOracle
+ * @typedef {{
+ *   schema: 'orma.usdterms/1', id: string, mandateHash: string, loanAsset: LoanAsset, xrpUsdOracle: XrpUsdOracle,
+ *   fxHaircutBps: number, maxSingleLoanUsd: string, issuedAt: string, hash: string, anchorTx: string
+ * }} UsdTerms
+ * @typedef {OracleSource & { price: string|null, lastUpdateTime: string|null, ageSeconds: string|null, fresh: boolean, used: boolean, ledgerIndex: number, ledgerHash: string }} OracleRead
+ * @typedef {{
+ *   value: string, provenance: 'REAL', method: string, asOf: string, ageSeconds: string, sources: OracleRead[],
+ *   spreadBps: number, maxSpreadBps: number, minSources: number, maxAgeSeconds: number,
+ *   ledgerAggregate: { median: string, size: number, ledgerIndex: number, ledgerHash: string }, note: string
+ * }} UsdReference
+ * @typedef {{ id: string, hash: string, anchorTx: string, fxHaircutBps: number, maxSingleLoanUsd: string }} UsdTermsRef
+ * @typedef {{
+ *   loanAsset: LoanAsset, requestedUsd: string, collateralHeldUsd: string, ltvHeldBps: number,
+ *   reference: UsdReference, terms: UsdTermsRef, collateralRule: string
+ * }} TicketUsd
+ * @typedef {{
+ *   loanAsset: LoanAsset|null, principalOutstandingUsd: string, collateralHeldUsd: string|null, ltvHeldBps: number|null,
+ *   reference: UsdReference|null, terms: UsdTermsRef|null, priceUnavailable?: string
+ * }} PositionUsd
+ */
+
+/** XLS-47 LastUpdateTime is UNIX seconds; a ledger's close_time is Ripple seconds, this many later. */
+export const RIPPLE_EPOCH_OFFSET = 946684800
+
+/** The words every surface puts on the dollar, whole: it is never called RLUSD alone. */
+export const USD_LABEL = 'test dollar, stands in for RLUSD (Devnet)'
+/** The line a USD ticket carries: the loan's currency changes, never the collateral (I4). */
+export const USD_COLLATERAL_RULE = 'Collateral: shares of XRP vaults only. An issued asset can be clawed back or frozen by its issuer.'
+/** The six figures a USD pledge ticket carries instead of maxLoan, requested, ltvHeld and lender1to1. */
+export const USD_FIGURES = Object.freeze(['maxLoanUsd', 'requestedUsd', 'collateralHeldUsd', 'ltvHeldUsd', 'lender1to1Usd', 'priceAge'])
+const XRP_LOAN_FIGURES = ['maxLoan', 'requested', 'ltvHeld', 'lender1to1']
+
+const USD_TERMS_KEYS = ['schema', 'id', 'mandateHash', 'loanAsset', 'xrpUsdOracle', 'fxHaircutBps', 'maxSingleLoanUsd', 'issuedAt']
+
+/**
+ * The median of a set of decimal prices, exact: the middle one, or the mean of the two middle ones, as
+ * get_aggregate_price computes it. Pure.
+ * @param {string[]} prices
+ * @returns {string}
+ */
+export function medianOf(prices) {
+  const s = prices.map((p) => num(p)).sort((a, b) => a.cmp(b))
+  if (s.length === 0) throw new RangeError('no price: no median')
+  const mid = Math.floor(s.length / 2)
+  return (s.length % 2 ? s[mid] : s[mid - 1].plus(s[mid]).div(2)).toFixed()
+}
+
+/** The spread of a set of prices around their median, in whole bps, rounded up: ceil((max − min) × 10000 / median). */
+export function spreadBpsOf(prices) {
+  const s = prices.map((p) => num(p)).sort((a, b) => a.cmp(b))
+  const m = num(medianOf(prices))
+  return m.isZero() ? Infinity : JSON.parse(s.at(-1).minus(s[0]).times(10000).div(m).ceil().toFixed(0))
+}
+
+/**
+ * The hash of the USD terms, as for the mandate: over their orma.usdterms/1 keys only, without hash,
+ * anchorTx or an envelope.
+ * @param {Partial<UsdTerms>} t
+ * @returns {string}
+ */
+export function usdTermsHash(t) {
+  return sha256Hex(canonical(Object.fromEntries(USD_TERMS_KEYS.map((k) => [k, /** @type {any} */ (t)[k]]))))
+}
+
+/**
+ * An issued-currency amount as rippled reads it: the currency, its issuer and the value as a decimal
+ * string. A number, an exponent or an empty value is refused, never coerced.
+ * @param {string} value
+ * @param {string} issuer
+ * @returns {{ currency: 'USD', issuer: string, value: string }}
+ */
+export function usdAmount(value, issuer) {
+  if (typeof value !== 'string' || !/^\d+(?:\.\d+)?$/.test(value)) throw new TypeError(`a USD amount is a decimal string, not ${JSON.stringify(value)}`)
+  if (typeof issuer !== 'string' || !/^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(issuer)) throw new TypeError(`a USD amount names its issuer, not ${JSON.stringify(issuer)}`)
+  return { currency: 'USD', issuer, value }
 }
 
 // --- manager statements (orma.stmt/1 in Vault.Data) ----------------------------------------------------
@@ -563,7 +670,7 @@ function figureInto(/** @type {string[]} */ out, /** @type {any} */ f, /** @type
   if (!r.obj(f, p)) return
   if (typeof f.value === 'number') r.fail(`${p}.value`, 'is a number: amounts are decimal strings')
   else r.dec(f.value, `${p}.value`)
-  r.oneOf(f.unit, ['drops', 'share-units', 'ratio', 'seconds', 'bps'], `${p}.unit`)
+  r.oneOf(f.unit, ['drops', 'share-units', 'ratio', 'seconds', 'bps', 'usd'], `${p}.unit`)
   r.str(f.meaning, `${p}.meaning`)
   r.str(f.formula, `${p}.formula`)
   r.oneOf(f.provenance, ['REAL', 'DECLARED', 'MODELLED', 'SIMULATED'], `${p}.provenance`)
@@ -697,13 +804,19 @@ function validateTicket(doc) {
       for (const k of ['lockedUntil', 'cashAvailable', 'claim']) figureInto(out, f.n3[k], `figures.n3.${k}`, L)
       r.str(f.n3.redemptionAt, 'figures.n3.redemptionAt')
     }
-    if (t.op === 'pledge') {
-      for (const k of ['maxLoan', 'requested', 'ltvHeld', 'lender1to1']) figureInto(out, f[k], `figures.${k}`, L)
+    if (t.op === 'pledge' && 'usd' in t) {
+      // step 21: a loan in the test dollar, its loan figures in dollars
+      for (const k of USD_FIGURES) figureInto(out, f[k], `figures.${k}`, L)
+      for (const k of XRP_LOAN_FIGURES) r.absent(f, k, 'figures', 'on a USD ticket: its loan figures are in dollars')
+      r.absent(f, 'maxUnits', 'figures', 'on a pledge ticket')
+    } else if (t.op === 'pledge') {
+      for (const k of XRP_LOAN_FIGURES) figureInto(out, f[k], `figures.${k}`, L)
+      for (const k of USD_FIGURES) r.absent(f, k, 'figures', 'on an XRP ticket')
       r.absent(f, 'maxUnits', 'figures', 'on a pledge ticket')
     }
     if (t.op === 'buy') {
       figureInto(out, f.maxUnits, 'figures.maxUnits', L)
-      for (const k of ['maxLoan', 'requested', 'ltvHeld', 'lender1to1']) r.absent(f, k, 'figures', 'on a buy ticket: the 1:1 column measures a loan')
+      for (const k of [...XRP_LOAN_FIGURES, ...USD_FIGURES]) r.absent(f, k, 'figures', 'on a buy ticket: the 1:1 column measures a loan')
     }
   }
   if (r.obj(t.conduct, 'conduct')) {
@@ -716,7 +829,112 @@ function validateTicket(doc) {
   verdictInto(out, t.verdict, 'verdict')
   if (t.op === 'pledge') verdictInto(out, t.verdict1to1, 'verdict1to1')
   if (t.op === 'buy') r.absent(t, 'verdict1to1', '', 'on a buy ticket')
+  if ('usd' in t) {
+    if (t.op !== 'pledge') r.fail('usd', 'is a loan in dollars: a buy ticket carries none')
+    else usdInto(out, t.usd, 'usd', f, L)
+  }
   return out
+}
+
+/** The usd block of a USD ticket, each number the value of its figure, its price read at the ticket's ledger. */
+function usdInto(/** @type {string[]} */ out, /** @type {any} */ u, /** @type {string} */ p, /** @type {any} */ figures, /** @type {{ ledgerIndex: number, ledgerHash: string }|null} */ L = null) {
+  const r = rules(out)
+  if (!r.obj(u, p)) return
+  loanAssetInto(out, u.loanAsset, `${p}.loanAsset`)
+  r.dec(u.requestedUsd, `${p}.requestedUsd`)
+  r.dec(u.collateralHeldUsd, `${p}.collateralHeldUsd`)
+  r.int(u.ltvHeldBps, `${p}.ltvHeldBps`)
+  usdReferenceInto(out, u.reference, `${p}.reference`, L)
+  usdTermsRefInto(out, u.terms, `${p}.terms`)
+  r.eq(u.collateralRule, USD_COLLATERAL_RULE, `${p}.collateralRule`)
+  const same = (/** @type {string} */ k, /** @type {unknown} */ v, /** @type {string} */ fig) => {
+    if (figures?.[fig] && String(v) !== figures[fig].value) r.fail(`${p}.${k}`, `is not the value of figures.${fig}`)
+  }
+  same('requestedUsd', u.requestedUsd, 'requestedUsd')
+  same('collateralHeldUsd', u.collateralHeldUsd, 'collateralHeldUsd')
+  same('ltvHeldBps', u.ltvHeldBps, 'ltvHeldUsd')
+  same('reference.ageSeconds', u.reference?.ageSeconds, 'priceAge')
+  const xrpUsd = figures?.collateralHeldUsd?.inputs?.find((/** @type {any} */ i) => i?.name === 'xrpUsd')
+  if (xrpUsd && u.reference && xrpUsd.value !== u.reference.value) r.fail(`${p}.reference.value`, 'is not the xrpUsd input of the dollar figures')
+}
+
+function loanAssetInto(/** @type {string[]} */ out, /** @type {any} */ a, /** @type {string} */ p) {
+  const r = rules(out)
+  if (!r.obj(a, p)) return
+  r.eq(a.currency, 'USD', `${p}.currency`)
+  r.re(a.issuer, ADDRESS, `${p}.issuer`, 'a classic address')
+  r.eq(a.label, USD_LABEL, `${p}.label`)
+}
+
+function oracleSourceInto(/** @type {string[]} */ out, /** @type {any} */ s, /** @type {string} */ p) {
+  const r = rules(out)
+  if (!r.obj(s, p)) return
+  r.re(s.account, ADDRESS, `${p}.account`, 'a classic address')
+  r.int(s.documentId, `${p}.documentId`)
+  r.str(s.provider, `${p}.provider`)
+  r.str(s.uri, `${p}.uri`)
+}
+
+/**
+ * The XRP/USD price of a dollar figure: REAL, the median of the used sources, each read at one ledger (the
+ * document's, when one is given), every used source fresh, at least minSources of them, their spread within
+ * maxSpreadBps, and the ledger's get_aggregate_price over them agreeing at that ledger.
+ */
+function usdReferenceInto(/** @type {string[]} */ out, /** @type {any} */ x, /** @type {string} */ p, /** @type {{ ledgerIndex: number, ledgerHash: string }|null} */ L = null) {
+  const r = rules(out)
+  if (!r.obj(x, p)) return
+  r.dec(x.value, `${p}.value`)
+  if (DEC.test(x.value ?? '') && !num(x.value).gt(0)) r.fail(`${p}.value`, 'is not above 0')
+  r.eq(x.provenance, 'REAL', `${p}.provenance`)
+  r.str(x.method, `${p}.method`)
+  r.re(x.asOf, ISO, `${p}.asOf`, 'an ISO 8601 UTC time')
+  r.dec(x.ageSeconds, `${p}.ageSeconds`)
+  r.int(x.spreadBps, `${p}.spreadBps`)
+  r.int(x.maxSpreadBps, `${p}.maxSpreadBps`)
+  r.int(x.minSources, `${p}.minSources`)
+  r.int(x.maxAgeSeconds, `${p}.maxAgeSeconds`)
+  r.str(x.note, `${p}.note`)
+  if (!r.arr(x.sources, `${p}.sources`)) return
+  x.sources.forEach((/** @type {any} */ s, /** @type {number} */ i) => {
+    const q = `${p}.sources[${i}]`
+    oracleSourceInto(out, s, q)
+    r.bool(s?.fresh, `${q}.fresh`)
+    r.bool(s?.used, `${q}.used`)
+    ledgerAt(r, s, q)
+    if (L && (s?.ledgerIndex !== L.ledgerIndex || s?.ledgerHash !== L.ledgerHash)) r.fail(q, `is not read at the document's ledger ${L.ledgerIndex}`)
+    if (s?.price !== null) r.dec(s?.price, `${q}.price`)
+    if (s?.used && !s?.fresh) r.fail(`${q}.used`, 'is a stale source')
+    if (s?.used && (s.price === null || !DEC.test(s.ageSeconds ?? '') || num(s.ageSeconds).gt(x.maxAgeSeconds ?? 0) || num(s.ageSeconds).lt(0))) r.fail(`${q}.ageSeconds`, 'is older than maxAgeSeconds, or dated after the ledger, on a used source')
+  })
+  const used = x.sources.filter((/** @type {any} */ s) => s?.used && DEC.test(s?.price ?? ''))
+  if (Number.isSafeInteger(x.minSources) && used.length < x.minSources) r.fail(`${p}.sources`, `uses ${used.length} sources, fewer than minSources ${x.minSources}`)
+  if (used.length) {
+    if (DEC.test(x.value ?? '') && !num(medianOf(used.map((/** @type {any} */ s) => s.price))).eq(x.value)) r.fail(`${p}.value`, 'is not the median of the used sources')
+    if (Number.isSafeInteger(x.spreadBps) && spreadBpsOf(used.map((/** @type {any} */ s) => s.price)) !== x.spreadBps) r.fail(`${p}.spreadBps`, 'is not the spread of the used sources')
+    const oldest = used.map((/** @type {any} */ s) => s.lastUpdateTime).sort()[0]
+    if (x.asOf !== oldest) r.fail(`${p}.asOf`, 'is not the oldest update of the used sources')
+  }
+  if (Number.isSafeInteger(x.spreadBps) && Number.isSafeInteger(x.maxSpreadBps) && x.spreadBps > x.maxSpreadBps) r.fail(`${p}.spreadBps`, 'is above maxSpreadBps')
+  const a = x.ledgerAggregate
+  if (r.obj(a, `${p}.ledgerAggregate`)) {
+    r.dec(a.median, `${p}.ledgerAggregate.median`)
+    r.int(a.size, `${p}.ledgerAggregate.size`)
+    ledgerAt(r, a, `${p}.ledgerAggregate`)
+    if (DEC.test(a.median ?? '') && DEC.test(x.value ?? '') && !num(a.median).eq(x.value)) r.fail(`${p}.ledgerAggregate.median`, 'disagrees with the median read from the sources')
+    if (L && a.ledgerIndex !== L.ledgerIndex) r.fail(`${p}.ledgerAggregate`, `is not read at the document's ledger ${L.ledgerIndex}`)
+    if (Number.isSafeInteger(a.size) && a.size !== used.length) r.fail(`${p}.ledgerAggregate.size`, 'is not the number of used sources')
+  }
+}
+
+function usdTermsRefInto(/** @type {string[]} */ out, /** @type {any} */ t, /** @type {string} */ p) {
+  const r = rules(out)
+  if (!r.obj(t, p)) return
+  r.str(t.id, `${p}.id`)
+  hex64(r, t.hash, `${p}.hash`)
+  hex64(r, t.anchorTx, `${p}.anchorTx`)
+  r.int(t.fxHaircutBps, `${p}.fxHaircutBps`)
+  if (Number.isSafeInteger(t.fxHaircutBps) && t.fxHaircutBps >= 10000) r.fail(`${p}.fxHaircutBps`, 'leaves the collateral worth nothing')
+  r.dec(t.maxSingleLoanUsd, `${p}.maxSingleLoanUsd`)
 }
 
 /** @param {unknown} doc @returns {string[]} */
@@ -940,6 +1158,43 @@ function validateMarginPolicy(doc) {
 }
 
 /** @param {unknown} doc @returns {string[]} */
+function validateUsdTerms(doc) {
+  const out = []
+  deepProblems(doc, '', out)
+  const r = rules(out)
+  if (!r.obj(doc, '')) return out
+  const t = /** @type {any} */ (doc)
+  r.eq(t.schema, 'orma.usdterms/1', 'schema')
+  r.str(t.id, 'id')
+  hex64(r, t.mandateHash, 'mandateHash')
+  loanAssetInto(out, t.loanAsset, 'loanAsset')
+  if (r.obj(t.xrpUsdOracle, 'xrpUsdOracle')) {
+    const o = t.xrpUsdOracle
+    r.eq(o.baseAsset, 'XRP', 'xrpUsdOracle.baseAsset')
+    r.eq(o.quoteAsset, 'USD', 'xrpUsdOracle.quoteAsset')
+    r.eq(o.aggregation, 'median', 'xrpUsdOracle.aggregation')
+    if (r.arr(o.sources, 'xrpUsdOracle.sources')) {
+      o.sources.forEach((/** @type {any} */ s, /** @type {number} */ i) => oracleSourceInto(out, s, `xrpUsdOracle.sources[${i}]`))
+      const keys = o.sources.map((/** @type {any} */ s) => `${s?.account}/${s?.documentId}`)
+      if (new Set(keys).size !== keys.length) r.fail('xrpUsdOracle.sources', 'names one document twice')
+      if (Number.isSafeInteger(o.minSources) && o.minSources > o.sources.length) r.fail('xrpUsdOracle.minSources', 'is more than the sources named')
+    }
+    if (!Number.isSafeInteger(o.minSources) || o.minSources < 1) r.fail('xrpUsdOracle.minSources', 'is not a whole number of sources, at least 1')
+    if (!Number.isSafeInteger(o.maxAgeSeconds) || o.maxAgeSeconds < 1 || o.maxAgeSeconds > 300) r.fail('xrpUsdOracle.maxAgeSeconds', 'is not 1 to 300 seconds')
+    r.int(o.maxSpreadBps, 'xrpUsdOracle.maxSpreadBps')
+    r.str(o.note, 'xrpUsdOracle.note')
+  }
+  r.int(t.fxHaircutBps, 'fxHaircutBps')
+  if (Number.isSafeInteger(t.fxHaircutBps) && t.fxHaircutBps >= 10000) r.fail('fxHaircutBps', 'leaves the collateral worth nothing')
+  r.dec(t.maxSingleLoanUsd, 'maxSingleLoanUsd')
+  r.re(t.issuedAt, ISO, 'issuedAt', 'an ISO 8601 UTC time')
+  hex64(r, t.hash, 'hash')
+  hex64(r, t.anchorTx, 'anchorTx')
+  if (out.length === 0 && t.hash !== usdTermsHash(t)) r.fail('hash', 'is not sha256Hex(canonical(terms without hash and anchorTx))')
+  return out
+}
+
+/** @param {unknown} doc @returns {string[]} */
 function validateMarginCall(doc) {
   const out = []
   deepProblems(doc, '', out)
@@ -968,8 +1223,10 @@ function validateMarginCall(doc) {
       r.re(c.shortfall.collateralValueDrops, UINT, 'shortfall.collateralValueDrops', 'a whole number of drops')
       r.re(c.shortfall.sharesToAdd, UINT, 'shortfall.sharesToAdd', 'a whole number of share units')
       r.dec(c.shortfall.withdrawalValuePerShare, 'shortfall.withdrawalValuePerShare')
+      if ('collateralValueUsd' in c.shortfall || c.currency === 'USD') r.dec(c.shortfall.collateralValueUsd, 'shortfall.collateralValueUsd')
     }
   }
+  if ('currency' in c) r.oneOf(c.currency, ['XRP', 'USD'], 'currency')
   if ('triggerTx' in c) hex64(r, c.triggerTx, 'triggerTx')
   return out
 }
@@ -1139,6 +1396,7 @@ export const SCHEMAS = Object.freeze({
   marginCall: validateMarginCall,
   marginCallEntry: validateMarginCallEntry,
   marginCalls: validateMarginCalls,
+  usdTerms: validateUsdTerms, // step 21
 })
 
 // --- examples --------------------------------------------------------------------------------------
@@ -1179,6 +1437,11 @@ const SOURCES = {
   maxLtvBps: { object: 'Mandate', field: 'limits.maxLtvBps', id: 'desk-1', value: '5000' },
   maxSingleLoanDrops: { object: 'Mandate', field: 'limits.maxSingleLoanDrops', id: 'desk-1', value: '1000000' },
   close_time: { object: 'Ledger', field: 'close_time', id: String(L), value: '846200000' },
+  // step 21: the risk officer's USD terms and the dollar plan
+  xrpUsd: { object: 'OracleAggregate', field: 'median', id: 'desk-1', value: '1.29' },
+  fxHaircutBps: { object: 'UsdTerms', field: 'fxHaircutBps', id: 'desk-1', value: '1000' },
+  priceAsOf: { object: 'OracleAggregate', field: 'asOf', id: 'desk-1', value: '846199950' },
+  principalUsd: { object: 'Plan', field: 'plannedLoan.principalUsd', id: 'desk-usd', value: '0.3483' },
 }
 const LOANS = {
   [LOAN1]: { PrincipalOutstanding: '10000000', TotalValueOutstanding: '10100000', ManagementFeeOutstanding: '0', Flags: String(LSF_LOAN_IMPAIRED) },
@@ -1252,6 +1515,36 @@ const MARGIN_CALL = {
   provenance: /** @type {const} */ ('DECLARED'), ledgerIndex: L, ledgerHash: H, entryHash: MARGIN_ENTRY.hash,
 }
 
+// Step 21: the risk officer's USD terms, and the same open call on a loan in the test dollar.
+const USD_ISSUER = 'rUSDw1nGKbkLj9hTjHmBPbVSVcXCoVhQe7'
+const RELAY = 'rRe1ayXRPUSDfeedsDevnetQvTnkGqh5u'
+const ORACLE_SOURCES = [
+  { account: RELAY, documentId: 1, provider: 'kraken', uri: 'https://api.kraken.com/0/public/Ticker?pair=XRPUSD' },
+  { account: RELAY, documentId: 2, provider: 'bitstamp', uri: 'https://www.bitstamp.net/api/v2/ticker/xrpusd/' },
+  { account: RELAY, documentId: 3, provider: 'coinbase', uri: 'https://api.exchange.coinbase.com/products/XRP-USD/ticker' },
+]
+const ORACLE_NOTE = 'Example: three XLS-47 documents relayed from exchange quotes; on mainnet, independent oracle providers.'
+const USD_TERMS_BODY = {
+  schema: /** @type {const} */ ('orma.usdterms/1'), id: 'desk-1', mandateHash: MANDATE.hash,
+  loanAsset: { currency: /** @type {const} */ ('USD'), issuer: USD_ISSUER, label: USD_LABEL },
+  xrpUsdOracle: { baseAsset: /** @type {const} */ ('XRP'), quoteAsset: /** @type {const} */ ('USD'), sources: ORACLE_SOURCES, aggregation: /** @type {const} */ ('median'), minSources: 2, maxAgeSeconds: 300, maxSpreadBps: 100, note: ORACLE_NOTE },
+  fxHaircutBps: 1000, maxSingleLoanUsd: '10',
+  issuedAt: '2026-10-24T12:05:00.000Z',
+}
+// the three documents read at the ticket's ledger L (close 23:33:20 UTC), 30 to 50 s old, median 1.29
+const ORACLE_READS = [['1.2899', '2026-10-24T23:32:40Z', '40'], ['1.29', '2026-10-24T23:32:30Z', '50'], ['1.2902', '2026-10-24T23:32:50Z', '30']]
+  .map(([price, lastUpdateTime, ageSeconds], i) => ({ ...ORACLE_SOURCES[i], price, lastUpdateTime, ageSeconds, fresh: true, used: true, ledgerIndex: L, ledgerHash: H }))
+const USD_TERMS = { ...USD_TERMS_BODY, hash: usdTermsHash(USD_TERMS_BODY), anchorTx: ANCHOR }
+const MARGIN_CALL_USD = {
+  ...MARGIN_CALL,
+  currency: /** @type {const} */ ('USD'),
+  shortfall: { ...MARGIN_CALL.shortfall, collateralValueUsd: '0.207267' },
+  reasons: [
+    'The mandate desk-1 limits the LTV at withdrawal value to 50.00 %.',
+    `The LTV at withdrawal value, in USD (${USD_LABEL}), is 61.00 %, above that limit.`,
+  ],
+}
+
 const pad19 = (/** @type {number} */ n) => String(n).padStart(19, '0')
 
 /** A pledge ticket on that book. */
@@ -1316,6 +1609,40 @@ function buyTicket(/** @type {any} */ t) {
     ticketId: 'E'.repeat(64),
     op: 'buy',
     figures: { ...figures, maxUnits: fig('maxUnits', '1243901', 'MODELLED', 'The most share units the mandate lets the desk buy at the withdrawal value') },
+  }
+}
+
+/** The same book, for a loan in the test dollar: the six dollar figures instead of the four in drops, and the usd block. */
+function usdTicket(/** @type {any} */ t) {
+  const { maxLoan: _m, requested: _r, ltvHeld: _l, lender1to1: _p, ...figures } = t.figures
+  void [_m, _r, _l, _p]
+  return {
+    ...t,
+    ticketId: 'F'.repeat(64),
+    figures: {
+      ...figures,
+      maxLoanUsd: fig('maxLoanUsd', '0.466676', 'MODELLED', 'The largest dollar loan the mandate allows against these shares'),
+      requestedUsd: fig('requestedUsd', '0.3483', 'DECLARED', 'The dollars the planned loan asks for'),
+      collateralHeldUsd: fig('collateralHeldUsd', '0.933353', 'MODELLED', 'Withdrawal value of these shares in dollars, at the declared reference price, less the haircut'),
+      ltvHeldUsd: fig('ltvHeldUsd', '3731', 'MODELLED', 'LTV at withdrawal value, in dollars'),
+      lender1to1Usd: fig('lender1to1Usd', '3000', 'MODELLED', 'The same dollar LTV for a lender at 1:1'),
+      priceAge: fig('priceAge', '50', 'MODELLED', 'Seconds since the oldest XRP/USD source used was updated'),
+    },
+    verdict: { status: 'PASS', breaches: [] },
+    verdict1to1: { status: 'PASS', breaches: [] },
+    usd: {
+      loanAsset: { currency: 'USD', issuer: USD_ISSUER, label: USD_LABEL },
+      requestedUsd: '0.3483',
+      collateralHeldUsd: '0.933353',
+      ltvHeldBps: 3731,
+      reference: {
+        value: '1.29', provenance: 'REAL', method: 'median of the fresh XLS-47 oracle documents the terms name, each read at the ledger of the ticket',
+        asOf: '2026-10-24T23:32:30Z', ageSeconds: '50', sources: ORACLE_READS, spreadBps: 3, maxSpreadBps: 100, minSources: 2, maxAgeSeconds: 300,
+        ledgerAggregate: { median: '1.29', size: 3, ledgerIndex: L, ledgerHash: H }, note: ORACLE_NOTE,
+      },
+      terms: { id: USD_TERMS.id, hash: USD_TERMS.hash, anchorTx: USD_TERMS.anchorTx, fxHaircutBps: 1000, maxSingleLoanUsd: '10' },
+      collateralRule: USD_COLLATERAL_RULE,
+    },
   }
 }
 
@@ -1397,10 +1724,13 @@ export const EXAMPLES = deepFreeze({
     moneyEffect: null,
     receipts: [{ object: 'Position', field: 'ltvHeldBps', before: null, after: 6100 }],
   },
+  usdTerms: USD_TERMS, // step 21
+  ticketUsd: usdTicket(TICKET),
+  marginCallUsd: MARGIN_CALL_USD,
 })
 
 /** Which schema validates each example (the two tickets share one, as do the three feed events). */
-export const EXAMPLE_SCHEMA = Object.freeze(Object.fromEntries(Object.keys(EXAMPLES).map((k) => [k, ({ feedEventStatement: 'feedEvent', feedEventMarginCall: 'feedEvent', ticketBuy: 'ticket' })[k] ?? k])))
+export const EXAMPLE_SCHEMA = Object.freeze(Object.fromEntries(Object.keys(EXAMPLES).map((k) => [k, ({ feedEventStatement: 'feedEvent', feedEventMarginCall: 'feedEvent', ticketBuy: 'ticket', ticketUsd: 'ticket', marginCallUsd: 'marginCall' })[k] ?? k])))
 
 /** @template T @param {T} o @returns {T} */
 function deepFreeze(o) {

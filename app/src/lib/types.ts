@@ -335,10 +335,11 @@ export interface FigureInput { name: string; value: string; object: string; fiel
 export type FormulaId =
   | 'heldValue' | 'naiveValue' | 'n1Overpayment' | 'cover' | 'heldPerUnitIfDefault' | 'lossAfterCover' | 'maxLoan'
   | 'maxUnits' | 'requested' | 'ltvHeld' | 'lender1to1' | 'cashAvailable' | 'claim' | 'lockedUntil'
+  | 'collateralHeldUsd' | 'maxLoanUsd' | 'requestedUsd' | 'ltvHeldUsd' | 'lender1to1Usd' | 'priceAge'
 
 export interface Figure {
   value: string
-  unit: 'drops' | 'share-units' | 'ratio' | 'seconds' | 'bps'
+  unit: 'drops' | 'share-units' | 'ratio' | 'seconds' | 'bps' | 'usd'
   meaning: string
   formula: string
   formulaId: FormulaId
@@ -358,12 +359,16 @@ export interface Ticket {
     heldValue: Figure; naiveValue: Figure; n1Overpayment: Figure; n2: N2Entry[]
     n3: { lockedUntil: Figure; redemptionAt: string; cashAvailable: Figure; claim: Figure }
     maxLoan?: Figure; maxUnits?: Figure; requested?: Figure; ltvHeld?: Figure; lender1to1?: Figure
+    // step 21: on a USD pledge ticket, in place of maxLoan, requested, ltvHeld and lender1to1
+    maxLoanUsd?: Figure; requestedUsd?: Figure; collateralHeldUsd?: Figure; ltvHeldUsd?: Figure; lender1to1Usd?: Figure; priceAge?: Figure
   }
   conduct: { recognitionLagSeconds: string[]; defaultsWithoutImpairment: number; coverOrderCostDrops: string }
   escrowPolicy: { finishAfter: string; cancelAfter: string; text: string }
   statement: Statement | null
   verdict: Verdict
   verdict1to1?: Verdict
+  /** Step 21: a loan in the test dollar. */
+  usd?: TicketUsd
 }
 
 export interface ChangeRow {
@@ -428,9 +433,11 @@ export interface MarginCall {
   status: MarginStatus; loanId: string
   issuedLedger: number | null; issuedAt: string | null; cureBy: string | null
   ltvHeldBps: number | null; maxLtvBps: number
-  shortfall: { collateralValueDrops: string; sharesToAdd: string; withdrawalValuePerShare: string } | null
+  shortfall: { collateralValueDrops: string; sharesToAdd: string; withdrawalValuePerShare: string; collateralValueUsd?: string } | null
   reasons: string[]; provenance: 'DECLARED'; ledgerIndex: number; ledgerHash: string
   entryHash?: string; triggerTx?: string
+  /** Step 21: on a loan in the test dollar, whose LTV is in dollars. */
+  currency?: 'USD'
 }
 export interface MarginCallEntry {
   seq: number; prevHash: string; kind: 'margin-call'; status: 'ISSUED' | 'CURED' | 'EXPIRED'; loanId: string
@@ -439,6 +446,50 @@ export interface MarginCallEntry {
 }
 /** GET /api/desk/margin-calls */
 export interface MarginCalls { ledgerIndex: number; ledgerHash: string; policy: MarginPolicy; marginCalls: MarginCall[] }
+
+// --- step 21, loans in the test dollar (addendum A11): mirrors of src/nyc/contracts.mjs -------------------
+
+/** The words every surface puts on the dollar, always whole, never shortened. */
+export const USD_LABEL = 'test dollar, stands in for RLUSD (Devnet)'
+/** The line a USD ticket shows: the loan's currency changes, never the collateral (I4). */
+export const USD_COLLATERAL_RULE = 'Collateral: shares of XRP vaults only. An issued asset can be clawed back or frozen by its issuer.'
+export interface LoanAsset { currency: 'USD'; issuer: string; label: string }
+/**
+ * The risk officer names the price sources, never a price: the XRP/USD price is the median of the XLS-47
+ * Oracle documents of the terms, read at the ledger of the decision, fresh ones only, the ledger's own
+ * get_aggregate_price agreeing. On Devnet the documents are relayed from Kraken, Bitstamp and Coinbase quotes
+ * by a test account of the desk, standing in for independent oracle providers; on mainnet, the providers.
+ */
+export interface OracleSource { account: string; documentId: number; provider: string; uri: string }
+export interface XrpUsdOracle {
+  baseAsset: 'XRP'; quoteAsset: 'USD'; sources: OracleSource[]; aggregation: 'median'
+  minSources: number; maxAgeSeconds: number; maxSpreadBps: number; note: string
+}
+export interface UsdTerms {
+  schema: 'orma.usdterms/1'; id: string; mandateHash: string; loanAsset: LoanAsset; xrpUsdOracle: XrpUsdOracle
+  fxHaircutBps: number; maxSingleLoanUsd: string; issuedAt: string; hash: string; anchorTx: string
+}
+/** One source as read at the ledger of the document: its price, its update time and age, whether it was used. */
+export interface OracleRead extends OracleSource {
+  price: string | null; lastUpdateTime: string | null; ageSeconds: string | null; fresh: boolean; used: boolean
+  ledgerIndex: number; ledgerHash: string
+}
+/** The XRP/USD price a dollar figure rests on: REAL, the median of the used sources; asOf is the oldest used update. */
+export interface UsdReference {
+  value: string; provenance: 'REAL'; method: string; asOf: string; ageSeconds: string; sources: OracleRead[]
+  spreadBps: number; maxSpreadBps: number; minSources: number; maxAgeSeconds: number
+  ledgerAggregate: { median: string; size: number; ledgerIndex: number; ledgerHash: string }; note: string
+}
+export interface UsdTermsRef { id: string; hash: string; anchorTx: string; fxHaircutBps: number; maxSingleLoanUsd: string }
+export interface TicketUsd {
+  loanAsset: LoanAsset; requestedUsd: string; collateralHeldUsd: string; ltvHeldBps: number
+  reference: UsdReference; terms: UsdTermsRef; collateralRule: string
+}
+/** A dollar position; with no usable price or terms, no dollar figure: collateralHeldUsd, ltvHeldBps and reference null (terms too, when they do not hash), and why. */
+export interface PositionUsd {
+  loanAsset: LoanAsset | null; principalOutstandingUsd: string; collateralHeldUsd: string | null; ltvHeldBps: number | null
+  reference: UsdReference | null; terms: UsdTermsRef | null; priceUnavailable?: string
+}
 
 export interface UniverseVault {
   vaultId: string
@@ -468,3 +519,6 @@ void _typeProbe
 // The four of step 20, the same way.
 const _marginProbe: [MarginPolicy, MarginCall, MarginCallEntry, MarginCalls] | null = null
 void _marginProbe
+// The nine of step 21, the same way.
+const _usdProbe: [LoanAsset, OracleSource, XrpUsdOracle, UsdTerms, OracleRead, UsdReference, UsdTermsRef, TicketUsd, PositionUsd] | null = null
+void _usdProbe

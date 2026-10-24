@@ -1,0 +1,44 @@
+{
+  "schema": "orma.usdterms/1",
+  "id": "desk-1",
+  "mandateHash": "958688edb796a9dcc09c68521b1e90aca6c55e4a8ee1f98f97fd44abff80ffd5",
+  "loanAsset": {
+    "currency": "USD",
+    "issuer": "rafC9dJGuVa74wdaBgQDGGxVzJgtnePvSd",
+    "label": "test dollar, stands in for RLUSD (Devnet)"
+  },
+  "xrpUsdOracle": {
+    "baseAsset": "XRP",
+    "quoteAsset": "USD",
+    "sources": [
+      {
+        "account": "rhmUZSc85ZraVS4EZEwkzvwNWfPvPiF7vr",
+        "documentId": 1,
+        "provider": "kraken",
+        "uri": "https://api.kraken.com/0/public/Ticker?pair=XRPUSD"
+      },
+      {
+        "account": "rhmUZSc85ZraVS4EZEwkzvwNWfPvPiF7vr",
+        "documentId": 2,
+        "provider": "bitstamp",
+        "uri": "https://www.bitstamp.net/api/v2/ticker/xrpusd/"
+      },
+      {
+        "account": "rhmUZSc85ZraVS4EZEwkzvwNWfPvPiF7vr",
+        "documentId": 3,
+        "provider": "coinbase",
+        "uri": "https://api.exchange.coinbase.com/products/XRP-USD/ticker"
+      }
+    ],
+    "aggregation": "median",
+    "minSources": 2,
+    "maxAgeSeconds": 300,
+    "maxSpreadBps": 100,
+    "note": "Devnet stand-in: three XLS-47 documents relayed every 60 s from the last trades of Kraken, Bitstamp and Coinbase by a test account of the desk (src/demo/fx-relay.mjs), because no XRP/USD oracle is maintained on Devnet. On mainnet the terms name independent oracle providers; nothing else changes."
+  },
+  "fxHaircutBps": 1000,
+  "maxSingleLoanUsd": "10",
+  "issuedAt": "2026-10-24T22:31:18.915Z",
+  "hash": "0e12fb2fe8bc340846dd1be98cc7c824f173d818144415067d2d6ce19543bd58",
+  "anchorTx": "5211066A17309BE1CF3783CB69331B70453BCFDC39D2B645A32A2A1B7A6004F7"
+}

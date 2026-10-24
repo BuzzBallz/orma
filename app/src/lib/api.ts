@@ -1,4 +1,4 @@
-import type { ChangeRow, CollateralAccount, MarginCall } from './types'
+import type { ChangeRow, CollateralAccount, LoanAsset, MarginCall, PositionUsd, UsdTerms } from './types'
 
 export const API_BASE = (import.meta.env?.VITE_API_BASE ?? 'http://localhost:8787').replace(/\/+$/, '')
 
@@ -75,12 +75,28 @@ export interface DeskPlan {
   plannedLoan: { units: string; principalDrops: string; paymentInterval: number; gracePeriod: number }
   plannedBuy: { share: string; units: string }
   vaults: DeskPlanVault[]
+  /** Step 21: the desk's dollar pool, when this server lends the test dollar. */
+  usd?: DeskPlanUsd
+}
+/** The dollar plan of demo/desk-usd.json and the risk officer's terms, served beside the mandate (step 21). */
+export interface DeskPlanUsd {
+  plannedLoan: { units: string; principalUsd: string; paymentInterval: number; gracePeriod: number }
+  loanAsset: LoanAsset
+  vaultId: string
+  loanBrokerId: string
+  terms: UsdTerms
 }
 export interface PositionCollateral { escrowId: string; shareMptId: string; units: string; account: CollateralAccount }
 export interface Position {
+  /** principalOutstanding: the loan's PrincipalOutstanding in its asset, drops for XRP, dollars for USD (step 21). */
   loanId: string; loanSetTxHash: string | null; vaultId: string; borrower: string; principalOutstanding: string
-  collateral: PositionCollateral[]; collateralHeldDrops: string; ltvHeldBps: number
-  usage: { limit: string; value: string; threshold: string }[]
+  /** null when no pledged collateral was read, or (USD) no usable price: the server says so, never a zero. */
+  collateral: PositionCollateral[]; collateralHeldDrops: string; ltvHeldBps: number | null
+  /** value (and, without USD terms, threshold) is null when the server could not state it. */
+  usage: { limit: string; value: string | null; threshold: string | null }[]
+  /** Step 21: the loan's currency; a USD position's ltvHeldBps is in dollars and it carries usd. */
+  currency?: 'XRP' | 'USD'
+  usd?: PositionUsd | null
   /** Step 20: the desk's margin call on this loan, judged at the ledger of the answer. */
   marginCall?: MarginCall
 }
@@ -88,28 +104,46 @@ export interface Positions { ledgerIndex: number; ledgerHash: string; positions:
 
 export const deskPlanPath = '/api/desk/mandates/desk-1'
 
+/** Step 21: the currency of the loan the desk is asked for. XRP is the default; the collateral is XRP-vault shares either way. */
+export type LoanCurrency = 'XRP' | 'USD'
+
+/** The loan currency an address asks for: `?asset=USD`, else XRP. Read like `facility`, so a copied address carries it. */
+export function assetFromSearch(search: string): LoanCurrency {
+  return new URLSearchParams(search).get('asset') === 'USD' ? 'USD' : 'XRP'
+}
+
 /**
  * The tickets the desk reads for a facility. No facility: Harbor-1. A facility that is no Harbor: no
  * harbor and no pledge ticket, never a silent fall back on Harbor-1, whose L2 may already be in default.
+ * Step 21: `asset` USD reads the pledge ticket of the dollar plan (`&asset=USD`, its own units); on a plan
+ * without `usd` it is no pledge ticket at all, never the XRP one under a dollar choice. XRP is unchanged.
  */
-export function deskTicketPaths(deskPlan: DeskPlan, facility?: string | null): { harbor: DeskPlanVault | null; pledge: string | null; buy: string } {
+export function deskTicketPaths(deskPlan: DeskPlan, facility?: string | null, asset: LoanCurrency = 'XRP'): { harbor: DeskPlanVault | null; pledge: string | null; buy: string } {
   const harbors = deskPlan.vaults.filter((v) => v.label.startsWith('harbor-'))
   const harbor = facility
     ? harbors.find((v) => v.vaultId.toUpperCase() === facility.toUpperCase()) ?? null
     : harbors.find((v) => v.label === 'harbor-1') ?? null
   const ticket = (share: string, op: string, units: string) => `/api/tickets?share=${share}&op=${op}&units=${units}&mandate=desk-1`
+  const usd = asset === 'USD' ? deskPlan.usd ?? null : null
+  const pledge = !harbor ? null
+    : asset === 'USD' ? (usd ? `${ticket(harbor.shareMptId, 'pledge', usd.plannedLoan.units)}&asset=USD` : null)
+      : ticket(harbor.shareMptId, 'pledge', deskPlan.plannedLoan.units)
   return {
     harbor,
-    pledge: harbor ? ticket(harbor.shareMptId, 'pledge', deskPlan.plannedLoan.units) : null,
+    pledge,
     buy: ticket(deskPlan.plannedBuy.share, 'buy', deskPlan.plannedBuy.units),
   }
 }
 
-/** The facility's demo loan: a validated LoanSet whose escrow holds the Harbor's shares, on desk first, else the first one. */
-export function demoLoanFor(positions: Positions | null, deskPlan: DeskPlan, facility?: string | null): Position | null {
+/**
+ * The facility's demo loan: a validated LoanSet whose escrow holds the Harbor's shares, on desk first, else the first one.
+ * Step 21: with `currency`, only the loans in that currency (a position without `currency` is an XRP one).
+ */
+export function demoLoanFor(positions: Positions | null, deskPlan: DeskPlan, facility?: string | null, currency?: LoanCurrency): Position | null {
   const harbor = deskTicketPaths(deskPlan, facility).harbor
   if (!harbor || !positions) return null
   const backed = positions.positions.filter((p) => /^[0-9A-F]{64}$/i.test(p.loanSetTxHash ?? '')
+    && (currency === undefined || (p.currency ?? 'XRP') === currency)
     && p.collateral.some((c) => c.shareMptId.toUpperCase() === harbor.shareMptId.toUpperCase()))
   const desk = deskPlan.vaults.find((v) => v.label === 'desk')
   return backed.find((p) => desk && p.vaultId.toUpperCase() === desk.vaultId.toUpperCase()) ?? backed[0] ?? null
@@ -122,8 +156,12 @@ export function cureTicketPath(share: string, units: string): string {
   return `/api/tickets?share=${share}&op=pledge&units=${units}&mandate=desk-1`
 }
 
-/** The lending vault of a desk loan: the plan's label for the loan's vaultId when it is `desk` or `spare`, else null. */
+/**
+ * The lending vault of a desk loan: the plan's label for the loan's vaultId when it is `desk` or `spare`, else null.
+ * Step 21: a loan of the dollar pool (`deskPlan.usd.vaultId`) is requested on the vault `desk`, so its pledges are too.
+ */
 export function lendingVaultOf(deskPlan: DeskPlan, vaultId: string): 'desk' | 'spare' | null {
+  if (deskPlan.usd && deskPlan.usd.vaultId.toUpperCase() === vaultId.toUpperCase()) return 'desk'
   const label = deskPlan.vaults.find((v) => v.vaultId.toUpperCase() === vaultId.toUpperCase())?.label
   return label === 'desk' || label === 'spare' ? label : null
 }
@@ -210,6 +248,8 @@ export function errorSentence(code: string | null): string {
     case 'SUBMIT_UNCONFIRMED': return 'The submission could not be confirmed on the ledger. Check the transaction before trying again.'
     case 'WARMING_UP': return 'The ledger could not be read at one ledger yet. It is retried on its own.'
     case 'BUSY': return 'Too many ledger reads are running. It is retried on its own.'
+    // step 21: the XRP/USD median of the oracle sources could not be used at this ledger
+    case 'PRICE_UNAVAILABLE': return 'No usable XRP/USD price at this ledger: too few fresh oracle sources, or the sources too far apart. No dollar figure is shown and nothing was signed. It is retried on its own.'
     default: return 'The server could not answer this request. Nothing was sent.'
   }
 }

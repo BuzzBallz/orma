@@ -105,9 +105,14 @@ const check = (what, ok) => {
   console.log('  ' + (ok ? 'ok  ' : 'MISS') + ' ' + what)
   return ok
 }
-const { DeskScreen, DESK_TABS, OPERATOR_ACTIONS, rememberOperator } = await import('../src/screens/Desk.tsx')
+const { DeskScreen, DESK_TABS, OPERATOR_ACTIONS, rememberOperator, secondsText, recomputeReference } = await import('../src/screens/Desk.tsx')
 const { Figure, Recompute } = await import('../src/components/Ledger.tsx')
 const api = await import('../src/lib/api.ts')
+const { USD_LABEL, USD_COLLATERAL_RULE } = await import('../src/lib/types.ts')
+// Step 21: a dollar amount on the page is a number followed by "USD (" + the whole label; the one exception is
+// the declared rate "1.29 USD per XRP", which the label follows on its own line. Returns what is left bare.
+const LABELLED = new RegExp('\\d USD(?! \\(' + USD_LABEL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\)| per XRP)', 'g')
+const unlabelled = (html) => [...html.matchAll(LABELLED)].map((m) => html.slice(Math.max(0, m.index - 20), m.index + 40))
 const LOADING = 'The ledger is being read at a validated ledger. The figures appear on their own.'
 const GRADE = />(AAA|AA|A|BBB|BB|B|CCC|CC|C|D)[+-]?</
 const render = (props) => plain(renderToString(createElement(DeskScreen, props)))
@@ -255,6 +260,81 @@ if (deskPlan) {
     const html = render({ ticket: null, mark: null, tab: 'positions', data: positions, deskPlan, facility: h1.vaultId })
     check('positions under Harbor-1: Harbor-1 on its rows, the 2-of-3 line under the collateral', html.includes('Harbor-1') && html.includes('Selected facility') && html.includes('2-of-3') && html.includes('master key disabled'))
   }
+
+  // Step 21 (addendum A11): loans in the test dollar, when this server lends it. Absent, no USD UI at all.
+  const usdPlan = deskPlan.usd
+  if (!usdPlan) {
+    console.log('  --   deskPlan.usd not served: this server lends no test dollar, the USD ticket is not exercised')
+    const plainHtml = t1 ? render({ ticket: t1, mark: null, tab: 'ticket', deskPlan, positions }) : ''
+    check('no deskPlan.usd: no currency choice and no dollar label on the ticket', !plainHtml.includes('Loan currency') && !plainHtml.includes(USD_LABEL))
+  } else {
+    check('deskPlan.usd: loan asset USD with the whole label, a planned loan in dollars, the risk officer\'s terms',
+      usdPlan.loanAsset?.currency === 'USD' && usdPlan.loanAsset?.label === USD_LABEL && /^\d+(\.\d+)?$/.test(usdPlan.plannedLoan?.principalUsd ?? '')
+      && usdPlan.terms?.schema === 'orma.usdterms/1' && /^[0-9A-F]{64}$/i.test(usdPlan.terms?.hash ?? ''))
+    const usdPath = DESK_TABS[0].source({ deskPlan, asset: 'USD' })
+    check('the USD ticket path: the Harbor-1 pledge of the dollar plan, with &asset=USD; the XRP path keeps none',
+      usdPath === '/api/tickets?share=' + h1.shareMptId + '&op=pledge&units=' + usdPlan.plannedLoan.units + '&mandate=desk-1&asset=USD'
+      && DESK_TABS[0].source({ deskPlan }) === p1.pledge && !p1.pledge.includes('asset='))
+    // A price the oracles cannot give (too few fresh sources, or too far apart) is a 409 PRICE_UNAVAILABLE, never a
+    // figure: the screen then shows its sentence. This check needs a usable price, so it fails, naming why.
+    const usdAnswer = await fetch(BASE + usdPath).then(async (res) => ({ status: res.status, body: await res.json().catch(() => null) }), (e) => ({ status: 0, body: { error: { code: e.cause?.code ?? e.message } } }))
+    const tu = usdAnswer.status === 200 ? usdAnswer.body : null
+    if (usdAnswer.status === 409 && usdAnswer.body?.error?.code === 'PRICE_UNAVAILABLE') {
+      const h = render({ ticket: null, mark, tab: 'ticket', deskPlan, positions, asset: 'USD', error: 'PRICE_UNAVAILABLE' })
+      check('USD ticket refused 409 PRICE_UNAVAILABLE: the screen says ' + JSON.stringify(api.errorSentence('PRICE_UNAVAILABLE')), h.includes(api.errorSentence('PRICE_UNAVAILABLE')) && h.includes('role="alert"') && !h.includes('Ledger field'))
+    }
+    check('the USD ticket is served with its usd block' + (tu ? '' : ' (answered ' + usdAnswer.status + ' ' + (usdAnswer.body?.error?.code ?? '') + ': ' + (usdAnswer.body?.error?.message ?? '') + ')'), Boolean(tu?.usd))
+    if (tu?.usd) {
+      const r = tu.usd.reference
+      const six = ['maxLoanUsd', 'requestedUsd', 'collateralHeldUsd', 'ltvHeldUsd', 'lender1to1Usd', 'priceAge']
+      check('USD ticket: the six dollar figures, none of maxLoan, requested, ltvHeld, lender1to1',
+        six.every((k) => tu.figures[k]) && ['maxLoan', 'requested', 'ltvHeld', 'lender1to1'].every((k) => !tu.figures[k]))
+      const usdServed = []
+      const walkUsd = (o) => {
+        if (o && typeof o === 'object') {
+          if (typeof o.formulaId === 'string' && Array.isArray(o.inputs)) usdServed.push(o)
+          else Object.values(o).forEach(walkUsd)
+        }
+      }
+      walkUsd(tu.figures)
+      const usdOff = usdServed.filter((f) => !plain(renderToString(createElement(Recompute, { figure: f }))).includes('>MATCH'))
+      check('every served USD-ticket figure (' + usdServed.length + ') recomputes MATCH in the browser' + (usdOff.length ? ': not ' + usdOff.map((f) => f.formulaId).join(', ') : ''), usdServed.length > 0 && usdOff.length === 0)
+      const html = render({ ticket: tu, mark, tab: 'ticket', deskPlan, positions, asset: 'USD' })
+      check('USD ticket: the reference is REAL, the median of at least minSources used sources, the ledger aggregate the same median',
+        r.provenance === 'REAL' && Array.isArray(r.sources) && r.sources.filter((x) => x.used).length >= r.minSources && r.ledgerAggregate?.median === r.value)
+      check('USD ticket: the served median and spread recompute MATCH in the browser', recomputeReference(r) === 'MATCH')
+      for (const [what, s] of [
+        ['the label', USD_LABEL], ['the median', r.value + ' USD per XRP'], ['its method', r.method], ['its time', r.asOf],
+        ['its age', secondsText(String(r.ageSeconds)) + ' (' + r.ageSeconds + ' s)'], ['its provenance', '>' + r.provenance + '<'], ['the note', r.note],
+        ['the spread', 'Spread between the sources used'], ['the collateral line', USD_COLLATERAL_RULE],
+        ['the XRP | USD choice', 'aria-label="Loan currency"'], ['the dollar loan with its label', 'Loan of ' + tu.usd.requestedUsd + ' USD (' + USD_LABEL + ')'],
+        ...r.sources.flatMap((x) => [['source ' + x.provider, x.provider], ['its price', x.price === null ? 'no price at this ledger' : x.price + ' USD per XRP'], ['its account', x.account], ['used or not', x.used ? 'used in the median' : 'not used']]),
+      ]) check('USD ticket: ' + what + (['the label', 'the collateral line', 'the note', 'its method'].includes(what) ? '' : ', ' + s), html.includes(s))
+      const bare = unlabelled(html)
+      check('USD ticket: every dollar amount carries the label' + (bare.length ? ' (not: ' + bare.slice(0, 3).join(' | ') + ')' : ''), bare.length === 0)
+      check('USD ticket: MATCH under every figure of its audit, no MISMATCH', count(html, 'MISMATCH') === 0 && count(html, 'MATCH') >= usdServed.length)
+      accessible('USD ticket', html)
+      check('the XRP ticket under a dollar choice is never drawn: the loading note, no figure', Boolean(t1) && (() => {
+        const h = render({ ticket: t1, mark, tab: 'ticket', deskPlan, positions, asset: 'USD' })
+        return h.includes(LOADING) && !h.includes('Ledger field')
+      })())
+      const xrpHtml = t1 ? render({ ticket: t1, mark, tab: 'ticket', deskPlan, positions }) : ''
+      check('the XRP ticket on this plan: the choice on XRP, no dollar figure', xrpHtml.includes('aria-current="true">XRP</a>') && !xrpHtml.includes(USD_COLLATERAL_RULE) && !xrpHtml.includes('USD per XRP'))
+    }
+    // The borrower's request carries the currency; the XRP request is the body it always was.
+    const reqBody = (asset) => OPERATOR_ACTIONS.find((e) => e.action === 'requestLoan').body({ harbor: 'harbor-1', lending: 'desk', ticket: tu ?? t1, buyTicket: null, pledgeActionId: 'P'.repeat(32), requestActionId: null, ...(asset ? { asset } : {}) })
+    check('requestLoan body: asset USD on a dollar request, no asset key on an XRP one', reqBody('USD')?.asset === 'USD' && reqBody('USD')?.vault === 'desk' && reqBody(null) && !('asset' in reqBody(null)))
+    check('lendingVaultOf: a loan of the dollar pool is pledged from desk', api.lendingVaultOf(deskPlan, usdPlan.vaultId) === 'desk')
+    const usdPositions = positions?.positions.filter((p) => p.currency === 'USD') ?? []
+    if (usdPositions.length === 0) console.log('  --   no USD position on the desk yet, the positions in dollars are not exercised live')
+    else {
+      const html = render({ ticket: null, mark: null, tab: 'positions', data: positions, deskPlan })
+      check('positions: each USD loan\'s principal in dollars with the label (' + usdPositions.length + ')', usdPositions.every((p) => html.includes('principal outstanding ' + p.principalOutstanding + ' USD (' + USD_LABEL + ')')))
+      check('positions: each USD loan\'s collateral in dollars with the label', usdPositions.every((p) => !p.usd || html.includes(p.usd.collateralHeldUsd + ' USD (' + USD_LABEL + ')')))
+      const bare = unlabelled(html)
+      check('positions: every dollar amount carries the label' + (bare.length ? ' (not: ' + bare.slice(0, 3).join(' | ') + ')' : ''), bare.length === 0)
+    }
+  }
 }
 
 // The sources: the title template, App's channel, and no import.meta.env. without ?.
@@ -315,6 +395,20 @@ for (const file of surfaces) {
   check(file + ': no grade, no verdict colour outside Verdict' + (found.length ? ' (' + found.join(', ') + ')' : ''), found.length === 0)
 }
 
+// Step 21: the test dollar is never named RLUSD alone. Every RLUSD in every file of app/src, comments included,
+// sits inside the whole label. Self-test first: a lone RLUSD is caught, in a string or a comment; the label is not.
+const { statSync } = await import('node:fs')
+const filesUnder = (dir) => readdirSync(dir).flatMap((n) => (statSync(dir + '/' + n).isDirectory() ? filesUnder(dir + '/' + n) : [dir + '/' + n]))
+const loneRlusd = (s) => s.split(USD_LABEL).join('').includes('RLUSD')
+check('RLUSD self-test: a lone RLUSD is caught in a string and in a comment; the whole label is not',
+  loneRlusd('const x = "RLUSD"') && loneRlusd('/** never RLUSD alone */ const y = 1') && loneRlusd("'" + USD_LABEL + "' // RLUSD") && !loneRlusd("const x = '" + USD_LABEL + "'"))
+const srcFiles = filesUnder('src')
+const labelled = srcFiles.filter((f) => readFileSync(f, 'utf8').includes(USD_LABEL))
+const loneAt = srcFiles.flatMap((f) => readFileSync(f, 'utf8').replace(/\r\n/g, NL).split(NL).flatMap((line, i) => (loneRlusd(line) ? [f + ':' + (i + 1)] : [])))
+check('app/src (' + srcFiles.length + ' files, the label in ' + labelled.length + '): every RLUSD inside "' + USD_LABEL + '"' + (loneAt.length ? ' (not at: ' + loneAt.join(', ') + ')' : ''), loneAt.length === 0 && labelled.length > 0)
+check('label self-test: a bare "2.322 USD" is caught; with the label, and "1.29 USD per XRP", it is not',
+  unlabelled('<p>2.322 USD</p>').length === 1 && unlabelled('2.322 USD (' + USD_LABEL + ')').length === 0 && unlabelled('1.29 USD per XRP').length === 0)
+
 // Each screen that declares SMOKE_CASES renders them, and each must show its strings.
 for (const n of readdirSync('src/screens').filter((x) => x.endsWith('.tsx'))) {
   if (!readFileSync('src/screens/' + n, 'utf8').includes('export const SMOKE_CASES')) continue
@@ -333,6 +427,11 @@ for (const n of readdirSync('src/screens').filter((x) => x.endsWith('.tsx'))) {
       check(name + ': "' + c.enabledButton + '" is not disabled', Boolean(b) && !/\bdisabled\b/.test(b[1]))
     }
     for (const s of c.mustNotContain ?? []) check(name + ': no ' + s, !html.includes(s))
+    // Step 21: on the desk, no dollar amount without its label, in any case.
+    if (n.startsWith('Desk')) {
+      const bare = unlabelled(html)
+      if (bare.length) check(name + ': a dollar amount without the label (' + bare.slice(0, 3).join(' | ') + ')', false)
+    }
   }
 }
 

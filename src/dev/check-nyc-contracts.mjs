@@ -9,7 +9,7 @@ import {
   SCHEMAS, EXAMPLES, EXAMPLE_SCHEMA, NYC_ROUTES, FORMULAS, AMOUNT_FIELDS, MARK_STEPS, NYC_ERRORS, ACTION_STATES,
   DECISION_CODES, canonical, sha256Hex, mandateHash, decisionHash, encodeStatement, parseStatement,
   statementConsistency, COLLATERAL_POLICY, COLLATERAL_STAGES, collateralStageOf, judgeCollateralAccount,
-  judgeCollateralShare, marginPolicyHash,
+  judgeCollateralShare, marginPolicyHash, usdTermsHash, usdAmount, USD_LABEL, USD_COLLATERAL_RULE, USD_FIGURES, medianOf, spreadBpsOf,
 } from '../nyc/contracts.mjs'
 
 let bad = 0
@@ -51,7 +51,7 @@ function main() {
     }
   }
   walk(EXAMPLES, 'EXAMPLES')
-  eq('the examples carry Figures of all fourteen formulas', [...new Set(figures.map(([, f]) => f.formulaId))].sort(), Object.keys(FORMULAS).sort())
+  eq('the examples carry Figures of all twenty formulas', [...new Set(figures.map(([, f]) => f.formulaId))].sort(), Object.keys(FORMULAS).sort())
   eq('each Figure of the examples has a formula of FORMULAS and exactly its inputs', figures.filter(([, f]) => SCHEMAS.figure(f).length).map(([p]) => p), [])
   const ticket = EXAMPLES.ticket
   const cover = ticket.figures.n2[0].cover
@@ -119,6 +119,55 @@ function main() {
   eq('a margin-calls document with a call read at another ledger', SCHEMAS.marginCalls(otherLedger).some((p) => p.includes("document's ledger")), true)
   eq('the hardening values are in the contract', [ACTION_STATES.includes('approving'), DECISION_CODES.includes('SUBMIT_UNCONFIRMED'), NYC_ERRORS.BUSY], [true, true, { status: 503, retryable: true }])
 
+  console.log('loans in the test dollar (step 21)')
+  const terms = EXAMPLES.usdTerms
+  const oracle = terms.xrpUsdOracle
+  eq('the USD terms example hash is over its own keys, not the envelope', [terms.hash, usdTermsHash({ ...terms, serverTime: 'x', ledgerIndex: 1 })], [usdTermsHash(terms), terms.hash])
+  eq('terms whose haircut changed after hashing are refused', SCHEMAS.usdTerms({ ...clone(terms), fxHaircutBps: 0 }).some((p) => p.startsWith('hash')), true)
+  eq('terms whose sources changed after hashing are refused', SCHEMAS.usdTerms({ ...clone(terms), xrpUsdOracle: { ...clone(oracle), minSources: 1 } }).some((p) => p.startsWith('hash')), true)
+  eq('the terms name sources, never a price: a declared price is not a key of the hash', usdTermsHash({ ...clone(terms), xrpUsdReference: { value: '9.99' } }), terms.hash)
+  eq('the dollar is never called RLUSD alone', SCHEMAS.usdTerms({ ...clone(terms), loanAsset: { ...terms.loanAsset, label: 'RLUSD' } }).some((p) => p.startsWith('loanAsset.label')), true)
+  eq('the label is the whole sentence', USD_LABEL, 'test dollar, stands in for RLUSD (Devnet)')
+  eq('a haircut of 10000 bps leaves nothing to lend against', SCHEMAS.usdTerms({ ...clone(terms), fxHaircutBps: 10000 }).some((p) => p.startsWith('fxHaircutBps')), true)
+  eq('more sources required than named, one document named twice, an age above the 300 s rippled allows: refused',
+    [SCHEMAS.usdTerms({ ...clone(terms), xrpUsdOracle: { ...clone(oracle), minSources: 4 } }).some((p) => p.startsWith('xrpUsdOracle.minSources')),
+      SCHEMAS.usdTerms({ ...clone(terms), xrpUsdOracle: { ...clone(oracle), sources: [oracle.sources[0], oracle.sources[0]] } }).some((p) => p.startsWith('xrpUsdOracle.sources')),
+      SCHEMAS.usdTerms({ ...clone(terms), xrpUsdOracle: { ...clone(oracle), maxAgeSeconds: 86400 } }).some((p) => p.startsWith('xrpUsdOracle.maxAgeSeconds'))], [true, true, true])
+  eq('maxSingleLoanUsd is an amount: as a number it is refused', SCHEMAS.usdTerms({ ...clone(terms), maxSingleLoanUsd: 10 }).some((p) => p.includes('is a number')), true)
+  eq('medianOf: the middle price, or the mean of the two middle ones, exact', [medianOf(['1.2902', '1.2899', '1.29']), medianOf(['1.29', '1.2901']), medianOf(['3'])], ['1.29', '1.29005', '3'])
+  eq('spreadBpsOf: ceil((max − min) × 10000 / median)', [spreadBpsOf(['1.2899', '1.29', '1.2902']), spreadBpsOf(['1', '1'])], [3, 0])
+  const tu = EXAMPLES.ticketUsd
+  const ref = tu.usd.reference
+  const withRef = (o) => ({ ...clone(tu), usd: { ...clone(tu.usd), reference: { ...clone(ref), ...o } } })
+  eq('the USD ticket carries the six dollar figures and none of the four in drops', [USD_FIGURES.every((k) => k in tu.figures), ['maxLoan', 'requested', 'ltvHeld', 'lender1to1'].some((k) => k in tu.figures)], [true, false])
+  eq('a USD ticket that also carries requested in drops is refused', SCHEMAS.ticket({ ...clone(tu), figures: { ...clone(tu.figures), requested: clone(EXAMPLES.ticket.figures.requested) } }).some((p) => p.startsWith('figures.requested')), true)
+  const xrpWithUsdFigure = clone(EXAMPLES.ticket)
+  xrpWithUsdFigure.figures.ltvHeldUsd = clone(tu.figures.ltvHeldUsd)
+  eq('an XRP ticket that carries a dollar figure is refused', SCHEMAS.ticket(xrpWithUsdFigure).some((p) => p.startsWith('figures.ltvHeldUsd')), true)
+  eq('the usd block names the value of its figure: an LTV that is not ltvHeldUsd is refused', SCHEMAS.ticket({ ...clone(tu), usd: { ...clone(tu.usd), ltvHeldBps: 1 } }).some((p) => p.startsWith('usd.ltvHeldBps')), true)
+  eq('a price age that is not priceAge is refused', SCHEMAS.ticket(withRef({ ageSeconds: '1' })).some((p) => p.startsWith('usd.reference.ageSeconds')), true)
+  eq('the price is REAL, read from the ledger, never DECLARED', SCHEMAS.ticket(withRef({ provenance: 'DECLARED' })).some((p) => p.startsWith('usd.reference.provenance')), true)
+  eq('a price that is not the median of the used sources is refused', SCHEMAS.ticket(withRef({ value: '1.2902' })).some((p) => p.startsWith('usd.reference.value')), true)
+  eq('a stale source used, or used sources fewer than minSources, is refused',
+    [SCHEMAS.ticket(withRef({ sources: ref.sources.map((s, i) => (i === 0 ? { ...s, fresh: false } : s)) })).some((p) => p.startsWith('usd.reference.sources[0].used')),
+      SCHEMAS.ticket(withRef({ sources: ref.sources.map((s, i) => (i === 0 ? { ...s, ageSeconds: '301' } : s)) })).some((p) => p.startsWith('usd.reference.sources[0].ageSeconds')),
+      SCHEMAS.ticket(withRef({ minSources: 4 })).some((p) => p.startsWith('usd.reference.sources'))], [true, true, true])
+  eq('a source read at another ledger is refused', SCHEMAS.ticket(withRef({ sources: ref.sources.map((s, i) => (i === 1 ? { ...s, ledgerIndex: s.ledgerIndex - 1 } : s)) })).some((p) => p.includes("document's ledger")), true)
+  eq('sources further apart than maxSpreadBps are refused', SCHEMAS.ticket(withRef({ maxSpreadBps: 2 })).some((p) => p.startsWith('usd.reference.spreadBps')), true)
+  eq('the ledger aggregate must agree with the median, over the same sources', [SCHEMAS.ticket(withRef({ ledgerAggregate: { ...ref.ledgerAggregate, median: '1.31' } })).some((p) => p.startsWith('usd.reference.ledgerAggregate.median')), SCHEMAS.ticket(withRef({ ledgerAggregate: { ...ref.ledgerAggregate, size: 2 } })).some((p) => p.startsWith('usd.reference.ledgerAggregate.size'))], [true, true])
+  eq('the reference is the xrpUsd input of the dollar figures', SCHEMAS.ticket(withRef({ value: '1.2901', sources: ref.sources.map((s) => ({ ...s, price: '1.2901' })), spreadBps: 0, ledgerAggregate: { ...ref.ledgerAggregate, median: '1.2901' } })).some((p) => p.startsWith('usd.reference.value')), true)
+  eq('the USD ticket carries the collateral line, word for word', [tu.usd.collateralRule, SCHEMAS.ticket({ ...clone(tu), usd: { ...clone(tu.usd), collateralRule: 'Collateral: anything.' } }).some((p) => p.startsWith('usd.collateralRule'))], [USD_COLLATERAL_RULE, true])
+  eq('a buy ticket carries no loan in dollars', SCHEMAS.ticket({ ...clone(EXAMPLES.ticketBuy), usd: clone(tu.usd) }).some((p) => p.startsWith('usd')), true)
+  eq('a dollar figure carries its unit usd', SCHEMAS.figure({ ...clone(tu.figures.collateralHeldUsd), unit: 'drops' }).some((p) => p.endsWith('unit is not usd, the unit of collateralHeldUsd')), true)
+  eq('the dollar figures read the price as an OracleAggregate input and the haircut from UsdTerms', tu.figures.collateralHeldUsd.inputs.filter((x) => ['xrpUsd', 'fxHaircutBps'].includes(x.name)).map((x) => [x.name, x.object]).sort(), [['fxHaircutBps', 'UsdTerms'], ['xrpUsd', 'OracleAggregate']])
+  eq('no usable price is PRICE_UNAVAILABLE, 409, retryable', NYC_ERRORS.PRICE_UNAVAILABLE, { status: 409, retryable: true })
+  const mu = EXAMPLES.marginCallUsd
+  eq('a USD margin call without its shortfall in dollars is refused', SCHEMAS.marginCall({ ...clone(mu), shortfall: { ...EXAMPLES.marginCall.shortfall } }).some((p) => p.startsWith('shortfall.collateralValueUsd')), true)
+  eq('a margin call in a currency the desk does not lend is refused', SCHEMAS.marginCall({ ...clone(mu), currency: 'EUR' }).some((p) => p.startsWith('currency')), true)
+  eq('an XRP margin call is what it was: no currency key', 'currency' in EXAMPLES.marginCall, false)
+  eq('an issued-currency amount: currency, issuer and a decimal string', usdAmount('2.322', terms.loanAsset.issuer), { currency: 'USD', issuer: terms.loanAsset.issuer, value: '2.322' })
+  eq('an amount given as a number, in exponent form, or without its issuer is refused', [throws(() => usdAmount(2.322, terms.loanAsset.issuer)), throws(() => usdAmount('1e3', terms.loanAsset.issuer)), throws(() => usdAmount('1', ''))], ['TypeError', 'TypeError', 'TypeError'])
+
   console.log('canonical and sha256Hex')
   eq('canonical sorts keys at every depth, no spaces', canonical({ b: 1, a: [{ d: 2, c: '3' }], u: undefined }), '{"a":[{"c":"3","d":2}],"b":1}')
   eq('sha256Hex of the empty string', sha256Hex(''), 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
@@ -127,8 +176,8 @@ function main() {
   const ts = readFileSync(new URL('../../app/src/lib/types.ts', import.meta.url), 'utf8')
   const union = /export type FormulaId\s*=([^;]*?)(?:\r?\n\s*\r?\n|\r?\nexport |;)/.exec(ts)
   const names = union ? [...union[1].matchAll(/'([A-Za-z0-9]+)'/g)].map((m) => m[1]) : null
-  eq('the union names exactly the fourteen keys of FORMULAS', names?.slice().sort(), Object.keys(FORMULAS).sort())
-  eq('fourteen formulas', Object.keys(FORMULAS).length, 14)
+  eq('the union names exactly the twenty keys of FORMULAS', names?.slice().sort(), Object.keys(FORMULAS).sort())
+  eq('twenty formulas: fourteen at step 1, six in dollars at step 21', [Object.keys(FORMULAS).length, Object.keys(FORMULAS).slice(14)], [20, ['collateralHeldUsd', 'maxLoanUsd', 'requestedUsd', 'ltvHeldUsd', 'lender1to1Usd', 'priceAge']])
 
   console.log('routes')
   eq('sixteen NYC routes: fifteen at step 1, GET /api/desk/margin-calls at step 20', [NYC_ROUTES.length, NYC_ROUTES.at(-1).path], [16, '/api/desk/margin-calls'])

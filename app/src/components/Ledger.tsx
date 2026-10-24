@@ -2,7 +2,7 @@ import { Fragment, useState, type ReactNode } from 'react'
 import Decimal from 'decimal.js'
 import { Check, Clock, X } from 'lucide-react'
 import { useFlash } from '../lib/useFlash'
-import type { ChangeRow, Figure as FigureDoc, FormulaId, Provenance } from '../lib/types'
+import { USD_LABEL, type ChangeRow, type Figure as FigureDoc, type FormulaId, type Provenance } from '../lib/types'
 import { dropsToXrp, ratioToPct } from '../lib/format'
 
 /**
@@ -37,6 +37,8 @@ export function figureParts(f: Pick<FigureDoc, 'value' | 'unit'>): { text: strin
     case 'ratio': return { text: D(f.value).mul(100).toFixed(2) + '%', unit: 'of par' }
     case 'seconds': return { text: formatDuration(f.value), unit: '' }
     case 'share-units': return { text: D(f.value).toFixed(0), unit: 'shares' }
+    // step 21: every dollar figure carries the stand-in label, whole
+    case 'usd': return { text: D(f.value).toFixed(), unit: `USD (${USD_LABEL})` }
   }
 }
 
@@ -81,6 +83,7 @@ function formatFigure(figure: FigureDoc): string {
     case 'ratio': return ratioToPct(figure.value)
     case 'seconds': return formatSeconds(figure.value)
     case 'share-units': return formatShareUnits(figure)
+    case 'usd': return `${D(figure.value).toFixed()} USD (${USD_LABEL})`
   }
 }
 
@@ -158,10 +161,12 @@ function reader(inputs: Inputs) {
   const floor = (x: Decimal) => x.toFixed(0, Decimal.ROUND_DOWN)
   const exp = () => (v('LEVersion').eq(1) ? v('PrincipalOutstanding') : v('TotalValueOutstanding').minus(v('ManagementFeeOutstanding')))
   const cover = () => Decimal.min(v('DebtTotal').times(v('CoverRateMinimum').div(1e5)).times(v('CoverRateLiquidation').div(1e5)).ceil(), exp(), v('CoverAvailable'))
+  // step 21: d drops at the declared reference price, less the haircut, rounded down to a millionth of a dollar
+  const usd = (d: Decimal) => new Decimal(d.div(1e6).times(v('xrpUsd')).times(new Decimal(1).minus(v('fxHaircutBps').div(10000))).toFixed(6, Decimal.ROUND_DOWN))
   const impaired = () => (BigInt(v('Flags').toFixed(0)) & LSF_LOAN_IMPAIRED) !== 0n
   const held = () => value(perUnit(v('AssetsTotal').minus(v('LossUnrealized'))))
   const ifDefault = () => perUnit(v('AssetsTotal').minus(exp().minus(cover())).minus(v('LossUnrealized').minus(impaired() ? exp() : 0)))
-  return { v, perUnit, value, floor, cover, impaired, held, ifDefault }
+  return { v, perUnit, value, floor, cover, impaired, held, ifDefault, usd }
 }
 
 /** One function per key of FORMULAS, with its rounding: a key without one fails `tsc -b`. */
@@ -184,6 +189,13 @@ export const RECOMPUTE: Record<FormulaId, (inputs: Inputs) => string> = {
   lender1to1: (i) => { const r = reader(i); return r.floor(r.v('principalDrops').times(10000).div(r.v('units').div(new Decimal(10).pow(r.v('Scale'))))) },
   cashAvailable: (i) => reader(i).v('AssetsAvailable').toFixed(0),
   lockedUntil: (i) => { const r = reader(i); return r.v('RedemptionDate').minus(r.v('close_time')).toFixed(0) },
+  // step 21: a loan in the test dollar against the same shares
+  collateralHeldUsd: (i) => { const r = reader(i); return r.usd(r.held()).toFixed(6) },
+  maxLoanUsd: (i) => { const r = reader(i); return r.v('maxLtvBps').times(r.usd(r.held())).div(10000).toFixed(6, Decimal.ROUND_DOWN) },
+  requestedUsd: (i) => reader(i).v('principalUsd').toFixed(),
+  ltvHeldUsd: (i) => { const r = reader(i); return r.floor(r.v('principalUsd').times(10000).div(r.usd(r.held()))) },
+  lender1to1Usd: (i) => { const r = reader(i); return r.floor(r.v('principalUsd').times(10000).div(r.usd(r.v('units').div(new Decimal(10).pow(r.v('Scale')))))) },
+  priceAge: (i) => { const r = reader(i); return r.v('close_time').minus(r.v('priceAsOf')).toFixed(0) },
 }
 
 /** MATCH if and only if replaying the figure's formula on its own inputs gives the served value. */

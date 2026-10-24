@@ -1,0 +1,77 @@
+{
+  "label": "desk-usd",
+  "note": "The desk's dollar lending pool (step 21, addendum A11). Its id is usdVaultId, not vaultId: it is read by the desk's code, not served by the information layer.",
+  "asset": {
+    "currency": "USD",
+    "issuer": "rafC9dJGuVa74wdaBgQDGGxVzJgtnePvSd",
+    "label": "test dollar, stands in for RLUSD (Devnet)"
+  },
+  "usdIssuer": "rafC9dJGuVa74wdaBgQDGGxVzJgtnePvSd",
+  "owner": "rPjXveBHGSkMbBPCXXMZhK78S1g4aog2ut",
+  "usdVaultId": "AFF7751B9A79E4B465CA36D8E97026BF47744B7A30FD5EE7CE2A7D9260D08A79",
+  "shareMptId": "00000001DEC1337C145A572519BBC74D9B11B75672191402",
+  "loanBrokerId": "9AE022C241104612624B45B6CB9F7F1E557498164BC6C124708631D266A0A31A",
+  "subscriptionDate": 846192060,
+  "redemptionDate": 846388800,
+  "plannedLoan": {
+    "units": "5000000",
+    "principalUsd": "2.322",
+    "paymentInterval": 86400,
+    "gracePeriod": 3600,
+    "rule": "principalUsd = plannedLoan.principalDrops of demo/desk.json / 10^6 × 1.29 (XRP/USD on 24 Oct 20:19 UTC) × (1 − fxHaircutBps / 10000), toFixed(6) ROUND_DOWN: the XRP plan in dollars, at its LTV while XRP trades near 1.29"
+  },
+  "amounts": {
+    "issuedToDesk": "100",
+    "deposit": "30",
+    "cover": "6",
+    "debtMaximum": "30",
+    "trustLimit": "1000000"
+  },
+  "txs": {
+    "clawback": {
+      "txHash": "1C37DA1256150F440C52B214CDD7F000AC735AB4AC383DE40FE337850D0197C9",
+      "ledgerIndex": 6388339
+    },
+    "defaultRipple": {
+      "txHash": "81C8DE2CD18240E24D63CDB458CDF9D0473B49237BF79AC23B4623851D2E557F",
+      "ledgerIndex": 6388341
+    },
+    "trustDesk": {
+      "txHash": "9F7C17F553BC51DD5A692B4DACD450465D4A735D6F2E64D5C62ACFD4F0D6799C",
+      "ledgerIndex": 6388343
+    },
+    "trustBorrower": {
+      "txHash": "22DF3ED75F91BE7EEA694B508B86FC054B3D61803F165047FC8551CFFAEFFD5D",
+      "ledgerIndex": 6388344
+    },
+    "issue": {
+      "txHash": "C39842160F7E54D322C482DF112EC74B69C6EAE6A339B8764104B534C895293F",
+      "ledgerIndex": 6388346
+    },
+    "vaultCreate": {
+      "txHash": "E464AB8578521C3398808C71B939497A525975BC9F9BD68B2AA4527E735FC0B7",
+      "ledgerIndex": 6388348
+    },
+    "loanBrokerSet": {
+      "txHash": "5A0FFBFA482D4CB642687698EAC026DFA2AD8354B9E74E9EDEEAD2566FD48158",
+      "ledgerIndex": 6388350
+    },
+    "deposit": {
+      "txHash": "D650D147483D6F76614EDE2610AC09C6F56CA11765DDF79725CE280B05AEC2DA",
+      "ledgerIndex": 6388351
+    },
+    "cover": {
+      "txHash": "6D3E5B6BF43520B1038C3A9FEDCF993E6500E04BF9B5C1FE4AF0E53D4FBD415B",
+      "ledgerIndex": 6388353
+    }
+  },
+  "readAt": {
+    "ledgerIndex": 6388418,
+    "ledgerHash": "7E775BAC51485C0B0A5F665F1736D2ED0D113032E76250E0A76662E972727D6A"
+  },
+  "loanSetSimulated": {
+    "engineResult": "temBAD_SIGNER",
+    "ledgerIndex": 6388419
+  },
+  "bakedAt": "2026-10-24T21:16:19.604Z"
+}

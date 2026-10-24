@@ -9,7 +9,7 @@
  *   GET  /api/roles/{runId}/actions/{actionId}          -> the action, public (no Origin, token or kill check)
  */
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Wallet, hashes } from 'xrpl'
 import { num } from '../num.mjs'
@@ -68,12 +68,14 @@ function loadVaults(dir = 'demo') {
 }
 
 const readMandateFile = () => JSON.parse(readFileSync(join('demo', 'mandate-desk-1.json'), 'utf8'))
+/** Step 21: the desk's dollar pool, or null on a server where src/demo/bake-usd.mjs has not run. */
+const readUsdDeskFile = () => (existsSync(join('demo', 'desk-usd.json')) ? JSON.parse(readFileSync(join('demo', 'desk-usd.json'), 'utf8')) : null)
 
 /**
  * @param {{ reader: any, xrpl: any, env: Record<string, string | undefined>, accounts: Record<string, any>,
- *   vaults?: Record<string, any>, mandate?: () => any, submit?: Function, simulate?: Function }} deps
+ *   vaults?: Record<string, any>, mandate?: () => any, usdDesk?: () => any|null, submit?: Function, simulate?: Function }} deps
  */
-export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVaults(), mandate = readMandateFile, submit, simulate }) {
+export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVaults(), mandate = readMandateFile, usdDesk = readUsdDeskFile, submit, simulate }) {
   const allowedOrigins = new Set((env.ALLOWED_WRITE_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean))
   const configured = Boolean(accounts.holder && accounts.borrower && accounts.broker && accounts.deskOwner && Object.keys(vaults).length)
 
@@ -435,7 +437,12 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
       },
       requestLoan: {
         async preview({ run, action: act, body, vault }) {
-          const plan = vaults.desk?.plannedLoan
+          // step 21: asset USD lends the test dollar from the desk's dollar pool, against the same pledge
+          const usd = body.asset === 'USD'
+          const pool = usd ? usdDesk() : null
+          if (usd && !pool?.plannedLoan?.principalUsd) throw new HttpError(503, 'NOT_CONFIGURED', 'The desk lends no test dollar on this server: demo/desk-usd.json is missing.')
+          if (usd && pool.owner !== vault.owner) throw new HttpError(503, 'NOT_CONFIGURED', 'The dollar pool of demo/desk-usd.json is not owned by the desk.')
+          const plan = usd ? pool.plannedLoan : vaults.desk?.plannedLoan
           if (body.units !== plan?.units) throw bad(`units must be the planned loan's ${plan?.units}; nothing was signed`)
           const pledge = run.actions.get(body.pledgeActionId)
           if (!pledge || pledge.action !== 'pledgeEscrow' || pledge.state !== 'validated') {
@@ -452,12 +459,13 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
           act.pledgeActionId = body.pledgeActionId
           act.ticket = pick(body)
           act.escrow = pledge.escrow
+          if (usd) act.asset = 'USD'
           const borrower = accounts.borrower
           const signed = await enqueue(borrower.address, async () => {
             await xrpl.closeTime()
             const tx = await xrpl.client.autofill({
-              TransactionType: 'LoanSet', Account: borrower.address, LoanBrokerID: vault.loanBrokerId, Counterparty: vault.owner,
-              PrincipalRequested: plan.principalDrops, PaymentInterval: plan.paymentInterval, GracePeriod: plan.gracePeriod, PaymentTotal: 1,
+              TransactionType: 'LoanSet', Account: borrower.address, LoanBrokerID: usd ? pool.loanBrokerId : vault.loanBrokerId, Counterparty: vault.owner,
+              PrincipalRequested: usd ? plan.principalUsd : plan.principalDrops, PaymentInterval: plan.paymentInterval, GracePeriod: plan.gracePeriod, PaymentTotal: 1,
               LastLedgerSequence: xrpl.lastLedger + LOANSET_WINDOW,
               Memos: [
                 { Memo: { MemoType: hex('orma.ticket'), MemoData: body.ticketId.toUpperCase() } },
@@ -472,7 +480,9 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
           return {
             preview: {
               engineResult: 'not-simulated (awaiting countersignature)', provenance: 'DECLARED',
-              money: { principalDrops: signed.tx.PrincipalRequested, escrowIndex: pledge.escrow.index, lastLedgerSequence: signed.tx.LastLedgerSequence },
+              money: usd
+                ? { asset: 'USD', loanAsset: pool.asset, principalUsd: signed.tx.PrincipalRequested, escrowIndex: pledge.escrow.index, lastLedgerSequence: signed.tx.LastLedgerSequence }
+                : { principalDrops: signed.tx.PrincipalRequested, escrowIndex: pledge.escrow.index, lastLedgerSequence: signed.tx.LastLedgerSequence },
             },
           }
         },
@@ -499,6 +509,9 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
     if (action === 'requestLoan' && typeof body.pledgeActionId !== 'string') throw bad('pledgeActionId is required')
     // step 20: the one optional parameter of pledgeEscrow, the loan a cure pledge names
     if ('cureLoanId' in body && (action !== 'pledgeEscrow' || !HEX64.test(body.cureLoanId ?? ''))) throw bad('cureLoanId is the 64-hex id of a desk loan, on pledgeEscrow only')
+    // step 21: the one optional parameter of requestLoan, the loan's currency
+    if ('asset' in body && (action !== 'requestLoan' || !['XRP', 'USD'].includes(body.asset))) throw bad('asset is XRP or USD, on requestLoan only')
+    if (body.asset === 'USD' && body.vault !== 'desk') throw bad('a loan in the test dollar is lent by the vault desk')
     if (['approve', 'decline', 'rerequest'].includes(action)) {
       if (typeof body.requestActionId !== 'string') throw bad('requestActionId is required')
       const request = run.actions.get(body.requestActionId)

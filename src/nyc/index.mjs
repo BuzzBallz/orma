@@ -21,6 +21,10 @@ import { marginPolicyHash, MARGIN_FEED_TYPES } from './contracts.mjs'
 import { Reader } from '../poll.mjs'
 import { normaliseVault } from '../xrpl.mjs'
 import { createFeed, CURSOR } from '../feed/derive.mjs'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
+import { SCHEMAS, usdTermsHash } from './contracts.mjs'
+import { readXrpUsd, PriceUnavailableError } from '../fx/price.mjs'
 
 /**
  * @param {{ reader: import('../poll.mjs').Reader, env: NodeJS.ProcessEnv, fetchImpl?: typeof fetch }} deps
@@ -617,10 +621,133 @@ export function createNyc({ reader, env, fetchImpl = fetch }) {
     return true
   }
 
+  // --- step 21: usd-loans ---
+  // A loan in the test dollar, against the same shares of XRP vaults (addendum A11). handleUsdLoans answers
+  // GET /api/tickets when it carries an asset other than XRP: USD, on a pledge only, builds the ticket on the
+  // risk officer's terms (demo/usd-terms-desk-1.json, hashed and anchored) for the dollar plan of
+  // demo/desk-usd.json, at the XRP/USD median of the oracle documents the terms name, read at the ticket's own
+  // ledger (src/fx/price.mjs); no usable price is 409 PRICE_UNAVAILABLE, no figure; any other asset is 400.
+  // Without asset, or with XRP, the request goes on to step 7's route unchanged. It also answers, through step
+  // 7's handler and with that handler's own reads, the desk's plan (which gains the dollar pool and its terms)
+  // and the positions (where a dollar position's margin call names its currency). Reads go through step 7's
+  // cache and its cap of four desk ledger walks.
+  const usdLog = logger('nyc:usd')
+  /** The dollar pool and its terms, checked against the mandate; or, when they cannot be used, why. */
+  function usdLending(m) {
+    let pool
+    try {
+      pool = readDemo('desk-usd', TICKET_DEMO)
+    } catch {
+      return { why: 'The desk lends no test dollar on this server: demo/desk-usd.json is missing.' }
+    }
+    let terms
+    try {
+      terms = readDemo('usd-terms-desk-1', TICKET_DEMO)
+    } catch {
+      return { why: 'demo/usd-terms-desk-1.json is missing: the desk has no declared terms for loans in the test dollar.' }
+    }
+    if (SCHEMAS.usdTerms(terms).length || usdTermsHash(terms) !== terms.hash || terms.mandateHash !== m.hash) {
+      usdLog.error('usd terms refused: they do not hash to their own hash, or name another mandate', { id: terms?.id ?? null, hash: terms?.hash ?? null })
+      return { why: 'demo/usd-terms-desk-1.json does not hash to its own hash, or names another mandate.' }
+    }
+    if (!pool.plannedLoan?.principalUsd || !pool.plannedLoan?.units) return { why: 'demo/desk-usd.json carries no plannedLoan in dollars.' }
+    return { pool, terms }
+  }
+  async function handleUsdLoans(req, res, url, helpers) {
+    if (req.method !== 'GET' && req.method !== 'HEAD') return false
+    if (url.pathname === '/api/desk/positions') {
+      // the margin call of a dollar position names its currency, judged or not
+      const send = (code, body) => helpers.send(code, code === 200 && Array.isArray(body?.positions)
+        ? { ...body, positions: body.positions.map((p) => (p.currency === 'USD' && p.marginCall && !p.marginCall.currency ? { ...p, marginCall: { ...p.marginCall, currency: 'USD' } } : p)) }
+        : body)
+      return handleTicket(req, res, url, { ...helpers, send })
+    }
+    if (/^\/api\/desk\/mandates\/[^/]+$/.test(url.pathname)) {
+      // the desk's plan gains its dollar pool and the terms, when this server lends the test dollar
+      const send = (code, body) => {
+        const usd = code === 200 && body?.deskPlan && typeof body.hash === 'string' && existsSync(join(TICKET_DEMO, 'desk-usd.json')) ? usdLending(body) : null
+        if (!usd?.pool) return helpers.send(code, body)
+        const { units, principalUsd, paymentInterval, gracePeriod } = usd.pool.plannedLoan
+        return helpers.send(code, {
+          ...body,
+          deskPlan: { ...body.deskPlan, usd: { plannedLoan: { units, principalUsd, paymentInterval, gracePeriod }, loanAsset: usd.pool.asset, vaultId: usd.pool.usdVaultId, loanBrokerId: usd.pool.loanBrokerId, terms: usd.terms } },
+        })
+      }
+      return handleTicket(req, res, url, { ...helpers, send })
+    }
+    if (url.pathname !== '/api/tickets') return false
+    const asset = url.searchParams.get('asset')
+    if (asset === null || asset === 'XRP') return false
+    const { send, fail, stamp } = helpers
+    if (asset !== 'USD') {
+      fail(400, 'BAD_REQUEST', 'The asset must be XRP or USD.', false)
+      return true
+    }
+    if (!reader.xrpl || !firstPassDone()) {
+      fail(503, 'WARMING_UP', 'The reader has not finished its first pass over the facilities; retry shortly', true)
+      return true
+    }
+    const q = url.searchParams
+    const shareParam = q.get('share') ?? ''
+    if (!/^[A-Fa-f0-9]{48}$/.test(shareParam)) {
+      fail(400, 'BAD_REQUEST', 'The share must be the 48-hex MPT issuance id of a vault share.', false)
+      return true
+    }
+    const share = shareParam.toUpperCase()
+    if (q.get('op') !== 'pledge') {
+      fail(400, 'BAD_OP', 'A loan in the test dollar is a pledge: asset USD takes op pledge.', false)
+      return true
+    }
+    const units = q.get('units') ?? ''
+    if (!/^[0-9]{1,30}$/.test(units)) {
+      fail(400, 'BAD_UNITS', 'The units must be a whole number of share units, at most 30 digits.', false)
+      return true
+    }
+    const mandateId = q.get('mandate') ?? ''
+    const m = mandateOf(mandateId)
+    if (!m) {
+      fail(404, 'MANDATE_NOT_FOUND', `No mandate ${JSON.stringify(mandateId)} on this server.`, false)
+      return true
+    }
+    if (!reader.getByShareMpt(share)) {
+      const pending = reader.vaultIds?.some((v) => !reader.snapshots.has(v) && !reader.missing?.has(v))
+      if (pending) fail(503, 'WARMING_UP', 'A tracked facility has not been read yet; retry shortly', true)
+      else fail(404, 'SHARE_NOT_TRACKED', `No facility on this service issues the share ${share}.`, false)
+      return true
+    }
+    const usd = usdLending(m)
+    if (usd.why) {
+      fail(503, 'NOT_CONFIGURED', usd.why, true)
+      return true
+    }
+    const L = lastLedger()
+    const keep = typeof L === 'number'
+    try {
+      const ticket = await deskFlight(`ticket:${share}:pledge:${units}:${m.id}:USD:${usd.terms.hash}@${L}`, keep, async () => {
+        const inputs = await deskFlight(`inputs:${share}@${L}`, keep, () => walk(() => readTicketInputs(reader.xrpl, { shareMptId: share, reader })))
+        const price = await readXrpUsd(reader.xrpl, usd.terms, { ledgerIndex: inputs.ledgerIndex, ledgerHash: inputs.ledgerHash, closeTime: inputs.closeTime })
+        return buildTicket(inputs, { op: 'pledge', units, mandate: m, usd: { terms: usd.terms, principalUsd: usd.pool.plannedLoan.principalUsd, price } })
+      })
+      send(200, stamp(ticket))
+    } catch (e) {
+      if (e instanceof BusyError) fail(503, 'BUSY', 'Four desk ledger walks are already running; retry shortly', true)
+      else if (e instanceof PriceUnavailableError) {
+        usdLog.warn('no usable XRP/USD price', { ledgerIndex: e.ledgerIndex, reason: e.message.slice(0, 160) })
+        fail(409, 'PRICE_UNAVAILABLE', e.message, true)
+      }
+      else if (e instanceof SnapshotError) refuseSnapshot(e, fail)
+      else if (e instanceof ShareNotTrackedError) fail(404, 'SHARE_NOT_TRACKED', e.message, false)
+      else if (e instanceof RangeError) fail(400, 'BAD_UNITS', `${e.message.replace(/^./, (c) => c.toUpperCase())}.`, false)
+      else throw e
+    }
+    return true
+  }
+
   return {
     async handle(req, res, url, helpers) {
       if (await handleHarness(req, res, url, helpers)) return true
       if (await handleOrmaMark(req, res, url, helpers)) return true
+      if (await handleUsdLoans(req, res, url, helpers)) return true
       if (await handleTicket(req, res, url, helpers)) return true
       if (await handleDeskSigner(req, res, url, helpers)) return true
       if (await handleUniverse(req, res, url, helpers)) return true

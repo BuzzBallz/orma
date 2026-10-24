@@ -142,6 +142,7 @@ distressed loans and reports par.
 | `MANDATE_NOT_FOUND` | 404 | false | no mandate with that id |
 | `SEQUENCE_PASSED` | 409 | false | the borrower's account sequence has moved past the signed `LoanSet`'s, or the `LoanSet` would expire before inclusion; nothing was submitted; re-request, which signs again |
 | `INCONSISTENT_SNAPSHOT` | 409 | true | the ledger objects read at one ledger do not agree with each other (the vault invariants rippled checks after every transaction); no figure is shown and nothing is signed; retry on the next ledger |
+| `PRICE_UNAVAILABLE` | 409 | true | on a loan in the test dollar: fewer fresh XRP/USD oracle documents than the terms need, sources further apart than they allow, or the ledger's `get_aggregate_price` disagreeing with the median read; no dollar figure is shown and nothing is signed; retry on the next ledger |
 | `BUSY` | 503 | true | on `/api/tickets` and `/api/desk/positions`, four desk ledger walks are already running between them; on `/api/feed/stream`, 100 streams are already open; retry shortly |
 
 Every route that answers `GET` also answers `HEAD`, with the same status and headers and no body, so a
@@ -203,7 +204,7 @@ fields may be added, nothing may ever be renamed, retyped or removed.
 | `GET /api/openapi.json` | the OpenAPI 3.1 description of these routes |
 | `GET /api/mpt/:mptId/status` | is this share attested, not tracked, revoked or stale (200 for any well-formed id) |
 | `GET /api/mark/:mptId` | does a fresh verification of this share, from its MPT id alone, agree with the published reading |
-| `GET /api/tickets` | what are these shares worth as collateral at withdrawal value, and does the mandate allow the operation |
+| `GET /api/tickets` | what are these shares worth as collateral at withdrawal value, and does the mandate allow the operation; with `asset=USD`, a loan in the test dollar against the same shares |
 | `GET /api/desk/mandates/:id` | what the risk officer's mandate allows, with its hash recomputed |
 | `POST /api/roles/:runId/:role/:action` | preview one role action; nothing is signed or submitted |
 | `POST /api/roles/:runId/actions/:actionId/confirm` | queue a previewed action on its account, or, for an approval, have the desk re-read and countersign |
@@ -217,6 +218,18 @@ fields may be added, nothing may ever be renamed, retyped or removed.
 | `GET /api/feed` | which credit events happened after a cursor, and the amendment votes |
 | `GET /api/feed/stream` | the same credit events, pushed as server-sent events, with a heartbeat every 10 s |
 | `GET /api/desk/margin-calls` | which desk loans are under a margin call, by the risk officer's declared policy: the LTV at withdrawal value against the mandate's limit, the shares to add and the cure deadline |
+
+Since step 21 the desk also lends a Devnet test dollar that stands in for RLUSD, issued by a test account of
+the desk with clawback enabled before any trust line, because Ripple publishes no RLUSD issuer on Devnet. Only
+the loan's currency changes: the collateral stays shares of XRP vaults, since an issued asset can be clawed back
+or frozen by its issuer. `GET /api/tickets?...&asset=USD` values the pledged shares at their withdrawal value in
+XRP, at the XRP/USD price of the oracle documents the risk officer's terms name (`demo/usd-terms-desk-1.json`,
+`orma.usdterms/1`, hashed and anchored on the ledger), less a 10 % haircut. The price is the median of the fresh
+XLS-47 documents read at the ticket's ledger, and the ledger's `get_aggregate_price` over the same documents at
+that ledger must agree; on Devnet the documents are relayed from Kraken, Bitstamp and Coinbase by a test account of
+the desk, standing in for the independent oracle providers the terms would name on mainnet. `requestLoan` takes
+`asset: 'USD'`; positions carry `currency`, and a margin call on a dollar loan judges its LTV in dollars. Every
+document and surface that shows the dollar labels it "test dollar, stands in for RLUSD (Devnet)".
 
 The rows from `/api/mpt/:mptId/status` down are the routes of Orma Desk. Every amount in their documents
 is a decimal string and no document carries a grade; their shapes are in `src/openapi.json` and, executable, in
