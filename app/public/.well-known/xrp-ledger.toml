@@ -1,0 +1,8 @@
+[[ACCOUNTS]]
+address = "r91JiCEYCm4CzTF8G5eks1FpzVJxa5FtdL"
+desc = "Orma valuation publisher (XLS-47 Oracle objects)"
+network = "devnet"
+
+[[PRINCIPALS]]
+name = "Orma"
+website = "https://ormaprotocol.com"

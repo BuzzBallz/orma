@@ -11,9 +11,11 @@
  *
  * FOUR INVARIANTS, each of which corrupts data silently rather than erroring:
  *
- *  1. OracleSet is NOT A MERGE. Any (base,quote) pair already on the object but
- *     omitted from the transaction is KEPT with its AssetPrice and Scale STRIPPED.
- *     Publishing one dimension therefore blanks the other five. We always resend all.
+ *  1. Do not rely on OracleSet merging or on it stripping. It was believed to strip a pair
+ *     omitted from the transaction; on Devnet 3.4.1, on 23 Oct 2026, a one-pair OracleSet on an
+ *     Oracle that held six left the other five prices in place (check-oracle, exit 0, rehearsal
+ *     journal D116). That measurement is still to be confirmed. publish() always sends all of
+ *     its pairs, so no code depends on either behaviour.
  *  2. LastUpdateTime must STRICTLY INCREASE. Equal or lower gives
  *     tecINVALID_UPDATE_TIME, burning a fee and a sequence number. One update per
  *     second per object, maximum.
@@ -25,6 +27,7 @@
  *
  * LastUpdateTime is UNIX epoch, not Ripple epoch, and must be close to ledger time.
  */
+import { createHash } from 'node:crypto'
 import { num, Decimal } from './num.mjs'
 import { logger } from './log.mjs'
 
@@ -46,6 +49,13 @@ const SCALE = { NAV: 6, HDL: 4, LIQ: 4, COV: 4, CNC: 4, DDL: 4 }
 /** AssetPrice is a UInt64 rendered as hex. Invariant 4. */
 export const encodePrice = (n) => BigInt(n).toString(16).toUpperCase()
 export const decodePrice = (hex) => BigInt(`0x${hex}`)
+
+/**
+ * The Oracle document id of a vault: the first four bytes of sha256(VaultID) as a big-endian
+ * UInt32. A pure function of the id, so an Oracle is found from its vault alone, whatever the
+ * order the vaults were read in.
+ */
+export const oracleDocId = (vaultId) => createHash('sha256').update(vaultId.toUpperCase()).digest().readUInt32BE(0)
 
 /**
  * Derive a 40-hex currency code from a VaultID so the oracle is keyed to the vault.
@@ -96,25 +106,25 @@ export function buildPriceData(detail) {
 /**
  * Publisher. One instance per publishing account.
  *
- * OracleDocumentIDs come from an in-memory counter in first-publish order (docIdFor), never from a hash of the VaultID:
- * the id is a UInt32 scoped to (account, id) and a collision would silently overwrite
- * another vault's scores.
+ * OracleDocumentIDs are oracleDocId(VaultID). The id is a UInt32 scoped to (account, id), so a
+ * collision would silently overwrite another vault's scores: publish() refuses a second vault
+ * on a document id already taken.
  */
 export class OraclePublisher {
   /**
    * @param {import('xrpl').Client} client
    * @param {import('xrpl').Wallet} wallet
-   * @param {{provider?:string, assetClass?:string, docIds?:Record<string, number>}} [opts]
+   * @param {{provider?:string, assetClass?:string}} [opts]
    */
   constructor(client, wallet, opts = {}) {
     this.client = client
     this.wallet = wallet
-    this.provider = opts.provider ?? 'BuzzBallz Vault Solvency'
+    this.provider = opts.provider ?? process.env.ORACLE_PROVIDER ?? 'Orma'
     this.assetClass = opts.assetClass ?? 'risk'
-    /** @type {Map<string, number>} vaultId -> OracleDocumentID. Pinned ids come first, and new ones start
-     *  above them, so a restart or a retired vault never moves a document to another vault. */
-    this.docIds = new Map(Object.entries(opts.docIds ?? {}))
-    this._nextDocId = Math.max(0, ...this.docIds.values()) + 1
+    /** @type {Map<number, string>} OracleDocumentID -> the vault that published under it */
+    this._docOwners = new Map()
+    /** @type {Map<string, number>} vaultId -> ledger_index of its last validated OracleSet */
+    this._publishedAt = new Map()
     /** last LastUpdateTime per docId, to enforce invariant 2 without a round trip */
     this._lastUpdate = new Map()
     /** one in-flight publish per document, so two ticks cannot race the timestamp */
@@ -122,8 +132,7 @@ export class OraclePublisher {
   }
 
   docIdFor(vaultId) {
-    if (!this.docIds.has(vaultId)) this.docIds.set(vaultId, this._nextDocId++)
-    return this.docIds.get(vaultId)
+    return oracleDocId(vaultId)
   }
 
   /**
@@ -134,6 +143,12 @@ export class OraclePublisher {
   async publish(detail, ledgerCloseUnix) {
     const vaultId = detail.vault.vaultId
     const docId = this.docIdFor(vaultId)
+    const owner = this._docOwners.get(docId)
+    if (owner !== undefined && owner !== vaultId) {
+      log.error('oracle document id collision, not publishing', { vault: vaultId.slice(0, 12), other: owner.slice(0, 12), docId })
+      return { skipped: true, reason: 'collision' }
+    }
+    this._docOwners.set(docId, vaultId)
 
     // Invariant 2, enforced locally: LastUpdateTime must strictly increase, so we
     // bump rather than reject: two publishes on the same ledger close get consecutive
@@ -195,23 +210,30 @@ export class OraclePublisher {
 
       if (result === 'tesSUCCESS') {
         this._lastUpdate.set(docId, lut)
+        this._publishedAt.set(vaultId, r.result.ledger_index)
         log.info('published', { vault: vaultId.slice(0, 12), docId, nav: detail.vault.navCorrect, grade: detail.score.grade })
       } else {
         log.warn('publish failed', { vault: vaultId.slice(0, 12), docId, result })
       }
-      return { ok: result === 'tesSUCCESS', result, hash: r.result.hash, docId, lastUpdateTime: lut }
+      return { ok: result === 'tesSUCCESS', result, hash: r.result.hash, docId, lastUpdateTime: lut, ledgerIndex: r.result.ledger_index }
     } finally {
       this._locks.set(docId, false)
     }
   }
 
-  /** Read back what is actually on the ledger, decoding the hex prices. */
-  async read(vaultId) {
-    const docId = this.docIds.get(vaultId)
-    if (docId === undefined) return null
+  /**
+   * Read back what is actually on the ledger, decoding the hex prices. At `ledgerIndex`, else at
+   * the ledger of this vault's last validated OracleSet, else at the latest validated ledger,
+   * found first and then read by number.
+   */
+  async read(vaultId, ledgerIndex) {
+    const docId = this.docIdFor(vaultId)
+    const at = ledgerIndex ?? this._publishedAt.get(vaultId)
+      ?? (await this.client.request({ command: 'ledger', ledger_index: 'validated' })).result.ledger_index
     const r = await this.client.request({
       command: 'ledger_entry',
       oracle: { account: this.wallet.address, oracle_document_id: docId },
+      ledger_index: at,
     })
     const node = r.result.node
     const dims = (node.PriceDataSeries ?? []).map((e) => {
