@@ -5,8 +5,8 @@
  * Ledger integers are kept as rippled sends them and amounts go through Decimal; flags are tested as
  * BigInt.
  */
-import { num, Decimal, wholeShares } from '../num.mjs'
-import { FORMULAS, canonical, sha256Hex, parseStatement, statementConsistency } from '../nyc/contracts.mjs'
+import { num, Decimal, wholeShares, isoToRipple } from '../num.mjs'
+import { FORMULAS, canonical, sha256Hex, parseStatement, statementConsistency, USD_COLLATERAL_RULE, usdTermsHash } from '../nyc/contracts.mjs'
 
 const LSF_LOAN_DEFAULT = 0x00010000n
 const LSF_LOAN_IMPAIRED = 0x00020000n
@@ -49,6 +49,8 @@ export function evaluateFormula(formulaId, inputs) {
   const impaired = () => flag(v('Flags'), LSF_LOAN_IMPAIRED)
   const held = () => value(perUnit(v('AssetsTotal').minus(v('LossUnrealized'))))
   const ifDefault = () => perUnit(v('AssetsTotal').minus(exp().minus(cover())).minus(v('LossUnrealized').minus(impaired() ? exp() : 0)))
+  // usd(d): d drops at the XRP/USD price of the terms' oracles, less the haircut, rounded down to a millionth of a dollar
+  const usd = (d) => new Decimal(d.div(1e6).times(v('xrpUsd')).times(new Decimal(1).minus(v('fxHaircutBps').div(10000))).toFixed(6, Decimal.ROUND_DOWN))
   switch (formulaId) {
     case 'heldValue':
     case 'claim':
@@ -85,6 +87,25 @@ export function evaluateFormula(formulaId, inputs) {
       return v('AssetsAvailable').toFixed(0)
     case 'lockedUntil':
       return v('RedemptionDate').minus(v('close_time')).toFixed(0)
+    // step 21: the same shares against a loan in the test dollar
+    case 'collateralHeldUsd':
+      return usd(held()).toFixed(6)
+    case 'maxLoanUsd':
+      return v('maxLtvBps').times(usd(held())).div(10000).toFixed(6, Decimal.ROUND_DOWN)
+    case 'requestedUsd':
+      return v('principalUsd').toFixed()
+    case 'ltvHeldUsd': {
+      const h = usd(held())
+      if (h.isZero()) throw new RangeError('these units are worth 0 dollars at the withdrawal value: a pledge worth nothing has no LTV')
+      return floor(v('principalUsd').times(10000).div(h))
+    }
+    case 'lender1to1Usd': {
+      const par = usd(wholeShares(v('units'), v('Scale')))
+      if (par.isZero()) throw new RangeError('no units: no LTV at 1:1')
+      return floor(v('principalUsd').times(10000).div(par))
+    }
+    case 'priceAge':
+      return v('close_time').minus(v('priceAsOf')).toFixed(0)
     default:
       throw new RangeError(`no evaluation for ${formulaId}`)
   }
@@ -92,12 +113,21 @@ export function evaluateFormula(formulaId, inputs) {
 
 /**
  * The ticket of one operation on a share, at the ledger its inputs were read at.
+ *
+ * Step 21 (addendum A11): with `usd`, a pledge against a loan in the test dollar, at `usd.price`, the
+ * XRP/USD price readXrpUsd of src/fx/price.mjs read at the same ledger (REAL: the median of the terms'
+ * oracle documents). Its loan figures are in dollars (maxLoanUsd, requestedUsd, collateralHeldUsd, ltvHeldUsd,
+ * lender1to1Usd, priceAge) in place of maxLoan, requested, ltvHeld and lender1to1; the collateral figures are
+ * the same; the verdicts judge the dollar loan; the ticket carries the usd block. Without `usd`, the ticket
+ * is what it was.
  * @param {Awaited<ReturnType<import('./inputs.mjs').readTicketInputs>>} inputs
- * @param {{ op: 'pledge'|'buy', units: string, mandate: import('../nyc/contracts.mjs').Mandate, principalDrops?: string }} req
+ * @param {{ op: 'pledge'|'buy', units: string, mandate: import('../nyc/contracts.mjs').Mandate, principalDrops?: string,
+ *   usd?: { terms: import('../nyc/contracts.mjs').UsdTerms, principalUsd: string, price: import('../nyc/contracts.mjs').UsdReference, planId?: string } | null }} req
  * @returns {import('../nyc/contracts.mjs').Ticket}
  */
-export function buildTicket(inputs, { op, units, mandate, principalDrops }) {
+export function buildTicket(inputs, { op, units, mandate, principalDrops, usd = null }) {
   if (op !== 'pledge' && op !== 'buy') throw new RangeError(`op ${JSON.stringify(op)} is not pledge or buy`)
+  if (usd && op !== 'pledge') throw new RangeError('a loan in dollars is a pledge: a buy has no loan currency')
   const L = inputs.ledgerIndex
   const H = inputs.ledgerHash
   const share = inputs.issuance.id
@@ -117,6 +147,13 @@ export function buildTicket(inputs, { op, units, mandate, principalDrops }) {
     maxLtvBps: () => input('maxLtvBps', 'Mandate', mandate.id, 'limits.maxLtvBps', mandate.limits.maxLtvBps),
     maxSingleLoanDrops: () => input('maxSingleLoanDrops', 'Mandate', mandate.id, 'limits.maxSingleLoanDrops', mandate.limits.maxSingleLoanDrops),
     close_time: () => input('close_time', 'Ledger', String(L), 'close_time', inputs.closeTime),
+    // step 21: the XRP/USD median of the terms' oracles read at L (REAL), the haircut of the terms (DECLARED), the dollar plan
+    ...(usd && {
+      xrpUsd: () => input('xrpUsd', 'OracleAggregate', usd.terms.id, 'median', usd.price.value),
+      fxHaircutBps: () => input('fxHaircutBps', 'UsdTerms', usd.terms.id, 'fxHaircutBps', usd.terms.fxHaircutBps),
+      priceAsOf: () => input('priceAsOf', 'OracleAggregate', usd.terms.id, 'asOf', isoToRipple(usd.price.asOf)),
+      principalUsd: () => input('principalUsd', 'Plan', usd.planId ?? 'desk-usd', 'plannedLoan.principalUsd', usd.principalUsd),
+    }),
   }
   /** A Figure: the inputs FORMULAS names, its value from evaluateFormula alone. */
   const figure = (formulaId, provenance, meaning, extra = {}) => {
@@ -165,21 +202,32 @@ export function buildTicket(inputs, { op, units, mandate, principalDrops }) {
     }
   }
 
-  if (op === 'pledge') {
+  if (op === 'pledge' && !usd) {
     figures.maxLoan = figure('maxLoan', 'MODELLED', 'The largest loan the mandate allows against these shares')
     figures.requested = figure('requested', 'DECLARED', 'The principal the planned loan asks for')
     figures.ltvHeld = figure('ltvHeld', 'MODELLED', 'LTV at withdrawal value')
     figures.lender1to1 = figure('lender1to1', 'MODELLED', 'The same LTV for a lender at 1:1')
-  } else {
+  } else if (op === 'buy') {
     figures.maxUnits = figure('maxUnits', 'MODELLED', 'The most share units the mandate lets the desk buy, at the withdrawal value')
+  }
+  if (usd) {
+    // step 21: the same shares against dollars, in place of the drops figures of an XRP loan
+    figures.maxLoanUsd = figure('maxLoanUsd', 'MODELLED', 'The largest dollar loan the mandate allows against these shares')
+    figures.requestedUsd = figure('requestedUsd', 'DECLARED', 'The dollars the planned loan asks for')
+    figures.collateralHeldUsd = figure('collateralHeldUsd', 'MODELLED', 'Withdrawal value of these shares in dollars, at the XRP/USD median of the oracles, less the haircut')
+    figures.ltvHeldUsd = figure('ltvHeldUsd', 'MODELLED', 'LTV at withdrawal value, in dollars')
+    figures.lender1to1Usd = figure('lender1to1Usd', 'MODELLED', 'The same dollar LTV for a lender at 1:1')
+    figures.priceAge = figure('priceAge', 'REAL', 'Seconds since the oldest XRP/USD oracle document used was updated')
   }
 
   const worstN2 = figures.n2.reduce((m, e) => Decimal.max(m, num(e.lossAfterCover.value)), new Decimal(0))
   const lockup = num(mandate.limits.maxLockupDays).times(86400)
   const rowsFor = (ltv) => [
-    ...(op === 'pledge'
-      ? [['maxLtvBps', num(ltv), num(mandate.limits.maxLtvBps)], ['maxSingleLoanDrops', num(figures.requested.value), num(mandate.limits.maxSingleLoanDrops)]]
-      : []),
+    ...(op === 'pledge' && usd
+      ? [['maxLtvBps', num(ltv), num(mandate.limits.maxLtvBps)], ['maxSingleLoanUsd', num(figures.requestedUsd.value), num(usd.terms.maxSingleLoanUsd)]]
+      : op === 'pledge'
+        ? [['maxLtvBps', num(ltv), num(mandate.limits.maxLtvBps)], ['maxSingleLoanDrops', num(figures.requested.value), num(mandate.limits.maxSingleLoanDrops)]]
+        : []),
     ['maxN2LossDrops', worstN2, num(mandate.limits.maxN2LossDrops)],
     ['maxLockupDays', num(figures.n3.lockedUntil.value), lockup],
   ]
@@ -191,7 +239,8 @@ export function buildTicket(inputs, { op, units, mandate, principalDrops }) {
   const shareDoc = { mptId: share, vaultId: inputs.vault.id, units, shareScale: ledgerInt(vault.Scale) }
   const ticket = {
     schema: 'orma.ticket/1',
-    ticketId: sha256Hex(canonical({ share: shareDoc, op, units, mandateHash: mandate.hash, ledgerIndex: L, ledgerHash: H })),
+    // step 21: a USD ticket also hashes its loan's asset and the terms; an XRP ticket's id is what it was
+    ticketId: sha256Hex(canonical({ share: shareDoc, op, units, mandateHash: mandate.hash, ledgerIndex: L, ledgerHash: H, ...(usd && { loanAsset: { currency: 'USD', issuer: usd.terms.loanAsset.issuer }, usdTermsHash: usd.terms.hash }) })),
     inputsDigest: inputsDigest(figures),
     asOf: rippleIso(inputs.closeTime),
     ledgerIndex: L,
@@ -207,14 +256,45 @@ export function buildTicket(inputs, { op, units, mandate, principalDrops }) {
       text: ESCROW_POLICY_TEXT,
     },
     statement: statementOf(inputs),
-    verdict: verdictOf(rowsFor(op === 'pledge' ? figures.ltvHeld.value : '0')),
+    verdict: verdictOf(rowsFor(op === 'pledge' ? (usd ? figures.ltvHeldUsd.value : figures.ltvHeld.value) : '0')),
   }
-  if (op === 'pledge') ticket.verdict1to1 = verdictOf(rowsFor(figures.lender1to1.value))
+  if (op === 'pledge') ticket.verdict1to1 = verdictOf(rowsFor(usd ? figures.lender1to1Usd.value : figures.lender1to1.value))
+  if (usd) ticket.usd = usdBlockOf(usd.terms, figures, usd.price)
   return ticket
 }
 
+/** The terms a dollar figure was computed on, as a ticket or a position names them. */
+const termsRefOf = (t) => ({ id: t.id, hash: t.hash, anchorTx: t.anchorTx, fxHaircutBps: t.fxHaircutBps, maxSingleLoanUsd: t.maxSingleLoanUsd })
+
+/** The usd block of a USD ticket: each number the value of its figure, the price as it was read at L. */
+function usdBlockOf(terms, figures, price) {
+  return {
+    loanAsset: { currency: 'USD', issuer: terms.loanAsset.issuer, label: terms.loanAsset.label },
+    requestedUsd: figures.requestedUsd.value,
+    collateralHeldUsd: figures.collateralHeldUsd.value,
+    ltvHeldBps: JSON.parse(figures.ltvHeldUsd.value),
+    reference: price,
+    terms: termsRefOf(terms),
+    collateralRule: USD_COLLATERAL_RULE,
+  }
+}
+
 /**
- * The digest STALE compares: every { object, id, field, value } a figure read, off the ledger header,
+ * usd(d) of FORMULAS: d drops at an XRP/USD price, less the haircut, rounded down to a millionth of a
+ * dollar. The one conversion a position and a margin call make; a ticket's figures make it through
+ * evaluateFormula.
+ * @param {Decimal|string} drops
+ * @param {string} xrpUsd
+ * @param {number|string} fxHaircutBps
+ */
+export function dropsToUsd(drops, xrpUsd, fxHaircutBps) {
+  return new Decimal(num(drops).div(1e6).times(num(xrpUsd)).times(new Decimal(1).minus(num(fxHaircutBps).div(10000))).toFixed(6, Decimal.ROUND_DOWN))
+}
+
+/**
+ * The digest STALE compares: every { object, id, field, value } a figure read, off the ledger header and,
+ * on a dollar ticket (step 21), off the XRP/USD oracle median, which move without the request changing (the
+ * approval judges again at its own ledger, at the price of that ledger),
  * sorted by object, id then field, without duplicates. It does not move when only the ledger does.
  * @param {object} figures
  * @returns {string}
@@ -225,7 +305,7 @@ export function inputsDigest(figures) {
     if (Array.isArray(v)) v.forEach(walk)
     else if (v && typeof v === 'object') {
       if (typeof v.formulaId === 'string' && Array.isArray(v.inputs)) {
-        for (const i of v.inputs) if (i.object !== 'Ledger') seen.set(`${i.object}\u0000${i.id}\u0000${i.field}`, { object: i.object, id: i.id, field: i.field, value: i.value })
+        for (const i of v.inputs) if (i.object !== 'Ledger' && i.object !== 'OracleAggregate') seen.set(`${i.object}\u0000${i.id}\u0000${i.field}`, { object: i.object, id: i.id, field: i.field, value: i.value })
       } else {
         Object.values(v).forEach(walk)
       }
@@ -256,7 +336,17 @@ function statementOf(inputs) {
  * @param {import('../nyc/contracts.mjs').Mandate} mandate
  */
 export function buildPositions(p, mandate) {
+  // step 21: a loan of the desk's dollar broker is valued in dollars, on the terms and the XRP/USD price
+  // readPositions read with it at the same ledger; with no usable terms or price, no dollar figure, and why,
+  // and the XRP positions as they are
+  const termsOk = Boolean(p.usdTerms) && usdTermsHash(p.usdTerms) === p.usdTerms.hash && p.usdTerms.mandateHash === mandate.hash
+  const terms = termsOk ? p.usdTerms : null
+  const price = terms ? p.usdPrice ?? null : null
+  const noPrice = p.usdTerms && !termsOk
+    ? 'demo/usd-terms-desk-1.json does not hash to its own hash, or names another mandate: no dollar position is valued on it.'
+    : p.usdPriceError ?? 'No XRP/USD price was read at this ledger.'
   const positions = p.loans.map((loan) => {
+    const isUsd = loan.currency === 'USD'
     let held = new Decimal(0)
     let worstN2 = null
     let lockedUntil = null
@@ -273,16 +363,32 @@ export function buildPositions(p, mandate) {
       return { escrowId: c.escrowId, shareMptId: c.shareMptId, units: c.units, account, ...(c.cure && { cure: true }) }
     })
     const principal = num(loan.principalOutstanding)
-    const ltvHeldBps = collateral.length && held.gt(0) ? bpsOf(principal.times(10000).div(held)) : null
+    // in dollars for a dollar loan: the collateral's withdrawal value in XRP at the oracles' median, less the haircut
+    const heldUsd = isUsd && price ? dropsToUsd(held, price.value, terms.fxHaircutBps) : null
+    const ltvHeldBps = !collateral.length || !held.gt(0) ? null
+      : isUsd ? (heldUsd?.gt(0) ? bpsOf(principal.times(10000).div(heldUsd)) : null)
+        : bpsOf(principal.times(10000).div(held))
     const usage = [
       { limit: 'maxLtvBps', value: ltvHeldBps === null ? null : String(ltvHeldBps), threshold: String(mandate.limits.maxLtvBps) },
       { limit: 'maxSingleLoanDrops', value: principal.toFixed(0), threshold: String(mandate.limits.maxSingleLoanDrops) },
       { limit: 'maxN2LossDrops', value: worstN2 === null ? null : worstN2.toFixed(0), threshold: String(mandate.limits.maxN2LossDrops) },
       { limit: 'maxLockupDays', value: lockedUntil === null ? null : lockedUntil.toFixed(0), threshold: num(mandate.limits.maxLockupDays).times(86400).toFixed(0) },
     ]
+    // maxSingleLoanUsd of the terms in place of the mandate's maxSingleLoanDrops
+    if (isUsd) usage[1] = { limit: 'maxSingleLoanUsd', value: principal.toFixed(), threshold: terms ? String(terms.maxSingleLoanUsd) : null }
     return {
       loanId: loan.loanId, loanSetTxHash: loan.loanSetTxHash, loanSetLedger: loan.loanSetLedger ?? null, loanSetTicket: loan.loanSetTicket ?? null, vaultId: loan.vaultId, borrower: loan.borrower,
-      principalOutstanding: principal.toFixed(0), collateral, collateralHeldDrops: held.toFixed(0), ltvHeldBps, usage,
+      // the loan's PrincipalOutstanding as the ledger states it, in the loan's asset: drops for XRP, dollars for USD
+      principalOutstanding: isUsd ? principal.toFixed() : principal.toFixed(0), collateral, collateralHeldDrops: held.toFixed(0), ltvHeldBps, usage,
+      currency: isUsd ? 'USD' : 'XRP',
+      ...(isUsd && {
+        usd: {
+          loanAsset: terms ? { currency: 'USD', issuer: terms.loanAsset.issuer, label: terms.loanAsset.label } : p.usdLoanAsset ?? null,
+          principalOutstandingUsd: principal.toFixed(), collateralHeldUsd: heldUsd ? heldUsd.toFixed(6) : null, ltvHeldBps,
+          reference: price, terms: terms ? termsRefOf(terms) : null,
+          ...(!price && { priceUnavailable: noPrice }),
+        },
+      }),
     }
   })
   return { ledgerIndex: p.ledgerIndex, ledgerHash: p.ledgerHash, positions }

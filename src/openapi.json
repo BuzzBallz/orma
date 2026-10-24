@@ -598,6 +598,16 @@
           "schema": {
             "type": "string"
           }
+        },
+        {
+          "name": "asset",
+          "in": "query",
+          "required": false,
+          "description": "Step 21: the loan's currency, XRP (the default) or USD, the Devnet test dollar that stands in for RLUSD; USD with op=pledge only, else 400 BAD_OP; 503 NOT_CONFIGURED when this server lends no test dollar; 409 PRICE_UNAVAILABLE when the oracle documents of the terms give no usable XRP/USD price at the ticket's ledger. The collateral stays shares of XRP vaults.",
+          "schema": {
+            "type": "string",
+            "enum": ["XRP", "USD"]
+          }
         }
       ],
       "get": {
@@ -1534,7 +1544,8 @@
               "share-units",
               "ratio",
               "seconds",
-              "bps"
+              "bps",
+              "usd"
             ]
           },
           "meaning": {
@@ -1559,7 +1570,13 @@
               "lender1to1",
               "cashAvailable",
               "claim",
-              "lockedUntil"
+              "lockedUntil",
+              "collateralHeldUsd",
+              "maxLoanUsd",
+              "requestedUsd",
+              "ltvHeldUsd",
+              "lender1to1Usd",
+              "priceAge"
             ]
           },
           "inputs": {
@@ -1689,6 +1706,11 @@
           "verdict1to1": {
             "type": "object",
             "description": "pledge only."
+          },
+          "usd": {
+            "type": "object",
+            "description": "Step 21, a loan in the test dollar (asset=USD): loanAsset (the label 'test dollar, stands in for RLUSD (Devnet)'), requestedUsd, collateralHeldUsd, ltvHeldBps in dollars, the XRP/USD price (REAL: the median of the terms' fresh XLS-47 oracle documents read at the ticket's ledger, each source with its price and age, the spread, the ledger's get_aggregate_price), the terms and the collateral line. On such a ticket figures carries maxLoanUsd, requestedUsd, collateralHeldUsd, ltvHeldUsd, lender1to1Usd and priceAge instead of maxLoan, requested, ltvHeld and lender1to1.",
+            "required": ["loanAsset", "requestedUsd", "collateralHeldUsd", "ltvHeldBps", "reference", "terms", "collateralRule"]
           }
         }
       },
@@ -1735,7 +1757,8 @@
             "type": "string"
           },
           "deskPlan": {
-            "type": "object"
+            "type": "object",
+            "description": "plannedLoan, plannedBuy and vaults; step 21: usd, the dollar plan, loanAsset, vaultId, loanBrokerId and the UsdTerms, when this server lends the test dollar."
           }
         }
       },
@@ -1933,7 +1956,8 @@
           "positions": {
             "type": "array",
             "items": {
-              "type": "object"
+              "type": "object",
+              "description": "One desk loan. Step 21: currency (XRP or USD); principalOutstanding is the loan's PrincipalOutstanding in its asset (drops for XRP, dollars for USD); a USD position's ltvHeldBps is in dollars, its usage has maxSingleLoanUsd and maxPriceAgeSeconds, and it carries usd."
             }
           }
         }
@@ -2080,6 +2104,56 @@
           }
         }
       },
+      "UsdTerms": {
+        "type": "object",
+        "description": "orma.usdterms/1 (step 21), DECLARED by the risk officer: the test dollar that stands in for RLUSD (Devnet), the XRP/USD price sources the desk trusts (XLS-47 Oracle documents, never a price: the median of the fresh ones, read at the ledger of each decision, the ledger's get_aggregate_price agreeing), the FX haircut and the cap of a dollar loan. hash = sha256 of the canonical terms without hash and anchorTx; anchorTx is an AccountSet of the risk officer whose Memo is orma.usdterms/1:<hash>. On Devnet the documents are relayed from exchange quotes by a test account of the desk; on mainnet the terms name independent oracle providers.",
+        "required": ["schema", "id", "mandateHash", "loanAsset", "xrpUsdOracle", "fxHaircutBps", "maxSingleLoanUsd", "issuedAt", "hash", "anchorTx"],
+        "properties": {
+          "schema": { "const": "orma.usdterms/1" },
+          "id": { "type": "string" },
+          "mandateHash": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+          "loanAsset": {
+            "type": "object",
+            "required": ["currency", "issuer", "label"],
+            "properties": {
+              "currency": { "const": "USD" },
+              "issuer": { "type": "string" },
+              "label": { "const": "test dollar, stands in for RLUSD (Devnet)" }
+            }
+          },
+          "xrpUsdOracle": {
+            "type": "object",
+            "required": ["baseAsset", "quoteAsset", "sources", "aggregation", "minSources", "maxAgeSeconds", "maxSpreadBps", "note"],
+            "properties": {
+              "baseAsset": { "const": "XRP" },
+              "quoteAsset": { "const": "USD" },
+              "sources": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["account", "documentId", "provider", "uri"],
+                  "properties": {
+                    "account": { "type": "string" },
+                    "documentId": { "type": "integer" },
+                    "provider": { "type": "string" },
+                    "uri": { "type": "string" }
+                  }
+                }
+              },
+              "aggregation": { "const": "median" },
+              "minSources": { "type": "integer" },
+              "maxAgeSeconds": { "type": "integer", "maximum": 300 },
+              "maxSpreadBps": { "type": "integer" },
+              "note": { "type": "string" }
+            }
+          },
+          "fxHaircutBps": { "type": "integer" },
+          "maxSingleLoanUsd": { "type": "string" },
+          "issuedAt": { "type": "string" },
+          "hash": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" },
+          "anchorTx": { "type": "string", "pattern": "^[A-Fa-f0-9]{64}$" }
+        }
+      },
       "MarginPolicy": {
         "type": "object",
         "description": "orma.marginpolicy/1 (step 20): the risk officer's declared margin policy, hashed and anchored like the mandate.",
@@ -2115,9 +2189,11 @@
             "properties": {
               "collateralValueDrops": { "type": "string" },
               "sharesToAdd": { "type": "string" },
-              "withdrawalValuePerShare": { "type": "string" }
+              "withdrawalValuePerShare": { "type": "string" },
+              "collateralValueUsd": { "type": "string", "description": "Step 21, on a loan in the test dollar: the dollars missing at the declared reference price, less the haircut." }
             }
           },
+          "currency": { "type": "string", "enum": ["USD"], "description": "Step 21: present on a loan in the test dollar, whose LTV is in dollars." },
           "reasons": { "type": "array", "items": { "type": "string" } },
           "provenance": { "type": "string", "enum": ["DECLARED"] },
           "ledgerIndex": { "type": "integer" },
@@ -2192,7 +2268,8 @@
           "MANDATE_NOT_FOUND",
           "SEQUENCE_PASSED",
           "INCONSISTENT_SNAPSHOT",
-          "BUSY"
+          "BUSY",
+          "PRICE_UNAVAILABLE"
         ]
       }
     }

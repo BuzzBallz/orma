@@ -7,13 +7,14 @@
  *
  * account_tx is the one read that is not pinned to L by a ledger_index: it reads history up to L.
  */
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { decodeAccountID, hashes } from 'xrpl'
 import { num } from '../num.mjs'
 import { normaliseBroker, normaliseVault } from '../xrpl.mjs'
 import { readBrokerHistory, analyseOrdering } from '../history.mjs'
-import { judgeCollateralAccount } from '../nyc/contracts.mjs'
+import { judgeCollateralAccount, SCHEMAS, usdTermsHash } from '../nyc/contracts.mjs'
+import { readXrpUsd, PriceUnavailableError } from '../fx/price.mjs'
 
 /** A paged read follows marker at one ledger for at most this many pages, then refuses. */
 export const MAX_PAGES = 50
@@ -217,6 +218,24 @@ export function readDemo(label, dir = 'demo') {
 }
 
 /**
+ * The desk's lending pools, each with the currency it lends: desk and spare in XRP, and, once
+ * src/demo/bake-usd.mjs has run, desk-usd in the test dollar (step 21), whose vault id is usdVaultId.
+ * @param {string} [dir]
+ * @returns {{ label: string, vaultId: string, loanBrokerId: string, currency: 'XRP'|'USD', loanAsset?: any }[]}
+ */
+export function deskLenders(dir = 'demo') {
+  const out = ['desk', 'spare'].map((label) => {
+    const f = readDemo(label, dir)
+    return { label, vaultId: f.vaultId, loanBrokerId: f.loanBrokerId, currency: /** @type {const} */ ('XRP') }
+  })
+  if (existsSync(join(dir, 'desk-usd.json'))) {
+    const f = readDemo('desk-usd', dir)
+    out.push({ label: 'desk-usd', vaultId: f.usdVaultId, loanBrokerId: f.loanBrokerId, currency: 'USD', loanAsset: f.asset })
+  }
+  return out
+}
+
+/**
  * A 2-of-3 collateral account read at L, and judged: account_info (its signer list and OwnerCount), its
  * MPToken of the pledged share, every object of its directory (the escrows it receives), all at
  * ledger_index L, and, with history, its account_tx up to L for the pledge EscrowCreates it received. A
@@ -298,7 +317,21 @@ export async function readPositions(xrpl, { reader, demoDir = 'demo', at: pinned
   // `at` (step 20): read again at a ledger already read, the margin call's I2 re-read; absent, the validated ledger now
   const at = await ledgerOf(xrpl, pinned)
   const L = at.ledgerIndex
-  const lenders = ['desk', 'spare'].map((label) => readDemo(label, demoDir))
+  // step 21: the dollar pool beside desk and spare, and the terms its loans are valued on
+  const lenders = deskLenders(demoDir)
+  // terms missing or not hashing price no dollar position, and stop nothing else: the XRP positions stand
+  let usdTerms = null
+  let usdTermsError = null
+  const usdLender = lenders.find((f) => f.currency === 'USD') ?? null
+  if (usdLender) {
+    try {
+      const t = readDemo('usd-terms-desk-1', demoDir)
+      if (SCHEMAS.usdTerms(t).length || usdTermsHash(t) !== t.hash) usdTermsError = 'demo/usd-terms-desk-1.json does not hash to its own hash: no dollar position is valued on it.'
+      else usdTerms = t
+    } catch (e) {
+      usdTermsError = `demo/usd-terms-desk-1.json is missing or unreadable (${e.code ?? e.name}): no dollar position is valued.`
+    }
+  }
   const brokerIds = new Set(lenders.map((f) => f.loanBrokerId))
   const loans = []
   for (const f of lenders) {
@@ -306,7 +339,7 @@ export async function readPositions(xrpl, { reader, demoDir = 'demo', at: pinned
     if (!broker) continue
     for (let seq = 1; seq < ledgerInt(broker.LoanSequence); seq++) {
       const loan = await entryAt(xrpl, { loan: { loan_broker_id: f.loanBrokerId, loan_seq: seq } }, L)
-      if (loan) loans.push({ loan, vaultId: f.vaultId })
+      if (loan) loans.push({ loan, vaultId: f.vaultId, currency: f.currency })
     }
   }
   // the LoanSets that created the desk's loans, and the escrow each one names
@@ -339,7 +372,7 @@ export async function readPositions(xrpl, { reader, demoDir = 'demo', at: pinned
     }
   }
   const out = []
-  for (const { loan, vaultId } of loans) {
+  for (const { loan, vaultId, currency } of loans) {
     const made = createdBy.get(String(loan.index).toUpperCase()) ?? null
     const collateral = []
     if (made?.escrowIndex) {
@@ -363,8 +396,23 @@ export async function readPositions(xrpl, { reader, demoDir = 'demo', at: pinned
     }
     out.push({
       loanId: loan.index, loanSetTxHash: made?.txHash ?? null, loanSetLedger: made?.ledgerIndex ?? null, loanSetTicket: made ? made.ticketed : null, vaultId, borrower: loan.Borrower,
-      principalOutstanding: num(loan.PrincipalOutstanding).toFixed(0), collateral,
+      // drops of XRP, or dollars of the test dollar, as the ledger states them
+      principalOutstanding: currency === 'USD' ? num(loan.PrincipalOutstanding).toFixed() : num(loan.PrincipalOutstanding).toFixed(0), collateral, currency,
     })
   }
-  return { ledgerIndex: L, ledgerHash: at.ledgerHash, closeTime: at.closeTime, loans: out }
+  // step 21: the XRP/USD price of the terms' oracles at the same L; none usable is said, never guessed, and a
+  // failed price read prices no dollar position without taking the XRP ones down
+  let usdPrice = null
+  let usdPriceError = usdTermsError
+  if (usdTerms && out.some((l) => l.currency === 'USD')) {
+    try {
+      usdPrice = await readXrpUsd(xrpl, usdTerms, at)
+    } catch (e) {
+      usdPriceError = e instanceof PriceUnavailableError ? e.message : `The XRP/USD price could not be read at ledger ${L} (${String(e?.message ?? e).slice(0, 120)}).`
+    }
+  }
+  return {
+    ledgerIndex: L, ledgerHash: at.ledgerHash, closeTime: at.closeTime, loans: out,
+    ...(usdLender && { usdTerms, usdPrice, usdPriceError, usdLoanAsset: usdLender.loanAsset ?? null }),
+  }
 }
