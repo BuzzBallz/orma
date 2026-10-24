@@ -276,7 +276,9 @@ async function offline() {
     eq('the XRP pledge ticket, byte for byte', sha256Hex(canonical(buildTicket(inputs, { op: 'pledge', units: c.units, mandate, principalDrops: c.principalDrops }))), '4235973687f5fb7d924add34002391d37092b02c2f28a0993e0eda7e389dda1a')
     eq('the XRP buy ticket, byte for byte', sha256Hex(canonical(buildTicket(inputs, { op: 'buy', units: c.units, mandate }))), 'ef17fab3ba87d64cf4fad1f18342ea0f2274e2670eab73cf11472d0ddf1c9255')
     const p = buildPositions(positionsDoc('XRP', c.principalDrops), mandate)
-    const { currency, ...rest } = p.positions[0]
+    // the two fields of the Harbor-1 demo fix (the LoanSet's ledger and ticket Memo) are not what this pin guards
+    const { currency, loanSetLedger: _ledger, loanSetTicket: _ticket, ...rest } = p.positions[0]
+    void _ledger; void _ticket
     eq('an XRP position: what it was, plus currency XRP', [currency, sha256Hex(canonical({ ...p, positions: [rest] }))], ['XRP', 'ef1a3ce518b613d33ebe51c6e87dc7b2f0245d1139611a0249655c409e5917f6'])
     const x = buildTicket(inputs, { op: 'pledge', units: c.units, mandate, principalDrops: c.principalDrops })
     eq('an XRP ticket carries no usd and no dollar figure', ['usd' in x, USD_FIGURES.some((k) => k in x.figures)], [false, false])
