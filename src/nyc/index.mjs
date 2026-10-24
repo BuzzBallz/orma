@@ -6,6 +6,10 @@ import { accessSync, constants } from 'node:fs'
 import { Xrpl, DEVNET_WS } from '../xrpl.mjs'
 import { attestationStatus } from '../nav.mjs'
 import { verify } from '../mark/verify.mjs'
+import { readFileSync } from 'node:fs'
+import { Wallet } from 'xrpl'
+import { createRoleEngine } from '../roles/engine.mjs'
+import { logger } from '../log.mjs'
 
 /**
  * @param {{ reader: import('../poll.mjs').Reader, env: NodeJS.ProcessEnv }} deps
@@ -14,23 +18,45 @@ export function createNyc({ reader, env }) {
   const missing = ['ROLES_FILE', 'DESK_SEED', 'ALLOWED_WRITE_ORIGINS', 'PUBLISH_SEED'].filter((k) => !env[k])
 
   // --- step 2: harness ---
-  // A stub: writes answer 503 until the roles file and the desk seed exist. Step 8 replaces the body.
-  const rolesReadable = (() => {
-    try {
-      accessSync(env.ROLES_FILE, constants.R_OK)
-      return true
-    } catch {
-      return false
+  // --- step 8: role-engine ---
+  // The body of the step 2 stub, replaced (the one exception of code rule 10): /api/roles/ goes to the
+  // role engine, which answers its own 503 NOT_CONFIGURED after the Origin check.
+  function roleWallets() {
+    const wallets = {}
+    if (env.ROLES_FILE) {
+      try {
+        for (const [role, a] of Object.entries(JSON.parse(readFileSync(env.ROLES_FILE, 'utf8')).accounts ?? {})) wallets[role] = Wallet.fromSeed(a.seed)
+      } catch (e) {
+        // Never the error's message: a JSON or seed error may quote the file.
+        logger('roles').warn('roles file unreadable, writes not configured', { err: e.code ?? e.name })
+        return {}
+      }
     }
-  })()
-  async function handleHarness(req, res, url, { fail }) {
-    if (!url.pathname.startsWith('/api/roles/')) return false
-    if (req.method === 'POST' && !(rolesReadable && env.DESK_SEED)) {
-      fail(503, 'NOT_CONFIGURED', 'Writes are not configured on this server: ROLES_FILE and DESK_SEED are required', false)
-    } else {
-      fail(404, 'NOT_FOUND', `No route ${req.method} ${url.pathname}`, false)
+    // The desk owner signs only with DESK_SEED: the roles file alone never configures the desk.
+    delete wallets.deskOwner
+    if (env.DESK_SEED) {
+      try {
+        wallets.deskOwner = Wallet.fromSeed(env.DESK_SEED)
+      } catch (e) {
+        logger('roles').warn('DESK_SEED unusable, writes not configured', { err: e.name })
+      }
     }
-    return true
+    return wallets
+  }
+  const roleEngine = createRoleEngine({ reader, xrpl: new Xrpl(env.XRPL_WS ?? DEVNET_WS), env, accounts: roleWallets() })
+  const demoActions = {
+    run: async () => roleEngine.newRun(),
+    kill: async () => {
+      roleEngine.kill()
+      return {}
+    },
+    unkill: async () => {
+      roleEngine.unkill()
+      return {}
+    },
+  }
+  async function handleHarness(req, res, url, helpers) {
+    return roleEngine.handle(req, res, url, helpers)
   }
 
   // --- step 6: orma-mark ---
@@ -91,6 +117,6 @@ export function createNyc({ reader, env }) {
       return false
     },
     missing,
-    demoActions: {},
+    demoActions,
   }
 }

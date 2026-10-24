@@ -68,15 +68,12 @@ function parseArgs(argv) {
 function vaultsFromDemoDir() {
   const vaults = []
   const labels = {}
-  const docIds = {}
-  if (!existsSync('demo')) return { vaults, labels, docIds }
+  if (!existsSync('demo')) return { vaults, labels }
   for (const f of readdirSync('demo').filter((n) => n.endsWith('.json')).sort()) {
     try {
       const j = JSON.parse(readFileSync(join('demo', f), 'utf8'))
       if (typeof j.vaultId !== 'string' || !/^[A-Fa-f0-9]{64}$/.test(j.vaultId)) continue
       const id = j.vaultId.toUpperCase()
-      // A retired facility keeps its oracle document id reserved, so no other vault takes it over.
-      if (Number.isInteger(j.oracleDocumentId)) docIds[id] = j.oracleDocumentId
       if (j.retired) continue
       // Not every capture in demo/ is a facility bake. The oracle aggregate names the
       // vault it is about, which made the startup line claim five facilities for four
@@ -86,7 +83,7 @@ function vaultsFromDemoDir() {
       if (j.label) labels[id] = j.label
     } catch { /* a malformed capture must not stop the reader from starting */ }
   }
-  return { vaults, labels, docIds }
+  return { vaults, labels }
 }
 
 const cli = parseArgs(process.argv)
@@ -127,7 +124,7 @@ if (process.env.PUBLISH_SEED || process.env.PUBLISH === 'faucet') {
     const wallet = process.env.PUBLISH_SEED
       ? Wallet.fromSeed(process.env.PUBLISH_SEED)
       : (await pubClient.fundWallet()).wallet
-    const publisher = new OraclePublisher(pubClient, wallet, { docIds: baked.docIds })
+    const publisher = new OraclePublisher(pubClient, wallet)
     publishLoop = new PublishLoop(reader, publisher)
     publishLoop.attach()
     log.info('publishing enabled', { publisher: wallet.address, funded: !process.env.PUBLISH_SEED })
@@ -162,6 +159,7 @@ if (nyc.missing.length) log.error('nyc config incomplete', { missing: nyc.missin
 
 const api = createApi(reader, {
   nyc,
+  demo: nyc.demoActions,
   source: 'devnet',
   watchAccounts,
   raterAddress,
