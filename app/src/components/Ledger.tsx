@@ -268,7 +268,7 @@ export function sharedPrefix(text: string, others: string[]): string {
 
 const FRIENDLY: Record<string, string> = {
   AssetsTotal: 'Total assets', LossUnrealized: 'Recognised loss', AssetsAvailable: 'Cash available', OutstandingAmount: 'Shares outstanding', Scale: 'Share scale',
-  units: 'Shares in this ticket', DebtTotal: "Broker's total debt", CoverRateMinimum: 'Minimum cover rate', CoverRateLiquidation: 'Liquidation cover rate',
+  units: 'Shares in this ticket', DebtTotal: "Broker's total debt", CoverRateMinimum: 'Minimum cover rate', CoverRateLiquidation: 'Share of the cover drawn on a default',
   CoverAvailable: 'First-loss cover available', LEVersion: 'Loan engine version', PrincipalOutstanding: 'Loan principal outstanding',
   TotalValueOutstanding: 'Loan total value outstanding', ManagementFeeOutstanding: 'Management fee outstanding', Flags: 'Loan flags',
   RedemptionDate: 'Redemption date', close_time: 'Ledger close time', maxLtvBps: 'Mandate: max LTV', maxSingleLoanDrops: 'Mandate: max single loan', principalDrops: 'Planned loan principal',
