@@ -4,6 +4,7 @@ import { Check, Clock, X } from 'lucide-react'
 import { useFlash } from '../lib/useFlash'
 import { USD_LABEL, type ChangeRow, type Figure as FigureDoc, type FormulaId, type Provenance } from '../lib/types'
 import { dropsToXrp, ratioToPct } from '../lib/format'
+import { durationText } from '../lib/duration'
 
 /**
  * The institutional register's kit. Every figure on an NYC surface goes through <Figure>, every panel
@@ -27,7 +28,8 @@ function formatDuration(seconds: string): string {
   const s = D(seconds)
   const days = s.div(86400).floor()
   const hours = s.minus(days.mul(86400)).div(3600).floor()
-  return days.isZero() ? `${hours.toFixed(0)} h` : `${days.toFixed(0)} days ${hours.toFixed(0)} h`
+  // under a day, to the minute or the second (a loan 1000 s past due is not "0 h")
+  return days.isZero() ? durationText(seconds) : `${days.toFixed(0)} days ${hours.toFixed(0)} h`
 }
 
 export function figureParts(f: Pick<FigureDoc, 'value' | 'unit'>): { text: string; unit: string } {
@@ -61,7 +63,7 @@ function formatSeconds(seconds: string): string {
   const days = s.div(86400).floor()
   const hours = s.mod(86400).div(3600).floor()
   if (days.gt(0)) return `${days.toFixed(0)} days ${hours.toFixed(0)} h`
-  return `${hours.toFixed(0)} h ${s.mod(3600).div(60).floor().toFixed(0)} min`
+  return durationText(s.toFixed(0))
 }
 
 /** Share units at the vault's scale, with their XRP equivalent at the withdrawal value when the inputs carry it. */
@@ -196,6 +198,8 @@ export const RECOMPUTE: Record<FormulaId, (inputs: Inputs) => string> = {
   ltvHeldUsd: (i) => { const r = reader(i); return r.floor(r.v('principalUsd').times(10000).div(r.usd(r.held()))) },
   lender1to1Usd: (i) => { const r = reader(i); return r.floor(r.v('principalUsd').times(10000).div(r.usd(r.v('units').div(new Decimal(10).pow(r.v('Scale')))))) },
   priceAge: (i) => { const r = reader(i); return r.v('close_time').minus(r.v('priceAsOf')).toFixed(0) },
+  // step 22: how long a loan is past its due date
+  pastDue: (i) => { const r = reader(i); return Decimal.max(0, r.v('close_time').minus(r.v('NextPaymentDueDate'))).toFixed(0) },
 }
 
 /** MATCH if and only if replaying the figure's formula on its own inputs gives the served value. */

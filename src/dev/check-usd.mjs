@@ -272,9 +272,15 @@ async function offline() {
 
   console.log('the XRP path, unchanged')
   {
-    // hashes of the XRP ticket and positions as buildTicket and buildPositions gave them before step 21
-    eq('the XRP pledge ticket, byte for byte', sha256Hex(canonical(buildTicket(inputs, { op: 'pledge', units: c.units, mandate, principalDrops: c.principalDrops }))), '4235973687f5fb7d924add34002391d37092b02c2f28a0993e0eda7e389dda1a')
-    eq('the XRP buy ticket, byte for byte', sha256Hex(canonical(buildTicket(inputs, { op: 'buy', units: c.units, mandate }))), 'ef17fab3ba87d64cf4fad1f18342ea0f2274e2670eab73cf11472d0ddf1c9255')
+    // hashes of the XRP ticket and positions as buildTicket and buildPositions gave them before step 21; step 22
+    // (addendum A12) adds the payment record to every ticket, which these goldens leave out
+    const before22 = (t) => {
+      const { payments: _p, paymentSummary: _s, ...figures } = t.figures
+      void [_p, _s]
+      return { ...t, figures }
+    }
+    eq('the XRP pledge ticket, byte for byte (without the payment record of step 22)', sha256Hex(canonical(before22(buildTicket(inputs, { op: 'pledge', units: c.units, mandate, principalDrops: c.principalDrops })))), '4235973687f5fb7d924add34002391d37092b02c2f28a0993e0eda7e389dda1a')
+    eq('the XRP buy ticket, byte for byte (without the payment record of step 22)', sha256Hex(canonical(before22(buildTicket(inputs, { op: 'buy', units: c.units, mandate })))), 'ef17fab3ba87d64cf4fad1f18342ea0f2274e2670eab73cf11472d0ddf1c9255')
     const p = buildPositions(positionsDoc('XRP', c.principalDrops), mandate)
     const { currency, ...rest } = p.positions[0]
     eq('an XRP position: what it was, plus currency XRP', [currency, sha256Hex(canonical({ ...p, positions: [rest] }))], ['XRP', 'ef1a3ce518b613d33ebe51c6e87dc7b2f0245d1139611a0249655c409e5917f6'])

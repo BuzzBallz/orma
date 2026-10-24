@@ -336,6 +336,7 @@ export type FormulaId =
   | 'heldValue' | 'naiveValue' | 'n1Overpayment' | 'cover' | 'heldPerUnitIfDefault' | 'lossAfterCover' | 'maxLoan'
   | 'maxUnits' | 'requested' | 'ltvHeld' | 'lender1to1' | 'cashAvailable' | 'claim' | 'lockedUntil'
   | 'collateralHeldUsd' | 'maxLoanUsd' | 'requestedUsd' | 'ltvHeldUsd' | 'lender1to1Usd' | 'priceAge'
+  | 'pastDue'
 
 export interface Figure {
   value: string
@@ -347,6 +348,17 @@ export interface Figure {
   provenance: Provenance
 }
 
+/** Step 22 (addendum A12): a loan's payment record, read at the ticket's ledger; a defaulted loan has no due date. */
+export type PaymentStatus = 'current' | 'due_soon' | 'overdue' | 'defaultable' | 'impaired' | 'defaulted'
+export interface PaymentEntry {
+  loanId: string; label: string; status: PaymentStatus
+  nextPaymentDueAt: string | null; graceEndsAt: string | null; pastDue: Figure | null; paymentsMissed: number | null
+  paymentRemaining: number; paymentIntervalSeconds: number; recognitionLagSeconds: string | null
+}
+export interface PaymentSummary {
+  loans: number; pastDue: number; pastGrace: number; impaired: number; defaulted: number
+  worstLoanId: string | null; worstPastDueSeconds: string
+}
 export interface N2Entry { loanId: string; label: string; scenario: string; lossAfterCover: Figure; cover: Figure; heldPerUnitIfDefault: Figure; alreadyInHeld: boolean }
 export interface Verdict { status: 'PASS' | 'BREACHED'; breaches: { limit: string; value: string; threshold: string }[] }
 
@@ -361,6 +373,8 @@ export interface Ticket {
     maxLoan?: Figure; maxUnits?: Figure; requested?: Figure; ltvHeld?: Figure; lender1to1?: Figure
     // step 21: on a USD pledge ticket, in place of maxLoan, requested, ltvHeld and lender1to1
     maxLoanUsd?: Figure; requestedUsd?: Figure; collateralHeldUsd?: Figure; ltvHeldUsd?: Figure; lender1to1Usd?: Figure; priceAge?: Figure
+    // step 22: the payment record of every loan of the vault not closed
+    payments: PaymentEntry[]; paymentSummary: PaymentSummary
   }
   conduct: { recognitionLagSeconds: string[]; defaultsWithoutImpairment: number; coverOrderCostDrops: string }
   escrowPolicy: { finishAfter: string; cancelAfter: string; text: string }

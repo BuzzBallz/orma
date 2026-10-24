@@ -8,7 +8,7 @@
 /**
  * @typedef {'REAL'|'DECLARED'|'MODELLED'|'SIMULATED'} Provenance
  * @typedef {{ name: string, value: string, object: string, field: string, id: string, ledgerIndex: number, ledgerHash: string }} FigureInput
- * @typedef {'heldValue'|'naiveValue'|'n1Overpayment'|'cover'|'heldPerUnitIfDefault'|'lossAfterCover'|'maxLoan'|'maxUnits'|'requested'|'ltvHeld'|'lender1to1'|'cashAvailable'|'claim'|'lockedUntil'|'collateralHeldUsd'|'maxLoanUsd'|'requestedUsd'|'ltvHeldUsd'|'lender1to1Usd'|'priceAge'} FormulaId
+ * @typedef {'heldValue'|'naiveValue'|'n1Overpayment'|'cover'|'heldPerUnitIfDefault'|'lossAfterCover'|'maxLoan'|'maxUnits'|'requested'|'ltvHeld'|'lender1to1'|'cashAvailable'|'claim'|'lockedUntil'|'collateralHeldUsd'|'maxLoanUsd'|'requestedUsd'|'ltvHeldUsd'|'lender1to1Usd'|'priceAge'|'pastDue'} FormulaId
  * @typedef {{ value: string, unit: 'drops'|'share-units'|'ratio'|'seconds'|'bps'|'usd', meaning: string, formula: string, formulaId: FormulaId, inputs: FigureInput[], provenance: Provenance }} Figure
  * @typedef {{ loanId: string, label: string, scenario: string, lossAfterCover: Figure, cover: Figure, heldPerUnitIfDefault: Figure, alreadyInHeld: boolean }} N2Entry
  * @typedef {{
@@ -19,7 +19,8 @@
  *   figures: { heldValue: Figure, naiveValue: Figure, n1Overpayment: Figure, n2: N2Entry[],
  *              n3: { lockedUntil: Figure, redemptionAt: string, cashAvailable: Figure, claim: Figure },
  *              maxLoan?: Figure, maxUnits?: Figure, requested?: Figure, ltvHeld?: Figure, lender1to1?: Figure,
- *              maxLoanUsd?: Figure, requestedUsd?: Figure, collateralHeldUsd?: Figure, ltvHeldUsd?: Figure, lender1to1Usd?: Figure, priceAge?: Figure },
+ *              maxLoanUsd?: Figure, requestedUsd?: Figure, collateralHeldUsd?: Figure, ltvHeldUsd?: Figure, lender1to1Usd?: Figure, priceAge?: Figure,
+ *              payments: PaymentEntry[], paymentSummary: PaymentSummary },
  *   conduct: { recognitionLagSeconds: string[], defaultsWithoutImpairment: number, coverOrderCostDrops: string },
  *   escrowPolicy: { finishAfter: string, cancelAfter: string, text: string },
  *   statement: Statement|null,
@@ -199,7 +200,25 @@ export const FORMULAS = deepFreeze({
   ltvHeldUsd: { unit: 'bps', inputs: [...USD_HELD_INPUTS, 'principalUsd'], rounding: `${PER_UNIT}; ${VALUE}; ${USD}; floor: toFixed(0), ROUND_DOWN`, text: 'floor(principalUsd × 10000 / usd(heldValue))' },
   lender1to1Usd: { unit: 'bps', inputs: ['principalUsd', 'units', 'Scale', 'xrpUsd', 'fxHaircutBps'], rounding: `${USD}; floor: toFixed(0), ROUND_DOWN`, text: 'floor(principalUsd × 10000 / usd(units / 10^Scale))' },
   priceAge: { unit: 'seconds', inputs: ['close_time', 'priceAsOf'], rounding: 'exact (two Ripple times)', text: 'close_time − priceAsOf' },
+  // step 22 (addendum A12): how long a loan is past its due date, on the ledger the ticket reads
+  pastDue: { unit: 'seconds', inputs: ['NextPaymentDueDate', 'close_time'], rounding: 'exact (two Ripple times)', text: 'max(0, close_time − NextPaymentDueDate)' },
 })
+
+/**
+ * The payment record of a ticket (step 22, addendum A12): one entry per loan of the vault that is not closed.
+ * @typedef {{
+ *   loanId: string, label: string,
+ *   status: 'current'|'due_soon'|'overdue'|'defaultable'|'impaired'|'defaulted',
+ *   nextPaymentDueAt: string|null, graceEndsAt: string|null, pastDue: Figure|null, paymentsMissed: number|null,
+ *   paymentRemaining: number, paymentIntervalSeconds: number, recognitionLagSeconds: string|null
+ * }} PaymentEntry
+ * @typedef {{
+ *   loans: number, pastDue: number, pastGrace: number, impaired: number, defaulted: number,
+ *   worstLoanId: string|null, worstPastDueSeconds: string
+ * }} PaymentSummary
+ */
+/** The reader's ladder of a loan that is not closed (normaliseLoan of src/xrpl.mjs). */
+export const PAYMENT_STATUSES = Object.freeze(['current', 'due_soon', 'overdue', 'defaultable', 'impaired', 'defaulted'])
 
 /**
  * Keys whose value is an amount: a decimal string (or, for moneyEffect, null or { value, unit }),
@@ -804,6 +823,7 @@ function validateTicket(doc) {
       for (const k of ['lockedUntil', 'cashAvailable', 'claim']) figureInto(out, f.n3[k], `figures.n3.${k}`, L)
       r.str(f.n3.redemptionAt, 'figures.n3.redemptionAt')
     }
+    paymentsInto(out, f, L) // step 22
     if (t.op === 'pledge' && 'usd' in t) {
       // step 21: a loan in the test dollar, its loan figures in dollars
       for (const k of USD_FIGURES) figureInto(out, f[k], `figures.${k}`, L)
@@ -834,6 +854,64 @@ function validateTicket(doc) {
     else usdInto(out, t.usd, 'usd', f, L)
   }
   return out
+}
+
+/**
+ * The payment record of a ticket (step 22): each entry on the reader's ladder, a defaulted loan with no due date,
+ * a past-due figure of its own formula read at the ticket's ledger, the missed payments 0 exactly when nothing
+ * is past due, every default scenario of n2 one of the entries under the same label, and the summary counting
+ * the entries.
+ */
+function paymentsInto(/** @type {string[]} */ out, /** @type {any} */ f, /** @type {{ ledgerIndex: number, ledgerHash: string }|null} */ L) {
+  const r = rules(out)
+  if (!r.arr(f.payments, 'figures.payments')) return
+  const byId = new Map()
+  f.payments.forEach((/** @type {any} */ e, /** @type {number} */ i) => {
+    const q = `figures.payments[${i}]`
+    if (!r.obj(e, q)) return
+    hex64(r, e.loanId, `${q}.loanId`)
+    r.str(e.label, `${q}.label`)
+    r.oneOf(e.status, PAYMENT_STATUSES, `${q}.status`)
+    r.int(e.paymentRemaining, `${q}.paymentRemaining`)
+    r.int(e.paymentIntervalSeconds, `${q}.paymentIntervalSeconds`)
+    if (e.recognitionLagSeconds !== null) r.dec(e.recognitionLagSeconds, `${q}.recognitionLagSeconds`)
+    if (e.recognitionLagSeconds !== null && e.status !== 'impaired') r.fail(`${q}.recognitionLagSeconds`, 'is set on a loan that is not impaired')
+    if (e.status === 'defaulted') {
+      for (const k of ['nextPaymentDueAt', 'graceEndsAt', 'pastDue', 'paymentsMissed']) if (e[k] !== null) r.fail(`${q}.${k}`, 'is not null on a defaulted loan (rippled deletes its NextPaymentDueDate)')
+    } else {
+      r.re(e.nextPaymentDueAt, ISO, `${q}.nextPaymentDueAt`, 'an ISO 8601 UTC time')
+      r.re(e.graceEndsAt, ISO, `${q}.graceEndsAt`, 'an ISO 8601 UTC time')
+      if (ISO.test(e.nextPaymentDueAt ?? '') && ISO.test(e.graceEndsAt ?? '') && Date.parse(e.graceEndsAt) < Date.parse(e.nextPaymentDueAt)) r.fail(`${q}.graceEndsAt`, 'is before nextPaymentDueAt')
+      figureInto(out, e.pastDue, `${q}.pastDue`, L)
+      if (e.pastDue && e.pastDue.formulaId !== 'pastDue') r.fail(`${q}.pastDue.formulaId`, 'is not pastDue')
+      if (e.pastDue && e.pastDue.provenance !== 'REAL') r.fail(`${q}.pastDue.provenance`, 'is not REAL')
+      r.int(e.paymentsMissed, `${q}.paymentsMissed`)
+      if (Number.isSafeInteger(e.paymentsMissed) && Number.isSafeInteger(e.paymentRemaining) && e.paymentsMissed > e.paymentRemaining) r.fail(`${q}.paymentsMissed`, 'is more than the payments remaining')
+      if (Number.isSafeInteger(e.paymentsMissed) && DEC.test(e.pastDue?.value ?? '')) {
+        if (num(e.pastDue.value).isZero() && e.paymentsMissed !== 0) r.fail(`${q}.paymentsMissed`, 'is not 0 although nothing is past due')
+        if (num(e.pastDue.value).gt(0) && e.paymentRemaining > 0 && e.paymentsMissed < 1) r.fail(`${q}.paymentsMissed`, 'is 0 although a payment is past due')
+      }
+    }
+    if (byId.has(e.loanId)) r.fail(`${q}.loanId`, 'appears twice')
+    byId.set(e.loanId, e)
+  })
+  for (const [i, n] of (Array.isArray(f.n2) ? f.n2 : []).entries()) {
+    const e = byId.get(n?.loanId)
+    if (!e) r.fail(`figures.n2[${i}].loanId`, 'is not one of figures.payments')
+    else if (e.label !== n.label) r.fail(`figures.n2[${i}].label`, 'is not the label of its payment entry')
+  }
+  const s = f.paymentSummary
+  if (!r.obj(s, 'figures.paymentSummary')) return
+  for (const k of ['loans', 'pastDue', 'pastGrace', 'impaired', 'defaulted']) r.int(s[k], `figures.paymentSummary.${k}`)
+  r.dec(s.worstPastDueSeconds, 'figures.paymentSummary.worstPastDueSeconds')
+  const entries = f.payments.filter((/** @type {any} */ e) => isPlainObject(e))
+  const late = entries.filter((/** @type {any} */ e) => DEC.test(e.pastDue?.value ?? '') && num(e.pastDue.value).gt(0))
+  const want = { loans: entries.length, pastDue: late.length, impaired: entries.filter((/** @type {any} */ e) => e.status === 'impaired').length, defaulted: entries.filter((/** @type {any} */ e) => e.status === 'defaulted').length }
+  for (const [k, v] of Object.entries(want)) if (s[k] !== v) r.fail(`figures.paymentSummary.${k}`, `is not ${v}, the count of the entries`)
+  if (Number.isSafeInteger(s.pastGrace) && Number.isSafeInteger(s.pastDue) && s.pastGrace > s.pastDue) r.fail('figures.paymentSummary.pastGrace', 'is more than the loans past due')
+  const worst = late.reduce((/** @type {any} */ w, /** @type {any} */ e) => (!w || num(e.pastDue.value).gt(num(w.pastDue.value)) ? e : w), null)
+  if (worst ? s.worstLoanId !== worst.loanId && !num(byId.get(s.worstLoanId)?.pastDue?.value ?? '-1').eq(num(worst.pastDue.value)) : s.worstLoanId !== null) r.fail('figures.paymentSummary.worstLoanId', 'is not the entry the most past due')
+  if (DEC.test(s.worstPastDueSeconds ?? '') && !num(s.worstPastDueSeconds).eq(worst ? num(worst.pastDue.value) : 0)) r.fail('figures.paymentSummary.worstPastDueSeconds', 'is not the largest pastDue')
 }
 
 /** The usd block of a USD ticket, each number the value of its figure, its price read at the ticket's ledger. */
@@ -1454,8 +1532,8 @@ const SOURCES = {
   principalUsd: { object: 'Plan', field: 'plannedLoan.principalUsd', id: 'desk-usd', value: '0.3483' },
 }
 const LOANS = {
-  [LOAN1]: { PrincipalOutstanding: '10000000', TotalValueOutstanding: '10100000', ManagementFeeOutstanding: '0', Flags: String(LSF_LOAN_IMPAIRED) },
-  [LOAN2]: { PrincipalOutstanding: '5000000', TotalValueOutstanding: '5050000', ManagementFeeOutstanding: '0', Flags: '0' },
+  [LOAN1]: { PrincipalOutstanding: '10000000', TotalValueOutstanding: '10100000', ManagementFeeOutstanding: '0', Flags: String(LSF_LOAN_IMPAIRED), NextPaymentDueDate: '846199000' },
+  [LOAN2]: { PrincipalOutstanding: '5000000', TotalValueOutstanding: '5050000', ManagementFeeOutstanding: '0', Flags: '0', NextPaymentDueDate: '846199400' },
 }
 
 /**
@@ -1596,6 +1674,18 @@ const TICKET = {
     requested: fig('requested', '300000', 'DECLARED', 'The principal the borrower asks for'),
     ltvHeld: fig('ltvHeld', '3731', 'MODELLED', 'LTV at withdrawal value'),
     lender1to1: fig('lender1to1', '3000', 'MODELLED', 'The same LTV for a lender at 1:1'),
+    // step 22: L1 impaired 1000 s past due, L2 past its grace 600 s past due; 600 s schedules, 3 payments left
+    payments: [
+      {
+        loanId: LOAN1, label: 'L1', status: 'impaired', nextPaymentDueAt: '2026-10-24T23:16:40.000Z', graceEndsAt: '2026-10-24T23:17:40.000Z',
+        pastDue: fig('pastDue', '1000', 'REAL', 'How long L1 is past its due date', LOAN1), paymentsMissed: 2, paymentRemaining: 3, paymentIntervalSeconds: 600, recognitionLagSeconds: '101',
+      },
+      {
+        loanId: LOAN2, label: 'L2', status: 'defaultable', nextPaymentDueAt: '2026-10-24T23:23:20.000Z', graceEndsAt: '2026-10-24T23:24:20.000Z',
+        pastDue: fig('pastDue', '600', 'REAL', 'How long L2 is past its due date', LOAN2), paymentsMissed: 2, paymentRemaining: 3, paymentIntervalSeconds: 600, recognitionLagSeconds: null,
+      },
+    ],
+    paymentSummary: { loans: 2, pastDue: 2, pastGrace: 2, impaired: 1, defaulted: 0, worstLoanId: LOAN1, worstPastDueSeconds: '1000' },
   },
   conduct: { recognitionLagSeconds: ['101'], defaultsWithoutImpairment: 0, coverOrderCostDrops: '0' },
   escrowPolicy: {

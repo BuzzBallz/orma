@@ -1576,7 +1576,8 @@
               "requestedUsd",
               "ltvHeldUsd",
               "lender1to1Usd",
-              "priceAge"
+              "priceAge",
+              "pastDue"
             ]
           },
           "inputs": {
@@ -1685,7 +1686,7 @@
           },
           "figures": {
             "type": "object",
-            "description": "Each leaf is a Figure."
+            "description": "Each leaf is a Figure. Step 22: payments, one entry per loan of the vault not closed (loanId, label as in n2, status on the reader's ladder current, due_soon, overdue, defaultable, impaired or defaulted, nextPaymentDueAt, graceEndsAt, pastDue a Figure of formula pastDue, paymentsMissed, paymentRemaining, paymentIntervalSeconds, recognitionLagSeconds), and paymentSummary (loans, pastDue, pastGrace, impaired, defaulted, worstLoanId, worstPastDueSeconds), read at the ticket's ledger and left out of inputsDigest."
           },
           "conduct": {
             "type": "object"

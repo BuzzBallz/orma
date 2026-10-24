@@ -6,6 +6,7 @@
  * BigInt.
  */
 import { num, Decimal, wholeShares, isoToRipple } from '../num.mjs'
+import { normaliseLoan } from '../xrpl.mjs'
 import { FORMULAS, canonical, sha256Hex, parseStatement, statementConsistency, USD_COLLATERAL_RULE, usdTermsHash } from '../nyc/contracts.mjs'
 
 const LSF_LOAN_DEFAULT = 0x00010000n
@@ -106,6 +107,9 @@ export function evaluateFormula(formulaId, inputs) {
     }
     case 'priceAge':
       return v('close_time').minus(v('priceAsOf')).toFixed(0)
+    // step 22: how long a loan is past its due date
+    case 'pastDue':
+      return Decimal.max(0, v('close_time').minus(v('NextPaymentDueDate'))).toFixed(0)
     default:
       throw new RangeError(`no evaluation for ${formulaId}`)
   }
@@ -220,6 +224,11 @@ export function buildTicket(inputs, { op, units, mandate, principalDrops, usd = 
     figures.priceAge = figure('priceAge', 'REAL', 'Seconds since the oldest XRP/USD oracle document used was updated')
   }
 
+  // step 22: the payment record of every loan of the vault not closed, read from the Loan objects at L
+  const record = paymentsOf(inputs, input, figure)
+  figures.payments = record.payments
+  figures.paymentSummary = record.summary
+
   const worstN2 = figures.n2.reduce((m, e) => Decimal.max(m, num(e.lossAfterCover.value)), new Decimal(0))
   const lockup = num(mandate.limits.maxLockupDays).times(86400)
   const rowsFor = (ltv) => [
@@ -263,6 +272,56 @@ export function buildTicket(inputs, { op, units, mandate, principalDrops, usd = 
   return ticket
 }
 
+/**
+ * The payment record of a ticket (step 22, addendum A12), one entry per loan of the vault that is not closed,
+ * in the order the ticket reads them, with the labels of n2. The status is the reader's ladder
+ * (normaliseLoan); paymentsMissed counts the payment due at NextPaymentDueDate and every scheduled payment
+ * since, because NextPaymentDueDate advances only when a payment is made, at most PaymentRemaining. A
+ * defaulted loan has no due date: rippled deletes it.
+ */
+function paymentsOf(inputs, input, figure) {
+  const payments = []
+  let pastGrace = 0
+  for (const b of inputs.brokers) {
+    for (const loan of b.loans) {
+      const f = loan.fields
+      const { status } = normaliseLoan(f, inputs.closeTime)
+      if (status === 'closed') continue
+      const dated = status !== 'defaulted' && Number.isSafeInteger(f.NextPaymentDueDate)
+      const remaining = ledgerInt(f.PaymentRemaining)
+      const interval = ledgerInt(f.PaymentInterval)
+      let missed = null
+      if (dated) {
+        const late = num(inputs.closeTime).minus(num(f.NextPaymentDueDate))
+        missed = late.lte(0) ? 0 : JSON.parse(Decimal.min(num(remaining), interval > 0 ? late.div(interval).floor().plus(1) : num(1)).toFixed(0))
+        if (num(inputs.closeTime).gt(num(f.NextPaymentDueDate).plus(num(ledgerInt(f.GracePeriod))))) pastGrace++
+      }
+      payments.push({
+        loanId: loan.id, label: loan.label, status,
+        nextPaymentDueAt: dated ? rippleIso(f.NextPaymentDueDate) : null,
+        graceEndsAt: dated ? rippleIso(f.NextPaymentDueDate + ledgerInt(f.GracePeriod)) : null,
+        pastDue: dated
+          ? figure('pastDue', 'REAL', `How long ${loan.label} is past its due date`, { NextPaymentDueDate: () => input('NextPaymentDueDate', 'Loan', loan.id, 'NextPaymentDueDate', f.NextPaymentDueDate) })
+          : null,
+        paymentsMissed: missed,
+        paymentRemaining: remaining,
+        paymentIntervalSeconds: interval,
+        recognitionLagSeconds: status === 'impaired' ? inputs.recognitionLags?.[String(loan.id).toUpperCase()] ?? null : null,
+      })
+    }
+  }
+  const late = payments.filter((p) => p.pastDue && num(p.pastDue.value).gt(0))
+  const worst = late.reduce((w, p) => (!w || num(p.pastDue.value).gt(num(w.pastDue.value)) ? p : w), null)
+  return {
+    payments,
+    summary: {
+      loans: payments.length, pastDue: late.length, pastGrace,
+      impaired: payments.filter((p) => p.status === 'impaired').length, defaulted: payments.filter((p) => p.status === 'defaulted').length,
+      worstLoanId: worst?.loanId ?? null, worstPastDueSeconds: worst ? worst.pastDue.value : '0',
+    },
+  }
+}
+
 /** The terms a dollar figure was computed on, as a ticket or a position names them. */
 const termsRefOf = (t) => ({ id: t.id, hash: t.hash, anchorTx: t.anchorTx, fxHaircutBps: t.fxHaircutBps, maxSingleLoanUsd: t.maxSingleLoanUsd })
 
@@ -294,7 +353,8 @@ export function dropsToUsd(drops, xrpUsd, fxHaircutBps) {
 /**
  * The digest STALE compares: every { object, id, field, value } a figure read, off the ledger header and,
  * on a dollar ticket (step 21), off the XRP/USD oracle median, which move without the request changing (the
- * approval judges again at its own ledger, at the price of that ledger),
+ * approval judges again at its own ledger, at the price of that ledger), and off the payment record (step 22),
+ * derived from the same Loan objects and ledger,
  * sorted by object, id then field, without duplicates. It does not move when only the ledger does.
  * @param {object} figures
  * @returns {string}
@@ -311,7 +371,7 @@ export function inputsDigest(figures) {
       }
     }
   }
-  walk(figures)
+  walk(Object.fromEntries(Object.entries(figures).filter(([k]) => k !== 'payments' && k !== 'paymentSummary')))
   const entries = [...seen.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([, e]) => e)
   return sha256Hex(canonical(entries))
 }

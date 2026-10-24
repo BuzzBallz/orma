@@ -204,7 +204,7 @@ fields may be added, nothing may ever be renamed, retyped or removed.
 | `GET /api/openapi.json` | the OpenAPI 3.1 description of these routes |
 | `GET /api/mpt/:mptId/status` | is this share attested, not tracked, revoked or stale (200 for any well-formed id) |
 | `GET /api/mark/:mptId` | does a fresh verification of this share, from its MPT id alone, agree with the published reading |
-| `GET /api/tickets` | what are these shares worth as collateral at withdrawal value, and does the mandate allow the operation; with `asset=USD`, a loan in the test dollar against the same shares |
+| `GET /api/tickets` | what are these shares worth as collateral at withdrawal value, and does the mandate allow the operation; with `asset=USD`, a loan in the test dollar against the same shares; on every ticket, the payment record of each loan of the vault: how long it is past due and how many payments it missed |
 | `GET /api/desk/mandates/:id` | what the risk officer's mandate allows, with its hash recomputed |
 | `POST /api/roles/:runId/:role/:action` | preview one role action; nothing is signed or submitted |
 | `POST /api/roles/:runId/actions/:actionId/confirm` | queue a previewed action on its account, or, for an approval, have the desk re-read and countersign |

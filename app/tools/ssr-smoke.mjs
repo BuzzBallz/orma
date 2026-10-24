@@ -195,6 +195,29 @@ if (ticket) {
   const off = served.filter((f) => !plain(renderToString(createElement(Recompute, { figure: f }))).includes('>MATCH'))
   check('every served figure (' + served.length + ') recomputes MATCH in the browser' + (off.length ? ': not ' + off.map((f) => f.formulaId).join(', ') : ''), served.length > 0 && off.length === 0)
 
+  // Step 22 (addendum A12): the payment record of the live ticket, its bank-practice note and its pastDue figures.
+  const { durationText } = await import('../src/lib/duration.ts')
+  for (const s of ['Payment record', 'Only loans past their grace period are tested', '30 days past due', 'Art. 178']) check('ticket (step 22): ' + s, html.includes(s))
+  const payments = Array.isArray(ticket.figures.payments) ? ticket.figures.payments : null
+  const ps = ticket.figures.paymentSummary
+  check('ticket (step 22): figures.payments and figures.paymentSummary served', Boolean(payments && ps && typeof ps.loans === 'number'))
+  if (payments && ps) {
+    const pastDues = payments.filter((p) => p.pastDue)
+    const dated = payments.filter((p) => p.status !== 'defaulted')
+    const pastDueOff = pastDues.filter((p) => !plain(renderToString(createElement(Recompute, { figure: p.pastDue }))).includes('>MATCH'))
+    check('ticket (step 22): every live pastDue figure (' + pastDues.length + ') is formula pastDue and recomputes MATCH, one per loan not defaulted' + (pastDueOff.length ? ': not ' + pastDueOff.map((p) => p.label).join(', ') : ''),
+      pastDues.length > 0 && pastDues.length === dated.length && pastDues.every((p) => p.pastDue.formulaId === 'pastDue') && pastDueOff.length === 0)
+    check('ticket (step 22): each pastDue in the audit list as "{label}: past due"', pastDues.every((p) => html.includes(p.label + ': past due</td>')))
+    const worst = payments.find((p) => p.loanId === ps.worstLoanId)
+    const head = ps.pastDue === 0 ? 'No loan in this vault is past due.' : ps.pastDue + ' of ' + ps.loans + ' loans in this vault past due.'
+    const worstSaid = (worst ? ' Worst: ' + worst.label + ', past due ' + durationText(ps.worstPastDueSeconds) + ', ' + worst.paymentsMissed + ' of ' + worst.paymentRemaining + ' remaining payments missed, ' + (worst.status === 'impaired' ? 'impaired.' : 'not impaired.') : '')
+      + (ps.defaulted > 0 ? ' ' + ps.defaulted + (ps.defaulted === 1 ? ' loan' : ' loans') + ' defaulted.' : '')
+    check('ticket (step 22): the summary line, ' + JSON.stringify(head + worstSaid), html.includes('>REAL</span> ' + head + worstSaid))
+    const lines = ticket.figures.n2.map((e) => [e, payments.find((p) => p.loanId === e.loanId)])
+    check('ticket (step 22): each default scenario (' + lines.length + ') is a loan of the record, with its payment line under it',
+      lines.every(([e, p]) => p && p.pastDue && html.includes(e.scenario + '<span class="t-body-s dim block">past due ' + durationText(p.pastDue.value) + ', ' + p.paymentsMissed + ' of ' + p.paymentRemaining + ' remaining payments missed, ' + (p.status === 'impaired' ? 'impaired' : 'not impaired') + '</span>')))
+  }
+
   // The operator's memory, without a browser: a validated pledge reaches requestLoan, a requested loan reaches approve.
   let session = rememberOperator({ runId: 'r1', token: 't0', pledgeActionId: null, requestActionId: null }, { pledgeActionId: 'P'.repeat(32) })
   session = rememberOperator(session, { requestActionId: 'Q'.repeat(32) })
@@ -408,6 +431,14 @@ const loneAt = srcFiles.flatMap((f) => readFileSync(f, 'utf8').replace(/\r\n/g, 
 check('app/src (' + srcFiles.length + ' files, the label in ' + labelled.length + '): every RLUSD inside "' + USD_LABEL + '"' + (loneAt.length ? ' (not at: ' + loneAt.join(', ') + ')' : ''), loneAt.length === 0 && labelled.length > 0)
 check('label self-test: a bare "2.322 USD" is caught; with the label, and "1.29 USD per XRP", it is not',
   unlabelled('<p>2.322 USD</p>').length === 1 && unlabelled('2.322 USD (' + USD_LABEL + ')').length === 0 && unlabelled('1.29 USD per XRP').length === 0)
+
+// Step 22: the words of a late loan are past due, missed and late. The one word banks avoid on a desk screen is
+// built from two halves, so this file never holds it whole; self-test first: it is caught in any case.
+const AVOIDED = new RegExp('delin' + 'quen', 'i')
+check('words self-test: the avoided word is caught in any case, "past due" is not', AVOIDED.test('a ' + 'Delin' + 'quent loan') && !AVOIDED.test('a loan past due, 2 payments missed, late'))
+const wordFiles = [...readdirSync('src/screens').filter((n) => /^Desk.*\.tsx$/.test(n)).map((n) => 'src/screens/' + n), 'src/lib/duration.ts']
+const saidAt = wordFiles.filter((f) => AVOIDED.test(readFileSync(f, 'utf8')))
+check('the desk screens and lib/duration.ts say past due, missed or late, never the avoided word' + (saidAt.length ? ' (in: ' + saidAt.join(', ') + ')' : ''), saidAt.length === 0)
 
 // Each screen that declares SMOKE_CASES renders them, and each must show its strings.
 for (const n of readdirSync('src/screens').filter((x) => x.endsWith('.tsx'))) {

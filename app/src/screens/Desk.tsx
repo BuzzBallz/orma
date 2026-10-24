@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import Decimal from 'decimal.js'
-import { USD_COLLATERAL_RULE, USD_LABEL, type ChangeRow, type CollateralAccount, type FeedEvent, type Figure as FigureDoc, type LoanAsset, type Mandate, type MarginCall, type Mark, type PositionUsd, type Ticket, type TicketUsd, type UsdReference, type UsdTerms } from '../lib/types'
+import { USD_COLLATERAL_RULE, USD_LABEL, type ChangeRow, type CollateralAccount, type FeedEvent, type Figure as FigureDoc, type LoanAsset, type Mandate, type MarginCall, type Mark, type PaymentEntry, type PaymentStatus, type PaymentSummary, type PositionUsd, type Ticket, type TicketUsd, type UsdReference, type UsdTerms } from '../lib/types'
 import { AuditTable, FigureValue, HashLink, Panel, ProvenanceKey, ReadAt, Recompute, ShowWork, TestNetBanner, Verdict, Figure, formatBps, formatWhen, formatXrp, type VerdictStatus } from '../components/Ledger'
 import { BalanceBar, DefaultDots, LockBar, LtvGauge, PriceBars } from '../components/Charts'
 import {
@@ -11,6 +11,7 @@ import {
 import { usePoll } from '../lib/usePoll'
 import { follow, tabHref } from '../lib/useRoute'
 import { dropsToXrp, inUnit } from '../lib/format'
+import { durationText } from '../lib/duration'
 import { DeskUniverse } from './DeskUniverse'
 import { DeskFeed, FEED_POLL_MS, type FeedDoc } from './DeskFeed'
 
@@ -277,6 +278,7 @@ function ApprovalReading({ ticket, choice }: { ticket: Ticket; choice?: ReactNod
             <p className="t-body-m approval-line">{u
               ? `Loan of ${dollars(l.requested.value)} against collateral worth ${formatXrp(f.heldValue.value)} XRP at withdrawal value, ${dollars(u.collateralHeldUsd)} at the reference price less the haircut.`
               : `Loan of ${formatXrp(l.requested.value)} XRP against collateral worth ${formatXrp(f.heldValue.value)} XRP at withdrawal value.`}</p>
+            <PaymentSummaryLine figures={f} />
             <div className="approval-verdict">
               <span className="t-label-m">LTV at withdrawal value <span className="dim">{u ? '(loan ÷ collateral, both in dollars)' : '(loan ÷ collateral)'}</span></span>
               <Verdict status={statusOf(ticket.verdict)} big />
@@ -286,7 +288,12 @@ function ApprovalReading({ ticket, choice }: { ticket: Ticket; choice?: ReactNod
             {ticket.verdict1to1 && <p className="t-body-m approval-line">Lender at 1:1 <Verdict status={statusOf(ticket.verdict1to1)} /></p>}
             <p className="t-body-s dim">The risk officer approves in the operator controls below.</p>
           </>
-        ) : <p className="t-body-m approval-line">No loan request is waiting. Play “Sign and request loan” in the operator controls below.</p>}
+        ) : (
+          <>
+            <p className="t-body-m approval-line">No loan request is waiting. Play “Sign and request loan” in the operator controls below.</p>
+            <PaymentSummaryLine figures={f} />
+          </>
+        )}
       </div>
     </aside>
   )
@@ -372,6 +379,77 @@ function UsdReferencePanel({ usd, figures, ledgerIndex }: { usd: TicketUsd; figu
   )
 }
 
+// --- step 22, late payments (addendum A12) -------------------------------------------------------------
+// How late each loan of the vault is, in the units a credit officer uses: time past due and payments missed.
+// Every duration goes through durationText (lib/duration.ts). Words: past due, missed, late.
+
+const PAYMENT_STATUS_LABEL: Record<PaymentStatus, string> = {
+  current: 'Current', due_soon: 'Due soon', overdue: 'Past due, in grace', defaultable: 'Past due, grace ended', impaired: 'Impaired', defaulted: 'Defaulted',
+}
+const BANK_PRACTICE = "For reference, bank practice: IFRS 9 presumes a significant increase in credit risk once a payment is more than 30 days past due (IFRS 9, 5.5.11) and a default by 90 days (B5.5.37); the EU's CRR counts a default after more than 90 days past due on a material obligation (Art. 178(1)(b)). Devnet schedules run in minutes: three missed monthly payments are about 90 days, so the count of missed payments is the comparable figure."
+const LATE_CAPTION = 'Only loans past their grace period are tested: a missed payment is one of the strongest early signs of default.'
+const NONE_PAST_DUE = 'No loan in this vault is past due.'
+
+/** A loan is late when its pastDue figure is above zero; a defaulted loan has none. */
+const isLate = (p: PaymentEntry) => p.pastDue !== null && SECONDS.test(p.pastDue.value) && new Decimal(p.pastDue.value).gt(0)
+const missedText = (p: PaymentEntry) => (p.paymentsMissed === null ? '—' : `${p.paymentsMissed} of ${p.paymentRemaining} remaining payments missed`)
+const impairedWord = (p: PaymentEntry) => (p.status === 'impaired' ? 'impaired' : 'not impaired')
+/** "past due 10 min 00 s, 2 of 3 remaining payments missed, not impaired": the same form on every surface. */
+const paymentLine =(p: PaymentEntry) => `past due ${durationText(p.pastDue?.value)}, ${missedText(p)}, ${impairedWord(p)}`
+const recognitionText = (p: PaymentEntry) => (p.recognitionLagSeconds !== null ? `impaired ${durationText(p.recognitionLagSeconds)} after its due date`
+  : isLate(p) && p.status !== 'impaired' ? 'not impaired' : '—')
+const ISO_UTC = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})(\.\d+)?Z$/
+/** An ISO time of the record to the second, in UTC: Devnet schedules run in minutes. */
+const atUtc = (iso: string | null) => {
+  if (!iso) return '—'
+  const m = ISO_UTC.exec(iso)
+  return m ? `${m[1]} ${m[2]} UTC` : iso
+}
+
+/** The summary line under the approval line, from paymentSummary and the worst loan's entry. */
+/** A defaulted loan has no due date left to be past: the summary names it apart, never as a loan in good standing. */
+const defaultedText = (s: PaymentSummary): string => (s.defaulted > 0 ? ` ${s.defaulted} ${s.defaulted === 1 ? 'loan' : 'loans'} defaulted.` : '')
+
+function paymentSummaryText(payments: PaymentEntry[], s: PaymentSummary): string {
+  if (s.pastDue === 0) return NONE_PAST_DUE + defaultedText(s)
+  const head = `${s.pastDue} of ${s.loans} loans in this vault past due.`
+  const worst = payments.find((p) => p.loanId === s.worstLoanId)
+  return (worst ? `${head} Worst: ${worst.label}, past due ${durationText(s.worstPastDueSeconds)}, ${missedText(worst)}, ${impairedWord(worst)}.` : head) + defaultedText(s)
+}
+
+function PaymentSummaryLine({ figures }: { figures: Ticket['figures'] }) {
+  return <p className="t-body-m"><span className="prov" data-prov="REAL">REAL</span>{` ${paymentSummaryText(figures.payments, figures.paymentSummary)}`}</p>
+}
+
+/** Every loan of the vault not closed: its status, due date, time past due, payments missed, grace end and recognition. */
+function PaymentRecordPanel({ payments }: { payments: PaymentEntry[] }) {
+  return (
+    <Panel provenance="REAL" title="Payment record" source="Orma">
+      {payments.length === 0 ? <p className="t-body-s">No open loan in this vault.</p> : (
+        <div className="table-scroll">
+          <table className="op-tbl">
+            <thead><tr>{['Loan', 'Status', 'Due', 'Past due', 'Payments missed', 'Grace ended', 'Recognition'].map((h) => <th key={h} scope="col">{h}</th>)}</tr></thead>
+            <tbody>
+              {payments.map((p) => (
+                <tr key={p.loanId}>
+                  <td>{p.label}<span className="t-fig-s dim block">{`loan ${p.loanId.slice(0, 8)}`}</span></td>
+                  <td>{PAYMENT_STATUS_LABEL[p.status] ?? p.status}</td>
+                  <td className="t-fig-s">{atUtc(p.nextPaymentDueAt)}</td>
+                  <td className="t-fig-m">{p.pastDue ? durationText(p.pastDue.value) : '—'}</td>
+                  <td className="t-body-s">{missedText(p)}</td>
+                  <td className="t-fig-s">{atUtc(p.graceEndsAt)}</td>
+                  <td className="t-body-s">{recognitionText(p)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="t-body-s"><span className="prov" data-prov="DECLARED">DECLARED</span>{` ${BANK_PRACTICE}`}</p>
+    </Panel>
+  )
+}
+
 const VIEWS = [['summary', 'Summary'], ['defaults', 'If a loan defaults'], ['history', 'Assets and lock-up'], ['proof', 'Proof'], ['audit', 'Audit']] as const
 type View = typeof VIEWS[number][0]
 
@@ -399,6 +477,8 @@ function TicketView({ ticket, mark, harbor, loan, buyTicket, deskPlan, changeRow
       { label: `${e.label}: withdrawal value per share if it defaults`, figure: e.heldPerUnitIfDefault },
       { label: `${e.label}: vault cover drawn`, figure: e.cover },
     ]),
+    // step 22: each loan's time past due, its NextPaymentDueDate and the ledger's close_time one click away
+    ...f.payments.flatMap((p) => (p.pastDue ? [{ label: `${p.label}: past due`, figure: p.pastDue }] : [])),
     { label: 'Locked until redemption', figure: f.n3.lockedUntil },
     { label: 'Cash in the vault', figure: f.n3.cashAvailable },
     { label: 'Claim at redemption', figure: f.n3.claim },
@@ -466,19 +546,24 @@ function TicketView({ ticket, mark, harbor, loan, buyTicket, deskPlan, changeRow
           </div>
 
           <div hidden={view !== 'defaults'} className="view-stack">
+            <PaymentRecordPanel payments={f.payments} />
             <Panel provenance="MODELLED" title="If one loan defaults alone" source="Orma">
+              <p className="caption">{LATE_CAPTION}</p>
               <DefaultDots now={perShareNow} rows={f.n2.map((e) => ({ label: `${e.label} defaults alone`, value: e.heldPerUnitIfDefault.value, impaired: e.alreadyInHeld }))} />
               <div className="table-scroll">
                 <table className="op-tbl">
                   <thead><tr>{['Scenario', `Loss on the ${ticket.share.units} pledged shares, after cover`, 'Vault cover drawn'].map((h) => <th key={h} scope="col">{h}</th>)}</tr></thead>
                   <tbody>
-                    {f.n2.map((e) => (
-                      <tr key={e.loanId}>
-                        <td>{e.scenario}</td>
-                        <td className="t-fig-m">{e.alreadyInHeld ? 'already in the withdrawal value (impaired)' : `${formatXrp(e.lossAfterCover.value)} XRP`}</td>
-                        <td className="t-fig-m">{`${formatXrp(e.cover.value)} XRP`}</td>
-                      </tr>
-                    ))}
+                    {f.n2.map((e) => {
+                      const record = f.payments.find((p) => p.loanId === e.loanId)
+                      return (
+                        <tr key={e.loanId}>
+                          <td>{e.scenario}{record?.pastDue && <span className="t-body-s dim block">{paymentLine(record)}</span>}</td>
+                          <td className="t-fig-m">{e.alreadyInHeld ? 'already in the withdrawal value (impaired)' : `${formatXrp(e.lossAfterCover.value)} XRP`}</td>
+                          <td className="t-fig-m">{`${formatXrp(e.cover.value)} XRP`}</td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1175,6 +1260,37 @@ function MarginCallRow({ position, call, deskPlan, session, primary }: {
 const FIX_L = 6390000
 const FIX_HASH = 'AB'.repeat(32)
 const fix = (formulaId: FigureDoc['formulaId'], unit: FigureDoc['unit'], value: string): FigureDoc => ({ value, unit, meaning: 'fixture', formula: 'fixture', formulaId, inputs: [], provenance: 'MODELLED' })
+
+// Step 22: the payment record, shaped as the server's (EXAMPLES.ticket of src/nyc/contracts.mjs). The ticket's
+// ledger closes at 2026-10-25T12:00:00Z, Ripple time 846244800; 600 s schedules, 60 s of grace, 3 payments left.
+const FIX_CLOSE = '846244800'
+const FIX_PAY_L1 = 'A7'.repeat(32)
+const FIX_PAY_L2 = 'A8'.repeat(32)
+const FIX_PAY_L3 = 'A9'.repeat(32)
+const ledgerInput = (name: string, object: string, field: string, id: string, value: string) => ({ name, value, object, field, id, ledgerIndex: FIX_L, ledgerHash: FIX_HASH })
+/** A pastDue figure with its two inputs, the value written out: the recompute replays it. */
+const pastDueOf = (label: string, loanId: string, due: string, value: string): FigureDoc => ({
+  value, unit: 'seconds', meaning: `How long ${label} is past its due date`, formula: 'max(0, close_time − NextPaymentDueDate)', formulaId: 'pastDue', provenance: 'REAL',
+  inputs: [ledgerInput('NextPaymentDueDate', 'Loan', 'NextPaymentDueDate', loanId, due), ledgerInput('close_time', 'Ledger', 'close_time', String(FIX_L), FIX_CLOSE)],
+})
+const payEntry = (label: string, loanId: string, status: PaymentEntry['status'], due: [string, string, string] | null, value: string | null, missed: number | null, lag: string | null = null): PaymentEntry => ({
+  loanId, label, status, nextPaymentDueAt: due ? due[1] : null, graceEndsAt: due ? due[2] : null,
+  pastDue: due && value !== null ? pastDueOf(label, loanId, due[0], value) : null,
+  paymentsMissed: missed, paymentRemaining: 3, paymentIntervalSeconds: 600, recognitionLagSeconds: lag,
+})
+/** L1 due in 5 min: nothing past due. */
+const PAY_CURRENT = payEntry('L1', FIX_PAY_L1, 'current', ['846245100', '2026-10-25T12:05:00.000Z', '2026-10-25T12:06:00.000Z'], '0', 0)
+/** L1 30 s past due, inside its 60 s of grace: one payment missed, not yet a default scenario. */
+const PAY_IN_GRACE = payEntry('L1', FIX_PAY_L1, 'overdue', ['846244770', '2026-10-25T11:59:30.000Z', '2026-10-25T12:00:30.000Z'], '30', 1)
+/** L2 10 min past due, its grace ended: floor(600 / 600) + 1 = 2 payments missed. */
+const PAY_PAST_GRACE = payEntry('L2', FIX_PAY_L2, 'defaultable', ['846244200', '2026-10-25T11:50:00.000Z', '2026-10-25T11:51:00.000Z'], '600', 2)
+/** L1 16 min 40 s past due and impaired 101 s after its due date: floor(1000 / 600) + 1 = 2 payments missed. */
+const PAY_IMPAIRED = payEntry('L1', FIX_PAY_L1, 'impaired', ['846243800', '2026-10-25T11:43:20.000Z', '2026-10-25T11:44:20.000Z'], '1000', 2, '101')
+/** L3 defaulted: rippled deletes its NextPaymentDueDate, so no due date, no past due, no count. */
+const PAY_DEFAULTED = payEntry('L3', FIX_PAY_L3, 'defaulted', null, null, null)
+const summaryOf = (loans: number, pastDue: number, pastGrace: number, impaired: number, defaulted: number, worstLoanId: string | null, worstPastDueSeconds: string): PaymentSummary =>
+  ({ loans, pastDue, pastGrace, impaired, defaulted, worstLoanId, worstPastDueSeconds })
+
 const FIX_TICKET: Ticket = {
   schema: 'orma.ticket/1', ticketId: 'E'.repeat(64), inputsDigest: 'F'.repeat(64), asOf: '2026-10-25T12:00:00Z', ledgerIndex: FIX_L, ledgerHash: FIX_HASH,
   op: 'pledge', share: { mptId: '11'.repeat(24), vaultId: '22'.repeat(32), units: '5000000', shareScale: 0 },
@@ -1183,6 +1299,7 @@ const FIX_TICKET: Ticket = {
     heldValue: fix('heldValue', 'drops', '4000000'), naiveValue: fix('naiveValue', 'drops', '5000000'), n1Overpayment: fix('n1Overpayment', 'drops', '1000000'), n2: [],
     n3: { lockedUntil: fix('lockedUntil', 'seconds', '1415248'), redemptionAt: '2026-11-10T00:00:00Z', cashAvailable: fix('cashAvailable', 'drops', '35000000'), claim: fix('claim', 'drops', '4000000') },
     maxLoan: fix('maxLoan', 'drops', '2137600'), requested: fix('requested', 'drops', '2600000'), ltvHeld: fix('ltvHeld', 'bps', '6500'), lender1to1: fix('lender1to1', 'bps', '5200'),
+    payments: [PAY_CURRENT], paymentSummary: summaryOf(1, 0, 0, 0, 0, null, '0'),
   },
   conduct: { recognitionLagSeconds: [], defaultsWithoutImpairment: 0, coverOrderCostDrops: '0' },
   escrowPolicy: { finishAfter: '0', cancelAfter: '0', text: 'fixture' },
@@ -1374,6 +1491,18 @@ const FIX_MANDATE: Mandate = {
   policy: { escrowFinish: 'only-after-default', finishAfterMarginSeconds: 600, approvalSlackSeconds: 120, cancelAfterOffsetSeconds: 86400 },
   issuedAt: '2026-10-24T12:00:00.000Z', hash: 'C'.repeat(64), anchorTx: 'D'.repeat(64),
 }
+
+// Step 22: the XRP fixture ticket under a payment record of its own, with the default scenarios of the loans past grace.
+const n2Of = (p: PaymentEntry, alreadyInHeld = false) => ({
+  loanId: p.loanId, label: p.label, scenario: `if ${p.label} defaults alone`, alreadyInHeld,
+  lossAfterCover: fix('lossAfterCover', 'drops', alreadyInHeld ? '0' : '485000'), cover: fix('cover', 'drops', '150000'), heldPerUnitIfDefault: fix('heldPerUnitIfDefault', 'ratio', '0.703000'),
+})
+const lateScreen = (payments: PaymentEntry[], paymentSummary: PaymentSummary, n2: Ticket['figures']['n2'] = []) =>
+  <DeskScreen ticket={{ ...FIX_TICKET, figures: { ...FIX_TICKET.figures, n2, payments, paymentSummary } }} mark={null} tab="ticket" />
+// Written out, not built by durationText: the cases fail if the formatter drifts from the addendum's four ranges.
+const DURATION_SAMPLES = ['45', '725', '69120', '273600', '0', '59', '60', '3599', '3600', '86399', '86400', '129600', '90.7', 'abc']
+const DURATION_SHOWN = '45 s | 12 min 05 s | 19 h 12 min | 3 d 4 h | 0 s | 59 s | 1 min 00 s | 59 min 59 s | 1 h 00 min | 23 h 59 min | 1 d 0 h | 1 d 12 h | 1 min 30 s | —'
+const DEFAULTED_ROW = '<tr><td>L3<span class="t-fig-s dim block">loan A9A9A9A9</span></td><td>Defaulted</td><td class="t-fig-s">—</td><td class="t-fig-m">—</td><td class="t-body-s">—</td><td class="t-fig-s">—</td><td class="t-body-s">—</td></tr>'
 
 export interface SmokeCase { name: string; element: ReactNode; mustContain?: string[]; before?: string[]; enabledButton?: string; mustNotContain?: string[] }
 
@@ -1585,5 +1714,52 @@ export const SMOKE_CASES: SmokeCase[] = [
   {
     name: 'mandate tab beside a USD position with a null usage value: no crash, the dollar rows ignored', element: <DeskScreen ticket={null} mark={null} tab="mandate" data={FIX_MANDATE} positions={{ ledgerIndex: FIX_L, ledgerHash: FIX_HASH, positions: [FIX_USD_POSITION, positionWith(FIX_NONE, 'C2'.repeat(32))] }} />,
     mustContain: ['Maximum loan-to-value at withdrawal value', '55.56%', 'Largest single loan', 'Longest lock-up'], mustNotContain: [USD_LABEL],
+  },
+  // Step 22, late payments (addendum A12).
+  {
+    name: 'late payments: no loan past due', element: lateScreen([PAY_CURRENT], summaryOf(1, 0, 0, 0, 0, null, '0')),
+    before: ['Loan of 2.600000 XRP', NONE_PAST_DUE, 'Payment record', '>Current<', BANK_PRACTICE, 'If one loan defaults alone', LATE_CAPTION],
+    mustContain: [
+      '<span class="prov" data-prov="REAL">REAL</span> No loan in this vault is past due.', 'Source: Orma', '2026-10-25 12:05:00 UTC', '2026-10-25 12:06:00 UTC',
+      '<td class="t-body-s">0 of 3 remaining payments missed</td><td class="t-fig-s">2026-10-25 12:06:00 UTC</td><td class="t-body-s">—</td>', '<td class="t-fig-m">0 s</td>',
+      `<span class="prov" data-prov="DECLARED">DECLARED</span> ${BANK_PRACTICE}`, '30 days past due', 'Art. 178(1)(b)', 'L1: past due',
+    ],
+    mustNotContain: ['loans in this vault past due', 'not impaired', 'defaults alone</td>'],
+  },
+  {
+    name: 'late payments: one loan in grace, past due but not a default scenario', element: lateScreen([PAY_IN_GRACE], summaryOf(1, 1, 0, 0, 0, FIX_PAY_L1, '30')),
+    before: ['1 of 1 loans in this vault past due. Worst: L1, past due 30 s, 1 of 3 remaining payments missed, not impaired.', 'Payment record', '>Past due, in grace<', '2026-10-25 11:59:30 UTC', '>30 s<', '>1 of 3 remaining payments missed<', '2026-10-25 12:00:30 UTC', '>not impaired<', LATE_CAPTION],
+    mustContain: ['L1: past due'],
+    mustNotContain: ['if L1 defaults alone', 'Past due, grace ended', NONE_PAST_DUE],
+  },
+  {
+    name: 'late payments: one loan past grace, tested alone with its payment line', element: lateScreen([PAY_CURRENT, PAY_PAST_GRACE], summaryOf(2, 1, 1, 0, 0, FIX_PAY_L2, '600'), [n2Of(PAY_PAST_GRACE)]),
+    before: [
+      '1 of 2 loans in this vault past due. Worst: L2, past due 10 min 00 s, 2 of 3 remaining payments missed, not impaired.', 'Payment record', '>Current<', '>Past due, grace ended<',
+      BANK_PRACTICE, 'If one loan defaults alone', LATE_CAPTION, '<td>if L2 defaults alone<span class="t-body-s dim block">past due 10 min 00 s, 2 of 3 remaining payments missed, not impaired</span></td>',
+    ],
+    mustContain: ['L1: past due', 'L2: past due', '>10 min 00 s<'],
+    mustNotContain: ['if L1 defaults alone'],
+  },
+  {
+    name: 'late payments: an impaired loan with its recognition, both tested', element: lateScreen([PAY_IMPAIRED, PAY_PAST_GRACE], summaryOf(2, 2, 2, 1, 0, FIX_PAY_L1, '1000'), [n2Of(PAY_IMPAIRED, true), n2Of(PAY_PAST_GRACE)]),
+    before: [
+      '2 of 2 loans in this vault past due. Worst: L1, past due 16 min 40 s, 2 of 3 remaining payments missed, impaired.', 'Payment record', '>Impaired<', '>16 min 40 s<', 'impaired 1 min 41 s after its due date',
+      '>Past due, grace ended<', '>not impaired<', LATE_CAPTION,
+      '<td>if L1 defaults alone<span class="t-body-s dim block">past due 16 min 40 s, 2 of 3 remaining payments missed, impaired</span></td>',
+      '<td>if L2 defaults alone<span class="t-body-s dim block">past due 10 min 00 s, 2 of 3 remaining payments missed, not impaired</span></td>',
+    ],
+    mustContain: ['L1: past due', 'L2: past due', 'already in the withdrawal value (impaired)'],
+  },
+  {
+    name: 'late payments: a defaulted loan has no due date, dashes', element: lateScreen([PAY_DEFAULTED], summaryOf(1, 0, 0, 0, 1, null, '0')),
+    mustContain: [DEFAULTED_ROW, NONE_PAST_DUE], mustNotContain: ['L3: past due', 'NaN', 'undefined', 'Invalid'],
+  },
+  { name: 'late payments: a served pastDue figure recomputes MATCH', element: <Recompute figure={PAY_PAST_GRACE.pastDue as FigureDoc} />, mustContain: ['>MATCH<'], mustNotContain: ['MISMATCH'] },
+  { name: 'late payments: a pastDue one second off is MISMATCH', element: <Recompute figure={{ ...(PAY_PAST_GRACE.pastDue as FigureDoc), value: '601' }} />, mustContain: ['>MISMATCH<'] },
+  { name: 'late payments: a due date still ahead is 0 s past due, never negative', element: <Recompute figure={PAY_CURRENT.pastDue as FigureDoc} />, mustContain: ['>MATCH<'], mustNotContain: ['MISMATCH'] },
+  {
+    name: 'duration formatter: the four ranges, their edges, never a fractional day', element: <p>{DURATION_SAMPLES.map(durationText).join(' | ')}</p>,
+    mustContain: [DURATION_SHOWN], mustNotContain: ['1.5', 'NaN'],
   },
 ]

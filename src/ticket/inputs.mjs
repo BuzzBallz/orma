@@ -174,13 +174,15 @@ export async function readTicketInputs(xrpl, { shareMptId, reader, at, history =
   const judged = judgeSnapshot({ vault, issuance, shareMptId: share, ledgerIndex: L, readAt })
   if (!judged.consistent) throw new SnapshotError({ violations: judged.violations, vaultId, ledgerIndex: L, ledgerHash: H })
 
-  const conduct = history ? await conductOf(xrpl, brokers, vault, closeTime) : { recognitionLagSeconds: [], defaultsWithoutImpairment: 0, coverOrderCostDrops: '0' }
+  const { lagsByLoan, ...conduct } = history ? await conductOf(xrpl, brokers, vault, closeTime) : { recognitionLagSeconds: [], defaultsWithoutImpairment: 0, coverOrderCostDrops: '0', lagsByLoan: {} }
   return {
     ledgerIndex: L, ledgerHash: H, closeTime,
     vault: { id: vaultId, fields: vault, raw: vault },
     issuance: { id: share, fields: issuance ?? {}, raw: issuance },
     brokers,
     conduct,
+    // step 22: each impaired loan's recognition lag, the last impairment on record, for its payment entry
+    recognitionLags: lagsByLoan,
     readAt,
   }
 }
@@ -192,6 +194,7 @@ export async function readTicketInputs(xrpl, { shareMptId, reader, at, history =
  */
 async function conductOf(xrpl, brokers, vault, closeTime) {
   const lags = []
+  const lagsByLoan = {}
   let undeclared = 0
   let cost = num(0)
   const v = normaliseVault(vault, closeTime)
@@ -205,11 +208,12 @@ async function conductOf(xrpl, brokers, vault, closeTime) {
       if (!loan || loan.fields.NextPaymentDueDate === undefined) continue
       const at = num(Date.parse(e.at)).div(1000).minus(946684800)
       lags.push(at.minus(num(loan.fields.NextPaymentDueDate)).toFixed(0))
+      lagsByLoan[String(loan.id).toUpperCase()] = lags.at(-1)
     }
     const ordering = analyseOrdering(events, broker, window)
     if (ordering.applicable) cost = cost.plus(num(ordering.costToDepositors))
   }
-  return { recognitionLagSeconds: lags, defaultsWithoutImpairment: undeclared, coverOrderCostDrops: cost.toFixed(0) }
+  return { recognitionLagSeconds: lags, defaultsWithoutImpairment: undeclared, coverOrderCostDrops: cost.toFixed(0), lagsByLoan }
 }
 
 /** demo/<label>.json, read when asked: createNyc starts without demo/. */

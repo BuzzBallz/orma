@@ -51,7 +51,7 @@ function main() {
     }
   }
   walk(EXAMPLES, 'EXAMPLES')
-  eq('the examples carry Figures of all twenty formulas', [...new Set(figures.map(([, f]) => f.formulaId))].sort(), Object.keys(FORMULAS).sort())
+  eq('the examples carry Figures of all twenty-one formulas', [...new Set(figures.map(([, f]) => f.formulaId))].sort(), Object.keys(FORMULAS).sort())
   eq('each Figure of the examples has a formula of FORMULAS and exactly its inputs', figures.filter(([, f]) => SCHEMAS.figure(f).length).map(([p]) => p), [])
   const ticket = EXAMPLES.ticket
   const cover = ticket.figures.n2[0].cover
@@ -176,8 +176,8 @@ function main() {
   const ts = readFileSync(new URL('../../app/src/lib/types.ts', import.meta.url), 'utf8')
   const union = /export type FormulaId\s*=([^;]*?)(?:\r?\n\s*\r?\n|\r?\nexport |;)/.exec(ts)
   const names = union ? [...union[1].matchAll(/'([A-Za-z0-9]+)'/g)].map((m) => m[1]) : null
-  eq('the union names exactly the twenty keys of FORMULAS', names?.slice().sort(), Object.keys(FORMULAS).sort())
-  eq('twenty formulas: fourteen at step 1, six in dollars at step 21', [Object.keys(FORMULAS).length, Object.keys(FORMULAS).slice(14)], [20, ['collateralHeldUsd', 'maxLoanUsd', 'requestedUsd', 'ltvHeldUsd', 'lender1to1Usd', 'priceAge']])
+  eq('the union names exactly the twenty-one keys of FORMULAS', names?.slice().sort(), Object.keys(FORMULAS).sort())
+  eq('twenty-one formulas: fourteen at step 1, six in dollars at step 21, pastDue at step 22', [Object.keys(FORMULAS).length, Object.keys(FORMULAS).slice(14)], [21, ['collateralHeldUsd', 'maxLoanUsd', 'requestedUsd', 'ltvHeldUsd', 'lender1to1Usd', 'priceAge', 'pastDue']])
 
   console.log('routes')
   eq('sixteen NYC routes: fifteen at step 1, GET /api/desk/margin-calls at step 20', [NYC_ROUTES.length, NYC_ROUTES.at(-1).path], [16, '/api/desk/margin-calls'])
