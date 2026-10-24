@@ -61,6 +61,12 @@ export const DESK_TABS: DeskTab[] = [
   { id: 'feed', label: 'Feed', source: () => '/api/feed', pollMs: FEED_POLL_MS, mustContain: [], accepts: hasArray('events') },
 ]
 
+/** The two fictional institutions of the demo. The lender is the mandate's `desk`; the borrower's name lives here only. */
+export const LENDER_NAME = 'Harbor Credit Desk (fictional)'
+export const BORROWER_NAME = 'Tidewater Payments (fictional)'
+/** What the desk is, in one line under the title of every tab. */
+export const DESK_LINE = 'Short-term secured financing against XRPL vault shares, the on-chain equivalent of a repo. The shares stay in escrow; the price is the withdrawal value.'
+
 /** harbor-2 -> Harbor-2. */
 const harborName = (label: string | null) => (label ? label.replace(/^harbor-/, 'Harbor-') : 'unknown facility')
 export const deskTitle = (harbor: string | null, tab: string) => `Credit desk: ${harborName(harbor)} · ${tab}`
@@ -214,7 +220,7 @@ function TicketView({ ticket, mark, harbor, loan, buyTicket, deskPlan, changeRow
     ...f.n2.flatMap((e) => [
       { label: `${e.label}: loss on the ${ticket.share.units} pledged shares, after cover`, figure: e.lossAfterCover },
       { label: `${e.label}: withdrawal value per share if it defaults`, figure: e.heldPerUnitIfDefault },
-      { label: `${e.label}: vault cover liquidated`, figure: e.cover },
+      { label: `${e.label}: vault cover drawn`, figure: e.cover },
     ]),
     { label: 'Locked until redemption', figure: f.n3.lockedUntil },
     { label: 'Cash in the vault', figure: f.n3.cashAvailable },
@@ -284,7 +290,7 @@ function TicketView({ ticket, mark, harbor, loan, buyTicket, deskPlan, changeRow
               <DefaultDots now={perShareNow} rows={f.n2.map((e) => ({ label: `${e.label} defaults alone`, value: e.heldPerUnitIfDefault.value, impaired: e.alreadyInHeld }))} />
               <div className="table-scroll">
                 <table className="op-tbl">
-                  <thead><tr>{['Scenario', `Loss on the ${ticket.share.units} pledged shares, after cover`, 'Vault cover liquidated'].map((h) => <th key={h} scope="col">{h}</th>)}</tr></thead>
+                  <thead><tr>{['Scenario', `Loss on the ${ticket.share.units} pledged shares, after cover`, 'Vault cover drawn'].map((h) => <th key={h} scope="col">{h}</th>)}</tr></thead>
                   <tbody>
                     {f.n2.map((e) => (
                       <tr key={e.loanId}>
@@ -347,6 +353,7 @@ function PositionsTab({ doc, deskPlan, harbor }: { doc: Positions; deskPlan?: De
   return (
     <>
       <p className="t-body-l summary-line">{`${doc.positions.length} ${doc.positions.length === 1 ? 'loan' : 'loans'} on the desk.`}</p>
+      <p className="t-body-m parties">{`Lender: ${LENDER_NAME} · Borrower: ${BORROWER_NAME}`}</p>
       <div className="tbl-wrap"><table className="op-tbl">
           <thead><tr>{['Loan', 'Collateral', 'Collateral at withdrawal value', 'LTV at withdrawal value'].map((h) => <th key={h} scope="col" className={h === 'Collateral at withdrawal value' ? 'num' : undefined}>{h}</th>)}</tr></thead>
           <tbody>
@@ -354,7 +361,7 @@ function PositionsTab({ doc, deskPlan, harbor }: { doc: Positions; deskPlan?: De
               const ltvLimit = p.usage.find((u) => u.limit === 'maxLtvBps')?.threshold
               return (
                 <tr key={p.loanId}>
-                  <td>{p.loanSetTxHash ? <HashLink hash={p.loanSetTxHash} /> : <span className="dim">LoanSet not found in the history</span>}<span className="t-fig-s dim block">{`loan ${p.loanId.slice(0, 8)}`}</span></td>
+                  <td>{p.loanSetTxHash ? <HashLink hash={p.loanSetTxHash} /> : <span className="dim">LoanSet not found in the history</span>}<span className="t-fig-s dim block">{`loan ${p.loanId.slice(0, 8)}`}</span><span className="t-body-s block">{`${BORROWER_NAME} `}<HashLink hash={p.borrower} kind="accounts" /></span></td>
                   <td>
                     {p.collateral.map((c) => {
                       const v = deskPlan?.vaults.find((x) => same(x.shareMptId, c.shareMptId))
@@ -444,6 +451,7 @@ function TicketTab({ ticket, mark, error, buyTicket, deskPlan, positions, facili
     <>
       {error && <ErrorBlock code={error} />}
       {error ? <p className="read-at t-fig-s">{`Read at ledger ${own.ledgerIndex} — these figures are no longer current.`}</p> : <ReadAt ledger={own.ledgerIndex} at={own.asOf} />}
+      <p className="t-body-m parties">{`Lender: ${LENDER_NAME} · Borrower: ${BORROWER_NAME}`}{loan?.borrower && <>{' '}<HashLink hash={loan.borrower} kind="accounts" /></>}</p>
       <TicketView ticket={own} mark={ownMark} harbor={harbor} loan={loan} buyTicket={buyTicket} deskPlan={deskPlan} changeRows={rows} onChange={setRows} />
     </>
   )
@@ -497,6 +505,7 @@ export function DeskScreen({ ticket, mark, tab, data, error = null, buyTicket = 
       <header className="desk-head">
         <div>
           <h1 className="t-heading-l">{title}</h1>
+          <p className="t-body-m desk-line">{DESK_LINE}</p>
           {TAB_SUBTITLE[current.id] && <p className="t-body-m dim tab-sub">{TAB_SUBTITLE[current.id]}</p>}
         </div>
         {harbors.length > 0 && (current.id === 'ticket' || current.id === 'positions') && (
@@ -581,7 +590,7 @@ function MoneyPreview({ action, preview, units }: { action: string; preview: Act
       `Withdrawal value per share now: ${text(m.heldPerUnitNow)} drops`,
       `Withdrawal value per share if L2 defaults: ${text(m.heldPerUnitIfDefault)} drops`,
       `${text(m.lossAfterCover)} drops: loss on the ${units} pledged shares, after cover`,
-      `${text(m.cover)} drops: vault cover liquidated`,
+      `${text(m.cover)} drops: vault cover drawn`,
     )
   } else if (m.reserveDrops !== undefined) {
     lines.push(`${text(preview.engineResult)}: the desk creates the collateral account and pays its ${xrp(m.reserveDrops)} reserve.`)

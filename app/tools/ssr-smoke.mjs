@@ -130,6 +130,12 @@ check('deskPlan: each Harbor carries impairL1Tx, impairL1Hidden and statementTx'
   && JSON.stringify(v.impairL1Hidden) === JSON.stringify(['Vault.LossUnrealized']) && /^[0-9A-F]{64}$/i.test(v.statementTx ?? '')))
 check('deskPlan: the planned loan of demo/desk.json, a planned buy', deskPlan?.plannedLoan.units === desk.plannedLoan.units && Boolean(deskPlan?.plannedBuy.units))
 
+// Step 19 (addendum A11): both parties named as fictional institutions, the desk's line under every title.
+const LENDER = 'Harbor Credit Desk (fictional)'
+const BORROWER = 'Tidewater Payments (fictional)'
+const REPO_LINE = 'Short-term secured financing against XRPL vault shares, the on-chain equivalent of a repo. The shares stay in escrow; the price is the withdrawal value.'
+check('the lender is the mandate\'s desk, ' + LENDER, JSON.parse(readFileSync('../demo/mandate-desk-1.json', 'utf8')).desk === LENDER)
+
 // Each tab with the answer of its own source, the channel App.tsx uses; then with another tab's answer.
 const answers = {}
 for (const tab of DESK_TABS) {
@@ -142,7 +148,12 @@ for (const tab of DESK_TABS) {
   for (const s of tab.mustContain) check('tab ' + tab.id + ': ' + s, html.includes(s))
   for (const k of tab.mustShowKeys ?? []) check('tab ' + tab.id + ': ' + k, html.includes(String(data[k])))
   accessible('tab ' + tab.id, html)
+  check('tab ' + tab.id + ': the desk line under the title', html.includes(REPO_LINE))
+  if (tab.id === 'ticket' || tab.id === 'positions') {
+    check('tab ' + tab.id + ': both parties, ' + LENDER + ' and ' + BORROWER, html.includes('Lender: ' + LENDER) && html.includes('Borrower: ' + BORROWER))
+  }
   if (tab.id === 'positions') {
+    check('positions: ' + BORROWER + ' beside each borrower address', data.positions.length === 0 || data.positions.every((p) => html.includes(p.borrower)))
     check('positions: the table in a .tbl-wrap', html.includes('<div class="tbl-wrap"><table'))
     check('positions: every loanSetTxHash', data.positions.every((p) => !p.loanSetTxHash || html.includes(p.loanSetTxHash)))
     check('positions: a 64-hex LoanSet backed by Harbor-1 shares', data.positions.some((p) => /^[0-9A-F]{64}$/i.test(p.loanSetTxHash ?? '')
