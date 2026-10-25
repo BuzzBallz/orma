@@ -127,7 +127,9 @@ async function readVault(xrpl, id, seen, L, closeTime) {
   try {
     brokers = await brokersOf(xrpl, v.Owner, id, L)
   } catch (e) {
-    if (seen === 'live' && !(e instanceof RangeError)) {
+    // A vault seen only live is omitted on any failure, past MAX_PAGES too: a stranger's vault whose
+    // owner holds that many brokers would otherwise answer 503 for the whole document.
+    if (seen === 'live') {
       log.warn('vault seen live could not be read, omitted', { vaultId: id, ledgerIndex: L, code: errorCode(e) })
       return null
     }
