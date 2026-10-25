@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import './app.css'
 import { API_MIXED_ORIGIN, SUSPECT_AFTER_FAILS, SUSPECT_BACKOFF_MS, deskPlanPath, deskTicketPaths, type DeskPlan, type Positions } from './lib/api'
 import { usePoll } from './lib/usePoll'
@@ -21,6 +21,9 @@ import { Toaster } from '@/components/ui/sonner'
 import { toast } from 'sonner'
 import { WalletProvider } from './lib/wallet'
 import { ArrowLeft } from 'lucide-react'
+
+// The temporary live demo lab, in its own chunk: it alone loads xrpl, through a dynamic import, so no other page grows.
+const DemoLab = lazy(() => import('./screens/DemoLab').then((m) => ({ default: m.DemoLab })))
 
 const POLL_MS = 3000
 
@@ -116,7 +119,8 @@ function Desk() {
   useEffect(() => {
     document.title = path === '/desk'
       ? `${deskTitle(deskPlan ? deskPaths?.harbor?.label ?? null : 'harbor-1', deskTab.label)} · Orma`
-      : `${DESKS.find(([p]) => p === path)?.[1] ?? 'Portfolio'} · Orma`
+      : path === '/demo' ? 'Live demo lab · Orma'
+        : `${DESKS.find(([p]) => p === path)?.[1] ?? 'Portfolio'} · Orma`
   }, [path, deskPlan, deskPaths?.harbor?.label, deskTab.label])
 
   const slow = API_MIXED_ORIGIN
@@ -205,6 +209,8 @@ function Desk() {
   const picker = <FacilityPicker vaults={rows} activeVaultId={vaultId} onSelect={select} variant="block" />
 
   function body() {
+    // The live demo lab reads its own documents; the masthead below draws it as the desk (no sign-in, the desk lockup).
+    if (path === '/demo') return <Suspense fallback={<p className="caption">Loading the demo lab…</p>}><DemoLab /></Suspense>
     // First of all: the no-facility note further down draws a grade letter per facility.
     if (path === '/desk') {
       return (
@@ -314,7 +320,7 @@ function Desk() {
       <HeaderBar
         vaults={rows}
         activeVaultId={vaultId}
-        path={path}
+        path={path === '/demo' ? '/desk' : path}
         asOf={(path === '/evidence' ? race.data?.capturedAt : stamp?.serverTime) ?? null}
         withheld={health.fails > 0 || health.stale}
         slide={!quiet}

@@ -440,6 +440,45 @@ const wordFiles = [...readdirSync('src/screens').filter((n) => /^Desk.*\.tsx$/.t
 const saidAt = wordFiles.filter((f) => AVOIDED.test(readFileSync(f, 'utf8')))
 check('the desk screens and lib/duration.ts say past due, missed or late, never the avoided word' + (saidAt.length ? ' (in: ' + saidAt.join(', ') + ')' : ''), saidAt.length === 0)
 
+// --- the live demo lab (/demo) -------------------------------------------------------------------------------
+// Temporary, Devnet only: both sides sign in the browser with keys loaded at runtime. Its own cases run in the
+// SMOKE_CASES loop below; these check what one render cannot. The route, xrpl reached through import() from
+// lib/demoKeys.ts only (so no other page carries it), no way out for a seed, and a loaded seed never rendered.
+// Offline: nothing here reads the API. The seed is a throwaway wallet generated now, never a role seed.
+console.log(NL + '  demo lab')
+const routeSrc = readFileSync('src/lib/useRoute.ts', 'utf8')
+check('/demo is a route of useRoute.ts and not a section of DESKS', /const ROUTES: RoutePath\[\] = \[[^\]]*'\/demo'/.test(routeSrc) && !/\['\/demo',/.test(routeSrc))
+check('App.tsx draws DemoLab on /demo, loaded lazily', appSrc.includes("path === '/demo'") && /lazy\(\(\) => import\('\.\/screens\/DemoLab'\)/.test(appSrc))
+const STATIC_XRPL = /^\s*import\s+(?!type\b)[^;]*?from\s+['"]xrpl['"]|require\(\s*['"]xrpl['"]\s*\)/m
+const DYNAMIC_XRPL = /import\(\s*['"]xrpl['"]\s*\)/
+check('xrpl self-test: a static import is caught; a type import and import() are not',
+  STATIC_XRPL.test("import { Wallet } from 'xrpl'") && STATIC_XRPL.test("import * as x from \"xrpl\"") && !STATIC_XRPL.test("import type { Wallet } from 'xrpl'")
+  && !STATIC_XRPL.test("const m = await import('xrpl')") && DYNAMIC_XRPL.test("xrplModule ??= import('xrpl')"))
+const xrplStatic = srcFiles.filter((f) => STATIC_XRPL.test(readFileSync(f, 'utf8')))
+const xrplDynamic = srcFiles.filter((f) => DYNAMIC_XRPL.test(readFileSync(f, 'utf8')))
+check('no file of app/src imports xrpl statically' + (xrplStatic.length ? ' (' + xrplStatic.join(', ') + ')' : ''), xrplStatic.length === 0)
+check('only src/lib/demoKeys.ts loads xrpl, through import()' + ' (' + xrplDynamic.join(', ') + ')', JSON.stringify(xrplDynamic) === JSON.stringify(['src/lib/demoKeys.ts']))
+const labSrc = readFileSync('src/screens/DemoLab.tsx', 'utf8')
+const keysSrc = readFileSync('src/lib/demoKeys.ts', 'utf8')
+const NO_WAY_OUT = /fetch\(|XMLHttpRequest|sendBeacon|WebSocket|localStorage|console\./
+const NO_DIALOG = /window\.(confirm|alert|prompt)|\b(alert|prompt)\(/
+check('self-test: fetch, localStorage, console. and window.confirm are caught', NO_WAY_OUT.test('await fetch(url)') && NO_WAY_OUT.test('localStorage.setItem') && NO_WAY_OUT.test('console.log(seed)') && NO_DIALOG.test('window.confirm("x")') && !NO_WAY_OUT.test('sessionStorage.setItem'))
+check('lib/demoKeys.ts: no fetch, socket, beacon, localStorage or console, so a seed has no way out', !NO_WAY_OUT.test(keysSrc))
+check('DemoLab.tsx: no localStorage or console, no browser dialog (the default asks in the page)', !/localStorage|console\./.test(labSrc) && !NO_DIALOG.test(labSrc))
+{
+  const keys = await import('../src/lib/demoKeys.ts')
+  const xrplMod = await import('xrpl')
+  const throwaway = (xrplMod.Wallet ?? xrplMod.default.Wallet).generate()
+  const { KeysPanel, DemoLab } = await import('../src/screens/DemoLab.tsx')
+  await keys.loadSeeds({ borrower: throwaway.seed })
+  const keysHtml = plain(renderToString(createElement(KeysPanel, { keys: keys.keyStore.get() })))
+  check('keys panel: the address derived in the browser from a loaded seed is shown', keysHtml.includes(throwaway.classicAddress))
+  check('keys panel: the seed itself is never rendered', !keysHtml.includes(throwaway.seed))
+  keys.forgetKeys()
+  check('Forget keys: no key left', keys.keyStore.get().length === 0)
+  accessible('demo lab without a run', plain(renderToString(createElement(DemoLab))))
+}
+
 // Each screen that declares SMOKE_CASES renders them, and each must show its strings.
 for (const n of readdirSync('src/screens').filter((x) => x.endsWith('.tsx'))) {
   if (!readFileSync('src/screens/' + n, 'utf8').includes('export const SMOKE_CASES')) continue

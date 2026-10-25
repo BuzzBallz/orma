@@ -1,4 +1,4 @@
-import type { ChangeRow, CollateralAccount, LoanAsset, MarginCall, PositionUsd, UsdTerms } from './types'
+import type { ChangeRow, CollateralAccount, LoanAsset, MarginCall, PositionUsd, SignatureBody, SignerField, ToSign, UsdTerms } from './types'
 
 export const API_BASE = (import.meta.env?.VITE_API_BASE ?? 'http://localhost:8787').replace(/\/+$/, '')
 
@@ -180,7 +180,7 @@ export function buildActionRequest(action: string, role: string, runId: string, 
 }
 
 /** What a role action answered: its status and its envelope, an error included, never thrown. */
-export interface ActionAnswer { status: number; body: { actionId?: string; preview?: ActionPreview; state?: string; error?: ActionError } & Record<string, unknown> }
+export interface ActionAnswer { status: number; body: { actionId?: string; preview?: ActionPreview; state?: string; error?: ActionError; toSign?: ToSign | null } & Record<string, unknown> }
 export interface ActionError { code: string; message?: string; requestActionId?: string; breaches?: unknown[]; status?: number }
 export interface ActionPreview { engineResult?: string | null; provenance?: string; money?: Record<string, unknown>; schema?: string; rows?: ChangeRow[] }
 
@@ -215,6 +215,24 @@ export function postAction(action: string, role: string, runId: string, token: s
 export function confirmAction(runId: string, token: string, actionId: string): Promise<ActionAnswer> {
   const { init } = buildActionRequest('', '', runId, token)
   return send(`${API_BASE}/api/roles/${runId}/actions/${actionId}/confirm`, init, 'SUBMIT_UNCONFIRMED')
+}
+
+// --- addition, demo lab: browser signing ------------------------------------------------------------------
+
+/** The body field that opts a role action into browser signing (/demo only). */
+export const BROWSER_SIGNER: SignerField = { signer: 'browser' }
+
+/** How long a signature POST may take: the server answers at once, it never waits for the ledger. */
+export const SIGNATURE_TIMEOUT_MS = 30_000
+
+/**
+ * POST /api/roles/{runId}/actions/{actionId}/signature with { requestId, txBlob }: the blob signed in this browser,
+ * the only thing that leaves it. Under the write policy of every role POST (Origin, operator token, kill switch).
+ * A timeout may have been received: the action is read again before anything is signed twice.
+ */
+export function postSignature(runId: string, token: string, actionId: string, body: SignatureBody): Promise<ActionAnswer> {
+  const { init } = buildActionRequest('', '', runId, token, body)
+  return send(`${API_BASE}/api/roles/${runId}/actions/${actionId}/signature`, init, 'SUBMIT_UNCONFIRMED', SIGNATURE_TIMEOUT_MS)
 }
 
 /** The operator's run, and the two ids a reload between the pre-slot pledge and the live refusal must not lose. */
@@ -266,6 +284,9 @@ export function errorSentence(code: string | null): string {
     case 'BUSY': return 'Too many ledger reads are running. It is retried on its own.'
     // step 21: the XRP/USD median of the oracle sources could not be used at this ledger
     case 'PRICE_UNAVAILABLE': return 'No usable XRP/USD price at this ledger: too few fresh oracle sources, or the sources too far apart. No dollar figure is shown and nothing was signed. It is retried on its own.'
+    // demo lab: browser signing
+    case 'SIGNATURE_MISMATCH': return 'The signed transaction is not the one the server built, or it was not signed by the account asked for. Nothing was submitted; the request stays open, sign it again with the right key.'
+    case 'SIGNATURE_TIMEOUT': return 'No signature arrived before the request expired. Nothing was submitted. Play the step again.'
     default: return 'The server could not answer this request. Nothing was sent.'
   }
 }

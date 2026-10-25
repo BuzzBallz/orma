@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState, type MouseEvent } from 'react'
 
-export type RoutePath = '/' | '/facility' | '/event' | '/methodology' | '/evidence' | '/desk'
-const ROUTES: RoutePath[] = ['/', '/facility', '/event', '/methodology', '/evidence', '/desk']
+// '/demo' is the temporary live demo lab (both sides sign on Devnet in the browser): reached by its operator
+// link only, so it is a route but not one of DESKS, and no section link points at it.
+export type RoutePath = '/' | '/facility' | '/event' | '/methodology' | '/evidence' | '/desk' | '/demo'
+const ROUTES: RoutePath[] = ['/', '/facility', '/event', '/methodology', '/evidence', '/desk', '/demo']
 
 // 'Evidence' last of the reading desks, and named for what it proves rather than for how it
 // works: it is the only desk addressed to an engineer, and it should not be the first thing an
