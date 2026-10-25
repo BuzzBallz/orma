@@ -3,12 +3,12 @@
   "info": {
     "title": "Orma",
     "version": "1.0.0",
-    "summary": "Read-only credit readings of XRP Ledger lending vaults (XLS-65, XLS-66) on Devnet.",
-    "description": "Every amount is a decimal string, in drops for an XRP vault: never parse one into a float. Every 200 carries serverTime and ledgerIndex. The prose reference, with captures, is documentation/pages/http-api.mdx. Nothing here signs or moves anything."
+    "summary": "Credit readings of XRP Ledger lending vaults (XLS-65, XLS-66) on Devnet, and the Devnet write routes of Orma Desk.",
+    "description": "Every amount is a decimal string, in drops for an XRP vault: never parse one into a float. Every 200 carries serverTime and ledgerIndex. The prose reference, with captures, is documentation/pages/http-api.mdx. The read routes sign and move nothing. The POST routes under /api/roles/ and /api/demo/ are Devnet-only writes: a role write passes the Origin allow-list, its run token and the kill switch before anything is signed, and /api/demo/ answers loopback or an X-Demo-Key only."
   },
   "servers": [
     {
-      "url": "https://orma-api.onrender.com"
+      "url": "https://ormaprotocol.com"
     },
     {
       "url": "http://localhost:8787"
@@ -668,6 +668,9 @@
           },
           "500": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
         }
       }
@@ -1072,7 +1075,7 @@
         "summary": "Credit events derived from full re-reads, and the amendment votes",
         "responses": {
           "200": {
-            "description": "At most 100 events after the cursor.",
+            "description": "The events after the cursor, of the at most 500 this process keeps; no cursor, all of them.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1109,7 +1112,7 @@
         "summary": "Server-sent credit events, and a heartbeat every 10 s",
         "responses": {
           "200": {
-            "description": "event: credit with a FeedEvent, event: heartbeat with { serverTime }.",
+            "description": "A comment line (: connected) as the stream opens, then event: credit with a FeedEvent, and event: heartbeat with an empty object {} every 10 s.",
             "content": {
               "text/event-stream": {
                 "schema": {
@@ -1958,7 +1961,7 @@
             "type": "array",
             "items": {
               "type": "object",
-              "description": "One desk loan. Step 21: currency (XRP or USD); principalOutstanding is the loan's PrincipalOutstanding in its asset (drops for XRP, dollars for USD); a USD position's ltvHeldBps is in dollars, its usage has maxSingleLoanUsd and maxPriceAgeSeconds, and it carries usd."
+              "description": "One desk loan. Step 21: currency (XRP or USD); principalOutstanding is the loan's PrincipalOutstanding in its asset (drops for XRP, dollars for USD); a USD position's ltvHeldBps is in dollars, its usage has maxSingleLoanUsd in place of maxSingleLoanDrops, and it carries usd. A collateral entry added by a cure pledge (an EscrowCreate whose orma.cure Memo names the loan, counted only when its share is eligible and its account conforms) carries cure: true."
             }
           }
         }
@@ -2256,7 +2259,7 @@
       },
       "NycErrorCode": {
         "type": "string",
-        "description": "The error codes NYC routes add. BUSY (503, retryable) is also raised by /api/tickets and /api/desk/positions (four desk ledger walks at once) and by /api/feed/stream (100 open streams).",
+        "description": "The error codes NYC routes add. BUSY (503, retryable) is also raised by /api/tickets and /api/desk/positions (four desk ledger walks at once), by /api/mark/{mptId} (four verifications in flight, or two for one client) and by /api/feed/stream (100 open streams, or four for one client).",
         "enum": [
           "NOT_CONFIGURED",
           "UNAUTHORIZED",

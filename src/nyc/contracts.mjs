@@ -1,5 +1,5 @@
 // The NYC contract in executable form: the orma.*/1 documents Orma Desk serves, the closed table of
-// formulas a Figure may carry, the fifteen NYC routes, and the pure judges that later steps import
+// formulas a Figure may carry, the sixteen NYC routes, and the pure judges that later steps import
 // (manager statements in Vault.Data, the 2-of-3 collateral account, the pledged share). Frozen at
 // step 1: later steps add to this file, they never change a field's type or meaning. The reference
 // text is the "§0.0 NYC" section of docs/01-API-CONTRACT.md; the TypeScript mirrors are at the end of
@@ -82,7 +82,7 @@ import { num } from '../num.mjs'
 
 // --- routes ----------------------------------------------------------------------------------------
 
-/** The fifteen NYC routes, OpenAPI path templates; `kill` and `unkill` count as two. */
+/** The sixteen NYC routes, OpenAPI path templates; `kill` and `unkill` count as two. */
 export const NYC_ROUTES = Object.freeze([
   { method: 'GET', path: '/api/mpt/{mptId}/status' },
   { method: 'GET', path: '/api/mark/{mptId}' },

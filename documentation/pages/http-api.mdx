@@ -1,9 +1,10 @@
 ---
 title: "API reference"
-description: "The thirteen routes Orma serves, the question each one answers, its parameters, and a real Devnet response."
+description: "The thirty-one routes Orma serves, the question each one answers, its parameters, and a real Devnet response."
 ---
 
-Orma exposes thirteen `GET` routes over plain HTTP. The server is `src/api.mjs`: `node:http`, no
+Orma exposes thirty-one routes over plain HTTP: twenty-six `GET` routes that read, and five `POST` routes of
+Orma Desk, under `/api/roles/` and `/api/demo/`, that write on Devnet only. The server is `src/api.mjs`: `node:http`, no
 framework, no middleware stack. The default listen address is `http://localhost:8787`, overridable
 with `PORT`.
 
@@ -143,7 +144,7 @@ distressed loans and reports par.
 | `SEQUENCE_PASSED` | 409 | false | the borrower's account sequence has moved past the signed `LoanSet`'s, or the `LoanSet` would expire before inclusion; nothing was submitted; re-request, which signs again |
 | `INCONSISTENT_SNAPSHOT` | 409 | true | the ledger objects read at one ledger do not agree with each other (the vault invariants rippled checks after every transaction); no figure is shown and nothing is signed; retry on the next ledger |
 | `PRICE_UNAVAILABLE` | 409 | true | on a loan in the test dollar: fewer fresh XRP/USD oracle documents than the terms need, sources further apart than they allow, or the ledger's `get_aggregate_price` disagreeing with the median read; no dollar figure is shown and nothing is signed; retry on the next ledger |
-| `BUSY` | 503 | true | on `/api/tickets` and `/api/desk/positions`, four desk ledger walks are already running between them; on `/api/feed/stream`, 100 streams are already open; retry shortly |
+| `BUSY` | 503 | true | on `/api/tickets` and `/api/desk/positions`, four desk ledger walks are already running between them; on `/api/mark/:mptId`, four verifications are in flight, or two for this client; on `/api/feed/stream`, 100 streams are open, or four for this client (a client as `clientKeyOf` of `src/api.mjs` keys it; loopback without `X-Forwarded-For` has the global caps only); retry shortly |
 
 Every route that answers `GET` also answers `HEAD`, with the same status and headers and no body, so a
 link checker sees the status a reader would.
@@ -1194,7 +1195,7 @@ third party, and it is the only step that leaves the ledger.
 ## GET /api/indexer-race
 
 The captured proof that the first impairment of a healthy vault is invisible to metadata diffing. No
-parameters. Served from `demo/indexer-race.json`, falling back to `fixtures/indexer-race.json`.
+parameters. Served from `demo/indexer-race.json`.
 
 ```bash
 curl -s http://localhost:8787/api/indexer-race
@@ -1341,11 +1342,12 @@ host rather than fixed by the server: `createApi(reader, { demo })` takes a map 
 handler, and `/api/demo/:action` dispatches into it.
 
 <Note>
-`src/index.mjs` does **not** pass a `demo` map. In the shipped entrypoint the dispatcher is reachable
-but the map is empty, so every `POST /api/demo/:action` from loopback answers
-`404 {"error":{"code":"NOT_FOUND","message":"no demo action \"<name>\""}}`. Nothing here mutates the
-ledger as shipped. The facilities are built by the scripts in `src/demo/`, which are run from a
-terminal and take no key. Treat this family as an extension point, not as an available API.
+`src/index.mjs` passes the `demo` map of Orma Desk (`nyc.demoActions`): `run`, `kill` and `unkill`.
+They move no ledger state themselves: `run` opens a run and hands back its operator token, `kill` stops every
+role action and `unkill` allows them again, so together they gate every write of `/api/roles/`. Any other name
+answers `404 {"error":{"code":"NOT_FOUND","message":"no demo action \"<name>\""}}`. The facilities are built by
+the scripts in `src/demo/`, which are run from a terminal and take no key. A request that reaches the server
+through a proxy is not loopback: it must carry `X-Demo-Key`.
 </Note>
 
 It is bound to loopback. A request whose remote address is neither `127.0.0.1` nor `::1` is refused
