@@ -16,7 +16,8 @@
  *   node --env-file-if-exists=.env src/demo/fx-relay.mjs --once      one round: fetch the three quotes, publish each
  *   node --env-file-if-exists=.env src/demo/fx-relay.mjs             one round every 60 s until stopped (Ctrl-C, SIGTERM)
  *   node --env-file-if-exists=.env src/demo/fx-relay.mjs --dry-run   fetch the quotes and print the OracleSets, nothing sent
- * Exit: 0 done, 1 a round published nothing, 2 refused (no key; --init with a key already on file), 64 bad usage.
+ * Exit: 0 done, 1 a round published nothing, 2 refused (no key; --init with a key whose account is already on the
+ * ledger), 64 bad usage. An --init that wrote its key and died before the faucet funded it is finished by --init.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { Client, Wallet } from 'xrpl'
@@ -87,12 +88,16 @@ async function main() {
     return 64
   }
   let wallet = null
+  let unfunded = null // a key on file whose account may not exist yet: an earlier --init died before funding it
+  const keySource = process.env.FX_RELAY_SEED ? 'FX_RELAY_SEED' : KEY_FILE
   if (mode.init) {
-    if (keyOnFile()) {
-      console.log(`  refused: a relay key is already on file (${process.env.FX_RELAY_SEED ? 'FX_RELAY_SEED' : KEY_FILE}); the relay account is created once.`)
+    const onFile = keyOnFile()
+    if (onFile && mode.dry) {
+      console.log(`  refused: a relay key is already on file (${keySource}); the relay account is created once.`)
       return 2
     }
-    if (!mode.dry) {
+    if (onFile) unfunded = onFile
+    else if (!mode.dry) {
       wallet = Wallet.generate()
       mkdirSync('.demo', { recursive: true })
       // the key first, before any funding: a run that dies later must not lose the account it paid for
@@ -112,9 +117,17 @@ async function main() {
   process.once('SIGINT', halt)
   process.once('SIGTERM', halt)
   try {
+    if (unfunded) {
+      if (await onLedger(client, unfunded.address)) {
+        console.log(`  refused: a relay key is already on file (${keySource}); the relay account is created once.`)
+        return 2
+      }
+      wallet = unfunded
+      console.log(`  the relay key on file (${keySource}) has no account on the ledger yet: an earlier --init stopped before funding it, so this one funds it`)
+    }
     if (mode.init && wallet) {
       await client.fundWallet(wallet)
-      console.log(`  relay account ${wallet.address} funded at the faucet; its key is in ${KEY_FILE}`)
+      console.log(`  relay account ${wallet.address} funded at the faucet; its key is in ${keySource}`)
     }
     const last = new Map()
     if (wallet) {
@@ -144,7 +157,19 @@ async function main() {
   }
 }
 
+/** Whether the account exists on the validated ledger; actNotFound is the only answer read as no. */
+async function onLedger(client, account) {
+  try {
+    await client.request({ command: 'account_info', account, ledger_index: 'validated' })
+    return true
+  } catch (e) {
+    if (e?.data?.error === 'actNotFound') return false
+    throw e
+  }
+}
+
 process.exitCode = await main().catch((e) => {
-  console.log(`  the relay failed: ${String(e?.message ?? e).slice(0, 200)}`)
+  const unfundedKey = e?.data?.error === 'actNotFound' ? ' The relay key on file has no account on the ledger: rerun --init to fund it.' : ''
+  console.log(`  the relay failed: ${String(e?.message ?? e).slice(0, 200)}${unfundedKey}`)
   return 1
 })
