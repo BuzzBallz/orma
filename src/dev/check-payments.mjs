@@ -223,6 +223,7 @@ async function live() {
   const plan = JSON.parse(readFileSync('demo/desk.json', 'utf8')).plannedLoan
   const x = new Xrpl(process.env.XRPL_WS ?? 'wss://s.devnet.rippletest.net:51233')
   await x.connect()
+  let checked = 0
   try {
     for (const label of ['harbor-1', 'harbor-2', 'harbor-3']) {
       const share = JSON.parse(readFileSync(`demo/${label}.json`, 'utf8')).shareMptId
@@ -243,9 +244,12 @@ async function live() {
         const input = e.pastDue.inputs.find((i) => i.name === 'NextPaymentDueDate')
         fresh.push([e.label, input.object === 'Loan' && input.id === e.loanId && input.ledgerIndex === t.ledgerIndex, input.value === String(node.NextPaymentDueDate), evaluateFormula('pastDue', e.pastDue.inputs) === e.pastDue.value])
       }
+      checked += fresh.length
       eq(`${label}: each pastDue cites the Loan's NextPaymentDueDate at the ticket's ledger, equal to a fresh read there, and recomputes`, fresh.every(([, a, b, c]) => a && b && c), true)
       console.log(`    ${t.figures.payments.map((e) => `${e.label} ${e.status}${e.pastDue ? `, past due ${e.pastDue.value} s, ${e.paymentsMissed} of ${e.paymentRemaining} missed` : ''}`).join('; ')}`)
     }
+    // every() over no figure is true: each Harbor's loans carry a due date (L1 is impaired, so past due), so zero means nothing was tested.
+    eq(`at least one pastDue was checked against a fresh read (${checked})`, checked > 0, true)
   } finally {
     await x.disconnect().catch(() => {})
   }

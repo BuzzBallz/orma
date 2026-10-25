@@ -336,9 +336,12 @@ async function live() {
   const d = await r.json()
   eq('GET /api/desk/margin-calls: 200 at a numeric ledger, the policy on file', [r.status, Number.isSafeInteger(d.ledgerIndex), d.policy?.hash], [200, true, POLICY.hash])
   eq('the document passes SCHEMAS.marginCalls', SCHEMAS.marginCalls(d), [])
-  const p = await (await fetch(`${base}/api/desk/positions`)).json()
+  const pr = await fetch(`${base}/api/desk/positions`)
+  const p = await pr.json()
   const open = (p.positions ?? []).filter((x) => num(x.principalOutstanding).gt(0))
-  eq('every open position carries a marginCall with a status', open.every((x) => ['NONE', 'ISSUED', 'CURED', 'EXPIRED'].includes(x.marginCall?.status)), true)
+  // An error body has no positions and an empty book proves nothing: the demo holds an open desk loan since step 10.
+  eq('GET /api/desk/positions: 200, at least one open position, each carrying a marginCall with a status',
+    [pr.status, open.length > 0, open.every((x) => ['NONE', 'ISSUED', 'CURED', 'EXPIRED'].includes(x.marginCall?.status))], [200, true, true])
   console.log(`  ${open.length} open position(s), calls: ${open.map((x) => x.marginCall?.status).join(', ') || 'none'}`)
   void Decimal
 }
