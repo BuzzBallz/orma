@@ -9,7 +9,7 @@ const Unit = ({ u }: { u: string }) => <span data-vocab-exempt>{'\u00a0'}{u}</sp
 /**
  * An amount in XRP: decimals and the unit, "10 XRP". Only a run of three zeros that the
  * decimals themselves hold ("1000000") is written 1×10⁶, underlined so it can be seen to
- * say more; the cursor over it, or a tap, shows the whole number. Nothing is lost to the
+ * say more; the cursor over it, a tap, or Enter on it shows the whole number. Nothing is lost to the
  * compact form but zeros, so a reader without a pointer still has every digit.
  */
 export function Amount({ drops }: { drops: string }) {
@@ -28,7 +28,12 @@ export function Amount({ drops }: { drops: string }) {
       <TooltipProvider delayDuration={100}>
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="sci" role="img" aria-label={`${full} ${unit}`} onClick={() => setWhole(w => !w)}>
+            {/* A key reaches it too: focusable, Enter or Space toggles the digits. Not a <button>: every button is a .btn. */}
+            <span
+              className="sci" role="button" tabIndex={0} aria-label={`${full} ${unit}`} aria-pressed={whole}
+              onClick={() => setWhole(w => !w)}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setWhole(w => !w) } }}
+            >
               {whole ? full : <>{c.mantissa}{c.exp !== 0 && <>×10<sup>{c.exp}</sup></>}</>}
             </span>
           </TooltipTrigger>

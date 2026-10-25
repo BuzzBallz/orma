@@ -32,7 +32,7 @@ const POLL_MS = 3000
 /** Why no figure is shown yet, in the reader's words. Every case retries on its own. */
 function waitingWords(code: string | null): string {
   if (code === 'WARMING_UP') return 'The service has just started and has not read this facility yet. The figures appear on their own.'
-  if (code === 'TIMEOUT' || code === null) return 'The service is not answering. It sleeps when idle and takes about half a minute to wake. The figures appear on their own.'
+  if (code === 'TIMEOUT' || code === null) return 'The service is not answering. The figures appear on their own when it does.'
   return 'This facility is on file. No figure is shown until one is received.'
 }
 
@@ -80,7 +80,7 @@ function Desk() {
   const { path, vaultId, tab, navigate } = useRoute()
 
   // A desk rises into place when a reader clicks to it, but not on the first paint and
-  // not when the keyboard took them there: a shortcut is used too often to be animated.
+  // not on back or forward.
   const [quiet, setQuiet] = useState(true)
   const go = useCallback((p: RoutePath, id?: string | null) => {
     setQuiet(false)
@@ -132,29 +132,8 @@ function Desk() {
 
   const rows = vaults.data?.vaults ?? NO_ROWS
 
-  // The keys still work for anyone who finds them; they are not advertised as a feature.
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      const t = e.target as HTMLElement | null
-      if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.closest('[data-picker], [role="dialog"]'))) return
-      if (e.metaKey || e.ctrlKey || e.altKey) return
-      // On the desk a key a judge strikes changes neither the facility nor the screen.
-      if (path === '/desk') return
-      const n = Number(e.key)
-      if (n >= 1 && n <= 5 && rows[n - 1]) {
-        setQuiet(true)
-        navigate(path === '/' ? '/facility' : path, rows[n - 1].vaultId)
-        return
-      }
-      const routes: Record<string, RoutePath> = {
-        p: '/', f: '/facility', e: '/event', m: '/methodology', v: '/evidence',
-      }
-      const r = routes[e.key.toLowerCase()]
-      if (r) { setQuiet(true); navigate(r) }
-    }
-    addEventListener('keydown', onKey)
-    return () => removeEventListener('keydown', onKey)
-  }, [rows, path, navigate])
+  // No single-key shortcuts (WCAG 2.1.4): a bare key changed the screen for a speech-input user who
+  // said a letter, and could not be turned off. The desks are reached by their links, from the keyboard too.
 
   // Exhibits 3 and 4. Fetched only on the facility desk and only once a facility is
   // chosen, and slowly: a manager's track record is history, not a live figure. A 404
