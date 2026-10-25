@@ -1,13 +1,15 @@
 # Devnet transaction captures
 
 Devnet prunes old ledgers. On 2026-10-13 the public server reported `complete_ledgers` 5193077-6086200,
-and the transactions the top-level README cites sit in ledgers 5255252-5273819, close to that floor. Once
+and the Paris event's transactions sit in ledgers 5255252-5273819, close to that floor. Once
 they fall below it, the public server stops returning them. This directory keeps a copy of every one, and
 of the whole history the API's two history routes read.
 
-50 transactions, captured from the Devnet JSON-RPC endpoint (`https://s.devnet.rippletest.net:51234`,
-rippled 3.4.1) on 2026-10-13: the 46 the README links, and four more that complete the account histories
-below (the `Payment` that funded each facility's owner).
+79 transactions, captured from the Devnet JSON-RPC endpoint (`https://s.devnet.rippletest.net:51234`):
+50 on 2026-10-13, from rippled 3.4.1, the 46 the README of that day linked and four more that complete the
+account histories below (the `Payment` that funded each facility's owner); Halden's seven of 19 October,
+on 20 October; and the 22 of the New York event, validated on 24 October 2026, which the README section
+*Built in New York* links.
 
 - `<hash>.json`: the `tx` response in API v1 JSON, with `meta`.
 - `<hash>.bin.json`: the same transaction requested with `binary: true`, as `tx_blob` and `meta_blob`.
