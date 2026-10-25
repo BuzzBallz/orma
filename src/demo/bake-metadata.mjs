@@ -29,6 +29,7 @@ import { Client, Wallet, signLoanSetByCounterparty } from 'xrpl'
 import { Xrpl } from '../xrpl.mjs'
 import { buildShareMetadata, encodeShareMetadata, MPT_PLACEHOLDER } from '../metadata.mjs'
 import { resolveFromIssuance, valuePledge } from '../nav.mjs'
+import { num } from '../num.mjs'
 
 const WS = process.env.XRPL_WS ?? 'wss://s.devnet.rippletest.net:51233'
 
@@ -125,7 +126,7 @@ const tx = await c.autofill({
   PrincipalRequested: '10000000', InterestRate: 100000, LateInterestRate: 20000,
   PaymentInterval: 60, PaymentTotal: 3, GracePeriod: 60,
 })
-tx.Fee = String(Number(tx.Fee) * 2)
+tx.Fee = num(tx.Fee).times(2).toFixed(0)
 r = must(await c.submitAndWait(signLoanSetByCounterparty(borrower, owner.sign(tx).tx_blob).tx_blob), 'LoanSet 10 XRP')
 const loanId = created(r.result.meta, 'Loan').LedgerIndex
 
@@ -154,10 +155,10 @@ let pledge = null
 if (resolved.nav) {
   // What a lender would actually compute: 1,000,000 units offered as collateral.
   pledge = valuePledge(resolved.nav, '1000000')
-  const over = (Number(pledge.overstatement) / 1e6).toFixed(6)
+  const over = num(pledge.overstatement).div(1e6).toFixed(6)
   console.log(`\n  A PLEDGE OF 1,000,000 UNITS`)
-  console.log(`    on the reported figure   ${(Number(pledge.valueReported) / 1e6).toFixed(6)} XRP`)
-  console.log(`    on the honest figure     ${(Number(pledge.valueHeld) / 1e6).toFixed(6)} XRP`)
+  console.log(`    on the reported figure   ${num(pledge.valueReported).div(1e6).toFixed(6)} XRP`)
+  console.log(`    on the honest figure     ${num(pledge.valueHeld).div(1e6).toFixed(6)} XRP`)
   console.log(`    a naive lender is over by ${over} XRP`)
 }
 

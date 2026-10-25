@@ -98,7 +98,7 @@ let tx = await c.autofill({
   Counterparty: borrower.address, PrincipalRequested: '30000000', InterestRate: 100000,
   LateInterestRate: 20000, PaymentInterval: 60, PaymentTotal: 3, GracePeriod: 60,
 })
-tx.Fee = String(Number(tx.Fee) * 2)
+tx.Fee = num(tx.Fee).times(2).toFixed(0)
 const dual = signLoanSetByCounterparty(borrower, owner.sign(tx).tx_blob)
 r = await c.submitAndWait(dual.tx_blob)
 must(r, 'LoanSet')
@@ -115,7 +115,7 @@ const before = presentCollateral(escrows, snap)
 
 step(5, 'The lender values its collateral. Both readings agree.')
 line(`    NAV naive ${before.navNaive}   NAV correct ${before.navCorrect}`)
-line(`    40 shares -> naive ${(Number(before.totalValueNaive) / 1e6).toFixed(2)} XRP | correct ${(Number(before.totalValueCorrect) / 1e6).toFixed(2)} XRP`)
+line(`    40 shares -> naive ${num(before.totalValueNaive).div(1e6).toFixed(2)} XRP | correct ${num(before.totalValueCorrect).div(1e6).toFixed(2)} XRP`)
 line(`    overstatement ${before.totalOverstatementPct}%  <- nothing to see yet`)
 
 step(6, 'The borrower misses a payment. The broker impairs the loan.')
@@ -134,8 +134,8 @@ const after = presentCollateral(escrows, snap)
 
 step(7, 'The same collateral, valued again')
 line(`    NAV naive ${after.navNaive}   NAV correct ${after.navCorrect}   (${snap.navDivergenceBps} bps apart)`)
-line(`    40 shares -> naive ${(Number(after.totalValueNaive) / 1e6).toFixed(2)} XRP | correct ${(Number(after.totalValueCorrect) / 1e6).toFixed(2)} XRP`)
-line(`\n    [31mThe lender is over-collateralised on paper by ${(Number(after.totalOverstatement) / 1e6).toFixed(2)} XRP (${after.totalOverstatementPct}%)[0m`)
+line(`    40 shares -> naive ${num(after.totalValueNaive).div(1e6).toFixed(2)} XRP | correct ${num(after.totalValueCorrect).div(1e6).toFixed(2)} XRP`)
+line(`\n    [31mThe lender is over-collateralised on paper by ${num(after.totalOverstatement).div(1e6).toFixed(2)} XRP (${after.totalOverstatementPct}%)[0m`)
 line(`    and the ledger event that caused it showed an EMPTY diff.`)
 
 mkdirSync('.demo', { recursive: true })
