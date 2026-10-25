@@ -37,8 +37,8 @@ export class ApiFailure extends Error {
 }
 
 /**
- * Single fetch with a hard abort. 30s, not less: the API sleeps when idle and takes about 22s to
- * wake, and a shorter abort turned every wake into a run of failures. Throws ApiFailure on anything
+ * Single fetch with a hard abort. 30s, not less: a slow Devnet read or a cold host outlives a
+ * shorter abort, which turned every slow answer into a run of failures. Throws ApiFailure on anything
  * that is not a 2xx JSON body.
  */
 export async function getJson<T>(path: string, timeoutMs = 30_000): Promise<T> {
@@ -86,7 +86,7 @@ export interface DeskPlanUsd {
   loanBrokerId: string
   terms: UsdTerms
 }
-export interface PositionCollateral { escrowId: string; shareMptId: string; units: string; account: CollateralAccount }
+export interface PositionCollateral { escrowId: string; shareMptId: string; units: string; account: CollateralAccount; cure?: true }
 export interface Position {
   /** principalOutstanding: the loan's PrincipalOutstanding in its asset, drops for XRP, dollars for USD (step 21). */
   loanId: string; loanSetTxHash: string | null; loanSetLedger?: number | null; loanSetTicket?: boolean | null; vaultId: string; borrower: string; principalOutstanding: string
@@ -184,24 +184,37 @@ export interface ActionAnswer { status: number; body: { actionId?: string; previ
 export interface ActionError { code: string; message?: string; requestActionId?: string; breaches?: unknown[]; status?: number }
 export interface ActionPreview { engineResult?: string | null; provenance?: string; money?: Record<string, unknown>; schema?: string; rows?: ChangeRow[] }
 
-async function send(url: string, init: RequestInit): Promise<ActionAnswer> {
+/** How long a role action may take: an approve waits for the LoanSet to validate, so well past a read's 30 s. */
+export const ACTION_TIMEOUT_MS = 90_000
+
+/**
+ * One role POST, with a hard abort, so a server that takes the connection and never answers ends the row
+ * instead of leaving it on "Previewing…". `onTimeout` is the code the abort stands for: a preview submits
+ * nothing (TIMEOUT), a confirm may have been submitted (SUBMIT_UNCONFIRMED: check before trying again).
+ */
+export async function send(url: string, init: RequestInit, onTimeout: 'TIMEOUT' | 'SUBMIT_UNCONFIRMED' = 'TIMEOUT', timeoutMs = ACTION_TIMEOUT_MS): Promise<ActionAnswer> {
+  const ctl = new AbortController()
+  const timer = setTimeout(() => ctl.abort(), timeoutMs)
   try {
-    const res = await fetch(url, init)
+    const res = await fetch(url, { ...init, signal: ctl.signal })
     const body = await res.json().catch(() => ({}))
     return { status: res.status, body }
-  } catch {
+  } catch (e: unknown) {
+    if (ctl.signal.aborted || (e instanceof DOMException && e.name === 'AbortError')) return { status: 0, body: { error: { code: onTimeout } } }
     return { status: 0, body: { error: { code: 'UNREACHABLE' } } }
+  } finally {
+    clearTimeout(timer)
   }
 }
 
 export function postAction(action: string, role: string, runId: string, token: string, body: object): Promise<ActionAnswer> {
   const { url, init } = buildActionRequest(action, role, runId, token, body)
-  return send(url, init)
+  return send(url, init, 'TIMEOUT')
 }
 
 export function confirmAction(runId: string, token: string, actionId: string): Promise<ActionAnswer> {
   const { init } = buildActionRequest('', '', runId, token)
-  return send(`${API_BASE}/api/roles/${runId}/actions/${actionId}/confirm`, init)
+  return send(`${API_BASE}/api/roles/${runId}/actions/${actionId}/confirm`, init, 'SUBMIT_UNCONFIRMED')
 }
 
 /** The operator's run, and the two ids a reload between the pre-slot pledge and the live refusal must not lose. */
@@ -243,7 +256,9 @@ export function errorSentence(code: string | null): string {
     case 'UNAUTHORIZED': return 'This operator session is not valid for the run. Open the operator link again. Nothing was sent.'
     case 'FORBIDDEN': return 'This page is not allowed to write to the desk. Nothing was sent.'
     case 'BAD_REQUEST': return 'The request does not match the desk\'s contract. Nothing was sent.'
-    case 'NOT_FOUND': return 'This action is not available in this build. Nothing was sent.'
+    // a 404 names an action, request or pledge the server does not hold: off its list, or no longer waiting (a stale id after a reload)
+    case 'NOT_FOUND': return 'Nothing was found to act on: the action, request or pledge this names is not held by the server, or is no longer waiting. Preview again. Nothing was sent.'
+    case 'TIMEOUT': return 'The server did not answer in time. Nothing was sent.'
     case 'SEQUENCE_PASSED': return 'The borrower has sent another transaction since signing. Re-request the loan to sign it again. Nothing was sent.'
     case 'INCONSISTENT_SNAPSHOT': return 'The ledger objects read at one ledger do not agree with each other. Nothing was signed or sent. Retry on the next ledger.'
     case 'SUBMIT_UNCONFIRMED': return 'The submission could not be confirmed on the ledger. Check the transaction before trying again.'
