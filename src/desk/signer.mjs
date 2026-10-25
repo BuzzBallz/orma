@@ -17,6 +17,7 @@ import { readTicketInputs, readCollateralAccount, allPages, PageLimitError, Snap
 import { buildTicket } from '../ticket/engine.mjs'
 import { openLog } from './decision-log.mjs'
 import { readXrpUsd, PriceUnavailableError } from '../fx/price.mjs'
+import { sleep } from '../xrpl.mjs'
 
 const log = logger('desk:signer')
 const MEMO_ESCROW = Buffer.from('orma.escrow', 'utf8').toString('hex').toUpperCase()
@@ -27,7 +28,6 @@ const LOANSET_WINDOW = 600
 const EXPIRY_MARGIN = 10
 
 const same = (a, b) => typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 /** A refusal with its HTTP status, which the role engine's handle passes through withDeskErrors. */
 export class DeskError extends Error {
@@ -233,7 +233,14 @@ export function createSigner({ xrpl, reader, wallet, submit, lookupTx, readDesk,
 
     if ((act.asset === 'USD') !== loan.isUsd) reasons.push(`the signed LoanSet lends ${loan.isUsd ? 'USD' : 'XRP'}, not the ${act.asset ?? 'XRP'} of the request`)
     const inputs = await readTicketInputs(xrpl, { shareMptId: share, reader, at: L })
-    const ticket = buildTicket(inputs, { op: 'pledge', units: act.ticket.units, mandate, ...(await loan.terms(String(tx.PrincipalRequested), L)) })
+    let ticket
+    try {
+      ticket = buildTicket(inputs, { op: 'pledge', units: act.ticket.units, mandate, ...(await loan.terms(String(tx.PrincipalRequested), L)) })
+    } catch (e) {
+      // a pledge worth 0 at the withdrawal value has no LTV: the mandate cannot pass, nothing is signed
+      if (e instanceof RangeError) throw new DeskError(409, 'BREACHED', `The mandate cannot pass at this ledger: ${e.message}. Nothing was signed.`, { breaches: [] })
+      throw e
+    }
     const digest = ticket.inputsDigest === act.ticket.inputsDigest ? 'same' : 'STALE'
 
     let sequence = 'ok'
@@ -266,6 +273,13 @@ export function createSigner({ xrpl, reader, wallet, submit, lookupTx, readDesk,
     let L = null
     let mandate = null
     try {
+      decisionsLog()
+    } catch (e) {
+      // I2: no countersignature outside the log; a log that cannot be opened refuses before anything is signed
+      log.error('decision log unavailable, approval refused', { actionId: act.actionId, ticketId: act.ticket?.ticketId ?? null, err: String(e?.message ?? e).slice(0, 120) })
+      throw notConfigured('the decision log cannot be opened')
+    }
+    try {
       L = await ledgerNow()
       try {
         mandate = readMandate()
@@ -283,6 +297,7 @@ export function createSigner({ xrpl, reader, wallet, submit, lookupTx, readDesk,
         append(act, mandate, L, 'refused', { code: 'PRICE_UNAVAILABLE' })
         throw new DeskError(409, 'PRICE_UNAVAILABLE', `${e.message} Nothing was signed.`)
       }
+      if (e instanceof DeskError && e.code === 'BREACHED') append(act, mandate, L, 'refused', { code: 'BREACHED' })
       throw e
     }
     const refuse = (status, code, message, extra = {}) => {
@@ -316,9 +331,15 @@ export function createSigner({ xrpl, reader, wallet, submit, lookupTx, readDesk,
     }
     const result = String(out.engineResult ?? '')
     if (result === 'tesSUCCESS' || /^tec/.test(result)) {
-      append(act, r.mandate, r.L, 'approved', { txHash: out.txHash ?? hash })
       const loanId = (out.meta?.AffectedNodes ?? []).map((n) => n.CreatedNode).find((c) => c?.LedgerEntryType === 'Loan')?.LedgerIndex ?? null
+      // known to this process before the append: a log write that fails cannot let a second approve sign again
       if (result === 'tesSUCCESS') countersigned.set(r.escrowIndex, { txHash: out.txHash ?? hash, loanId })
+      try {
+        append(act, r.mandate, r.L, 'approved', { txHash: out.txHash ?? hash })
+      } catch (e) {
+        // the LoanSet is on the ledger: the approval stands, and the missing entry is said loudly with its hash
+        log.error('approved LoanSet validated but its decision entry was not written', { actionId: act.actionId, ticketId: act.ticket.ticketId, txHash: out.txHash ?? hash, ledgerIndex: out.ledgerIndex ?? null, engineResult: result, err: String(e?.message ?? e).slice(0, 120) })
+      }
       return { txHash: out.txHash ?? hash, engineResult: result, ledgerIndex: out.ledgerIndex ?? null, loanId }
     }
     if (/^(tef|tem|tel)/.test(result)) throw refuse(409, 'SEQUENCE_PASSED', `The countersigned LoanSet was not included (${result}). Re-request the loan to sign it again.`)
@@ -387,11 +408,11 @@ export function createSigner({ xrpl, reader, wallet, submit, lookupTx, readDesk,
     return { ticket, signed }
   }
 
-  return { approve, previewApprove, decline, rerequest, decisions: () => decisionsLog(), signedOf }
+  return { approve, previewApprove, decline, rerequest, decisions: () => decisionsLog() }
 }
 
 /** One breach as a refusal says it. */
-export function breachText(b) {
+function breachText(b) {
   return `${b.limit} ${b.value} over ${b.threshold}`
 }
 
@@ -437,8 +458,11 @@ export function registerDeskActions(engine, { signer, deskAddress, borrower }) {
     if (!r || r.action !== 'requestLoan') throw new DeskError(404, 'NOT_FOUND', 'requestActionId names no requestLoan of this run.')
     return r
   }
+  /** the requests a decline or a rerequest is confirming: not served, so the served states stay those of the contract */
+  const busy = new WeakSet()
   const awaiting = (r) => {
     if (r.state !== 'pending-approval') throw new DeskError(404, 'NOT_FOUND', `The loan request is ${r.state}, not awaiting approval.`)
+    if (busy.has(r)) throw new DeskError(404, 'NOT_FOUND', 'The loan request is being declined or signed again, not awaiting approval.')
   }
   const done = (act, fields) => Object.assign(act, fields) // one assignment: a GET never sees validated without its fields
 
@@ -515,7 +539,13 @@ export function registerDeskActions(engine, { signer, deskAddress, borrower }) {
       if (act.state !== 'previewed') return {}
       const req = requestOf(run, act)
       awaiting(req)
-      const { L } = await signer.decline({ actionOfRequest: req })
+      busy.add(req) // before the first await: an approve, a rerequest or a second decline confirm now answers 404
+      let L
+      try {
+        ;({ L } = await signer.decline({ actionOfRequest: req }))
+      } finally {
+        busy.delete(req)
+      }
       done(req, { state: 'refused', engineResult: 'declined' })
       done(act, { state: 'validated', engineResult: 'declined (no transaction)', ledgerIndex: L.ledgerIndex })
       return {}
@@ -533,7 +563,13 @@ export function registerDeskActions(engine, { signer, deskAddress, borrower }) {
       awaiting(req)
       const who = borrower()
       if (!who) throw new DeskError(503, 'NOT_CONFIGURED', 'The borrower account is not configured on this server.')
-      const { signed } = await signer.rerequest({ actionOfRequest: req, borrower: who, enqueue })
+      busy.add(req) // before the first await: an approve, a decline or a second rerequest confirm now answers 404
+      let signed
+      try {
+        ;({ signed } = await signer.rerequest({ actionOfRequest: req, borrower: who, enqueue }))
+      } finally {
+        busy.delete(req)
+      }
       done(act, { state: 'validated', engineResult: 'signed again (no transaction)', ledgerIndex: null, lastLedgerSequence: signed.tx.LastLedgerSequence })
       return {}
     },
