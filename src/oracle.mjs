@@ -33,17 +33,11 @@ import { logger } from './log.mjs'
 
 const log = logger('oracle')
 
-/** Three-character quote codes. One PriceData entry per dimension. */
-export const DIMENSION_CODES = {
-  NAV: 'NAV',       // loss-adjusted assets per share — the number a lender needs
-  HEADLINE: 'HDL',
-  LIQUIDITY: 'LIQ',
-  COVER: 'COV',
-  CONCENT: 'CNC',
-  DEADLINE: 'DDL',
-}
-
-/** NAV carries six decimals; the normalised 0..1 dimensions carry four. */
+/**
+ * The three-character quote code of each dimension, one PriceData entry each: NAV (loss-adjusted assets
+ * per share, the number a lender needs), HDL, LIQ, COV, CNC, DDL. NAV carries six decimals; the
+ * normalised 0..1 dimensions carry four.
+ */
 const SCALE = { NAV: 6, HDL: 4, LIQ: 4, COV: 4, CNC: 4, DDL: 4 }
 
 /** AssetPrice is a UInt64 rendered as hex. Invariant 4. */

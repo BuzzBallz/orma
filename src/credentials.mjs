@@ -29,10 +29,6 @@
  * That is the right design and it is worth saying out loud, because the alternative
  * would be a rater who can trap capital.
  */
-import { logger } from './log.mjs'
-
-const log = logger('gate')
-
 export const TF_VAULT_PRIVATE = 0x00010000
 
 /** CredentialType is a hex blob, 1..64 bytes. Anything outside that is temMALFORMED. */
@@ -183,4 +179,3 @@ export function isNamedIn(status, issuerAddress) {
   return status.acceptedCredentials.some((a) => a.issuer === issuerAddress)
 }
 
-export { log as gateLog }

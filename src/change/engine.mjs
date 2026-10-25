@@ -10,8 +10,9 @@
  * Why HIDDEN exists: ApplyStateTable.cpp:202-208 (rippled 3.4.1) saves into PreviousFields only the
  * fields present on the original node. A field absent before the transaction, at its type default, and
  * present after it, changes without leaving a trace in PreviousFields: a reader that diffs metadata
- * never sees it change. Only an object read at L proves the field was absent; an object the preview did
- * not read (a signer's AccountRoot) takes its FinalFields overlaid by its PreviousFields as its values
+ * never sees it change. Only an object read at L proves the field was absent. simulateAndRead reads at L
+ * every object the simulated metadata modifies or deletes; one with no read at L (it did not exist there,
+ * or a caller's `before` leaves it out) takes its FinalFields overlaid by its PreviousFields as its values
  * before, and none of its fields is ever HIDDEN.
  *
  * PreviousFields is read for one reason only: to compute `admitted`. A value is never taken from it for
@@ -70,16 +71,13 @@ export const DEFAULTS = Object.freeze({
 /** Keys of a node read by ledger_entry, or added by the API: never compared fields. */
 const NODE_KEYS = new Set(['index', 'LedgerEntryType', 'LedgerIndex', 'shares'])
 
-/**
- * The five normalisations. Each is named so that a check can show the row it removes.
- *   indexes        the Indexes of a DirectoryNode are ignored
- *   defaults       the NewFields of a CreatedNode are completed with DEFAULTS
- *   noFinalFields  a ModifiedNode without FinalFields is unchanged
- *   mptIssuanceId  the synthetic mpt_issuance_id is removed
- *   previousTxn    PreviousTxnID and PreviousTxnLgrSeq are ignored: they change with every transaction
- *                  that touches the object and are not state fields
- */
-export const NORMALISATIONS = Object.freeze(['indexes', 'defaults', 'noFinalFields', 'mptIssuanceId', 'previousTxn'])
+// The five normalisations, each named so that a check can turn it off and show the row it removes.
+//   indexes        the Indexes of a DirectoryNode are ignored
+//   defaults       the NewFields of a CreatedNode are completed with DEFAULTS
+//   noFinalFields  a ModifiedNode without FinalFields is unchanged
+//   mptIssuanceId  the synthetic mpt_issuance_id is removed
+//   previousTxn    PreviousTxnID and PreviousTxnLgrSeq are ignored: they change with every transaction
+//                  that touches the object and are not state fields
 
 /** Money fields: sign and unit of the effect of a change. `asset` is the vault's asset, `amount` the amount's own form. */
 const MONEY = Object.freeze({

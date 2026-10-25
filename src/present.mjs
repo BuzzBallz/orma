@@ -36,10 +36,6 @@ export function freshness(snap, closeTime) {
 export function setLabel(vaultId, label) { labels.set(vaultId, label) }
 
 /**
- * Trend needs history, which we only have once the reader has ticked twice.
- * Until then "stable" is the honest answer, not a guess.
- */
-/**
  * The outlook, from the state of the book alone: a non-performing exposure, or claims the
  * redemption date cannot meet, is deteriorating. Comparing the NAV with the last one this process
  * served said "stable" after every restart, and of a facility with every loan in default.
