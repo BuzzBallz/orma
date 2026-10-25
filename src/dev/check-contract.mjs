@@ -1,9 +1,12 @@
 // Does the presenter emit exactly the contract shape? Compare its keys against a
 // committed fixture, which IS the contract by construction.
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { Reader } from '../poll.mjs'
 import { presentVault, presentRow } from '../present.mjs'
 const VAULT='0B1014D870ECF81C2D9F860E101B04C0631F6A775E5B84AA0E73CBAC3EF97F6C'
+// fixtures/ is pre-event material and gitignored: a clone without it gets a sentence, not ENOENT.
+// No socket is open yet, so process.exit() is safe here (code rule 11).
+if (!existsSync('fixtures/vaults.json')) { console.log('  fixtures/ is not in this clone (gitignored pre-event material): nothing to compare'); process.exit(1) }
 const fx=JSON.parse(readFileSync('fixtures/vault-6717B5115871C2C1A5552C62B68F52A55C9C58086BD1FDC78D7DCE43ACDD773C.json','utf8'))
 const list=JSON.parse(readFileSync('fixtures/vaults.json','utf8')).vaults[0]
 const r=new Reader([VAULT]); await r.xrpl.connect(); await r.tick()
@@ -26,3 +29,4 @@ if(live.loans.length && fx.loans.length) cmp('loan[0]  ', live.loans[0], fx.loan
 if(live.alerts.length && fx.alerts.length) cmp('alert[0] ', live.alerts[0], fx.alerts[0])
 console.log(bad? `\n  ${bad} MISMATCH(ES)` : '\n  PASS — live presenter matches the frozen contract exactly')
 await r.stop()
+process.exitCode = bad ? 1 : 0

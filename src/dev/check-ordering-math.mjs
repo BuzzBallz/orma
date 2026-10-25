@@ -25,4 +25,4 @@ const closed = (ps) => c.times(new Decimal(ps.length).times(D0).minus(ps.reduce(
 console.log(`  closed form big-first   ${closed([big,small]).toFixed(0)}`)
 console.log(`  closed form small-first ${closed([small,big]).toFixed(0)}`)
 console.log(pass ? '\n  PASS: the module reproduces the on-chain measurements exactly' : '\n  FAIL')
-process.exit(pass ? 0 : 1)
+process.exit(pass && swing.toFixed(2) === '40.00' ? 0 : 1)

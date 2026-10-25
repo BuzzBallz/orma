@@ -1,14 +1,19 @@
 // Publishes the solvency vector as a native XLS-47 Oracle and exercises the four
 // invariants that corrupt data silently. Run against the vault left by the collateral
 // scenario: node src/dev/check-oracle.mjs
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { Client } from 'xrpl'
 import { Xrpl } from '../xrpl.mjs'
 import { Reader } from '../poll.mjs'
 import { presentVault } from '../present.mjs'
 import { OraclePublisher, vaultToBaseAsset, encodePrice, decodePrice } from '../oracle.mjs'
 
-const f = readdirSync('.demo').filter((n) => n.startsWith('collateral-')).sort().pop()
+const f = existsSync('.demo') ? readdirSync('.demo').filter((n) => n.startsWith('collateral-')).sort().pop() : undefined
+// .demo/ is gitignored: its capture comes from a run of the scenario. No socket yet, so process.exit() is safe.
+if (!f) {
+  console.log('  no .demo/collateral-*.json: run node src/demo/collateral-scenario.mjs first')
+  process.exit(1)
+}
 const st = JSON.parse(readFileSync(`.demo/${f}`, 'utf8'))
 
 const c = new Client('wss://s.devnet.rippletest.net:51233', { connectionTimeout: 20000 })
@@ -75,3 +80,5 @@ console.log(`    ${p3.result ?? 'skipped'}  |  dimensions carrying a price again
 
 await r.stop()
 await c.disconnect()
+// The partial-publish probe observes the ledger; the NAV round trip, the update time and the recovery are the verdict.
+process.exitCode = nav?.value === detail.vault.navCorrect && okLut && priced === 6 ? 0 : 1
