@@ -6,6 +6,7 @@
 import { num } from '../num.mjs'
 import { logger } from '../log.mjs'
 import { parseStatement, statementConsistency } from '../nyc/contracts.mjs'
+import { MAX_PAGES } from '../ticket/inputs.mjs'
 
 const log = logger('feed')
 
@@ -98,7 +99,7 @@ const clean = (e) => {
 /**
  * The feed of every vault the Reader reads. Each snapshot is composed with the borrower's share escrows
  * (one read per ledger, shared by the vaults of that ledger) and, when the vault changed, its Data; a
- * ledger whose reads fail or overflow a page is skipped, so the next snapshot compares with the last
+ * ledger whose reads fail or run past MAX_PAGES pages is skipped, so the next snapshot compares with the last
  * composed one and an escrow missed then found again is never a new pledge.
  * @param {any} reader @param {{ xrpl?: any, escrowAccounts: string[] }} opts
  */
@@ -117,9 +118,15 @@ export function createFeed(reader, { xrpl = reader.xrpl, escrowAccounts }) {
         read: (async () => {
           const out = []
           for (const account of escrowAccounts) {
-            const r = (await xrpl.req({ command: 'account_objects', account, type: 'escrow', limit: 400, ledger_index: L })).result
-            if (r.marker) throw new Error(`more than 400 escrows on ${account}`)
-            out.push(...(r.account_objects ?? []).filter((e) => e.Account === account))
+            // marker followed at L, MAX_PAGES at most; past that the ledger is skipped, like a failed read
+            let marker
+            let page = 0
+            do {
+              if (page++ === MAX_PAGES) throw new Error(`the escrows of ${account} run past ${MAX_PAGES} pages at ledger ${L}`)
+              const r = (await xrpl.req({ command: 'account_objects', account, type: 'escrow', limit: 400, ledger_index: L, ...(marker !== undefined && { marker }) })).result
+              out.push(...(r.account_objects ?? []).filter((e) => e.Account === account))
+              marker = r.marker ?? undefined
+            } while (marker !== undefined)
           }
           return out
         })(),
@@ -136,15 +143,27 @@ export function createFeed(reader, { xrpl = reader.xrpl, escrowAccounts }) {
     if (data === (prev?.vaultData ?? null)) return { vaultData: data, statementTxHash: prev?.statementTxHash }
     let statementTxHash
     if (data && node.PreviousTxnID) {
-      const tx = (await xrpl.req({ command: 'tx', transaction: node.PreviousTxnID })).result
-      const j = tx.tx_json ?? tx
-      if (j.TransactionType === 'VaultSet' && j.Account === node.Owner && j.Data === data) statementTxHash = tx.hash ?? node.PreviousTxnID
+      // The VaultSet's hash only labels the STATEMENT: a lookup that fails (a server without that
+      // history) leaves it out, and the snapshot is still composed, or the vault never had a baseline.
+      try {
+        const tx = (await xrpl.req({ command: 'tx', transaction: node.PreviousTxnID })).result
+        const j = tx.tx_json ?? tx
+        if (j.TransactionType === 'VaultSet' && j.Account === node.Owner && j.Data === data) statementTxHash = tx.hash ?? node.PreviousTxnID
+      } catch (e) {
+        log.warn('statement transaction not found, its STATEMENT carries no txHash', { vault: snap.vaultId.slice(0, 12), ledgerIndex: snap.ledgerIndex, err: String(e?.data?.error ?? e?.message ?? e).slice(0, 120) })
+      }
     }
     return { vaultData: data, statementTxHash }
   }
 
   async function compose(snap) {
     const prev = last.get(snap.vaultId)
+    // A pass read at an older ledger (a reconnection to a lagging server) is not compared: against the
+    // last composed snapshot it would undo what that one saw, and the ledger after it would replay it.
+    if (prev && snap.ledgerIndex < prev.ledgerIndex) {
+      log.warn('older ledger skipped by the feed', { vault: snap.vaultId.slice(0, 12), ledgerIndex: snap.ledgerIndex, last: prev.ledgerIndex })
+      return
+    }
     let escrows, data
     try {
       const share = snap.vault.shareMptId
