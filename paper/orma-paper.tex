@@ -95,7 +95,7 @@
 
 \title{Orma: measuring discretion in on-ledger private credit}
 \author{Alexandre Lemiere \and Andrea Gonzalez}
-\date{13 September 2026, corrected 13 October 2026}
+\date{13 September 2026, corrected 13 October 2026, extended 25 October 2026}
 
 \begin{document}
 \maketitle
@@ -111,6 +111,10 @@ fixed set of defaults depends on the order in which they are declared, that orde
 unilaterally by the party whose capital is consumed, and a closed form makes the size of the
 choice computable from public state. On the measured facility it is worth $0.20$ XRP out of
 $0.70$.
+
+Section~\ref{sec:desk}, added after the XRPL hackathon in New York, 24 and 25 October 2026,
+states the arithmetic of Orma Desk, which lends against vault shares at their withdrawal
+value. Its figures were read on Devnet during that event, not in Paris.
 \end{abstract}
 
 % The title page carries the title and the abstract and nothing else. A jury reading this
@@ -119,6 +123,14 @@ $0.70$.
 \clearpage
 
 \section{The setting}
+
+Sections~1 to 6 are the Paris paper: the information layer, built and measured in September
+2026. Section~\ref{sec:desk} is the New York extension. It puts that layer to one use, a
+lender's: Orma Desk lends XRP against shares of a closed-ended vault, values the pledge only
+at the held unit value of Section~2, prices the default of each late loan of the vault before
+it happens, and countersigns a loan only after reading the ledger again. The pledge sits in
+escrow toward a two-of-three account, so no single party can move it. The rules it keeps
+are stated as seven invariants, each with the check that tests it.
 
 \subsection{The objects}
 
@@ -441,7 +453,7 @@ broker declares them. \texttt{DebtTotal} is decremented by $p$ as each default s
 the book facing step $i$ is $D_{i-1} = D_0 - \sum_{j < i} p_{\sigma(j)}$.
 
 Write $T(\sigma, k)$ for total cover consumed across the $k$ declarations, under three regularity
-assumptions that hold on the measured facility and that Section~7 revisits.
+assumptions that hold on the measured facility and that Section~\ref{sec:limits} revisits.
 
 \begin{itemize}
 \itemsep7pt
@@ -796,7 +808,7 @@ nothing.
 
 Only a write-off, which removes the asset from \texttt{AssetsTotal} outright, is
 permanent destruction, and only that is counted. Par is taken as $1.0$, so $S$ is capital
-subscribed measured in asset units; Section~7 states when that holds.
+subscribed measured in asset units; Section~\ref{sec:limits} states when that holds.
 
 \subsection{Two worked facilities}
 
@@ -893,9 +905,314 @@ A conventional $20\%$ haircut on the reported figure is, on this instrument, alm
 consumed by the misstatement alone. It leaves $0.39$ percentage points of protection against
 everything else that could go wrong.
 
-\section{Limitations}
+\section{Orma Desk: lending against shares at their withdrawal value}
+\label{sec:desk}
 
-\paragraph{Devnet only.} Every figure here was measured on the XRP Ledger Devnet, network id
+This section was added after the XRPL hackathon in New York, 24 and 25 October 2026. It
+states what Orma Desk computes and the rules it keeps. Every figure was read on XRP Ledger
+Devnet during that event. The lender, Harbor Credit Desk, the borrower, Tidewater Payments,
+and the Harbor vaults are fictional; the transactions are real.
+
+A Devnet lending vault must be closed-ended (Section~1.1), so a holder who needs XRP before
+the redemption date cannot redeem and must borrow against the shares. The lender then has to
+price a share that no one can redeem, and Section~2 gives it two prices. Orma Desk lends
+against the held one only. Each figure the desk serves carries its value, a formula named
+from a closed table, and every input the formula used, each with the ledger object, field and
+id it was read from and the index and hash of the validated ledger it was read at. Amounts
+are decimal strings throughout, computed at $40$ significant digits as in Section~1.3. The
+browser replays each formula on the inputs it was sent; it does not read the ledger.
+
+\subsection{The ticket}
+
+A ticket, \texttt{orma.ticket/1}, is everything one operation on a share can cost, read at
+one validated ledger $\Lambda$. For a pledge of $u$ share units, write $k$ for the vault's
+\texttt{Scale}, $\bar S = S/10^{k}$ and $\bar u = u/10^{k}$ for whole shares, and
+\begin{align}
+  \pi(x) &= \round_{6}\!\big( x / \bar S \big),
+  \qquad \pi(x) = 0 \text{ when } \bar S = 0,
+  \\[4pt]
+  \mathrm{val}(p) &= \round_{0}\!\big( \bar u \, p \big),
+\end{align}
+both rounded to nearest, halves up: $\pi$ is the unit value of Section~2 at its $6$
+published decimals, and $\mathrm{val}$ is the value of the pledge in whole drops.
+
+\paragraph{Held value, naive value, and N1.}
+\begin{align}
+  V_{\mathrm{held}} &= \mathrm{val}\big( \pi(A - L) \big),
+  \\[4pt]
+  V_{\mathrm{naive}} &= \mathrm{val}\big( \pi(A) \big),
+  \\[4pt]
+  N_{1} &= V_{\mathrm{naive}} - V_{\mathrm{held}} .
+\end{align}
+$N_1$ is what a lender overpays by valuing the shares at the value everyone reads. It is the
+overstatement $\Omega$ of Section~6, taken on the two rounded values.
+
+\paragraph{N2, the default of each late loan alone.} For each loan $i$ of the vault that is
+past its due date plus its grace period and not already in default, write $e_i$ for its
+exposure, \texttt{PrincipalOutstanding} under \texttt{LEVersion} $=1$ and
+\texttt{TotalValueOutstanding} $-$ \texttt{ManagementFeeOutstanding} otherwise, and
+$\iota_i = 1$ when the loan is impaired, $0$ when it is not. The cover its default would
+consume is \eqref{eq:cover} with $e_i$ in place of $p$,
+\begin{equation}
+  T_i = \min\Big( \big\lceil D \cdot c_{\min} \cdot c_{\mathrm{liq}} \big\rceil,\; e_i,\; C \Big),
+\end{equation}
+and the held unit value if loan $i$ defaults alone, now, is
+\begin{equation}
+  \nu_i = \pi\Big( A - (e_i - T_i) - (L - \iota_i \, e_i) \Big):
+\end{equation}
+the default removes the exposure less the cover from the assets, and the loss of an
+impaired loan, already counted in $L$, leaves $L$. The loss of the pledge is
+\begin{equation}
+  N_{2,i} = \begin{cases}
+    0 & \text{if } \iota_i = 1, \\
+    V_{\mathrm{held}} - \mathrm{val}(\nu_i) & \text{otherwise},
+  \end{cases}
+\end{equation}
+since an impaired loan's loss is already in $V_{\mathrm{held}}$. The ticket also states
+$T_i$ and $\nu_i$. Each entry is one default against the current state, never several at
+once: a joint scenario depends on the order of the defaults (Section~4).
+
+\paragraph{N3, the lock-up.} The seconds until the vault lets a holder redeem,
+$\texttt{RedemptionDate} - \texttt{close\_time}(\Lambda)$; the cash the vault holds today,
+$A_v$; and what the shares claim at redemption, $V_{\mathrm{held}}$.
+
+\paragraph{The loan.} For a principal $P$ in drops and a mandate limit $m$ in basis points,
+\begin{align}
+  P_{\max} &= \big\lfloor m \, V_{\mathrm{held}} / 10^{4} \big\rfloor,
+  \\[4pt]
+  \mathrm{LTV}_{\mathrm{held}} &= \big\lfloor 10^{4} P / V_{\mathrm{held}} \big\rfloor,
+  \\[4pt]
+  \mathrm{LTV}_{1:1} &= \big\lfloor 10^{4} P / \bar u \big\rfloor ,
+\end{align}
+the last being the same loan seen by a lender who prices a whole share at par, one drop. A
+pledge worth $0$ at the held value has no $\mathrm{LTV}_{\mathrm{held}}$, and the ticket
+refuses to compute one.
+
+\paragraph{Identity and staleness.} The ticket's id is the SHA-256 of the canonical JSON
+(keys sorted, no spaces) of the share, the operation, $u$, the mandate's hash and the ledger
+index and hash, and for a loan in the test dollar also the loan's asset and the hash of the
+dollar terms. A second digest covers every input value its figures read except the ledger's
+close time and the XRP/USD median; the desk compares it at approval to tell a changed input
+from a later ledger.
+
+\subsection{The mandate and the refusal}
+
+The lender's rules are a mandate, \texttt{orma.mandate/1}: its id, the desk, the risk
+officer, four limits, the escrow policy and its issue date. Its hash is the SHA-256 of the
+canonical JSON of those keys and its schema name, and the risk officer anchored it on Devnet
+in a transaction memo. The mandate
+\texttt{desk-1} sets
+\begin{center}
+\begin{tabular}{lr}
+\toprule
+limit & value \\
+\midrule
+loan-to-value at the held value, $m$ & $53.44\%$ \\
+one loan & at most $4$ XRP \\
+loss if one vault loan defaults alone, $\max_i N_{2,i}$ & at most $0.97$ XRP \\
+lock-up, $\texttt{RedemptionDate} - \texttt{close\_time}$ & at most $23$ days \\
+\bottomrule
+\end{tabular}
+\end{center}
+The verdict lists each limit whose value is strictly above its threshold: $\mathrm{LTV}_{\mathrm{held}}$
+against $m$, $P$ against the single-loan limit, $\max_i N_{2,i}$ against the loss limit, and
+the lock-up against $86400$ times the day limit. It is \texttt{PASS} when the list is empty
+and \texttt{BREACHED} otherwise. A second verdict judges the same rows with
+$\mathrm{LTV}_{1:1}$ in place of $\mathrm{LTV}_{\mathrm{held}}$, so the ticket shows what a
+lender at par would decide.
+
+At approval a breach is refused as \texttt{409 BREACHED}, not retryable, with each breach
+as its limit, value and threshold, and nothing is signed. The other refusals are
+\texttt{STALE} (an input changed since the request), \texttt{ESCROW\_POLICY},
+\texttt{SEQUENCE\_PASSED} (the borrower's signed request can no longer be included),
+\texttt{INCONSISTENT\_SNAPSHOT} (invariant I7 below), \texttt{LOCKED} (the kill switch is
+on) and, for a dollar loan, \texttt{PRICE\_UNAVAILABLE}. Each is written to the decision log
+before it is returned.
+
+\subsection{The pledge}
+
+The borrower places its $u$ units in a token escrow (XLS-85) whose destination is a
+collateral account. The desk accepts that account only with its master key disabled, no
+regular key, a signer list of exactly the borrower, the desk and the Orma agent at weight
+$1$ each and quorum $2$, a token holding of the pledged share, no other ledger object, no
+deposit authorisation, and exactly one pledge escrow, the one named. No one key moves the
+shares. It accepts the share only if the vault's asset is XRP, the vault is closed-ended and
+the share issuance flags are exactly \texttt{0x38} (escrow, trade, transfer), with neither
+lock nor clawback.
+
+The escrow's window is bound to the loan. At approval, with $\Pi$ the payment interval, $G$
+the grace period and $n$ the number of payments of the \texttt{LoanSet},
+\texttt{FinishAfter} must be at least $\texttt{close\_time}(\Lambda) + \Pi + G$ plus a slack,
+so the escrow cannot be finished before the loan can default, and at most that sum plus the
+policy's margin; \texttt{CancelAfter} must be \texttt{FinishAfter} plus the policy's fixed
+offset, and at least $\texttt{close\_time}(\Lambda) + n\Pi + G$ plus the slack, so the loan
+matures before the escrow can be cancelled. The escrow must carry no crypto-condition.
+
+Once the escrow is finished the shares sit in the collateral account, and the Orma agent's
+published rule says when it co-signs their release. It finds the one desk \texttt{LoanSet},
+validated \texttt{tesSUCCESS}, whose memo names the account's pledge escrow; none, or more
+than one, releases nothing. If that loan is in default, the shares go to the desk; if it was
+repaid without default, back to the borrower; in every other state, nowhere. The account
+must still conform and the recipient must be able to receive the shares. The agent then
+co-signs one transaction only: a \texttt{Payment} from the collateral account to the party
+the rule names, of all the shares it holds, with no \texttt{SendMax}, \texttt{DeliverMin},
+\texttt{Paths}, partial payment or \texttt{Delegate}, a fee of at most $30$ times the base
+fee, and no other field.
+
+\subsection{The countersignature and the decision log}
+
+The borrower signs a \texttt{LoanSet} whose memos name the ticket and the escrow. When the
+risk officer approves, the desk takes a new validated ledger $\Lambda'$ and reads again at
+$\Lambda'$ the escrow the memo names, the collateral account, the share, the borrower's
+account and every input of the ticket. It countersigns only if, at $\Lambda'$, the escrow
+exists, belongs to the borrower, holds the ticket's share and units, backs no other desk
+loan and meets the window above; the account and the share conform; the recomputed ticket's
+input digest is the request's; its verdict is \texttt{PASS}; the borrower's sequence has not
+been used; and the kill switch is off. This is invariant I2.
+
+Every outcome, approved, refused or declined, is one line of an append-only log,
+\begin{align}
+  e_n &= \big( n,\; h_{n-1},\; \text{ticket id},\; \text{mandate hash},\; \text{decision},\;
+  \text{code},\; \text{transaction hash},\; \Lambda',\; \mathrm{hash}(\Lambda') \big),
+  \\[4pt]
+  h_n &= \mathrm{SHA256}\big( \mathrm{canonical}(e_n) \big),
+\end{align}
+with $h_0$ sixty-four zeros, so altering an entry breaks the chain from that entry on. A log
+that cannot be opened refuses the approval before anything is signed. Margin calls, below,
+are entries of the same chain.
+
+\subsection{The change preview}
+
+Before the browser confirms any action, the role engine simulates its transaction on the
+open ledger, reads again at $\Lambda$ every object the simulated metadata modifies or
+deletes, and serves \texttt{orma.change/1}: one row per changed field, with the value before
+and after, its money effect, and whether the metadata admits the change (\texttt{YES}) or
+hides it (\texttt{HIDDEN}), each with the line of \texttt{rippled} 3.4.1 that decides it. A
+field is hidden when it was absent before, at its type's default, and is present after:
+\texttt{PreviousFields} keeps only fields present on the original node, the rule of
+Proposition~\ref{prop:empty}. The known cases are \texttt{Vault.LossUnrealized} on a first
+impairment, \texttt{Vault.Data} on a manager's first statement, and \texttt{LockedAmount}
+on a holder's and an issuance's first escrow lock. \texttt{PreviousFields} is read only to
+decide that label, never for a value. After the transaction validates, the objects are read
+again and each row is marked \texttt{MATCH} or \texttt{MISMATCH}.
+
+\subsection{After the loan}
+
+\paragraph{The margin call.} A margin policy, \texttt{orma.marginpolicy/1}, names the
+mandate it serves by hash, a trigger, the mandate's limit $m$, a cure window $w$ and the cure,
+pledging more shares; it is hashed like the mandate and anchored. Each time the desk judges
+its positions, at most every $15$ seconds and at a validated ledger, an open desk loan
+whose $\mathrm{LTV}_{\mathrm{held}}$ is above $m$ moves from \texttt{NONE} to \texttt{ISSUED},
+with a deadline $\texttt{close\_time} + w$; back within the limit it is \texttt{CURED}; still
+above it after the deadline it is \texttt{EXPIRED}, and the desk may then act under its
+escrow policy. The collateral is not taken when the call is issued. For a principal $P$ and
+pledged value $H$, the value missing is the least whole number of drops $v$ with
+$\lfloor 10^{4} P / (H + v) \rfloor \le m$,
+\begin{equation}
+  v = \Big\lfloor \frac{10^{4} P}{m + 1} - H \Big\rfloor + 1,
+\end{equation}
+and the call states the least whole number of share units whose value, rounded as
+$\mathrm{val}$ rounds it, covers $v$. Orma computes and the desk decides, so the call is
+labelled declared; each transition is read again at the same ledger, then becomes an entry of
+the decision log and an event of the feed.
+
+\paragraph{The payment record.} For each loan of the vault that is not closed, the ticket
+states its status, how long it is past due,
+$\max\big(0,\, \texttt{close\_time}(\Lambda) - \texttt{NextPaymentDueDate}\big)$ seconds,
+and the payments missed: $0$ if it is not late, otherwise
+$\min\big( \texttt{PaymentRemaining},\; \lfloor \text{late} / \Pi \rfloor + 1 \big)$, because
+\texttt{NextPaymentDueDate} advances only when a payment is made. A defaulted loan has no due
+date, since the ledger deletes it, and so neither figure.
+
+\paragraph{Loans in a test dollar.} The desk also lends a Devnet token that stands in for
+RLUSD, against the same shares. The collateral rule does not change: shares of XRP vaults
+only, because an issued asset can be clawed back or frozen by its issuer. The XRP/USD price
+is the median of the XLS-47 Oracle documents the risk officer's terms name, each read at
+$\Lambda$, provided at least the stated number are fresh relative to $\texttt{close\_time}(\Lambda)$
+and lie within a stated spread of each other, and the ledger's own aggregate price over the
+same documents at $\Lambda$ agrees. Otherwise there is no price and no dollar figure. A drop
+amount $d$ is worth
+$\mathrm{usd}(d) = \lfloor d/10^{6} \cdot x \cdot (1 - h_{fx}/10^{4}) \rfloor_{6}$ dollars,
+rounded down to a millionth, at price $x$ and the terms' haircut $h_{fx}$, and the dollar
+loan-to-value is $\lfloor 10^{4} P_{\$} / \mathrm{usd}(V_{\mathrm{held}}) \rfloor$.
+
+\paragraph{Around the desk.} \texttt{orma-mark} checks a share's valuation from its token id
+alone: it follows the valuation pointer of Section~6, refuses one copied from another share,
+recomputes the held unit value from the vault and cross-checks Orma's Oracle object. The
+feed derives credit events from two full re-reads of a vault, never from metadata. The
+universe prices, at one ledger, every vault Orma knows and every vault seen in the
+transaction stream since the process started.
+
+\subsection{The invariants}
+
+\begin{center}
+\small
+\setlength{\tabcolsep}{6pt}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{lp{0.82\textwidth}}
+\toprule
+ & rule \\
+\midrule
+I1 & A pledge is valued only at its held value, read at a validated ledger: every input of
+every figure carries that ledger's index and hash. \\
+I2 & The desk countersigns a \texttt{LoanSet} only after reading again at a new validated
+ledger the escrow its memo names, the collateral account and the share, and only if the
+recomputed ticket passes the mandate. \\
+I3a & The collateral account has its master key disabled, no regular key and signers
+\{borrower, desk, Orma agent\} at weight $1$, quorum $2$. \\
+I3b & The Orma agent co-signs only the release \texttt{Payment} its published rule names. \\
+I4 & Only shares of XRP vaults are collateral, with share flags exactly \texttt{0x38}. \\
+I5 & The browser's actions include no \texttt{LoanPay}, no lifting of an impairment and no
+\texttt{VaultDeposit}. \\
+I6 & A manager's statement in \texttt{Vault.Data} is labelled declared and enters no figure. \\
+I7 & No figure on an inconsistent snapshot: the vault and its share issuance are held to
+\texttt{rippled} 3.4.1's vault state checks, else \texttt{409 INCONSISTENT\_SNAPSHOT}. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Worked: the demo loan}
+
+Harbor-1 held $50$ XRP for $50{,}000{,}000$ share units at \texttt{Scale} $0$, the only
+scale an XRP vault takes, when its first loan, L1, was impaired for $10$ XRP, so $\mathrm{NAV}_{\mathrm{naive}} = 1.000000$ and
+$\mathrm{NAV}_{\mathrm{held}} = 0.800000$ drop per unit. Tidewater pledges
+$u = 5{,}000{,}000$ units for $P = 2$ XRP $= 2{,}000{,}000$ drops, read at ledger
+$6{,}384{,}857$. The vault's second loan, L2, was then defaulted on Devnet on 24 October 2026
+at 22:11:21 UTC, ledger $6{,}389{,}290$: $0.15$ XRP of cover was drawn and the held unit
+value fell to $0.703000$, the value computed for L2's default before it was declared.
+
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+quantity & before L2's default & after \\
+\midrule
+$\pi(A - L)$, drop per unit & $0.800000$ & $0.703000$ \\
+$V_{\mathrm{held}}$, drops & $4{,}000{,}000$ & $3{,}515{,}000$ \\
+$P_{\max}$ at $m = 53.44\%$, drops & $2{,}137{,}600$ & $1{,}878{,}416$ \\
+$\mathrm{LTV}_{\mathrm{held}}$ for $P = 2$ XRP & $50.00\%$ & $\mathbf{56.89\%}$ \\
+verdict & \texttt{PASS} & \texttt{BREACHED} \\
+\addlinespace
+$\mathrm{LTV}_{1:1}$, a lender at par & $40.00\%$ & $40.00\%$ \\
+verdict at par & \texttt{PASS} & \texttt{PASS} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+$\mathrm{LTV}_{\mathrm{held}} = \lfloor 10^{4} \cdot 2{,}000{,}000 / 3{,}515{,}000 \rfloor
+= 5689$ basis points, above $5344$, so the same request after the default is refused, while
+a lender at par, $\lfloor 10^{4} \cdot 2{,}000{,}000 / 5{,}000{,}000 \rfloor = 4000$,
+would still approve it. Before the default, the $N_2$ formula priced L2's default at
+$4{,}000{,}000 - \mathrm{val}(0.703000) = 485{,}000$ drops for these units, within the
+$0.97$ XRP limit. Had that loan of $2$ XRP been outstanding against these units, the default
+would have opened a margin call: $v = \lfloor 2 \cdot 10^{10} / 5345 - 3{,}515{,}000 \rfloor + 1
+= 226{,}815$ drops of value missing, covered by $322{,}638$ more units at $0.703000$, which
+would bring $\mathrm{LTV}_{\mathrm{held}}$ back to $\lfloor 2 \cdot 10^{10} / 3{,}741{,}815 \rfloor
+= 5344$ basis points.
+
+\section{Limitations}
+\label{sec:limits}
+
+\paragraph{Devnet only.} Every figure of Sections~1 to 6 was measured on the XRP Ledger Devnet, network id
 $2$, against \texttt{rippled} 3.4.0-rc5. The lending amendments this depends on, XLS-65 for
 vaults and XLS-66 for the broker and loan objects, are not active on Mainnet, so there is no
 production facility to measure and no claim is made about one. The arithmetic is a property
@@ -948,5 +1265,40 @@ penalties in Section~5 are not derived from anything: they are a stated, ordinal
 reproducible judgement, published in full so a reader who disagrees can say where and by how
 much. The two results that are not judgements are Proposition~\ref{prop:empty} and
 Theorem~\ref{thm:order}, which follow from the protocol rules.
+
+\paragraph{Orma Desk, also Devnet only.} The figures of Section~\ref{sec:desk} were read on
+Devnet on 24 and 25 October 2026, with the amendments \texttt{SingleAssetVault},
+\texttt{LendingProtocol}, \texttt{LendingProtocolV1\_1}, \texttt{TokenEscrow},
+\texttt{MPTokensV1} and \texttt{PriceOracle} enabled. What the desk relies on, and what it
+does not cover, is stated here rather than implied.
+
+\paragraph{Keys.} The borrower and the desk together can always move pledged shares, and in
+the demo one server holds both keys, so invariant I3a holds between distinct parties only. No
+release by the Orma agent runs in the demo. After a default the escrow must be finished
+before its \texttt{CancelAfter}, or anyone may cancel it and return the shares to the
+borrower.
+
+\paragraph{The publisher and the browser.} Orma's Oracle objects carry what Orma's key
+signs; \texttt{orma-mark} recomputes from the vault and only cross-checks them. The browser
+replays each formula on the inputs the API sent; it does not read the ledger again, and
+\texttt{orma-mark} and the auditor do.
+
+\paragraph{Between the re-read and the loan.} The \texttt{LoanSet} validates a few ledgers
+after the desk's re-read at $\Lambda'$. The pledge cannot leave meanwhile, since an
+\texttt{EscrowFinish} before \texttt{FinishAfter} and an \texttt{EscrowCancel} before
+\texttt{CancelAfter} are both refused, but the vault's value can move; the next ticket and
+the margin call see it.
+
+\paragraph{Rounding of the desk's figures.} The held unit value is computed at $40$ digits
+and printed to $6$ decimals. It has not been compared with the ledger's own arithmetic on a
+real \texttt{VaultWithdraw}, which the lock-up does not yet allow.
+
+\paragraph{One default at a time.} $N_2$ prices each late loan defaulting alone against the
+current state. Several defaults together cost what Section~4 says they cost, which depends on
+their order, and no ticket figure states it.
+
+\paragraph{The dollar price.} No one runs an XRP/USD oracle on Devnet. A relay of the desk
+copies Kraken, Bitstamp and Coinbase trades into three XLS-47 documents every $60$ seconds,
+from one account. That demonstrates the mechanism; it is not three independent prices.
 
 \end{document}
