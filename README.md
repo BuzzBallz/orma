@@ -2,48 +2,119 @@
 
 ## Built in New York
 
-At the XRPL hackathon in New York, on 24–25 October 2026, we built **Orma Desk**. It sits on the information
-layer this README describes further down: the vault reader, the withdrawal value and the XLS-47 publisher,
-built in Paris in September 2026.
+Nobody can tell you what an XRPL vault share is worth, so nobody can safely lend against it. Orma prices
+a vault share straight from the ledger, and Orma Desk lets institutions borrow against their locked
+shares, with a report their risk committee can sign.
 
-A closed-ended XLS-65 vault refuses every withdrawal until its redemption date (`VaultWithdraw` returns
-`tecTOO_SOON`). A holder who needs XRP before then has to sell the shares or borrow against them, and either
-way someone must price a share the vault will not yet redeem. The price everyone reads, `AssetsTotal /
-shares`, ignores the losses the vault has already recognised. At ledger 6387294, a share of the Harbor-1
-vault, which redeems on 10 November 2026, read 1.000000 that way and was worth 0.800000.
+[Desk](https://ormaprotocol.com/desk) · [Site](https://ormaprotocol.com) · [Docs](https://buzzballz.github.io/orma/) ·
+[HACKATHON.md](HACKATHON.md): where the event's work starts, and how to check that without trusting us.
+It was committed at the start of the build (`4eccf89`), from the plan, and two of its sentences describe
+the plan, not the result: the step tags do not run to `step-16-rehearsal`, and not every transaction of the
+event is captured yet. The tags actually pushed, what was not built and what is not captured are below.
 
-Orma Desk is a credit desk that lends XRP against such shares, and it values them at one price only: their
-withdrawal value, the XLS-65 withdraw rate `(AssetsTotal − LossUnrealized) / shares`, read at a validated
-ledger. The borrower pledges the shares through an XLS-85 escrow into a 2-of-3 account. Its three keys belong
-to the borrower, the desk and the Orma agent, a program that co-signs only what a published rule allows, and
-any two of them move the shares. The desk refuses the loan with `409 BREACHED` when the risk officer's
-mandate does not hold: its limits on loan-to-value, loan size, loss in a default and lock-up. It runs against
-XRPL Devnet, the network where the lending amendments are live, at
-[ormaprotocol.com/desk](https://ormaprotocol.com/desk).
+At the XRPL hackathon in New York, 24–25 October 2026 (Lending & Borrowing track), we built **Orma Desk**,
+collateral management for XRPL lending. It sits on Orma's information layer, built in Paris in September 2026.
+Everything runs on XRPL Devnet, the only network where XLS-65 vaults and XLS-66 lending exist. The three Harbor
+vaults, the lender and the borrower of the demo are fictional.
 
-Where the event's work starts, and how to check that without trusting us: [HACKATHON.md](HACKATHON.md). The
-diff is [`nyc-start...main`](https://github.com/BuzzBallz/orma/compare/nyc-start...main), or
-`git log --oneline nyc-start..main` in a clone. Each build step is one commit and one tag, from
-`step-01-contract` on.
+Today, every XRPL lending vault is closed-ended: `LoanBrokerSet` refuses an open-ended vault
+(`tecNO_PERMISSION`, [rippled#8076](https://github.com/XRPLF/rippled/pull/8076), merged on 26 August 2026),
+and capital stays locked until redemption (`VaultWithdraw` returns `tecTOO_SOON` for the whole Investment
+phase, from `SubscriptionDate` to `RedemptionDate`).
+A holder who needs XRP before then borrows against the shares, and the lender has to price a share the vault
+will not redeem yet. One share has three prices:
 
-| Part | What it does | Offline check |
+- **the value read by all**, `AssetsTotal / shares`, what anyone gets who reads `AssetsTotal` alone;
+- **the withdrawal value**, the XLS-65 withdraw rate `(AssetsTotal − LossUnrealized) / shares`, what
+  `VaultWithdraw` pays out;
+- **a lender at 1:1**, one drop (0.000001 XRP) per share unit, reading nothing.
+
+When the curator, the vault's manager, impairs a loan, the loss goes into `Vault.LossUnrealized` and
+`AssetsTotal` does not move. Harbor-1's first impairment
+([D38861C6…](https://devnet.xrpl.org/transactions/D38861C64E4228444AA04EEEAC5F2972E29FF378000446CCE0A5AA5C6C56A51F))
+put 10 XRP of loss on 50 XRP of assets and 50,000,000 shares: the value read by all stayed 1.000000 drop per
+share unit and the withdrawal value became 0.800000, which Orma's XLS-47 publication of Harbor-1
+([DE7AF2C4…](https://devnet.xrpl.org/transactions/DE7AF2C4F11D3250A2AD66A85E65EE179A6B29277609EA76AE3E09F9AE135262))
+carries as its `NAV`. Before the impairment the field sat at its default value, and a field at its default
+value is not stored, so the Vault node of that transaction's metadata has an empty `PreviousFields`: the
+standard metadata diff misses the loss.
+
+Orma Desk lends XRP against such shares and values them at the withdrawal value only, read at a validated
+ledger. Before each operation it produces a risk ticket, `orma.ticket/1`: what the collateral is worth, what
+can be lost and how long the money is locked; before each signature, a change preview, `orma.change/1`, lists
+the ledger fields the transaction will change. The borrower pledges the shares through an XLS-85 token escrow
+into a 2-of-3 collateral account whose keys belong to the borrower, the desk and the Orma agent, a third key
+that co-signs only the release `Payment` its published rule names (I3b). The desk countersigns the
+borrower's `LoanSet` only after reading everything again at the ledger it signs at, and refuses with
+`409 BREACHED` when the risk officer's mandate (`desk-1`, four limits whose hash is anchored on Devnet) does
+not hold. With the figures committed in `demo/desk.json` (ledger 6384857), the demo loan of 2 XRP against
+5,000,000 Harbor-1 share units has a loan-to-value of 50.00% at the withdrawal value, under the mandate's
+53.44%; if Harbor-1's loan L2 defaults it becomes 56.89% and the desk refuses, while a lender at 1:1 would
+still read 40.00%. Harbor-1's L2 has since been defaulted on Devnet (below): its withdrawal value, read on
+25 October, is that second case's 0.703000.
+
+**The boundary.** The event's work is `nyc-start..main`. `nyc-start` is an annotated tag on commit `bd39502`,
+tagged `2026-10-24 12:18:07 -0400` when the build opened (its message names the event's start, "sat 24 oct
+10:00 ET"). On GitHub:
+[`nyc-start...main`](https://github.com/BuzzBallz/orma/compare/nyc-start...main). In a clone:
+
+```bash
+git fetch --tags && git log --oneline nyc-start..main
+```
+
+Each step that was built ends on a tag: `step-01-contract` to `step-14-feed`, from the plan written before
+the event, then `step-19-desk-copy` to `step-22-late-payments`, steps added to the plan later.
+
+| Tag | What it adds | Offline check |
 |---|---|---|
-| Risk ticket, `orma.ticket/1` | For a share and a mandate: the withdrawal value beside the value read by all, the loss if each late loan defaults alone, the lock-up, the largest loan the mandate allows, and the verdict. Every figure names its formula and the ledger index and hash of each input, so anyone can recompute it. | `node src/dev/check-ticket.mjs` |
-| Desk signer | Countersigns a `LoanSet` only after reading again, at the ledger it signs at, the escrow the loan's memo names, the 2-of-3 account and the ticket. Each decision goes into a hash-chained log. | `node src/dev/check-desk.mjs` |
-| Change engine, `orma.change/1` | Before a transaction is signed, every field it will change, including the ones its metadata leaves out of `PreviousFields`, each with the rippled 3.4.1 file and line that sets it; after validation, MATCH or MISMATCH per field. | `node src/dev/check-change.mjs` |
-| Release rule and auditor | The public rule that sends pledged shares to the desk after a default or back to the borrower after repayment, the guard on what the Orma agent co-signs, and a read-only auditor of the desk's log and collateral accounts. | `node src/desk/audit.mjs --self-test` |
-| Role engine, desk screens, Feed, Universe | Named actions previewed by `simulate` and submitted through one queue per signing account; credit events derived from two full reads of a vault; every vault on file or seen in the transaction stream, read at one ledger. | `npm test` |
+| `step-01-contract` | The `orma.*/1` documents the desk serves. Each figure names one formula from a closed table and exactly its inputs, each input with a ledger index and hash; no amount is a JSON number. | `node src/dev/check-nyc-contracts.mjs` |
+| `step-02-harness` | The New York routes inside the existing API, and `src/dev/with-api.mjs`, a local API that neither signs nor publishes. | `node src/dev/with-api.mjs --self-test` (reads Devnet) |
+| `step-03-pinned-reads` | Every state read asks for a numeric validated `ledger_index` and keeps that ledger's hash. | `node src/dev/check-pinning.mjs` |
+| `step-04-publisher-identity` | The XLS-47 publisher `r91JiCEYCm4CzTF8G5eks1FpzVJxa5FtdL`, `Provider` `Orma`, `Domain` `ormaprotocol.com`, one document id per vault, derived from the vault id. | `node src/dev/check-reader-edges.mjs` (document ids, collision refusal); the account and its `Domain` read live, see How it works |
+| `step-05-bake-nyc` | Harbor-1 to Harbor-3, the desk's lending vaults `desk` and `spare`, the pools of 2-of-3 collateral accounts, the chain test (a pledge, a `LoanSet` the desk countersigned out of `spare` and a 2-of-3 `Payment`, linked below) and the anchored mandate, on Devnet. | `node src/dev/check-demo-ready.mjs --nyc --self-test` |
+| `step-06-orma-mark` | `orma-mark`: anyone checks a share's valuation from its MPT id alone. | `node src/dev/check-mark.mjs` |
+| `step-07-ticket` | The risk ticket `orma.ticket/1`, the mandate route and the desk's positions. | `node src/dev/check-ticket.mjs` |
+| `step-08-role-engine` | The browser's only write path: a closed list of named actions, each previewed (by `simulate` when it carries a transaction), then confirmed. | `node src/dev/check-roles.mjs` |
+| `step-09-desk-kit`, `step-11-desk-screens` | `/desk`, with the tabs Ticket, Positions and Mandate (Universe and Feed came with steps 13 and 14); the browser recomputes every figure from its inputs. | `pnpm -C app build` |
+| `step-10-desk-signer` | The desk's countersignature after a re-read at the signing ledger, and a hash-chained decision log. | `node src/dev/check-desk.mjs` |
+| `step-12-change-engine` | `orma.change/1`: field by field, what a transaction will change and, once validated, what it did. Also the collateral release rule, the guard on what the Orma agent co-signs, and a read-only auditor. | `node src/dev/check-change.mjs`, `node src/desk/audit.mjs --self-test` |
+| `step-13-universe` | Every vault on file or seen in the transaction stream, priced at one ledger. | `node src/dev/check-universe.mjs` |
+| `step-14-feed` | Credit events derived from full re-reads of each vault, by polling or server-sent events. | `node src/dev/check-feed.mjs` |
+| `step-19-desk-copy` | The desk's wording: Harbor Credit Desk (fictional) lends to Tidewater Payments (fictional), and a shortfall is a margin call; the XLS-66 field `CoverRateLiquidation` keeps its name, beside the label "Share of the cover drawn on a default". | `node src/dev/with-api.mjs -- pnpm --dir app smoke` (reads Devnet) |
+| `step-20-margin-call` | Margin calls under a declared policy, cured by pledging more shares. | `node src/dev/check-margin-call.mjs` |
+| `step-21-usd-loans` | Loans in a Devnet test dollar that stands in for RLUSD, against the same XRP-vault shares, at an XRP/USD price read from three XLS-47 documents. | `node src/dev/check-usd.mjs` |
+| `step-22-late-payments` | Each ticket's payment record: how long each loan is past due and how many payments it missed. | `node src/dev/check-payments.mjs` |
+
+Also in `nyc-start..main`, without a step tag: per-client limits on the API's ledger walks, on `/api/mark` and
+on `/api/feed/stream` (`npm run check:api`), the documentation of the new publisher, this README's event
+section with its captures, a redraw of the desk screens (`d7ecfba`) and fixes to them.
+
+**Not built.** Step 15, hardening, was only partly done (the per-client limits and the documentation above)
+and has no tag. Step 16, the predict-then-realise rehearsal, was not built. Step 17, an OTC purchase of shares
+in two legs, was not built: the role engine registers no `buyer` action, so a request for one from an
+authorised operator answers `404 NOT_FOUND`, and the two buyer rows still listed in `OPERATOR_ACTIONS`
+(`app/src/screens/Desk.tsx`) and the server's `op=buy` ticket lead to no settlement. Step 18, role pages for phones, was dropped from the plan.
 
 ### The event's transactions on Devnet
 
 Each link below is a validated Devnet transaction of the event, captured as JSON and as binary in
-[`evidence/devnet-tx/`](evidence/devnet-tx/). Devnet nodes prune their history, so a node may no longer serve
-a past ledger: the proof is the hash and its capture, not a fresh read.
+[`evidence/devnet-tx/`](evidence/devnet-tx/) ([how](evidence/devnet-tx/README.md), written for the captures of
+13 October; Halden's, added on 20 October, and the New York ones, added on 24 October, follow the same
+format). Devnet nodes prune their history, so the capture is the lasting record: its signed blob hashes back to
+the transaction id, but its metadata is the server's copy and cannot be checked offline
+(`node src/dev/check-evidence.mjs --self-test` shows that case on purpose). Ledger objects (vaults, brokers,
+loans, oracles) still read live with `ledger_entry`.
 
-The three Harbor vaults are fictional credit facilities. Their own loans, L1 and L2, are what produce their
-losses. The desk lends against Harbor shares out of the `desk` vault, and in the chain test out of `spare`.
+Each fictional Harbor vault has two loans of its own curator, L1 and L2, which produce its losses. L1 is
+impaired, then declared in the vault's `Data`; L2 is defaulted on demand by the broker's `defaultL2` action.
+Harbor-1's L2 was defaulted on 24 October at 22:11:21 UTC
+(`81C2B143D9156E77370F332891B1B9601C58000519F6E1BA3AB29A92AF4B9431`, ledger 6389290; not captured yet, so
+not linked): 0.15 XRP of first-loss cover was drawn and the withdrawal value fell from 0.800000 to 0.703000,
+the `heldIfL2` that `demo/desk.json` had computed at ledger 6384857. At ledger 6404835, on 25 October,
+Harbor-2's and Harbor-3's L2 were still open. The desk lends against Harbor shares out of the `desk` vault,
+and in the chain test out of `spare`.
 
-| Vault | Created | Loans L1 and L2 | L1 impaired | Manager's statement |
+| Vault | Created | Loans L1 and L2 | L1 impaired | Curator's statement |
 |---|---|---|---|---|
 | Harbor-1 | [FBD87DF2…](https://devnet.xrpl.org/transactions/FBD87DF24EAC9B6537A09FA27D9CBD1E735C7C505066DB4C47E29D9551BA13F4) | [E4FEEA2E…](https://devnet.xrpl.org/transactions/E4FEEA2E814178F7D2A53CFEBBDAE569874C0CB8885B45837800BAAF7C66FA28) · [3420270B…](https://devnet.xrpl.org/transactions/3420270B93FA047C39580B71A882766797B23C06A4C6AB0AF7691B0EDB2C5182) | [D38861C6…](https://devnet.xrpl.org/transactions/D38861C64E4228444AA04EEEAC5F2972E29FF378000446CCE0A5AA5C6C56A51F) | [FF81A871…](https://devnet.xrpl.org/transactions/FF81A871D4437C40CE554BE3C293D480E514BDB14B3D993E3CFB26D953A85A79) |
 | Harbor-2 | [B752D9AB…](https://devnet.xrpl.org/transactions/B752D9AB2A79990ED0404610A16CDC5585654D5A01FF297C87CEA9BCF97E675A) | [8FC8CB2A…](https://devnet.xrpl.org/transactions/8FC8CB2AB566D06128E0B105C0113C351C05FA8360D4B2CEBE11EF0DCBC54B07) · [C07E8885…](https://devnet.xrpl.org/transactions/C07E8885EEAC4BC1CA76BDCEAA5C72449C4ECA86F391543302E178753FC6DECA) | [F72442F6…](https://devnet.xrpl.org/transactions/F72442F6B625C0A45D55B35B269D9EDC17478D5E7A6E1B248E0D94F1A5D43843) | [3DC3B33F…](https://devnet.xrpl.org/transactions/3DC3B33F68689D913D3F166FF6FC97A594F73C0990EF255E59077C4F7B3A06E6) |
@@ -51,647 +122,444 @@ losses. The desk lends against Harbor shares out of the `desk` vault, and in the
 | desk, the vault the desk lends from | [07D7FF14…](https://devnet.xrpl.org/transactions/07D7FF14A713A8D2657528F641CC71C871D2F3ACE4E771444FC2CF038962F2D2) | | | |
 | spare, its second lending vault | [954DA2B3…](https://devnet.xrpl.org/transactions/954DA2B3BBE1572EA37E0529EBC7D44BDFD7CEC1A5DBF6B50FFA8B4F17000791) | | | |
 
-The first impairment of each Harbor vault sets `Vault.LossUnrealized`, a field the vault did not carry
-before. Its metadata leaves that field out of `PreviousFields`, so an indexer that diffs metadata never sees
-the loss appear. `node src/dev/check-change.mjs` replays Harbor-1's from the captured transaction.
+`node src/dev/check-change.mjs` replays Harbor-1's first impairment from a fixture captured read-only.
 
 - The chain test on `spare`: the borrower's
   [escrow of 5,000,000 Harbor-1 share units](https://devnet.xrpl.org/transactions/9690077B02B4F8951182106AB315B9B51A92F31659466883DBD493D8510E22DD)
   into a 2-of-3 account, the
   [LoanSet countersigned by the desk](https://devnet.xrpl.org/transactions/8A8F8176C6DB9FC3E511D72144A4351C37084DBB99D069027510ED3FDC7648E1)
-  whose memo names that escrow, and a
+  whose `orma.escrow` memo names that escrow, and a
   [Payment of shares out of a 2-of-3 test account](https://devnet.xrpl.org/transactions/D3E98D23A112CCCC9E922D03625C41B8456984A1CB12696D9689F3074F09D4EC),
-  signed by the desk and the agent, two of its three keys.
+  multi-signed by the desk and the agent, two of its three keys.
 - The mandate `desk-1`,
   [anchored by the risk officer](https://devnet.xrpl.org/transactions/E63C8AB9D41042B315AE41F45CF2B624592CDC190C66E87D17C8275A2A0A92ED)
-  with its hash in the memo.
+  with its hash in the memo (`demo/mandate-desk-1.json`).
 - [Harbor-1's XLS-47 publication](https://devnet.xrpl.org/transactions/DE7AF2C4F11D3250A2AD66A85E65EE179A6B29277609EA76AE3E09F9AE135262)
-  by the publisher account `r91JiCEYCm4CzTF8G5eks1FpzVJxa5FtdL`, at 20:07:30 UTC on 24 October.
+  by `r91JiCEYCm4CzTF8G5eks1FpzVJxa5FtdL`, at 20:07:30 UTC on 24 October.
 
-The L2 loans default at the two demo slots on 25 October; the hashes of those defaults are added here after
-each slot.
+Not captured yet, so not linked: Harbor-1's L2 default (its hash is above), the anchors of the margin policy
+and of the dollar terms, and the transactions of the dollar pool, whose hashes are in
+`demo/margin-policy-desk-1.json`, `demo/usd-terms-desk-1.json` and `demo/desk-usd.json`.
 
 ### What must never happen, and how anyone can check it
 
-Each local command below runs from a fresh clone after `npm ci`, with no `.demo/` and no access to our
-server; we ran each one that way on 24 October 2026. Two checks read production instead: the health URL of
-I4, and the auditor below the table.
+Each command runs from a fresh clone after `npm ci`, with no `.env`, no `.demo/` and no key (`with-api.mjs`
+writes its receipts under `.demo/receipts/`). Of the commands in the table, only I4's self-test goes to the
+network, to Devnet. Three checks read our servers: the former host in I4's row, the ticket screen named in
+I3a, and the auditor below the table, which reads our production API.
 
 | | Rule | Check |
 |---|---|---|
 | I1 | A pledge is valued only at its withdrawal value, read at a validated ledger: every input of every figure carries that ledger's index and hash. | `node src/dev/check-ticket.mjs` |
 | I2 | The desk countersigns a `LoanSet` only if, at the ledger it signs at, the escrow its memo names exists, belongs to the borrower, holds the ticket's shares and pays into a conforming 2-of-3 account, and the ticket recomputed there passes the mandate. | `node src/dev/check-desk.mjs` |
-| I3a | No single party, the desk, the borrower or Orma, can move pledged shares. | `node src/dev/check-nyc-contracts.mjs`, and the REAL collateral line of the ticket screen, read at a ledger |
-| I3b | The Orma agent co-signs only the release `Payment` its published rule names. | `node src/desk/audit.mjs --self-test` |
-| I4 | One process publishes with the publisher's key: the API container on our server. | `node --env-file-if-exists=.env src/dev/with-api.mjs --self-test`; and our former host, https://orma-api.onrender.com/api/health, is suspended, so it must not answer `ok: true` |
-| I5 | No `LoanPay` and no `tfLoanUnimpair` on a demo vault. | `git grep --untracked -qE "LoanPay\|tfLoanUnimpair\|VaultDeposit" -- src/roles`, which exits 1 |
-| I6 | A manager's statement (`orma.stmt/1` in `Vault.Data`) is labelled DECLARED and enters no computed figure. | `node src/dev/check-ticket.mjs` |
-| I7 | Orma recomputes the vault's withdrawal price as a second implementation, held to the vault-state invariants xrpld checks after every transaction (`VaultInvariant.cpp` 574-644). | `node src/dev/check-ticket.mjs` |
+| I3a | No single party, the desk, the borrower or Orma, can move pledged shares. | `node src/dev/check-nyc-contracts.mjs`, and the ticket screen's collateral line, labelled REAL (read from the ledger), at a ledger |
+| I3b | The Orma agent's published rule: it co-signs only the release `Payment` that rule names. | `node src/desk/audit.mjs --self-test` |
+| I4 | Only the API container on our server publishes with the publisher's key: the local API every check here runs blanks `PUBLISH_SEED` and `PUBLISH` (`src/dev/with-api.mjs`), and our former host is suspended. | `node --env-file-if-exists=.env src/dev/with-api.mjs --self-test`; and our former host, https://orma-api.onrender.com/api/health, is suspended, so it must not answer `ok: true` |
+| I5 | The role engine can build no `LoanPay`, no `tfLoanUnimpair` and no `VaultDeposit`: no action from the browser repays a loan, lifts an impairment or deposits into a vault. | `git grep --untracked -qE "LoanPay\|tfLoanUnimpair\|VaultDeposit" -- src/roles`, which exits 1 |
+| I6 | A curator's statement (`orma.stmt/1` in `Vault.Data`) is labelled DECLARED and enters no computed figure. | `node src/dev/check-ticket.mjs` |
+| I7 | Orma recomputes the vault's withdrawal price as a second implementation, held to the vault-state invariants xrpld checks after every transaction: those of `ValidVault::finalize` (`VaultInvariant.cpp`, xrpld 3.4.1, run when a transaction touches a vault) that one vault state can fail. No shares means no assets, 0 ≤ AssetsAvailable ≤ AssetsTotal, LossUnrealized ≤ AssetsTotal − AssetsAvailable, LossUnrealized ≥ 0, AssetsTotal ≥ 0; not its shares-maximum and assets-maximum checks. | `node src/dev/check-ticket.mjs` |
 
-The auditor also reads production. `node src/desk/audit.mjs` takes the desk's decision log from the
-production API and the ledger from Devnet, with no key. It exits 0 with no violation, 1 on a violation of I1
-to I3 or I7, and 2 when a read is impossible.
+The same commands, to copy:
+
+```bash
+node src/dev/check-ticket.mjs                     # I1, I6, I7
+node src/dev/check-desk.mjs                       # I2
+node src/dev/check-nyc-contracts.mjs              # I3a
+node src/desk/audit.mjs --self-test               # I3b
+node --env-file-if-exists=.env src/dev/with-api.mjs --self-test   # I4
+git grep --untracked -qE "LoanPay|tfLoanUnimpair|VaultDeposit" -- src/roles; echo $?   # I5: 1
+git grep --untracked -qE "LoanManage|EscrowCreate" -- src/roles; echo $?             # control: 0
+```
+
+I7 covers the state checks only, not the transition and transaction-type checks that `ValidVault::finalize`
+also makes; a single snapshot cannot replay those. A snapshot that fails them gets no figure: the ticket,
+the positions and the approval answer `409 INCONSISTENT_SNAPSHOT`, and Universe shows the vault as not priced.
+
+The auditor reads production. `node src/desk/audit.mjs` takes the desk's decision log from the production API
+and the collateral accounts from Devnet, with no key, and `--api <base>` points it elsewhere. It exits 0 with
+no violation, 1 on a violation of I1 to I3 or I7, and 2 when a read is impossible.
 
 What these rules do not cover: the borrower and the desk together can always move the pledged shares, a
-consensual exit, and in this demo our team holds both roles. The agent's release command
-(`node src/desk/audit.mjs --release`) is built and tested offline; no live release is run in the demo.
+consensual exit. In this demo our server holds both of those keys (the API signs for the borrower and for
+the desk), so two of the three keys are ours, and I3a holds between distinct parties only. The agent's
+release command (`node src/desk/audit.mjs --release --account <address>`) is built and tested offline; no live
+release is run in the demo. After a default the escrow has to be finished before its `CancelAfter`: past it,
+anyone may cancel it and the shares go back to the borrower.
 
----
+## How it works
 
-A lending vault on XRPL Devnet took 51 XRP, lent 10, and the borrower stopped paying. The manager wrote the
-loan down, the unit fell from 1.000000 to 0.803922, and the transaction metadata that every indexer diffs
-came back with `PreviousFields: {}`, an empty change set. Orma is a credit measurement, publication and
-enforcement layer for XLS-65 vaults and XLS-66 lending that reads solvency from ledger state instead of from
-metadata diffs, publishes the result as a native XLS-47 Oracle object and as a pointer inside the share
-token's own metadata, and lets an independent third party gate deposits on it through XLS-70 credentials.
+```
+                 XRPL Devnet, one validated ledger L (index and hash)
+  +-------------+  +--------------------+  +-------------------+  +------------------+
+  | Vault       |  | LoanBroker, Loan   |  | Escrow of shares  |  | Oracle           |
+  | XLS-65      |  | XLS-66             |  | XLS-85            |  | XLS-47           |
+  +------+------+  +---------+----------+  +---------+---------+  +--------^---------+
+         |                   |                       |                     |
+         +-------------------+-----------------------+                     | OracleSet
+                             | re-read whole at L, never diffed            |
+  +--------------------------v---------------------------------------------+-------+
+  | Orma, the information layer                                                    |
+  | withdrawal value, XLS-47 publication, orma-mark, Universe, Feed, statements    |
+  +--------------------------+-----------------------------------------------------+
+                             | figures, each with its formula and its inputs at L
+  +--------------------------v-----------------------------------------------------+
+  | Orma Desk, collateral management                                               |
+  | ticket -> mandate verdict -> change preview -> countersigned LoanSet -> calls  |
+  +--------------------------------------------------------------------------------+
 
-**1st place of 14 projects**, De Vinci Blockchain XRPL Lending Protocol Hackathon, Paris, 12-13 September 2026 ([ESILV](https://www.esilv.fr/xrpl-hackathon-devinci-blockchain-remporte-deux-places-sur-le-podium/)).\
-**Upstream:** three notes on the closed-ended vault draft ([XRPL-Standards#587](https://github.com/XRPLF/XRPL-Standards/pull/587#issuecomment-5655843515)), addressed by its author ([reply](https://github.com/XRPLF/XRPL-Standards/pull/587#issuecomment-5665157387)) and merged on 15 September; the `PreviousFields` issue, moved by a RippleX maintainer to the documentation tracker, where it is open ([xrpl-dev-portal#3926](https://github.com/XRPLF/xrpl-dev-portal/issues/3926)).\
-**Live:** [app](https://ormaprotocol.com) · [API, Meridian `/nav`](https://claude-vps.tailf3fd40.ts.net/orma/api/vaults/864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835/nav) (until the facilities load it answers `503 WARMING_UP`; retry) · [docs](https://buzzballz.github.io/orma/) · [paper](paper/orma-paper.pdf)\
-Built by Alexandre Lemiere ([@frytegg](https://github.com/frytegg)) and Andrea Gonzalez ([@andreagnzz](https://github.com/andreagnzz)).
+  borrower --EscrowCreate--> 2-of-3 collateral account {borrower, desk, Orma agent}
+```
 
-**The asymmetry.** The party who decides *when* a vault recognises a loss is the same party who decides *in
-what order* those losses are realised. The `LoanBroker` owner is necessarily the vault owner, by protocol.
-Both decisions move money from investors to them, and neither is visible with the standard tools. Orma
-measures both, publishes them, and enforces on them. One asymmetry, two levers, then enforcement.
+### Orma, the information layer
 
----
+**The reader.** `src/poll.mjs` re-reads each vault's full state every 4 seconds and never diffs
+`PreviousFields`. Every state read (vault, broker, loan, share issuance, account objects) names a numeric
+validated ledger and keeps its hash (`Xrpl.pinned` in `src/xrpl.mjs`), so any figure can be recomputed at the
+ledger it names. Amounts are decimal strings handled by `decimal.js` at precision 40 (`src/num.mjs`). No
+`Number()` and no `parseFloat` touches money in the reader, the ticket or the desk, and `check-ticket` greps
+`src/ticket/` for both; the one-off scripts of `src/demo/` are not held to that rule.
 
-## Compliance
+**XLS-47 publication.** Each vault's figures are published as a native Oracle object with six `PriceData`
+entries (`buildPriceData` in `src/oracle.mjs`), told apart by their `QuoteAsset`: `NAV`, the withdrawal value
+at `Scale` 6, which orma-mark cross-checks; and five dimensions from the Paris build at `Scale` 4, `HDL` (the
+Paris score as a number, `gradeNumeric / 100`), `LIQ`, `COV`, `CNC` and `DDL`. No desk figure uses those five.
+The document id is `oracleDocId(vaultId)` (`src/oracle.mjs`): `sha256(vaultId)` read as a
+big-endian `UInt32` from its first four bytes, where the hash is taken over the 64-character upper-case hex
+string of the vault id, not over its 32 bytes. The id depends on the vault alone, and the publisher refuses to
+publish a second vault under an id already held. `BaseAsset` is the first 20 bytes of the vault id, with its
+first hex digit set to `A` when the id starts with `00`, so that the code is never read as XRP
+(`vaultToBaseAsset` in `src/oracle.mjs`).
 
-| | |
-|---|---|
-| Track | **2**, closed-ended vault, Lending Protocol V1.1 |
-| Flavour | **Loaded**: XLS-65 and XLS-66, plus XLS-47 Price Oracle, XLS-70 Credentials, XLS-80 Permissioned Domains, XLS-85 Token Escrow and XLS-33 MPT shares |
-| Network | XRPL **Devnet**, `wss://s.devnet.rippletest.net:51233`, `network_id` **2** |
-| Explorer, faucet | https://devnet.xrpl.org · https://faucet.devnet.rippletest.net/accounts |
-| `rippled` | **3.4.0-rc5** during the event; Devnet has run **3.4.1** since |
-| Libraries | `xrpl` **5.3.0** with `ripple-binary-codec` **2.11.0**, `decimal.js` **10.6.0**; frontend React 19, Vite |
-| Runtime | Node **24.13.0** |
-| Team | **BuzzBallz** |
-
-The brief pins `xrpl.js@5.2.0-beta.0`. Stable `5.2.0` was published on 11 September 2026 at 22:20 UTC, before
-the event opened, and supersedes it, so the project pins the stable release.
-
-Devnet is not a convenience. The lending amendments are not on Mainnet, so Devnet is the only network where
-XLS-65 and XLS-66 exist. XLS-47, the publication rail, *is* live on Mainnet today; the measurement and the
-gate are not deployable until the lending amendments ship.
-
----
-
-## Transactions used
-
-Every transaction type the project submits, grouped by the standard it belongs to. Each one links to validated
-Devnet transactions the project submitted during the event; the full record is under
-[Verified on-chain transactions](#verified-on-chain-transactions).
-
-### XLS-65, Single Asset Vault (amendment `SingleAssetVault`)
-
-| Transaction | What Orma uses it for | Verified on Devnet |
+| `oracle_document_id` | Vault | Vault id |
 |---|---|---|
-| `VaultCreate` | Creates each demo facility. All four are closed-ended: `VaultKind=1` with `SubscriptionDate` and `RedemptionDate`, because `LoanBrokerSet` returns `tecNO_PERMISSION` otherwise, and `VaultKind` is immutable. | [Meridian](https://devnet.xrpl.org/transactions/D07C59257F0C568DAF401C4253E8609C206B900F838289E9B45B418F7DE4807C) · [Kestrel](https://devnet.xrpl.org/transactions/0AD99C9FC08A84FE743061488024FFFE7ED8ECBD034A73F007444523B283A258) · [Halden](https://devnet.xrpl.org/transactions/1A226B33CD370E82683A39F58FF8465A16FD1DED99C87EC65B00E8BA2B7B4CF5) · [Thorne](https://devnet.xrpl.org/transactions/3FC79BF77240B0D52148428DABEAC0A5F4971957ABEC1D429ABDF297470F2461) |
-| `VaultDeposit` | Subscribes investor capital, and is the transaction the XLS-70 gate admits or refuses at Thorne. | [Meridian](https://devnet.xrpl.org/transactions/3ACF03E8E5E68CD30814694CC7CD5C4BBE67E2EA396EF61EA8C756063892AA8C) · [Thorne, admitted](https://devnet.xrpl.org/transactions/7FC5C01BD735E9A41A0AC6ACFA4B6994B1347A8FA06DAEF8012A62B0E1DF98AF) · [Thorne, refused `tecNO_AUTH`](https://devnet.xrpl.org/transactions/E7CF5DB29DFE652801F4936C11D50A493EB3C474D6EEDFE9FC24394E8DD26101) · [wrong phase `tecEXPIRED`](https://devnet.xrpl.org/transactions/7A10D8053FEE687A008F17E2AD98121EE08553CBDEAAE92DDEC3C2798A1CB15B) |
-| `VaultWithdraw` | Redemption. Also the proof that revoking a credential closes entry without trapping the exit. | [Thorne, after revocation](https://devnet.xrpl.org/transactions/2E71A25973D55E26C8AECFDFDF1EF3BF0571B8FB4DD9D524B6A8C750994F39FE) · [Redemption](https://devnet.xrpl.org/transactions/D26222EC26111FFC4F77D3CCADE0FDD2E7C2B9710B9D3957CC4CB725EF58A734) · [wrong phase `tecTOO_SOON`](https://devnet.xrpl.org/transactions/CC104682C298DFB3619EE4C15F0112ACE2B6A95B4971CA0A0AC748F9B5B6617A) |
-
-### XLS-66, Lending Protocol (amendments `LendingProtocol`, `LendingProtocolV1_1`)
-
-| Transaction | What Orma uses it for | Verified on Devnet |
-|---|---|---|
-| `LoanBrokerSet` | Creates the `LoanBroker`. Its owner is necessarily the vault owner, which is the asymmetry the whole project measures. | [Meridian](https://devnet.xrpl.org/transactions/14CBC3F22EC25532DE74D3EB7758F7A1BB710B0F7ABA3C18C0A4DAC8EAE2785C) · [Kestrel](https://devnet.xrpl.org/transactions/E3D4366469498DDBFC60BC05AF582C18D829B27C52A7224CBE2A58A54B0896AF) · [open-ended vault `tecNO_PERMISSION`](https://devnet.xrpl.org/transactions/CE477E29A099A6BBC30EBA52F3E09AB2A450CDB05F338AE517EDAAC0584827AB) |
-| `LoanBrokerCoverDeposit` | Posts the first-loss cover whose consumption the ordering lever moves. | [Meridian](https://devnet.xrpl.org/transactions/C9483EBB8CD46DA7C6AA9A3E465FC2213E252D8C953F7AF6C347B032D14BB958) · [Kestrel](https://devnet.xrpl.org/transactions/E979EB6D211701C6B8BD66F7D4F3AD1A98388029414BF17FF70D092B74D2B76A) · [Halden](https://devnet.xrpl.org/transactions/A075625DAA314EEC6D8B1C032753E15CAF9A7F45364F1D27F60B5296F257D309) |
-| `LoanSet` | Originates each loan, counterparty-signed. Under cash-basis accounting (`LEVersion=1`) origination moves `DebtTotal`, not `AssetsTotal`. | [Meridian](https://devnet.xrpl.org/transactions/1523BD1B1548A01B46AAA88871EA965EE973BFA7016D7B8ACC950E463567AA4A) · [Kestrel, first](https://devnet.xrpl.org/transactions/525FC003CF1D4C99B82E876DE945000A681230D4312C03DE1120EA9F905118AB) · [Kestrel, second](https://devnet.xrpl.org/transactions/30B97AA397678AF36EDA7604582789C76F1F1B3B1083F453F95FB3107796A06B) · [wrong phase `tecTOO_SOON`](https://devnet.xrpl.org/transactions/E1121DED12D4A320FB58F77D02549429885D8A826B794F2B2539EC936BE39011) · [wrong phase `tecEXPIRED`](https://devnet.xrpl.org/transactions/8A09A988DD3C5433B30E92F5E7B42086D6B17CEB51C6C05572E7A74552B9DAE1) |
-| `LoanManage` | Impairs (`Flags 0x20000`) and defaults (`Flags 0x10000`). These are the two levers. Only the broker owner may submit either. | [impair, Meridian](https://devnet.xrpl.org/transactions/075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3) · [impair, Halden](https://devnet.xrpl.org/transactions/EC385DAF2DF412F86F06648B7855AEFDB1A1B8596048DA33C33B0A09FB2D08E5) · [default, Kestrel, larger](https://devnet.xrpl.org/transactions/FB23EC5313F85FA157D56966E0B0B1665068905988D925C70BB0E7C35C3B221B) · [default, Kestrel, smaller](https://devnet.xrpl.org/transactions/DE49DF0D6136B96AD28B253CD32100E5715078FD2D0AE6D1DB747AFECB803D1F) |
-
-### XLS-47, Price Oracles (amendment `PriceOracle`)
-
-| Transaction | What Orma uses it for | Verified on Devnet |
-|---|---|---|
-| `OracleSet` | Publishes the six-dimension score, one `PriceData` entry per dimension: `NAV`, `HDL`, `LIQ`, `COV`, `CNC`, `DDL`. The base asset is derived from the vault id. | [first publication](https://devnet.xrpl.org/transactions/DC5754D2EE4A6A7AB9233EA3EE704A9C2FD97FA06C80EA364E5D4811CAD75255) |
-| `OracleDelete` | Retires a document id. `OracleSet` is not a merge, so a stale document accumulates pairs until nothing can be published at all. | [recovery](https://devnet.xrpl.org/transactions/37A65CF8C94687C8B39EA66E92D777477F0088196153BEB82807CD58975F4347) |
-
-### XLS-70, Credentials (amendment `Credentials`)
-
-| Transaction | What Orma uses it for | Verified on Devnet |
-|---|---|---|
-| `CredentialCreate` | Issues the grade, credential type `ORMA-IG`. The subject's consent is not required to issue. | [issue](https://devnet.xrpl.org/transactions/619CC767741EFF1EA4DD8AD36F7CB400AE2175540CEC600751E565A73891B26B) |
-| `CredentialAccept` | The subject accepts, which is what makes the credential usable inside a domain. | [accept](https://devnet.xrpl.org/transactions/41F98989B64BD7329118B29B5FCB3AD148DF5520171A3A94259AC4CB51C9ED07) |
-| `CredentialDelete` | Revocation. Entry closes, the exit stays open. | [revoke](https://devnet.xrpl.org/transactions/E2D6F396F4A92DE4F36BDF6FD360EC8C849D4ED9DFDF8585998161098DE8C86D) |
-
-### XLS-80, Permissioned Domains (amendment `PermissionedDomains`)
-
-| Transaction | What Orma uses it for | Verified on Devnet |
-|---|---|---|
-| `PermissionedDomainSet` | A separate vault-owner account (for the demo, a Devnet wallet our setup script created) names Orma's issuer as an accepted credential. Our issuer signs nothing and cannot decline. | [Thorne domain](https://devnet.xrpl.org/transactions/4C425830675B021EB8A74904783D1DBDE516C74534C76E84A2899695DF3D87F9) |
-
-### Supporting standards
-
-| Transaction | Standard | What Orma uses it for | Verified on Devnet |
-|---|---|---|---|
-| `MPTokenAuthorize` | XLS-33 MPT (`MPTokensV1`) | Lets a second lender hold a vault's share token before it is pledged. | [second lender](https://devnet.xrpl.org/transactions/4D3A062391D872BD3581AA421A9B4DE68058E1CFCC0CA21A8FE61D480C7E3B93) |
-| `EscrowCreate` | XLS-85 TokenEscrow (`TokenEscrow`) | Pledges vault shares on ledger to a second lender. That pledge is what Orma prices. | [pledge](https://devnet.xrpl.org/transactions/3322B9214FB87822BA5699423691DAED4A043121D1E17080673F6292E01C1536) |
-| `DelegateSet` | XLS-75 Permission Delegation (`PermissionDelegationV1_1`) | Positive control for a finding: delegating `Payment` succeeds, while every lending permission is refused `temMALFORMED` before reaching a ledger. | [positive control](https://devnet.xrpl.org/transactions/547DA71992D469ACA345A0B3CEAD07864E2801919201B256EA606C3A7910AF17) |
-
----
-
-## Verified on-chain transactions
-
-Every hash below is a validated transaction on XRPL Devnet (`network_id` 2), submitted by this project
-during the event and re-read from the ledger with `tx` and `account_tx` on 13 September 2026. The links
-open the public explorer at https://devnet.xrpl.org. Devnet prunes old ledgers, so those links will stop
-resolving. The raw transactions behind every hash in this README are committed under
-[`evidence/devnet-tx/`](evidence/devnet-tx/README.md), captured on 13 October 2026. Each signed transaction
-blob hashes back to its id, and its metadata is the server's copy as served, not hash-bound offline;
-`npm run check:evidence` checks both against the JSON. The same directory holds every transaction the
-API's two history routes read for the four facilities, which they merge in as Devnet prunes them. The
-vault, oracle and domain objects are ledger state, not history, and still verify live with `ledger_entry`.
-
-### Meridian Trade Finance I, the empty change set
-
-The full closed-ended lifecycle: create, subscribe, attach the broker, post first-loss cover, originate in Investment, then the impairment whose metadata comes back with `PreviousFields: {}`.
-
-| | Transaction | Result | Validated (UTC) | Explorer |
-|---|---|---|---|---|
-| 1 | `VaultCreate` | `tesSUCCESS` | 2026-09-12 21:05:02Z | [`D07C5925…E4807C`](https://devnet.xrpl.org/transactions/D07C59257F0C568DAF401C4253E8609C206B900F838289E9B45B418F7DE4807C) |
-| 2 | `VaultDeposit` | `tesSUCCESS` | 2026-09-12 21:05:11Z | [`3ACF03E8…92AA8C`](https://devnet.xrpl.org/transactions/3ACF03E8E5E68CD30814694CC7CD5C4BBE67E2EA396EF61EA8C756063892AA8C) |
-| 3 | `LoanBrokerSet` | `tesSUCCESS` | 2026-09-12 21:05:20Z | [`14CBC3F2…E2785C`](https://devnet.xrpl.org/transactions/14CBC3F22EC25532DE74D3EB7758F7A1BB710B0F7ABA3C18C0A4DAC8EAE2785C) |
-| 4 | `LoanBrokerCoverDeposit` | `tesSUCCESS` | 2026-09-12 21:05:22Z | [`C9483EBB…4BB958`](https://devnet.xrpl.org/transactions/C9483EBB8CD46DA7C6AA9A3E465FC2213E252D8C953F7AF6C347B032D14BB958) |
-| 5 | `LoanSet` | `tesSUCCESS` | 2026-09-12 21:05:32Z | [`1523BD1B…67AA4A`](https://devnet.xrpl.org/transactions/1523BD1B1548A01B46AAA88871EA965EE973BFA7016D7B8ACC950E463567AA4A) |
-| 6 | `LoanManage`, impair | `tesSUCCESS` | 2026-09-12 21:07:52Z | [`075FE6D2…9229C3`](https://devnet.xrpl.org/transactions/075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3) |
-
-### Kestrel Bridge Financing II, the ordering lever
-
-Two loans originated, then both defaulted, the larger first. Cover consumed: 0.40 XRP on the first default and 0.10 XRP on the second.
-
-| | Transaction | Result | Validated (UTC) | Explorer |
-|---|---|---|---|---|
-| 1 | `VaultCreate` | `tesSUCCESS` | 2026-09-12 21:08:12Z | [`0AD99C9F…83A258`](https://devnet.xrpl.org/transactions/0AD99C9FC08A84FE743061488024FFFE7ED8ECBD034A73F007444523B283A258) |
-| 2 | `VaultDeposit` | `tesSUCCESS` | 2026-09-12 21:08:21Z | [`68D3787A…5B96DD`](https://devnet.xrpl.org/transactions/68D3787A20E1DB97EF6B55AAADBF4EF284727D159F7C65C09223FFD61A5B96DD) |
-| 3 | `LoanBrokerSet` | `tesSUCCESS` | 2026-09-12 21:08:30Z | [`E3D43664…0896AF`](https://devnet.xrpl.org/transactions/E3D4366469498DDBFC60BC05AF582C18D829B27C52A7224CBE2A58A54B0896AF) |
-| 4 | `LoanBrokerCoverDeposit` | `tesSUCCESS` | 2026-09-12 21:08:32Z | [`E979EB6D…D2B76A`](https://devnet.xrpl.org/transactions/E979EB6D211701C6B8BD66F7D4F3AD1A98388029414BF17FF70D092B74D2B76A) |
-| 5 | `LoanSet` | `tesSUCCESS` | 2026-09-12 21:08:42Z | [`525FC003…5118AB`](https://devnet.xrpl.org/transactions/525FC003CF1D4C99B82E876DE945000A681230D4312C03DE1120EA9F905118AB) |
-| 6 | `LoanSet` | `tesSUCCESS` | 2026-09-12 21:08:51Z | [`30B97AA3…96A06B`](https://devnet.xrpl.org/transactions/30B97AA397678AF36EDA7604582789C76F1F1B3B1083F453F95FB3107796A06B) |
-| 7 | `LoanManage`, default | `tesSUCCESS` | 2026-09-12 21:11:02Z | [`FB23EC53…3B221B`](https://devnet.xrpl.org/transactions/FB23EC5313F85FA157D56966E0B0B1665068905988D925C70BB0E7C35C3B221B) |
-| 8 | `LoanManage`, default | `tesSUCCESS` | 2026-09-12 21:11:10Z | [`DE49DF0D…803D1F`](https://devnet.xrpl.org/transactions/DE49DF0D6136B96AD28B253CD32100E5715078FD2D0AE6D1DB747AFECB803D1F) |
-
-### Halden Structured Credit IV, the token that prices itself
-
-The `VaultCreate` here carries the share token's XLS-89 metadata and its valuation pointer. These six were
-submitted on 19 October 2026, after the event.
-
-| | Transaction | Result | Validated (UTC) | Explorer |
-|---|---|---|---|---|
-| 1 | `VaultCreate` | `tesSUCCESS` | 2026-10-19 21:29:01Z | [`1A226B33…7B4CF5`](https://devnet.xrpl.org/transactions/1A226B33CD370E82683A39F58FF8465A16FD1DED99C87EC65B00E8BA2B7B4CF5) |
-| 2 | `VaultDeposit` | `tesSUCCESS` | 2026-10-19 21:29:10Z | [`22233F6B…2F17A2`](https://devnet.xrpl.org/transactions/22233F6BBEAC488A871ABBC35410F55D81A72D964E3FA4A4C970A9D7C22F17A2) |
-| 3 | `LoanBrokerSet` | `tesSUCCESS` | 2026-10-19 21:29:12Z | [`904C06FD…582AD0`](https://devnet.xrpl.org/transactions/904C06FDF6E60F881C74AE5F996AA7458C8DBAFCBBD41D9E83A9EF49FC582AD0) |
-| 4 | `LoanBrokerCoverDeposit` | `tesSUCCESS` | 2026-10-19 21:29:21Z | [`A075625D…57D309`](https://devnet.xrpl.org/transactions/A075625DAA314EEC6D8B1C032753E15CAF9A7F45364F1D27F60B5296F257D309) |
-| 5 | `LoanSet` | `tesSUCCESS` | 2026-10-19 21:29:31Z | [`D8301546…7CD10F`](https://devnet.xrpl.org/transactions/D8301546882B271F9B2200771ABD6E3320EC4233026983B4BF5B1FAFA87CD10F) |
-| 6 | `LoanManage`, impair | `tesSUCCESS` | 2026-10-19 21:31:52Z | [`EC385DAF…2D08E5`](https://devnet.xrpl.org/transactions/EC385DAF2DF412F86F06648B7855AEFDB1A1B8596048DA33C33B0A09FB2D08E5) |
-
-### Thorne Senior Secured I, the gate
-
-A vault owner names our credential issuer in their Permissioned Domain (in the demo, a separate account our setup script created). The ledger then admits
-the graded investor and refuses the ungraded one, and after revocation it refuses entry but still allows
-the exit.
-
-| | Step | Transaction | Result | Explorer |
-|---|---|---|---|---|
-| 1 | CredentialCreate | `CredentialCreate` | `tesSUCCESS` | [`619CC767…91B26B`](https://devnet.xrpl.org/transactions/619CC767741EFF1EA4DD8AD36F7CB400AE2175540CEC600751E565A73891B26B) |
-| 2 | CredentialAccept (by the LP) | `CredentialAccept` | `tesSUCCESS` | [`41F98989…C9ED07`](https://devnet.xrpl.org/transactions/41F98989B64BD7329118B29B5FCB3AD148DF5520171A3A94259AC4CB51C9ED07) |
-| 3 | PermissionedDomainSet | `PermissionedDomainSet` | `tesSUCCESS` | [`4C425830…3D87F9`](https://devnet.xrpl.org/transactions/4C425830675B021EB8A74904783D1DBDE516C74534C76E84A2899695DF3D87F9) |
-| 4 | VaultCreate (private + domain) | `VaultCreate` | `tesSUCCESS` | [`3FC79BF7…0F2461`](https://devnet.xrpl.org/transactions/3FC79BF77240B0D52148428DABEAC0A5F4971957ABEC1D429ABDF297470F2461) |
-| 5 | VaultDeposit — graded LP | `VaultDeposit` | `tesSUCCESS` | [`7FC5C01B…DF98AF`](https://devnet.xrpl.org/transactions/7FC5C01BD735E9A41A0AC6ACFA4B6994B1347A8FA06DAEF8012A62B0E1DF98AF) |
-| 6 | VaultDeposit — ungraded LP | `VaultDeposit` | `tecNO_AUTH` | [`E7CF5DB2…D26101`](https://devnet.xrpl.org/transactions/E7CF5DB29DFE652801F4936C11D50A493EB3C474D6EEDFE9FC24394E8DD26101) |
-| 7 | CredentialDelete (revoke) | `CredentialDelete` | `tesSUCCESS` | [`E2D6F396…E8C86D`](https://devnet.xrpl.org/transactions/E2D6F396F4A92DE4F36BDF6FD360EC8C849D4ED9DFDF8585998161098DE8C86D) |
-| 8 | VaultDeposit after revocation | `VaultDeposit` | `tecNO_AUTH` | [`AA25246A…2ADDBF`](https://devnet.xrpl.org/transactions/AA25246AE452DF1719751E4F03BAD8B6C286250DE8FB65EC2B7FBBFE272ADDBF) |
-| 9 | VaultWithdraw after revocation | `VaultWithdraw` | `tesSUCCESS` | [`2E71A259…4F39FE`](https://devnet.xrpl.org/transactions/2E71A25973D55E26C8AECFDFDF1EF3BF0571B8FB4DD9D524B6A8C750994F39FE) |
-
-### Wrong-phase rejections, Track 2 minimum bar item 5
-
-One closed-ended vault walked through Subscription, Investment and Redemption, with an open-ended vault
-for the first three rows. Each rejected
-`VaultDeposit`, `VaultWithdraw` and `LoanSet` sits next to a control that succeeds in the phase where the
-same transaction is legal. The Investment-phase `LoanSet` returned `tecNO_PERMISSION` because its term
-overran the redemption buffer; `feedback/appendix.pdf`, Appendix E, isolates that.
-
-| Phase | Attempt | Expected | Result | Explorer |
-|---|---|---|---|---|
-| OpenEnded | VaultDeposit (control) | tesSUCCESS | `tesSUCCESS` | [`9D7E7CFE…597D21`](https://devnet.xrpl.org/transactions/9D7E7CFE00A554FA065C30A6147B7619C3627D93B497A1B62C4EC0E49C597D21) |
-| OpenEnded | VaultWithdraw (control) | tesSUCCESS | `tesSUCCESS` | [`E394EA9B…F11E61`](https://devnet.xrpl.org/transactions/E394EA9BD518BEE31275EC9ECA8DD4D1DF5837EAD315BD0530F0A4936EF11E61) |
-| OpenEnded | LoanBrokerSet on an OPEN vault | reject | `tecNO_PERMISSION` | [`CE477E29…4827AB`](https://devnet.xrpl.org/transactions/CE477E29A099A6BBC30EBA52F3E09AB2A450CDB05F338AE517EDAAC0584827AB) |
-| Subscription | VaultDeposit (control) | tesSUCCESS | `tesSUCCESS` | [`202F9600…15F6C1`](https://devnet.xrpl.org/transactions/202F9600CC1D85266FFB27B70F26CE09AB0FE0423D4A8E77FA12F7F8D515F6C1) |
-| Subscription | VaultWithdraw (control) | tesSUCCESS | `tesSUCCESS` | [`92558A56…DB3D0B`](https://devnet.xrpl.org/transactions/92558A56C122F770B8601217D905F47B2362D5CF253612136B13815CD7DB3D0B) |
-| Subscription | LoanSet | reject | `tecTOO_SOON` | [`E1121DED…E39011`](https://devnet.xrpl.org/transactions/E1121DED12D4A320FB58F77D02549429885D8A826B794F2B2539EC936BE39011) |
-| Investment | VaultDeposit at wrong phase | reject | `tecEXPIRED` | [`7A10D805…1CB15B`](https://devnet.xrpl.org/transactions/7A10D8053FEE687A008F17E2AD98121EE08553CBDEAAE92DDEC3C2798A1CB15B) |
-| Investment | VaultWithdraw at wrong phase | reject | `tecTOO_SOON` | [`CC104682…B6617A`](https://devnet.xrpl.org/transactions/CC104682C298DFB3619EE4C15F0112ACE2B6A95B4971CA0A0AC748F9B5B6617A) |
-| Investment | LoanSet | tesSUCCESS | `tecNO_PERMISSION` | [`A9260300…39F63E`](https://devnet.xrpl.org/transactions/A926030097C2AD2F8ED4D1D6899200B27D2C75DF200A5A2EBEA8EBF88339F63E) |
-| Redemption | VaultDeposit at wrong phase | reject | `tecEXPIRED` | [`DEA67094…CAA670`](https://devnet.xrpl.org/transactions/DEA67094F92657625C795FD34B46DF751F2E54B3ECEA1B686777D5C141CAA670) |
-| Redemption | VaultWithdraw (control) | tesSUCCESS | `tesSUCCESS` | [`D26222EC…58A734`](https://devnet.xrpl.org/transactions/D26222EC26111FFC4F77D3CCADE0FDD2E7C2B9710B9D3957CC4CB725EF58A734) |
-| Redemption | LoanSet | reject | `tecEXPIRED` | [`8A09A988…B9DAE1`](https://devnet.xrpl.org/transactions/8A09A988DD3C5433B30E92F5E7B42086D6B17CEB51C6C05572E7A74552B9DAE1) |
-
-### Publication, collateral and delegation
-
-| What | Transaction | Result | Explorer |
-|---|---|---|---|
-| First publication of the six-dimension score | `OracleSet` | `tesSUCCESS` | [`DC5754D2…D75255`](https://devnet.xrpl.org/transactions/DC5754D2EE4A6A7AB9233EA3EE704A9C2FD97FA06C80EA364E5D4811CAD75255) |
-| Recovery from a document id full of stale pairs | `OracleDelete` | `tesSUCCESS` | [`37A65CF8…5F4347`](https://devnet.xrpl.org/transactions/37A65CF8C94687C8B39EA66E92D777477F0088196153BEB82807CD58975F4347) |
-| A second lender authorises the vault share token | `MPTokenAuthorize` | `tesSUCCESS` | [`4D3A0623…7E3B93`](https://devnet.xrpl.org/transactions/4D3A062391D872BD3581AA421A9B4DE68058E1CFCC0CA21A8FE61D480C7E3B93) |
-| Vault shares pledged on ledger to that lender | `EscrowCreate` | `tesSUCCESS` | [`3322B921…1C1536`](https://devnet.xrpl.org/transactions/3322B9214FB87822BA5699423691DAED4A043121D1E17080673F6292E01C1536) |
-| Delegation positive control: `Payment` delegates, the lending permissions return `temMALFORMED` and never reach a ledger | `DelegateSet` | `tesSUCCESS` | [`547DA719…10AF17`](https://devnet.xrpl.org/transactions/547DA71992D469ACA345A0B3CEAD07864E2801919201B256EA606C3A7910AF17) |
-
-The reader publishes each facility's XLS-47 document under `oracleDocId(VaultID)`: the first four bytes of
-`sha256(VaultID)`, read as a big-endian `UInt32` (`src/oracle.mjs`). The id is a function of the vault alone,
-so a restart, a retired vault or a second process never moves a document to another vault, and the publisher
-refuses to publish a second vault under an id already held rather than overwrite its scores. Identify a vault
-by `BaseAsset`, the first 20 bytes of its vault id. The documents the reader writes:
-
-| `oracle_document_id` | Facility | Vault id |
-|---|---|---|
-| 3238869064 | Thorne Senior Secured I | `4A5A8E37…` |
-| 275365832 | Meridian Trade Finance I | `864C5A2D…` |
-| 4197695612 | Kestrel Bridge Financing II | `24EAA01A…` |
-| 3412668304 | Halden Structured Credit IV | `DAB9E1EE…` |
 | 2611978006 | Harbor-1 | `E216E96D…` |
 | 1197106457 | Harbor-2 | `1F50CE2B…` |
 | 3647726209 | Harbor-3 | `0BAC80C3…` |
 | 587307429 | desk | `3422A5AD…` |
 | 2761675937 | spare | `88849E4F…` |
+| 3412668304 | Halden Structured Credit IV | `DAB9E1EE…` |
+| 275365832 | Meridian Trade Finance I | `864C5A2D…` |
+| 4197695612 | Kestrel Bridge Financing II | `24EAA01A…` |
+| 3238869064 | Thorne Senior Secured I | `4A5A8E37…` |
 
 Calder is retired: it is not read and has no document under the current publisher. Three accounts hold
-Orma's objects:
+Orma's Oracle objects:
 
-| Publisher | What its objects are |
+| Publisher | Its objects |
 |---|---|
-| [`r91JiCEYCm4CzTF8G5eks1FpzVJxa5FtdL`](https://devnet.xrpl.org/accounts/r91JiCEYCm4CzTF8G5eks1FpzVJxa5FtdL) | The current publisher, `Provider` `Orma`, since 24 October 2026. Its `Domain` is `ormaprotocol.com`, which lists it in `/.well-known/xrp-ledger.toml`. It republishes when a vault's NAV or grade changes, and on a 60-second heartbeat. |
-| [`rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H`](https://devnet.xrpl.org/accounts/rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H) | The deployed reader's publisher until 24 October 2026, under the project's former name, with document ids 1 to 5. Its objects are no longer updated: `OracleSet` refuses a `Provider` changed on an existing Oracle, so the new name needed a new account. |
-| [`rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B`](https://devnet.xrpl.org/accounts/rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B) | Written during the Paris event and frozen since, `LastUpdateTime` 2026-09-13 between 14:20 and 14:21 UTC, with document ids 1 to 4, numbered by the publisher of that time. |
+| [`r91JiCEYCm4CzTF8G5eks1FpzVJxa5FtdL`](https://devnet.xrpl.org/accounts/r91JiCEYCm4CzTF8G5eks1FpzVJxa5FtdL) | The current publisher, `Provider` `Orma`, since 24 October 2026. Its `Domain` is `ormaprotocol.com`, whose `/.well-known/xrp-ledger.toml` lists it (`app/public/.well-known/xrp-ledger.toml`). It republishes when a vault's figures change, and on a 60-second heartbeat (`HEARTBEAT_MS` in `src/publish-loop.mjs`). |
+| [`rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H`](https://devnet.xrpl.org/accounts/rPuYT6SZopnZopp4fmvkfd5eeXQTsozz6H) | The previous publisher, under the project's former name, document ids 1 to 5. Its objects are no longer updated: read on 25 October, the `LastUpdateTime` of documents 1, 2, 4 and 5 is 24 October 2026, 20:44 UTC, and that of Calder's document 3 is 20 October. `src/demo/set-domain.mjs` records that `OracleSet` refuses a changed `Provider` on an existing Oracle, so the new name needed a new account. |
+| [`rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B`](https://devnet.xrpl.org/accounts/rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B) | Written during the Paris event and frozen since, `LastUpdateTime` 2026-09-13 between 14:20 and 14:21 UTC, document ids 1 to 4. |
 
-`devnet.xrpl.org` has no route for a bare ledger index, so fetch the object itself rather than
-following a link to it. Halden, from the current publisher:
+`devnet.xrpl.org` has no route for a ledger object, so fetch the object itself. Halden, from the current
+publisher:
 
 ```bash
 curl -s https://s.devnet.rippletest.net:51234 -H 'Content-Type: application/json' -d '{"method":"ledger_entry","params":[{"oracle":{"account":"r91JiCEYCm4CzTF8G5eks1FpzVJxa5FtdL","oracle_document_id":3412668304},"ledger_index":"validated"}]}'
 ```
 
-Every `PriceData` entry carries `BaseAsset` `DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06C`, the first 20 bytes
-of Halden's vault id, and `NAV` reads `c4452` hex at `Scale` 6, which is 0.803922.
+Every `PriceData` entry carries `BaseAsset` `DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06C`, and `NAV` reads `c4452`
+hex at `Scale` 6, which is 0.803922.
 
-During the event we set two publishers against each other on Meridian, so `get_aggregate_price` had
-something to aggregate. The event-time publisher, `rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B` (document 2),
-reads the vault object and reports `0.803922`. A third account, `raiwYKSDdrhiediLdgJyGEzP1estXcmVcM`
-(document 1), is a throwaway Devnet faucet account we created to stand in for a naive indexer: it published,
-once, the `1.000000` that a metadata-diffing indexer computes, taken from `demo/indexer-race.json`. It is ours, not an independent publisher. rippled returned a median of
-`0.901961` across the two. The capture is in [`demo/oracle-aggregate.json`](demo/oracle-aggregate.json)
-with the request to reproduce it.
+**Universe** (`GET /api/universe`) lists the vaults in `demo/` and those the transaction stream has shown
+since the process started (200 at most), each priced at the reader's latest validated ledger. It is not a full
+ledger scan, and the screen says so. The stream reveals vault ids only; every figure comes from a read.
 
----
+**Feed and curator statements.** `GET /api/feed` (polling) and `GET /api/feed/stream` (server-sent events)
+carry `LOAN_ORIGINATED`, `LOAN_LATE`, `IMPAIRMENT`, `DEFAULT`, `COVER_DRAWN` and `SHARES_PLEDGED`, all REAL,
+plus `STATEMENT` and the three margin-call events, DECLARED. Each event is derived from two successive full
+reads of a vault (the reader's, every 4 seconds; a ledger whose reads fail is skipped), never from metadata,
+with its reason, its money effect, its ledger and, when there is one, its transaction hash. A curator can
+write a statement on the ledger, `orma.stmt/1` in `Vault.Data` (at most 120 characters of text): Harbor-1's ([FF81A871…](https://devnet.xrpl.org/transactions/FF81A871D4437C40CE554BE3C293D480E514BDB14B3D993E3CFB26D953A85A79))
+reads "L1 marked impaired: payment missed by 1 min". The desk shows it as DECLARED, compares it with the
+loan's state (`CONSISTENT`, `INCONSISTENT`, `NOT_CHECKABLE`, `UNPARSEABLE`), and lets it enter no figure (I6).
 
-## The four live Devnet facilities
+### Orma Desk, collateral management
 
-Each was originated, serviced, impaired or defaulted on live Devnet, and its capture is committed. The
-reader loads all four at startup.
+The Lending Protocol does not link a loan to collateral. Orma Desk makes the link: an escrow of shares that
+runs until the loan can be defaulted, and the `orma.escrow` memo on the `LoanSet` that names it.
 
-### 1. Meridian Trade Finance I, the empty change set
+1. **Ticket.** `GET /api/tickets?share=<48-hex MPT id>&op=pledge&units=<n>&mandate=desk-1` returns
+   `orma.ticket/1` for the planned loan of `demo/desk.json` (2 XRP; the principal is not a parameter). N1,
+   the overpayment: the value read by all minus the withdrawal value, for the shares of the operation. N2: what those shares would lose if each late loan defaulted alone, after the broker's
+   cover, which is `min(ceil(DebtTotal × CoverRateMinimum/1e5 × CoverRateLiquidation/1e5), exposure,
+   CoverAvailable)`. N3: how long the shares are locked, and the vault's cash. Then the largest loan the
+   mandate allows, the loan-to-value at the withdrawal value and for a lender at 1:1, and the verdict, PASS or
+   BREACHED, against the mandate's four limits (for `desk-1`: 5344 bps of loan-to-value, 4 XRP per loan,
+   0.97 XRP of N2 loss, 23 days of lock-up). Each figure carries its formula, its provenance (REAL, DECLARED,
+   MODELLED or SIMULATED) and its inputs with their ledger, and the browser recomputes it with `decimal.js`
+   (`app/src/components/Ledger.tsx`).
+2. **Pledge.** The borrower escrows the shares (`EscrowCreate`, XLS-85) to a 2-of-3 collateral account: master
+   key disabled, a signer list of quorum 2 with weight 1 on the borrower, the desk and the Orma agent, no
+   `RegularKey`, no `lsfDepositAuth`, no other object. `FinishAfter` is the pledge's close time plus the
+   loan's payment interval and grace period plus 14,400 s; `CancelAfter` is 86,400 s later; there is no
+   condition. Anyone may finish the escrow between the two, and the shares then sit in the 2-of-3 account,
+   not with the desk. Only shares of a closed-ended XRP vault whose issuance flags are exactly `0x00000038`
+   (escrow, trade, transfer; no lock, no clawback) and that are not locked are accepted (`judgeCollateralShare`
+   in `src/nyc/contracts.mjs`); anything else is refused with `409 ESCROW_POLICY` and its reason. XRP only,
+   because an issued asset can be clawed back or frozen by its issuer.
+3. **Approval.** The borrower signs a `LoanSet` carrying the `orma.ticket` and `orma.escrow` memos. At the
+   ledger of the approval the desk re-reads the escrow the memo names, the collateral account, the share and
+   the borrower's account, recomputes the ticket (same `inputsDigest`), checks the mandate and the borrower's
+   `Sequence`, then countersigns with `signLoanSetByCounterparty` and submits (`src/desk/signer.mjs`).
+   Otherwise it refuses, among other codes, with `ESCROW_POLICY`, `STALE`, `BREACHED` and the limits crossed,
+   `SEQUENCE_PASSED` or `INCONSISTENT_SNAPSHOT`. Every outcome, approved, refused or declined, goes into a
+   JSONL log chained by sha256 with the ledger read, served at `GET /api/desk/decisions`.
+4. **Change preview.** Before any signature, `orma.change/1` (`src/change/engine.mjs`) fixes the validated
+   ledger L, runs `simulate` on the open ledger, re-reads at L every object the simulated metadata modifies or
+   deletes, and lists each field it will change, including the ones the metadata leaves out of
+   `PreviousFields` (`Vault.LossUnrealized`, `Vault.Data`, the `LockedAmount` of an `MPToken` and of an
+   `MPTokenIssuance`), marked HIDDEN with the xrpld 3.4.1 rule (`ApplyStateTable.cpp`) that explains the
+   omission. After validation it re-reads the objects and marks each row MATCH or MISMATCH. `PreviousFields`
+   is read only to decide what the metadata admitted, never for the value of an object read at L.
+5. **Margin calls.** Each open loan is judged against the risk officer's policy `orma.marginpolicy/1`
+   (`demo/margin-policy-desk-1.json`): above the mandate's loan-to-value limit, a call is issued with the exact
+   number of share units to add; pledging them cures it, through the same pledge with a `cureLoanId` and an
+   `orma.cure` memo; past the cure window, 600 s on Devnet, it expires. Statuses `NONE`, `ISSUED`, `CURED`,
+   `EXPIRED`; every transition is read at one ledger, chained into the decision log and pushed to the Feed.
+   After expiry the policy says: "The desk may act under its escrow policy (finish only after a default). No
+   automatic seizure." `GET /api/desk/margin-calls`.
+6. **Late payments.** Each ticket carries, for every open loan of the vault, a payment record read at the
+   ticket's ledger: status (`current`, `due_soon`, `overdue`, `defaultable`, `impaired`, `defaulted`), next due
+   date, end of grace, `pastDue = max(0, close_time − NextPaymentDueDate)` (REAL), and the payments missed.
+7. **Loans in a test dollar.** With `&asset=USD`, the desk lends a "test dollar, stands in for RLUSD (Devnet)"
+   against the same shares of XRP vaults. The collateral and its withdrawal value do not change; the dollar
+   figures, MODELLED, convert it at the XRP/USD price read below, less the FX haircut the terms declare
+   (`fxHaircutBps` 1000, that is 10%), and the single-loan limit becomes the terms' `maxSingleLoanUsd`
+   (10 USD) in place of the mandate's 4 XRP. The XRP/USD price is read, never declared: the risk officer's terms (`demo/usd-terms-desk-1.json`) name three XLS-47 documents, and at each
+   ticket the desk reads them at L and takes the median of at least two sources no older than 300 s and no
+   further apart than 100 bps, which `get_aggregate_price` on the same documents at L must match; otherwise
+   `409 PRICE_UNAVAILABLE` and no dollar figure. No one maintains an XRP/USD oracle on Devnet, so
+   `src/demo/fx-relay.mjs` copies the last trades of Kraken, Bitstamp and Coinbase into those three documents
+   every 60 s from one test account: a stand-in for independent providers, not independence.
 
+`GET /api/desk/positions` lists the desk's loans with their collateral, loan-to-value and margin call, each
+with the hash and ledger of its `LoanSet`, found through the `orma.escrow` memo. `GET /api/desk/mandates/{id}`
+serves the mandate. In the demo every action goes through the role engine (`src/roles/engine.mjs`), played
+from the "Operator controls (demo)" panel: a run token, a kill switch, one serial queue per signing account,
+and only the actions it lists.
+
+## Verify it yourself
+
+`orma-mark` checks a share's valuation from its MPT id alone:
+
+```bash
+node src/mark/verify.mjs 0000000113268B160349A129A3343579AE8B0059C4BDC2F8   # Harbor-1's share
+node src/mark/verify.mjs <shareMptId> --ws <your node>                       # any other node
 ```
-vault   864C5A2DDCED78C6198B0703169D533B747A56E5F9398D832033F79E37E8C835
-broker  41BD2EA81CD03ED9EAC612BFFC6179AC742120FC4A5E0DD1D3E4DCE7DB5B2F38
-impair  075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3
-file    demo/indexer-race.json
-```
 
-A healthy Vault does not carry `LossUnrealized` at all: rippled declares the field `SoeDefault` (optional,
-and never stored at its default), so it is left off the object while it is 0. `PreviousFields` records a
-previous value only for a field that was there before, so the first impairment, which creates the field, has
-nothing to record. Under cash-basis accounting nothing else on the Vault object changes. The metadata is
-therefore emitted empty: an indexer that diffs it sees a node touched but unchanged. The rule is presence,
-not value: the same transaction records the Loan's previous `Flags` of 0, because `Flags` is a required field
-and is always on the object. Naive NAV reads `1.000000`. Net of the recognised loss it is `0.803922`.
-**1961 basis points apart, on the same transaction, from the same ledger.** (Restated on 13 October 2026; see
-[Since the event](#since-the-event).)
-
-### 2. Kestrel Bridge Financing II, the ordering lever
-
-```
-vault   24EAA01AD4CE70D8ABB4ACB4255DC4C216B8AF3B9E7315DB8052BFC1E5810089
-broker  8DB104980C31CBE9F196508E7D748E8C31FB783CD4E0A3620AE0B476CBDEA3FA
-file    demo/ordering-vault.json
-```
-
-Cover liquidated on a default is sized against the broker's **total** book, not against the loan that
-defaulted, and the book is decremented as each default lands. So the order of declaration changes the total.
-Two bad loans of 30 XRP and 10 XRP, declared largest first, consumed **0.50 XRP** of the manager's own
-first-loss capital. Smallest first would have consumed **0.70 XRP**. Same losses, same rates, only the order.
-The **0.20 XRP** difference is investor money, and the party who chose the order is the party it spared.
-
-By the rearrangement inequality this is general, not an artefact of these two numbers: total cover consumed
-is minimised by declaring the largest exposure first. Conduct grade **E**, findings
-`ORDERING_SELF_SERVING` and `DEFAULT_WITHOUT_IMPAIRMENT`. The facility destroyed **79% of subscribed
-capital**, which notches the composite from an AAA anchor down 14 steps to **B**.
-
-### 3. Halden Structured Credit IV, the token that prices itself
-
-```
-vault     DAB9E1EE3D8899C2112FCFC90F40D7C93B74B06CD4E67EF368080D15A602B245
-broker    3A87743DC5EEEBD4A527543D73E5CBDCB7B0201113084A47E1C4FE5D0B480AF6
-shareMPT  000000015281B163EE111C4DA95B27EE9D82D7ADE53A9797
-impair    EC385DAF2DF412F86F06648B7855AEFDB1A1B8596048DA33C33B0A09FB2D08E5
-file      demo/showcase-vault.json
-```
-
-The share token carries a valuation pointer in its own MPT metadata. An investor pledges units to a second
-lender who holds a token and nothing else; that lender reads the token's metadata, follows the declared
-`nav_url`, and prices the pledge in five steps, none of which involve a relationship with us. A pledge of
-1,000,000 units prices at **1.000000 XRP** naively and **0.803922 XRP** on what the instrument points to.
-**0.196078 XRP of overstatement kept out of the second lender's book.** A haircut absorbs volatility; it does
-not absorb a misstatement. This manager impaired the loan and has written nothing off, which the
-conduct assessment scores **A** against Kestrel's E.
-
-### 4. Thorne Senior Secured I, enforcement
-
-```
-vault   4A5A8E3716D52E334AEB077ADB09456EF4A941CC26021A8EAD37F95B00190DF5
-domain  FFBEC89D98B4E7CF52F4F254235086514A90CED0EC531941BDF747AF40C5A2FB
-issuer  rKQjjU5KFs9RAZCDvYVjcaoVK5gGsCJgkP, credential type ORMA-IG
-file    demo/gate-vault.json
-```
-
-A separate vault owner, an account our setup script created for the demo, named our credential issuer in their `PermissionedDomain` and bound the domain to
-their vault. Two investors, same second: the graded one deposited, the ungraded one was refused **by the
-ledger**, not by us. When the credential is revoked, `VaultDeposit` is refused and `VaultWithdraw` still
-succeeds. A rater who could trap capital would be a worse problem than the one we solve.
-
----
+It prints one `orma.mark/1` line after six steps: read the `MPTokenIssuance`, decode its metadata, fetch the
+nav document its pointer names, check that the share's issuer is the pseudo-account of a vault whose
+`ShareMPTID` is this share (a pointer copied onto another share is `SPOOFED`), recompute the withdrawal value
+at the document's ledger, and cross-check the Orma Oracle object found through the domain's toml. Exit 0
+agree, 4 disagree (`SPOOFED`, `RECOMPUTE_MISMATCH`, `ORACLE_MISMATCH`, `UNREACHABLE`), 64 invalid usage, 1 the
+node could not be reached. Two reads go to the publisher's domain, `ormaprotocol.com`: the nav document,
+which our production API serves, and the domain's toml; every other step reads the ledger from the node. This
+is a recompute against a public node, and it trusts the node you point it at. The API runs the same check at
+`GET /api/mark/{mptId}`, and `GET /api/mpt/{mptId}/status` says whether a share is attested.
+`node src/dev/check-mark.mjs` runs the chain offline on a fake ledger.
 
 ## Running it
 
-Node 24.13.0 (Node 20.19 or later works). The reader needs outbound access to Devnet and no keys: every
-facility it serves is public ledger state.
-
-```bash
-npm ci               # the committed lockfile, exactly: xrpl 5.2.0, ripple-binary-codec 2.11.0, decimal.js 10.6.0
-node src/index.mjs   # or: npm start
-```
-
-Use `npm ci`, not `npm install`. The lockfile is the toolchain we verified against live Devnet, and
-re-resolving it can move `ripple-binary-codec`, the package that serializes closed-ended vaults.
-
-The reader auto-discovers the baked facilities: it reads every `demo/*.json`, takes the `vaultId` and
-`label` from each, and serves all four without a single hex id being typed. Explicit
-`--vault <64-hex>[:label]` arguments, or `VAULTS=<id>,<id>`, override the discovery. The API listens on
-`http://localhost:8787` and the reader re-reads full vault state every 4 seconds.
-
-```bash
-cd app && pnpm install && pnpm dev
-```
-
-The frontend comes up on `http://localhost:5173` and talks to port 8787.
-
-Optional and off by default: set `PUBLISH_SEED=s...` to publish the score to the ledger as XLS-47 Oracle
-objects. Reading correctly is the product; publishing is distribution, and a missing seed must never stop
-the reader from starting.
-
-Each `check:*` script proves one claim:
-
-```bash
-npm run check:ordering   # the cover-ordering arithmetic, offline, against the figures measured on Devnet
-npm run check:history    # broker history reconstruction, live; funds fresh Devnet accounts from the faucet
-npm run check:oracle     # XLS-47 publication round trip, live; funds a fresh publisher from the faucet
-npm run check:api        # HEAD answers like GET, and "warming up" until a vault is first read, offline
-npm run check:navhistory # the NAV series, read from each transaction's own metadata, offline
-npm run check:archive    # both history routes as Devnet prunes the event, on the committed archive, offline
-```
-
-The HTTP API is documented in `documentation/pages/http-api.mdx`:
-
-```
-GET  /api/health
-GET  /api/methodology
-GET  /api/vaults
-GET  /api/vaults/:vaultId
-GET  /api/vaults/:vaultId/nav
-GET  /api/vaults/:vaultId/nav-history
-GET  /api/vaults/:vaultId/collateral
-GET  /api/vaults/:vaultId/broker-history
-GET  /api/vaults/:vaultId/gate
-GET  /api/mpt/:mptIssuanceId/nav          # CORS-open: called by a party with no relationship to us
-GET  /api/mpt/:mptIssuanceId/resolve      # CORS-open
-GET  /api/indexer-race                    # captures from the event
-GET  /api/oracle-aggregate
-GET  /api/demo/state
-GET  /api/openapi.json                    # OpenAPI 3.1; src/mcp.mjs serves the same readings as MCP tools
-```
-
-### Deploying
-
-The backend is a long-running process, a 4-second reader over a WebSocket, so it runs as a container. The
-frontend is static and runs on Vercel.
-
-**Backend.** `Dockerfile`, `render.yaml` and `railway.json` are at the root; no CLI is needed for either
-platform. On **Render**: New, then Blueprint, then this repository. It reads `render.yaml`, builds the image,
-injects `PORT`, health-checks `/api/health`, and asks only for the two values marked `sync: false`. On
-**Railway**: create a service from this repository and generate a public domain for it. Any other Docker
-host works the same way:
-
-```bash
-docker build -t orma-api . && docker run -p 8787:8787 orma-api
-```
-
-| Variable | Required | What it does |
-|---|---|---|
-| `PORT` | set by the platform | The port the API listens on, 8787 by default. |
-| `XRPL_WS` | no | Devnet WebSocket, `wss://s.devnet.rippletest.net:51233` by default. |
-| `PUBLISH_SEED` | no | Publishes the score as XLS-47 Oracle objects from that account. Set it on **one** running instance only: two processes publishing from the same account race each other for sequence numbers. Without it, every figure is still served and the oracle field reads `null`. |
-| `DEMO_KEY` | no | Opens the operator routes to requests carrying a matching `x-demo-key`. Without it they answer loopback only, which in a container means nobody. |
-| `VAULTS` | no | Comma-separated vault ids, overriding the facilities discovered in `demo/`. |
-
-**Frontend.** Import the repository into Vercel with **Root Directory `app`**; `app/vercel.json` already
-sets the Vite build and the single-page rewrite.
-
-| Variable | Value |
+| | |
 |---|---|
-| `VITE_API_BASE` | The backend's public URL. It must be `https://`: an https page cannot call http. |
-| `VITE_DOCS_URL` | Optional. Defaults to https://buzzballz.github.io/orma/. |
+| Network | XRPL Devnet, `wss://s.devnet.rippletest.net:51233`, `network_id` 2; explorer https://devnet.xrpl.org, faucet https://faucet.devnet.rippletest.net/accounts |
+| Server | `xrpld`, built from `XRPLF/rippled`; the change engine and I7 cite its 3.4.1 source. Read the version Devnet runs with `server_info`: it moves |
+| Libraries | `xrpl` 5.3.0, `ripple-binary-codec` 2.11.0, `decimal.js` 10.6.0; app: React 19, Vite 8, TypeScript, pnpm 12.11.2 in CI |
+| Runtime | Node 24.13.0 (`.nvmrc`, `Dockerfile`, CI); `package.json` allows 20.19 or later, which CI does not test |
 
-`VITE_` variables are inlined into the bundle at build time, so changing one needs a redeploy, and no
-secret may ever be one.
+Orma reads, publishes and signs on Devnet only: the vault and lending amendments (`SingleAssetVault`,
+`LendingProtocol`) are not enabled on Mainnet.
 
----
+```bash
+git clone https://github.com/BuzzBallz/orma.git && cd orma
+nvm use                      # Node 24.13.0
+npm ci                       # the committed lockfile, never npm install
+npm test                     # every offline check in src/dev (src/dev/run-checks.mjs); no network, no key
+npm start                    # reader and API on http://localhost:8787, read-only
+```
+
+`npm ci` installs exactly the lockfile we checked against Devnet; re-resolving it can move
+`ripple-binary-codec`, which serializes closed-ended vaults. `npm start` serves the nine vaults recorded in
+`demo/` and needs no key; `/api/health` answers `ok: false` until the reader's first pass. Without
+`ROLES_FILE` (the role accounts) and `DESK_SEED`, a write route answers `503 NOT_CONFIGURED`; a browser origin
+not listed in `ALLOWED_WRITE_ORIGINS` is refused `403 FORBIDDEN` first. `PUBLISH_SEED` is the publisher's key,
+and without it (or `PUBLISH=faucet`) the API publishes nothing. The API logs the names it lacks when it starts
+(`nyc config incomplete`). The seeds were written when the demo was set up on Devnet, by
+`src/demo/bake-nyc.mjs` (the script that created the demo's accounts, vaults and loans) and
+`src/demo/set-domain.mjs` (the publisher), and are not in the repository; `.env.example` names the variables.
+`node src/desk/audit.mjs --self-test` is not part of `npm test`; run it on its own.
+
+The app:
+
+```bash
+pnpm -C app install --frozen-lockfile
+pnpm -C app dev              # http://localhost:5173, calls VITE_API_BASE (default http://localhost:8787)
+pnpm -C app lint && pnpm -C app build
+```
+
+Live checks, read-only against Devnet, through a local API that neither signs nor publishes:
+
+```bash
+node --env-file-if-exists=.env src/dev/with-api.mjs -- node src/dev/check-ticket.mjs --live
+node --env-file-if-exists=.env src/dev/with-api.mjs -- node src/dev/check-payments.mjs --live
+node --env-file-if-exists=.env src/dev/with-api.mjs -- node src/dev/check-margin-call.mjs --live
+node --env-file-if-exists=.env src/dev/with-api.mjs -- node src/dev/check-usd.mjs --live
+node --env-file-if-exists=.env src/dev/with-api.mjs -- node src/dev/check-universe.mjs --live
+```
+
+**HTTP API.** 31 routes. The contract is `src/openapi.json`, served at `/api/openapi.json`, and
+`documentation/pages/http-api.mdx` describes each route. `npm run check:openapi` checks that the OpenAPI
+document names every route the prose indexes, and `node src/dev/check-nyc-contracts.mjs` that every New York
+route is in both. The New York routes:
+
+```
+GET  /api/tickets               GET  /api/desk/mandates/{id}     GET  /api/desk/positions
+GET  /api/desk/decisions        GET  /api/desk/margin-calls      GET  /api/universe
+GET  /api/feed                  GET  /api/feed/stream            GET  /api/mark/{mptId}
+GET  /api/mpt/{mptId}/status    POST /api/roles/{runId}/{role}/{action}
+POST /api/roles/{runId}/actions/{actionId}/confirm               GET  /api/roles/{runId}/actions/{actionId}
+POST /api/demo/run              POST /api/demo/kill              POST /api/demo/unkill
+```
+
+`npm run mcp` serves the same readings as read-only MCP tools; set `ORMA_API`, because its default in
+`src/mcp.mjs` is the suspended Render host.
+
+**Deploying.** The API is a long-running process, so it runs as a container: `docker build -t orma-api . &&
+docker run -p 8787:8787 orma-api` (Node 24.13.0, as the `node` user). With the desk configured, give it a
+writable `DESK_LOG_PATH`, because the image's working directory is not writable by that user. Production is
+that container on our server; the static site's `app/vercel.json` rewrites `/api/*` and `/v/:mpt/nav` to it.
+`render.yaml` and `railway.json` are still in the repository, but the Render host is suspended (I4).
+
+## Before New York: Paris, September 2026
+
+Orma's information layer was built at the De Vinci Blockchain XRPL Lending Protocol Hackathon in Paris,
+12–13 September 2026, where team BuzzBallz took **1st place of 14 projects**
+([ESILV](https://www.esilv.fr/xrpl-hackathon-devinci-blockchain-remporte-deux-places-sur-le-podium/)). It
+reads a vault's solvency from ledger state rather than from metadata diffs, publishes it as an XLS-47 Oracle
+object and as a pointer inside the share token's own metadata, and lets a vault owner gate deposits on an
+XLS-70 credential through an XLS-80 domain. Meridian, Kestrel and Thorne below, and Halden, are still on
+Devnet, and the API still reads them live, falling back on the captures in `evidence/devnet-tx/` for the
+history Devnet has pruned; the New York demo uses the Harbor vaults. The Paris screens also show a letter
+grade (`src/score.mjs`, `app/src/lib/grades.ts`) and a conduct assessment (`reputation` in `src/history.mjs`)
+derived from these readings. Orma Desk shows neither, and no New York document may carry a `grade` key
+(`deepProblems` in `src/nyc/contracts.mjs`); its ticket reads the broker's history (`readBrokerHistory` and
+`analyseOrdering` in `src/history.mjs`) for facts only, in its `conduct` block: how long each impairment came
+after the missed payment, the defaults with no impairment before them, and what the order of the defaults
+cost depositors.
+
+- **Meridian Trade Finance I.** 51 XRP deposited, 10 lent, the loan impaired: withdrawal value 0.803922,
+  value read by all 1.000000, 1961 bps apart on the same ledger, while the Vault node of the impairment's
+  metadata had an empty `PreviousFields`.
+- **Kestrel Bridge Financing II.** The cover drawn on a default is sized against the broker's whole book, not
+  the defaulted loan, and the book shrinks with each default. Two loans of 30 and 10 XRP defaulted largest
+  first drew 0.50 XRP of the curator's first-loss cover; smallest first would have drawn 0.70 XRP. The 0.20 XRP
+  difference is investor money (`npm run check:ordering`).
+- **Thorne Senior Secured I.** A vault owner (an account our setup script created) named Orma's credential
+  issuer in its permissioned domain: the investor holding the credential deposited, the one without it was
+  refused by the ledger, and after revocation entry was refused while the exit stayed open.
+- **Halden Structured Credit IV**, baked on 19 October 2026, between the two events: the share token's XLS-89
+  metadata points to its valuation, so a second lender holding only the token prices a pledge of 1,000,000
+  units at 0.803922 XRP instead of 1.000000.
+
+<details>
+<summary>The Paris transactions, one per claim above</summary>
+
+| What | Transaction | Result |
+|---|---|---|
+| Meridian, created | [D07C5925…](https://devnet.xrpl.org/transactions/D07C59257F0C568DAF401C4253E8609C206B900F838289E9B45B418F7DE4807C) | `tesSUCCESS` |
+| Meridian, loan impaired, empty `PreviousFields` | [075FE6D2…](https://devnet.xrpl.org/transactions/075FE6D2E0F29919AF477A2A8F581A680805A006138BB967D8434611E49229C3) | `tesSUCCESS` |
+| Kestrel, larger loan defaulted first | [FB23EC53…](https://devnet.xrpl.org/transactions/FB23EC5313F85FA157D56966E0B0B1665068905988D925C70BB0E7C35C3B221B) | `tesSUCCESS` |
+| Kestrel, smaller loan defaulted second | [DE49DF0D…](https://devnet.xrpl.org/transactions/DE49DF0D6136B96AD28B253CD32100E5715078FD2D0AE6D1DB747AFECB803D1F) | `tesSUCCESS` |
+| Thorne, deposit with the credential | [7FC5C01B…](https://devnet.xrpl.org/transactions/7FC5C01BD735E9A41A0AC6ACFA4B6994B1347A8FA06DAEF8012A62B0E1DF98AF) | `tesSUCCESS` |
+| Thorne, deposit without it | [E7CF5DB2…](https://devnet.xrpl.org/transactions/E7CF5DB29DFE652801F4936C11D50A493EB3C474D6EEDFE9FC24394E8DD26101) | `tecNO_AUTH` |
+| Thorne, deposit after revocation | [AA25246A…](https://devnet.xrpl.org/transactions/AA25246AE452DF1719751E4F03BAD8B6C286250DE8FB65EC2B7FBBFE272ADDBF) | `tecNO_AUTH` |
+| Thorne, withdrawal after revocation | [2E71A259…](https://devnet.xrpl.org/transactions/2E71A25973D55E26C8AECFDFDF1EF3BF0571B8FB4DD9D524B6A8C750994F39FE) | `tesSUCCESS` |
+| `LoanBrokerSet` on an open-ended vault | [CE477E29…](https://devnet.xrpl.org/transactions/CE477E29A099A6BBC30EBA52F3E09AB2A450CDB05F338AE517EDAAC0584827AB) | `tecNO_PERMISSION` |
+| `VaultWithdraw` in the Investment phase | [CC104682…](https://devnet.xrpl.org/transactions/CC104682C298DFB3619EE4C15F0112ACE2B6A95B4971CA0A0AC748F9B5B6617A) | `tecTOO_SOON` |
+| `VaultDeposit` in the Investment phase | [7A10D805…](https://devnet.xrpl.org/transactions/7A10D8053FEE687A008F17E2AD98121EE08553CBDEAAE92DDEC3C2798A1CB15B) | `tecEXPIRED` |
+| `LoanSet` in the Subscription phase | [E1121DED…](https://devnet.xrpl.org/transactions/E1121DED12D4A320FB58F77D02549429885D8A826B794F2B2539EC936BE39011) | `tecTOO_SOON` |
+| First XLS-47 publication, by `rpVg1u…` | [DC5754D2…](https://devnet.xrpl.org/transactions/DC5754D2EE4A6A7AB9233EA3EE704A9C2FD97FA06C80EA364E5D4811CAD75255) | `tesSUCCESS` |
+| `DelegateSet`: `Payment` delegates, every lending permission is refused `temMALFORMED` before a ledger | [547DA719…](https://devnet.xrpl.org/transactions/547DA71992D469ACA345A0B3CEAD07864E2801919201B256EA606C3A7910AF17) | `tesSUCCESS` |
+| Halden, created with its share metadata | [1A226B33…](https://devnet.xrpl.org/transactions/1A226B33CD370E82683A39F58FF8465A16FD1DED99C87EC65B00E8BA2B7B4CF5) | `tesSUCCESS` |
+| Halden, loan impaired | [EC385DAF…](https://devnet.xrpl.org/transactions/EC385DAF2DF412F86F06648B7855AEFDB1A1B8596048DA33C33B0A09FB2D08E5) | `tesSUCCESS` |
+
+</details>
+
+The delegation result still holds in New York: XLS-75 delegation does not reach the lending transactions.
+The full Paris record, transaction by transaction, is in the README
+of the [`hackathon-submission`](https://github.com/BuzzBallz/orma/releases/tag/hackathon-submission) release,
+and every one of its transactions is captured in `evidence/devnet-tx/`.
+
+During the Paris event we set two of our own accounts against each other on Meridian, so that
+`get_aggregate_price` had something to aggregate. `rpVg1ufqoVwHCN814QBqvibYPftMYc2u3B` (document 2) read the
+vault object and reported 0.803922. `raiwYKSDdrhiediLdgJyGEzP1estXcmVcM` (document 1), a throwaway Devnet
+faucet account we created to stand in for a naive indexer, published once the 1.000000 a metadata-diffing
+indexer computes. It is ours, not an independent publisher. The server returned a median of 0.901961; the
+capture and the request that reproduces it are in [`demo/oracle-aggregate.json`](demo/oracle-aggregate.json).
+
+Between the two events: the site's redesign (23 September) and a NAV-history route,
+`GET /api/vaults/{vaultId}/nav-history` (1 October); corrections of 13 October to the README, the paper and
+the feedback report, with dated notes in the paper, the register and `FEEDBACK.pdf`, the repository as then
+submitted staying in the `hackathon-submission` release; then, on 19–20 October, `xrpl` 5.3.0, Node 24.13.0,
+the MCP server, the OpenAPI document, Halden, and Calder's retirement.
+
+## Developer feedback, from Paris
+
+**40 findings: 7 P0 (blocks a developer entirely), 19 P1 (costs hours, with a non-obvious workaround), 14 P2
+(friction, or a documentation inaccuracy)**, plus 3 withdrawn after cross-checking and listed as withdrawn
+(the rubric is in `feedback/register.md`).
+`FEEDBACK.pdf` is the three-page report, corrected on 13 October 2026 with a dated line under the signature;
+`feedback/appendix.pdf` is the 34-page register behind it, and `FINDINGS.md` indexes the findings. The three
+that cost us the most:
+
+1. The first impairment of a healthy vault leaves `LossUnrealized` out of the Vault's `PreviousFields`: the
+   field was at its default value, so it was not stored and has no previous value to record. It was raised
+   before us as [`rippled#6487`](https://github.com/XRPLF/rippled/issues/6487) by the operator of an XRPL
+   explorer, and closed by its reporter. Our follow-up, `rippled#8222`, was moved by a Ripple
+   maintainer to the documentation repo as
+   [xrpl-dev-portal#3926](https://github.com/XRPLF/xrpl-dev-portal/issues/3926), where it is open.
+2. The documented lending tutorial could not complete on 12 September: its setup created an open-ended vault.
+   Our fix is in `contrib/tutorial-fix/`;
+   [xrpl-dev-portal#3923](https://github.com/XRPLF/xrpl-dev-portal/pull/3923), merged on 16 September 2026,
+   carries four of its five changes by our count.
+3. `LoanManage` carries no `LoanBrokerID` and an impairment does not touch the `LoanBroker`, so filtering
+   `account_tx` by broker drops every impairment; `Loan.FinalFields.LoanBrokerID` in the same metadata closes
+   the join.
+
+Upstream, three notes on the closed-ended vault draft
+([XRPL-Standards#587](https://github.com/XRPLF/XRPL-Standards/pull/587#issuecomment-5655843515)) were
+addressed by its author ([reply](https://github.com/XRPLF/XRPL-Standards/pull/587#issuecomment-5665157387))
+and merged on 15 September. [`contrib/filings/`](contrib/filings/README.md) records what was filed and what
+was not. The technical paper, [`paper/orma-paper.pdf`](paper/orma-paper.pdf), fourteen pages, states the
+arithmetic: the two readings of a share, the cover formula, and the ordering result with its proof.
 
 ## Repository map
 
-### `src/`, the backend
-
-Plain ESM `.mjs` with JSDoc typedefs, no build step.
-
-| File | What it does |
-|---|---|
-| `index.mjs` | Entrypoint. Facility discovery, reader, API, optional oracle publishing. |
-| `poll.mjs` | The 4-second reader. Re-reads the `Vault` SLE every tick and never diffs `PreviousFields`. |
-| `score.mjs` | The five measured factors and the ordinal notching. No weights anywhere: a weighted average lets a strong factor pay for a broken one. |
-| `history.mjs` | Broker history reconstruction and the cover-ordering mathematics. |
-| `nav.mjs`, `collateral.mjs` | NAV both ways, and pledge valuation against escrowed shares. |
-| `metadata.mjs` | Reads and writes the share token's valuation pointer. |
-| `oracle.mjs` | The XLS-47 publisher and the four invariants that corrupt data silently rather than erroring. |
-| `credentials.mjs` | XLS-70 issuance and acceptance, and the XLS-80 domain. |
-| `api.mjs` | The frozen HTTP contract. |
-| `num.mjs` | `decimal.js` at precision 40. No `Number()` and no `parseFloat` ever touches a monetary value. |
-| `demo/` | The bakers that create each facility on Devnet, plus the phase matrix and the collateral scenario. |
-| `dev/` | `check-*` scripts, each proving one claim against live Devnet. |
-
-### `app/`, the frontend
-
-React 19, Vite, Tailwind, TypeScript. Screens: Portfolio, Facility, FacilityExhibits, Evidence, OracleObject,
-PledgeResolution, EntryGate, Methodology, Event. It polls the backend and renders the same numbers the API serves, with the notch trace
-that produced each grade.
-
-### `demo/`
-
-The four captured facilities, one JSON file each, with vault ids, transaction hashes, the readings and the
-verdict, plus `delegation.json`, the delegation probe and its positive control. These are committed artefacts: the Evidence screen renders from them and needs no API.
-
-### `contrib/`
-
-`contrib/tutorial-fix/` is a Devnet-proven fix for the official XRPL lending tutorial, written during the
-event. On 12 September `lendingSetup.js` created an open-ended vault, `submitAndWait` did not throw on a `tec`,
-and `.find()` over the metadata returned `undefined`, so the script died at `Setting up tutorial: 5/7` with a
-`TypeError` rather than a result code, and all six *Use the Lending Protocol* tutorials ran it first. We did
-not file it: [xrpl-dev-portal#3923](https://github.com/XRPLF/xrpl-dev-portal/pull/3923), merged on
-16 September 2026, carries four of its five changes. What remains is the engine-result guard. The directory
-holds the diff, the PR body we did not send, a full run log, the before and after scripts, and the upstream
-sources it was taken from.
-
-`contrib/filings/` records what was filed upstream and what was not, and why.
-
-### `paper/`
-
-`orma-paper.pdf` is the technical paper, fourteen pages, compiled from `orma-paper.tex`. It states the
-arithmetic the protocol runs on so a reader can check it rather than read JavaScript: the two net asset
-value readings and why the naive one is not merely lazy, the cover liquidation formula and its three
-non-obvious properties, and the ordering result as a theorem with its proof. Every measured figure in it
-was read from live Devnet during the event, and every claim carries a transaction hash. The exception is
-the oldest ledger one Devnet server reported on 13 October 2026, given in one of the paper's two dated
-corrections of that day.
-
-### `documentation/`
-
-The protocol documentation, ten pages of Mintlify MDX plus its configuration. `build.mjs` renders the
-same source into a static site and `deploy.sh` publishes it to GitHub Pages, at
-https://buzzballz.github.io/orma/, so the pages do not depend on the Mintlify account
-(https://ormaprotocol.mintlify.site/).
-
-### `deck/`
-
-`content.md` is the ten-slide presentation, timed to four minutes, and `build.mjs` turns it into a
-self-contained deck that opens in a browser and prints to PDF. No slide toolchain to install.
-
-### `FEEDBACK.pdf` and `feedback/`
-
-`FEEDBACK.pdf` is the developer feedback report: **three pages**, written from the build, signed. It is
-short on purpose, because it is read by someone who did not ask for it. It was corrected on 13 October
-2026, with a dated line under the signature: the `PreviousFields` rule is worded by presence, not value
-([xrpl-dev-portal#3926](https://github.com/XRPLF/xrpl-dev-portal/issues/3926)), the prior report on
-`rippled#6487` is no longer called our strongest evidence, and the filings it called ready are listed as
-filed ([`contrib/filings/`](contrib/filings/README.md)). The report as submitted is attached to the
-[`hackathon-submission`](https://github.com/BuzzBallz/orma/releases/tag/hackathon-submission) release.
-
-Its evidence is `feedback/appendix.pdf`, the full 40-finding register — 34 pages, every claim carrying a
-transaction hash, repro steps and tracker status.
-
-`feedback/` holds what both are made of. `feedback.html` is the report, `register.md` is the register, and
-`build.mjs` renders each into its own PDF with headless Chrome, refusing to stay quiet if the report ever
-grows past three pages:
-
-```bash
-node feedback/build.mjs
-```
-
----
-
-## Developer feedback
-
-**40 findings: 7 P0, 19 P1, 14 P2.** Three more were withdrawn after cross-checking, and are listed as
-withdrawn rather than deleted. Every finding carries a component, a severity, a status against the live
-trackers, and a Devnet repro.
-
-The three that cost us the most:
-
-1. **The metadata hides the one credit event that matters.** The first impairment of a healthy vault emits
-   `PreviousFields: {}` while `FinalFields` carries a non-zero `LossUnrealized`: the field was not on the
-   object before, so there is no previous value to record. It was raised before us as
-   [`rippled#6487`](https://github.com/XRPLF/rippled/issues/6487) by the operator of an XRPL explorer, and
-   closed by its reporter as not a bug; we left a [comment crediting it](https://github.com/XRPLF/rippled/issues/6487#issuecomment-5655575723).
-   The metadata follows rippled's rules, and a consumer that diffs it still gets the wrong answer. The
-   follow-up we filed as `rippled#8222` was moved by a RippleX maintainer to the documentation tracker as
-   [xrpl-dev-portal#3926](https://github.com/XRPLF/xrpl-dev-portal/issues/3926), *Add clarification to docs
-   on PreviousFields metadata rules*.
-2. **The documented first hour could not complete.** Our fix, verified green on rc5, is in
-   `contrib/tutorial-fix`; [xrpl-dev-portal#3923](https://github.com/XRPLF/xrpl-dev-portal/pull/3923), merged
-   on 16 September 2026, carries four of its five changes, and the engine-result guard is what remains.
-3. **A broker's action history cannot be reconstructed by filtering.** `LoanManage` carries no
-   `LoanBrokerID`, and an impairment does not touch the `LoanBroker` object at all, so a filter over
-   `account_tx` silently drops every impairment. `Loan.FinalFields.LoanBrokerID` in the same metadata closes
-   the join. Before that fix, every default looked unsignalled, and the conduct rule written to reward
-   disclosure was penalising it. That one shipped a wrong answer inside our own code before we caught it.
-
-The register is `feedback/appendix.pdf`. Upstream, three notes on the closed-ended vault draft
-([XRPL-Standards#587](https://github.com/XRPLF/XRPL-Standards/pull/587#issuecomment-5655843515)) were addressed by its author
-([reply](https://github.com/XRPLF/XRPL-Standards/pull/587#issuecomment-5665157387)) and merged on 15 September, and the
-`PreviousFields` issue is open as a documentation task
-([xrpl-dev-portal#3926](https://github.com/XRPLF/xrpl-dev-portal/issues/3926)). `contrib/tutorial-fix/` is
-the tutorial fix we did not file, and `contrib/filings/` records the rest.
-
----
-
-## Since the event
-
-Up to 1 October 2026, 139 of the 141 commits on `main` were dated 12 and 13 September 2026. What happened
-after:
-
-- **14 September 2026.** `FINDINGS.md`, an index of the 40 findings, with statuses as of that day (Andrea).
-- **14 September 2026.** A RippleX maintainer moved our `PreviousFields` issue, `rippled#8222`, to
-  [xrpl-dev-portal#3926](https://github.com/XRPLF/xrpl-dev-portal/issues/3926) as a documentation task.
-- **15 September 2026.** The closed-ended vault draft,
-  [XRPL-Standards#587](https://github.com/XRPLF/XRPL-Standards/pull/587), merged with our three notes addressed.
-- **From 23 September 2026.** A UI redesign (Andrea), merged into `main` on 13 October 2026. It is what
-  https://ormaprotocol.com serves.
-- **1 October 2026.** A NAV-history route, `GET /api/vaults/:vaultId/nav-history`, a vault's NAV at every
-  transaction that modified it, on `main` (Andrea). The deployed API serves it since 13 October 2026.
-- **13 October 2026.** Corrections to this README and the docs: the `PreviousFields` mechanism restated
-  (presence, not value), the Kestrel oracle query fixed (document 4, deployed publisher), the oracle document
-  ids described as assigned in publish order, the upstream statuses updated, and the raw transactions behind
-  every hash captured under [`evidence/devnet-tx/`](evidence/devnet-tx/README.md). The paper and the
-  register (`feedback/register.md`, `feedback/appendix.pdf`) carry dated correction notes on the
-  `PreviousFields` mechanism and on Devnet's history window, which they had given as roughly 29 days, and the
-  source comments in `src/` were restated to match. Also corrected: the Meridian contest (the second
-  publisher was a second account of ours, not an independent one), the credential gate (its vault owner was
-  an account our setup script created), the pre-commit hook (local during the event, not in this
-  repository), the quickstart's first step (`tools/verify-toolchain.mjs` is not in the repository), and the
-  deck's speaker notes in four places.
-- **13 October 2026.** `FINDINGS.md` statuses refreshed, and the register's index with them. The API
-  answers `HEAD` and says `503 WARMING_UP` before its first snapshot. `FEEDBACK.pdf` corrected in four
-  places, with a dated line under the signature (Andrea). An MIT licence. The repository as submitted is
-  the [`hackathon-submission`](https://github.com/BuzzBallz/orma/releases/tag/hackathon-submission) release.
-- **13 October 2026.** The two history routes no longer depend on Devnet keeping the event's ledgers. Each
-  read is merged with the facilities' account histories, captured that day under
-  [`evidence/devnet-tx/`](evidence/devnet-tx/README.md); each point or event says whether it came from the
-  archive, and each response states the window it covers. When that window does not reach back to the
-  broker's creation, the conduct grade is withheld rather than computed: a pruned record would have graded
-  Kestrel's broker A 100 instead of E 25 (raised by Andrea). On a cold start, a facility not read yet answers
-  `503 WARMING_UP` rather than `404`. The deployed API serves all of this since that day.
-- **13 October 2026.** The app moved to its own domain, https://ormaprotocol.com, which its link card now
-  names; the old `ormaprotocol.vercel.app` address still works. A withheld conduct grade reads "Not
-  assessed" instead of "— / 100", and the history caveat is printed in the note's own vocabulary (Andrea).
-
----
+| Path | What it is | From |
+|---|---|---|
+| `src/` | The backend, plain ESM `.mjs` with JSDoc, no build step: reader (`poll.mjs`, `xrpl.mjs`), valuation (`nav.mjs`, `num.mjs`), publisher (`oracle.mjs`, `publish-loop.mjs`), share metadata (`metadata.mjs`), history, credentials, API (`api.mjs`, `openapi.json`), MCP (`mcp.mjs`) | Paris, extended in New York |
+| `src/nyc/`, `src/ticket/`, `src/desk/`, `src/roles/`, `src/change/` | Orma Desk: contracts, ticket, signer, decision log, margin calls, release rule and auditor, role engine, change engine | New York |
+| `src/mark/`, `src/universe/`, `src/feed/`, `src/fx/` | orma-mark, Universe, Feed, XRP/USD price | New York |
+| `src/demo/`, `src/dev/` | Scripts that create the facilities on Devnet (`bake-*.mjs` among them); `check-*` scripts, `run-checks.mjs` being `npm test` | both |
+| `app/` | React, Vite, TypeScript. `/desk` (`Desk.tsx`, `DeskUniverse.tsx`, `DeskFeed.tsx`, `components/Ledger.tsx`, `components/Charts.tsx`) is New York; Portfolio, Facility, Evidence and the other screens are Paris | both |
+| `demo/` | The committed record of each baked vault, the mandate, the margin policy and the dollar terms | both |
+| `evidence/devnet-tx/` | Captures of every linked transaction, and the archive the history routes fall back on as Devnet prunes | both |
+| `documentation/` | Mintlify MDX, also built to https://buzzballz.github.io/orma/ by `build.mjs` and `deploy.sh` | Paris, updated |
+| `paper/`, `FEEDBACK.pdf`, `feedback/`, `FINDINGS.md`, `contrib/` | Paper, feedback report and register, upstream work | Paris |
+| `deck/` | The Paris presentation, not updated for New York | Paris |
 
 ## Team
 
-**Alexandre Lemiere** ([@frytegg](https://github.com/frytegg)): the reader, scoring, NAV, the XLS-47
-publisher and the credential gate (`src/`); the verification screen and demo exhibits in the app; the
-40-finding register (`feedback/`); the upstream filings and `contrib/`; the paper and the documentation.\
-**Andrea Gonzalez** ([@andreagnzz](https://github.com/andreagnzz)): the app (`app/`), its visual identity (the Orma mark and palette) and its redesign; the
-three-page rewrite of the feedback report (`37d6a96`); `FINDINGS.md`; and the NAV-history API added after the
-event.
+Alexandre Lemiere ([@frytegg](https://github.com/frytegg)) and Andrea Gonzalez
+([@andreagnzz](https://github.com/andreagnzz)).
 
-Team BuzzBallz, 1st place of 14 projects. De Vinci Blockchain XRPL Lending Protocol Hackathon, Paris, 12 and
-13 September 2026.
+In New York, by commit author in `nyc-start..main`: Alexandre, the contract, pinned reads, the bake, the
+ticket, the desk signer, the change engine with the release rule and auditor, Universe, the per-client
+limits, the desk copy, margin calls, test-dollar loans and late payments; Andrea, the harness, the publisher
+identity, orma-mark, the role engine, the desk kit and screens, the Feed, and the desk's redraw and fixes.
+In Paris: Alexandre, the reader, the scoring, the XLS-47 publisher, the credential gate, the finding register,
+the upstream filings, the paper and the documentation; Andrea, the app, its visual identity and its redesign,
+the three-page feedback report and `FINDINGS.md`.
+
+MIT licence (`LICENSE`).
