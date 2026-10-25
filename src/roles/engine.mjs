@@ -8,14 +8,14 @@
  *   POST /api/roles/{runId}/actions/{actionId}/confirm  -> 202, the action queued on its account
  *   GET  /api/roles/{runId}/actions/{actionId}          -> the action, public (no Origin, token or kill check)
  */
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
+import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Wallet, hashes } from 'xrpl'
 import { num } from '../num.mjs'
 import { FLAG } from '../history.mjs'
 import { logger } from '../log.mjs'
-import { COLLATERAL_POLICY, COLLATERAL_STAGES, judgeCollateralAccount } from '../nyc/contracts.mjs'
+import { COLLATERAL_POLICY, COLLATERAL_STAGES, judgeCollateralAccount, NYC_ERRORS, sha256Hex } from '../nyc/contracts.mjs'
 import { buildChange, realise, rereadAt, simulateAndRead } from '../change/engine.mjs'
 import { readTicketInputs } from '../ticket/inputs.mjs'
 import { buildTicket } from '../ticket/engine.mjs'
@@ -40,11 +40,12 @@ const RESERVE_DROPS = '2000000'
 /** Any amount does: during the Investment phase every VaultWithdraw is tecTOO_SOON. */
 const WITHDRAW_PROBE_DROPS = '1000000'
 const BODY_MAX_BYTES = 64 * 1024
-/** A requestLoan holds its escrow unless it failed; a refused one is replayed by rerequest. */
+/** A requestLoan holds its escrow unless it failed; a declined one keeps it, and its pledge is made again. */
 const RELEASED = ['failed']
+/** A pledge's collateral account, reserved at preview, is free again for another pledge after this long unconfirmed. */
+const RESERVE_TTL_MS = 5 * 60_000
 
 const hex = (s) => Buffer.from(s, 'utf8').toString('hex').toUpperCase()
-const sha256 = (s) => createHash('sha256').update(s).digest('hex')
 const sameId = (a, b) => typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
 
 class HttpError extends Error {
@@ -79,11 +80,11 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
   const allowedOrigins = new Set((env.ALLOWED_WRITE_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean))
   const configured = Boolean(accounts.holder && accounts.borrower && accounts.broker && accounts.deskOwner && Object.keys(vaults).length)
 
-  /** @type {Map<string, { runId: string, operatorTokenHash: string, killed: boolean, actions: Map<string, any> }>} */
+  /** @type {Map<string, { runId: string, operatorTokenHash: string, actions: Map<string, any> }>} */
   const runs = new Map()
   /** actionId -> what the public action does not show: the transaction to rebuild, the signed LoanSet */
   const internals = new Map()
-  /** collateral account -> the pledgeEscrow that took it, while that action is previewed or confirming */
+  /** collateral account -> { act, at } of the pledgeEscrow that took it, while that action is previewed or confirming */
   const reserved = new Map()
   const queues = new Map()
   let killed = false
@@ -155,18 +156,26 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
   }
 
   function release(actionId) {
-    for (const [address, holder] of reserved) if (holder === actionId) reserved.delete(address)
+    for (const [address, holder] of reserved) if (holder.act.actionId === actionId) reserved.delete(address)
+  }
+
+  /** The pledge that holds the account, or null; a preview left unconfirmed lets it go after RESERVE_TTL_MS. */
+  function holderOf(address) {
+    const r = reserved.get(address)
+    if (r && r.act.state === 'previewed' && Date.now() - r.at > RESERVE_TTL_MS) reserved.delete(address)
+    return reserved.get(address)?.act.actionId ?? null
   }
 
   /** The first free account of the pool, reserved for this action; null when the pool is exhausted. */
-  async function takeFree(pool, shareMptId, actionId, L, collateral) {
+  async function takeFree(pool, shareMptId, act, L, collateral) {
+    const mine = (address) => [null, act.actionId].includes(holderOf(address))
     for (const address of pool) {
-      if (reserved.has(address) && reserved.get(address) !== actionId) continue
+      if (!mine(address)) continue
       if (!(await isFree(address, shareMptId, L, collateral))) continue
       // Checked again after the reads: a concurrent pledge may have taken it meanwhile.
-      if (reserved.has(address) && reserved.get(address) !== actionId) continue
-      release(actionId)
-      reserved.set(address, actionId)
+      if (!mine(address)) continue
+      release(act.actionId)
+      reserved.set(address, { act, at: Date.now() })
       return address
     }
     return null
@@ -189,7 +198,7 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
     const t0 = await xrpl.closeTime()
     const L = xrpl.lastLedger
     const pool = collateral.accounts?.[internals.get(act.actionId).harbor] ?? []
-    destination ??= await takeFree(pool, act.ticket.share, act.actionId, L, collateral)
+    destination ??= await takeFree(pool, act.ticket.share, act, L, collateral)
     const finishAfter = t0 + plan.paymentInterval + plan.gracePeriod + policy.finishAfterMarginSeconds
     return {
       L,
@@ -454,7 +463,9 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
           // Reserved before any await: a concurrent request on the same escrow sees this one.
           const rival = [...run.actions.values()].find((a) => a.action === 'requestLoan' && a.pledgeActionId === body.pledgeActionId && !RELEASED.includes(a.state))
           if (rival) {
-            throw new HttpError(409, 'ESCROW_POLICY', 'The pledged escrow is already named by another loan request. Nothing was signed. Use Re-request with a fresh ticket.', { requestActionId: rival.actionId })
+            // a declined request keeps its escrow and cannot be signed again: only a new pledge can back a new request
+            const next = rival.state === 'refused' ? 'That request was declined: pledge again to request a new loan.' : 'Use Re-request with a fresh ticket.'
+            throw new HttpError(409, 'ESCROW_POLICY', `The pledged escrow is already named by another loan request. Nothing was signed. ${next}`, { requestActionId: rival.actionId })
           }
           act.pledgeActionId = body.pledgeActionId
           act.ticket = pick(body)
@@ -500,10 +511,9 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
   /** The request contract of §5: 400 for a body outside it, before anything is previewed. */
   function checkBody(run, action, body) {
     if (!LABELS.includes(body.vault) || !vaults[body.vault]) throw bad('vault must be one of harbor-1, harbor-2, harbor-3, desk, spare')
-    const ticketed = ['pledgeEscrow', 'requestLoan', 'settle'].includes(action)
-    if (['pledgeEscrow', 'requestLoan'].includes(action) && !LENDERS.includes(body.vault)) throw bad('vault must be the lending vault, desk or spare')
-    if (['authorize', 'settle'].includes(action) && body.vault !== 'spare') throw bad('vault must be spare')
-    if ((ticketed || action === 'authorize') && !HEX48.test(body.share ?? '')) throw bad('share must be 48 hex characters')
+    const ticketed = ['pledgeEscrow', 'requestLoan'].includes(action)
+    if (ticketed && !LENDERS.includes(body.vault)) throw bad('vault must be the lending vault, desk or spare')
+    if (ticketed && !HEX48.test(body.share ?? '')) throw bad('share must be 48 hex characters')
     if (ticketed && !(HEX64.test(body.ticketId ?? '') && HEX64.test(body.inputsDigest ?? ''))) throw bad('ticketId and inputsDigest must be 64 hex characters')
     if (ticketed && !UNITS.test(body.units ?? '')) throw bad('units must be 1 to 30 digits')
     if (action === 'requestLoan' && typeof body.pledgeActionId !== 'string') throw bad('pledgeActionId is required')
@@ -524,25 +534,23 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
   function newRun() {
     const runId = randomBytes(16).toString('hex')
     const token = randomBytes(16).toString('hex')
-    runs.set(runId, { runId, operatorTokenHash: sha256(token), killed, actions: new Map() })
+    runs.set(runId, { runId, operatorTokenHash: sha256Hex(token), actions: new Map() })
     log.info('run created', { runId })
     return { runId, token }
   }
   function kill() {
     killed = true
-    for (const run of runs.values()) run.killed = true
     log.warn('kill switch on: every write refused, queued entries fail')
   }
   function unkill() {
     killed = false
-    for (const run of runs.values()) run.killed = false
     log.info('kill switch off')
   }
 
   function tokenOk(req, run) {
     const m = /^Bearer\s+(\S+)$/.exec(req.headers.authorization ?? '')
     if (!m || !run) return false
-    const got = Buffer.from(sha256(m[1]), 'hex')
+    const got = Buffer.from(sha256Hex(m[1]), 'hex')
     return timingSafeEqual(got, Buffer.from(run.operatorTokenHash, 'hex'))
   }
 
@@ -645,7 +653,8 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
       }
     } catch (e) {
       if (!(e instanceof HttpError)) throw e
-      helpers.send(e.status, { error: { code: e.code, message: e.message, retryable: e.status === 503 || e.status === 423, ...e.extra } })
+      // the contract's table first (423 LOCKED is not retryable), as DeskError reads it
+      helpers.send(e.status, { error: { code: e.code, message: e.message, retryable: NYC_ERRORS[e.code]?.retryable ?? e.status === 503, ...e.extra } })
     }
     return true
   }
