@@ -1,14 +1,15 @@
 /**
- * The API. Same routes and shapes as tools/fixture-server.mjs, so the frontend
- * never changes a URL: only `health.source` flips from "fixtures" to "devnet".
+ * The API: the information layer's routes here, the NYC routes through `opts.nyc`.
+ * `health.source` says where the figures come from ("devnet" unless a caller says otherwise).
  *
  * Zero dependencies on purpose. An HTTP framework is one more thing to fail at
- * 02:00, and this serves a dozen routes.
+ * 02:00, and node:http is enough for these routes.
  */
 import { createServer } from 'node:http'
 import { readFileSync, existsSync } from 'node:fs'
+import { createHash, timingSafeEqual } from 'node:crypto'
 import { isValidClassicAddress } from 'xrpl'
-import { presentVault, presentRow, setLabel } from './present.mjs'
+import { presentVault, presentRow } from './present.mjs'
 import { findShareEscrows, presentCollateral } from './collateral.mjs'
 import { readBrokerHistory, analyseOrdering, reputation, recommendOrder, CONDUCT } from './history.mjs'
 import { fetchNavHistory } from './navhistory.mjs'
@@ -28,6 +29,28 @@ const MAX_LEDGER_WALKS = 4
 /** Of those, at most this many per client (D-A5): one client cannot hold the whole cap and starve the others. */
 const MAX_WALKS_PER_CLIENT = 2
 const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1'])
+/** An operator action's body is a few fields at most. */
+const MAX_BODY_BYTES = 64 * 1024
+/** The operator actions are lowercase words; anything else under /api/demo/ is no route. */
+const DEMO_ACTION = /^\/api\/demo\/([a-z]+)$/
+
+/**
+ * A loopback socket that no proxy speaks through. A proxy on the same host connects over loopback
+ * and says so in a forwarding header; such a request is a public one and needs the demo key.
+ * @param {import('node:http').IncomingMessage} req
+ */
+function isDirectLoopback(req) {
+  const h = req.headers ?? {}
+  return LOOPBACK.has(req.socket?.remoteAddress ?? '') && !h['x-forwarded-for'] && !h.forwarded && !h['x-real-ip']
+}
+
+/** Constant time, whatever the lengths: both sides are hashed first, as the role engine does. */
+function sameKey(given, expected) {
+  if (typeof given !== 'string' || !expected) return false
+  const a = createHash('sha256').update(given).digest()
+  const b = createHash('sha256').update(expected).digest()
+  return timingSafeEqual(a, b)
+}
 
 /**
  * The client a request comes from, for the per-client limits: the last entry of x-forwarded-for (the
@@ -101,6 +124,59 @@ export function createApi(reader, opts = {}) {
       oracle: opts.oracleFor?.(snap.vaultId) ?? null,
       closeTime: reader.closeTime,
     })
+
+  /**
+   * Merged with the archive Devnet has pruned, and graded only if the record reaches back to
+   * the broker's creation: a pruned record would otherwise read as a clean one.
+   */
+  const brokerHistoryBody = async (snap, broker) => {
+    const { events, window } = await readBrokerHistory(reader.xrpl, broker, snap.vault)
+    const ordering = analyseOrdering(events, broker, window)
+    return {
+      loanBrokerId: broker.loanBrokerId,
+      owner: broker.owner,
+      events: events.map((e) => ({
+        kind: e.kind, at: e.at, hash: e.hash, loanId: e.loanId,
+        // null, not "0": an impairment leaves the broker object untouched, so this
+        // transaction does not report the book. Zero would read as an empty book.
+        brokerStateKnown: e.brokerStateKnown,
+        debtBefore: e.brokerStateKnown ? e.debtBefore.toFixed(0) : null,
+        debtAfter: e.brokerStateKnown ? e.debtAfter.toFixed(0) : null,
+        coverBefore: e.brokerStateKnown ? e.coverBefore.toFixed(0) : null,
+        coverAfter: e.brokerStateKnown ? e.coverAfter.toFixed(0) : null,
+        coverConsumed: e.coverConsumed.toFixed(0), principal: e.principal.toFixed(0),
+        exposure: e.exposure.toFixed(0),
+        // What a cover deposit or withdrawal MOVED. Without it the row that says
+        // "added first-loss capital" renders three zeros, on the exhibit whose whole
+        // subject is first-loss capital.
+        amount: e.amount ? e.amount.toFixed(0) : null,
+        source: e.source,
+      })),
+      ordering,
+      reputation: reputation(events, ordering, broker, window, snap.vault.asset),
+      recommendation: recommendOrder(snap.loans, broker),
+      window,
+    }
+  }
+
+  /** Is this facility gated, and by whom: two ledger reads, at most once per 30 s per vault. */
+  const gateBody = async (key, vault) => {
+    const status = await gateStatus(reader.xrpl, vault)
+    return {
+      vaultId: key,
+      ...status,
+      // The rater's own question: am I cited here? Answered without asking them,
+      // which is the point -- they were never consulted in the first place.
+      issuerNamed: opts.raterAddress ? isNamedIn(status, opts.raterAddress) : null,
+      raterAddress: opts.raterAddress ?? null,
+      // Only for the facility this chain was actually baked against. A gate object
+      // proves a domain exists; the chain proves what happened when someone tried to
+      // enter it, which is the part that cannot be asserted.
+      proof: opts.gateProof && opts.gateProof.vaultId === key
+        ? { bakedAt: opts.gateProof.bakedAt, steps: opts.gateProof.steps }
+        : null,
+    }
+  }
 
   const server = createServer(async (req, res) => {
     // Outside the try below, a target such as "//[" threw from this async handler and took the
@@ -232,39 +308,15 @@ export function createApi(reader, opts = {}) {
         if (!snap) return absent('VAULT_NOT_FOUND', 'No vault with that id', hm[1])
         const broker = snap.brokers[0]
         if (!broker) return fail(404, 'NO_BROKER', 'vault has no loan broker', false)
-        const cached = historyCache.get(broker.loanBrokerId)
-        if (cached && Date.now() - cached.at < 15000) return send(200, stamp(cached.body))
-        // Merged with the archive Devnet has pruned, and graded only if the record reaches back to
-        // the broker's creation: a pruned record would otherwise read as a clean one.
-        const { events, window } = await readBrokerHistory(reader.xrpl, broker, snap.vault)
-        const ordering = analyseOrdering(events, broker, window)
-        const body = {
-          loanBrokerId: broker.loanBrokerId,
-          owner: broker.owner,
-          events: events.map((e) => ({
-            kind: e.kind, at: e.at, hash: e.hash, loanId: e.loanId,
-            // null, not "0": an impairment leaves the broker object untouched, so this
-            // transaction does not report the book. Zero would read as an empty book.
-            brokerStateKnown: e.brokerStateKnown,
-            debtBefore: e.brokerStateKnown ? e.debtBefore.toFixed(0) : null,
-            debtAfter: e.brokerStateKnown ? e.debtAfter.toFixed(0) : null,
-            coverBefore: e.brokerStateKnown ? e.coverBefore.toFixed(0) : null,
-            coverAfter: e.brokerStateKnown ? e.coverAfter.toFixed(0) : null,
-            coverConsumed: e.coverConsumed.toFixed(0), principal: e.principal.toFixed(0),
-            exposure: e.exposure.toFixed(0),
-            // What a cover deposit or withdrawal MOVED. Without it the row that says
-            // "added first-loss capital" renders three zeros, on the exhibit whose whole
-            // subject is first-loss capital.
-            amount: e.amount ? e.amount.toFixed(0) : null,
-            source: e.source,
-          })),
-          ordering,
-          reputation: reputation(events, ordering, broker, window, snap.vault.asset),
-          recommendation: recommendOrder(snap.loans, broker),
-          window,
+        // The promise is cached, so requests that arrive during a miss share one ledger read, and it
+        // holds the stamped body: a cached answer keeps the ledger and time it was read at.
+        let hit = historyCache.get(broker.loanBrokerId)
+        if (!hit || Date.now() - hit.at >= 15000) {
+          hit = { at: Date.now(), body: brokerHistoryBody(snap, broker).then(stamp) }
+          historyCache.set(broker.loanBrokerId, hit)
+          hit.body.catch(() => historyCache.delete(broker.loanBrokerId))
         }
-        historyCache.set(broker.loanBrokerId, { at: Date.now(), body })
-        return send(200, stamp(body))
+        return send(200, await hit.body)
       }
 
       // The vault's NAV at every transaction that modified it: reported and held, each
@@ -320,25 +372,14 @@ export function createApi(reader, opts = {}) {
         const snap = reader.get(gm[1].toUpperCase()) ?? reader.get(gm[1])
         if (!snap) return absent('VAULT_NOT_FOUND', 'No vault with that id', gm[1])
         const key = snap.vault.vaultId
-        const cached = gateCache.get(key)
-        if (cached && Date.now() - cached.at < 30000) return send(200, stamp(cached.body))
-        const status = await gateStatus(reader.xrpl, snap.vault)
-        const body = {
-          vaultId: key,
-          ...status,
-          // The rater's own question: am I cited here? Answered without asking them,
-          // which is the point -- they were never consulted in the first place.
-          issuerNamed: opts.raterAddress ? isNamedIn(status, opts.raterAddress) : null,
-          raterAddress: opts.raterAddress ?? null,
-          // Only for the facility this chain was actually baked against. A gate object
-          // proves a domain exists; the chain proves what happened when someone tried to
-          // enter it, which is the part that cannot be asserted.
-          proof: opts.gateProof && opts.gateProof.vaultId === key
-            ? { bakedAt: opts.gateProof.bakedAt, steps: opts.gateProof.steps }
-            : null,
+        // Shared by the requests of a miss, and stamped once, as broker-history is.
+        let hit = gateCache.get(key)
+        if (!hit || Date.now() - hit.at >= 30000) {
+          hit = { at: Date.now(), body: gateBody(key, snap.vault).then(stamp) }
+          gateCache.set(key, hit)
+          hit.body.catch(() => gateCache.delete(key))
         }
-        gateCache.set(key, { at: Date.now(), body })
-        return send(200, stamp(body))
+        return send(200, await hit.body)
       }
 
       // THE ROUTE THE TOKEN POINTS AT. Same valuation, keyed by the share token instead
@@ -393,12 +434,11 @@ export function createApi(reader, opts = {}) {
         }
       }
 
-      // Demo 1. `demo/` is TRACKED and `fixtures/` is not, so the tracked capture must be
-      // tried first: served from fixtures alone, this route 404s on a clean clone and the
-      // most important demo in the pitch dies in front of the judges.
+      // Demo 1. Served from the tracked capture in `demo/` only, so a clean clone serves the
+      // same race the pitch shows, and nothing else ever stands in for it.
       if (key === 'GET /api/indexer-race') {
-        const path = ['demo/indexer-race.json', 'fixtures/indexer-race.json'].find((f) => existsSync(f))
-        if (!path) return fail(404, 'NOT_FOUND', 'no capture available', false)
+        const path = 'demo/indexer-race.json'
+        if (!existsSync(path)) return fail(404, 'NOT_FOUND', 'no capture available', false)
         return send(200, stamp(JSON.parse(readFileSync(path, 'utf8'))))
       }
 
@@ -430,13 +470,18 @@ export function createApi(reader, opts = {}) {
         // A browser always sends Origin on a POST, an operator's script never does. Without this,
         // any page open on the presenter's machine could post here from loopback.
         if (req.headers.origin) return fail(403, 'FORBIDDEN', 'operator routes refuse browser requests', false)
-        const allowed = req.socket.remoteAddress?.includes('127.0.0.1')
-          || req.socket.remoteAddress === '::1'
-          || (process.env.DEMO_KEY && req.headers['x-demo-key'] === process.env.DEMO_KEY)
+        const allowed = isDirectLoopback(req) || sameKey(req.headers['x-demo-key'], process.env.DEMO_KEY)
         if (!allowed) return fail(403, 'FORBIDDEN', 'operator routes are loopback-only', false)
-        const action = url.pathname.split('/').pop()
-        if (!opts.demo?.[action]) return fail(404, 'NOT_FOUND', `no demo action "${action}"`, false)
+        // The whole path names the action, and only the map's own functions are actions: not
+        // /api/demo/x/kill, not an inherited name such as constructor.
+        const am = DEMO_ACTION.exec(url.pathname)
+        const action = am?.[1]
+        if (!action || !Object.hasOwn(opts.demo ?? {}, action) || typeof opts.demo[action] !== 'function') {
+          return fail(404, 'NOT_FOUND', am ? `no demo action "${action}"` : `No route ${key}`, false)
+        }
         const body = await readBody(req)
+        if (body === TOO_LARGE) return fail(413, 'BODY_TOO_LARGE', `the body is over ${MAX_BODY_BYTES / 1024} KB`, false)
+        if (body === BAD_JSON) return fail(400, 'BAD_REQUEST', 'the body is not JSON', false)
         const out = await opts.demo[action](body, reader)
         return send(200, stamp({ ok: true, action, ...out }))
       }
@@ -461,10 +506,43 @@ export function createApi(reader, opts = {}) {
   }
 }
 
+const TOO_LARGE = Symbol('too large')
+const BAD_JSON = Symbol('bad json')
+
+/**
+ * An operator action's JSON body, `{}` when there is none. At most MAX_BODY_BYTES are read; past
+ * that, or for a body that is not JSON, a marker the route answers 413 or 400 with. A request that
+ * fails or closes before its end rejects, so the route answers instead of waiting forever.
+ * @param {import('node:http').IncomingMessage} req
+ */
 function readBody(req) {
-  return new Promise((resolve) => {
-    let s = ''
-    req.on('data', (c) => (s += c))
-    req.on('end', () => { try { resolve(s ? JSON.parse(s) : {}) } catch { resolve({}) } })
+  return new Promise((resolve, reject) => {
+    const chunks = []
+    let size = 0
+    let done = false
+    req.on('data', (c) => {
+      if (done) return
+      size += c.length
+      if (size > MAX_BODY_BYTES) {
+        done = true
+        req.resume()
+        return resolve(TOO_LARGE)
+      }
+      chunks.push(c)
+    })
+    req.on('end', () => {
+      if (done) return
+      done = true
+      const s = Buffer.concat(chunks).toString('utf8')
+      if (!s) return resolve({})
+      try {
+        const j = JSON.parse(s)
+        resolve(j !== null && typeof j === 'object' && !Array.isArray(j) ? j : BAD_JSON)
+      } catch {
+        resolve(BAD_JSON)
+      }
+    })
+    req.on('error', (e) => { if (!done) { done = true; reject(e) } })
+    req.on('close', () => { if (!done) { done = true; reject(new Error('request closed before its body ended')) } })
   })
 }
