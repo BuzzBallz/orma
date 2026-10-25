@@ -9,7 +9,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { request } from 'node:http'
-import { Wallet, hashes, decode } from 'xrpl'
+import { Wallet, hashes, decode, signLoanSetByCounterparty } from 'xrpl'
 import { createApi } from '../api.mjs'
 import { createRoleEngine } from '../roles/engine.mjs'
 import { buildTicket } from '../ticket/engine.mjs'
@@ -410,7 +410,7 @@ async function engineCases() {
   console.log('the role engine in memory')
   const ORIGIN = 'https://ormaprotocol.com'
   const harbor = (label) => ({ label, vaultId: hex64(label.at(-1)), shareMptId: label === 'harbor-1' ? SHARE : hex64(label.at(-1)).slice(0, 48), loanBrokerId: HARBOR_BROKER, owner: W.broker.address, loans: { L1, L2: hex64('2') } })
-  const setup = async ({ mandate = PASSING, simulate } = {}) => {
+  const setup = async ({ mandate = PASSING, simulate, ttl } = {}) => {
     const w = world()
     w.mandate = mandate
     const pool = [collateralAccount(w), collateralAccount(w), collateralAccount(w)]
@@ -430,6 +430,7 @@ async function engineCases() {
         if (acct) acct.root.Sequence++
         return { txHash: hex64('5'), engineResult: 'tesSUCCESS', ledgerIndex: w.L }
       },
+      ...(ttl && { signatureTtlMs: ttl }),
     })
     const s = signerFor(w, { mandate }) // its log and the record of what the desk submitted
     const signer = createSigner({
@@ -462,6 +463,7 @@ async function engineCases() {
     const t = run.token
     const post = (role, action, body) => call('POST', `/api/roles/${run.runId}/${role}/${action}`, { token: t, body })
     const confirm = (actionId) => call('POST', `/api/roles/${run.runId}/actions/${actionId}/confirm`, { token: t })
+    const signature = (actionId, body) => call('POST', `/api/roles/${run.runId}/actions/${actionId}/signature`, { token: t, body })
     const get = (actionId) => call('GET', `/api/roles/${run.runId}/actions/${actionId}`)
     const until = async (actionId, states) => {
       for (let i = 0; i < 200; i++) {
@@ -490,7 +492,7 @@ async function engineCases() {
       return out
     }
     const openRequest = async () => (await openRequests(1))[0]
-    return { w, s, api, call, post, confirm, get, until, request: openRequest, requests: openRequests, simulated, engine }
+    return { w, s, api, call, post, confirm, signature, get, until, request: openRequest, requests: openRequests, simulated, engine }
   }
 
   {
@@ -570,6 +572,75 @@ async function engineCases() {
     await ca
     const cd2 = await e.confirm(d.body.actionId)
     eq('the decline confirm during approving: 404; after the approval, never declined', [cd.status, cd2.status, e.s.decisions.entries().map((x) => x.decision)], [404, 404, ['approved']])
+    await e.api.close()
+  }
+
+  console.log('the demo lab: the desk owner countersigns in the browser')
+  {
+    // a refused verdict asks no signature: the confirm answers 409 as without the page
+    const e = await setup({ mandate: TIGHT })
+    const req = await e.request()
+    const p = await e.post('riskOfficer', 'approve', { vault: 'spare', requestActionId: req, signer: 'browser' })
+    const c = await e.confirm(p.body.actionId)
+    const a = (await e.get(p.body.actionId)).body
+    eq('browser approve on a tight mandate: 409 BREACHED at the confirm, no signature asked, logged refused, nothing submitted',
+      [p.status, p.body.state, c.status, c.body.error?.code, a.state, 'toSign' in a, e.s.decisions.entries().map((x) => [x.decision, x.code]), e.s.submitted.length],
+      [202, 'previewed', 409, 'BREACHED', 'refused', false, [['refused', 'BREACHED']], 0])
+    await e.api.close()
+  }
+  {
+    const e = await setup()
+    const req = await e.request()
+    const p = await e.post('riskOfficer', 'approve', { vault: 'spare', requestActionId: req, signer: 'browser' })
+    const c = await e.confirm(p.body.actionId)
+    const t = c.body.toSign
+    const kept = e.engine.loanSetOf(req)
+    eq('browser approve on a passing mandate: the confirm answers 202 awaiting-signature, a countersign of the borrower-signed LoanSet by the desk owner; nothing submitted nor logged',
+      [c.status, c.body.state, t?.kind, t?.role, t?.account, t?.txBlob === kept.tx_blob, 'txJson' in (t ?? {}), (await e.get(req)).body.state, e.s.submitted.length, e.s.decisions.entries().length],
+      [202, 'awaiting-signature', 'countersign', 'deskOwner', W.deskOwner.address, true, false, 'approving', 0, 0])
+    eq('its purpose names the desk, the borrower and the ledger the mandate passed at', [t.purpose.includes('Harbor Credit Desk'), t.purpose.includes('Tidewater Payments'), /at ledger \d+/.test(t.purpose)], [true, true, true])
+    const wrong = await e.signature(p.body.actionId, { requestId: t.requestId, txBlob: signLoanSetByCounterparty(W.stranger, t.txBlob).tx_blob })
+    const twice = await e.signature(p.body.actionId, { requestId: t.requestId, txBlob: t.txBlob })
+    eq('countersigned by another key: 400 SIGNATURE_MISMATCH; the borrower blob alone: the same; the request stays open, nothing submitted',
+      [wrong.status, wrong.body.error?.code, twice.status, twice.body.error?.code, (await e.get(p.body.actionId)).body.state, e.s.submitted.length], [400, 'SIGNATURE_MISMATCH', 400, 'SIGNATURE_MISMATCH', 'awaiting-signature', 0])
+    const blob = signLoanSetByCounterparty(W.deskOwner, t.txBlob).tx_blob
+    const ok = await e.signature(p.body.actionId, { requestId: t.requestId, txBlob: blob })
+    const done = await e.until(p.body.actionId, ['validated', 'failed', 'refused'])
+    eq('the right countersignature: 202, submitted as posted, the approve and the request validated, approved in the log',
+      [ok.status, done.state, e.s.submitted[0] === blob, (await e.get(req)).body.state, e.s.decisions.entries().map((x) => x.decision), e.s.decisions.verifyChain().ok], [202, 'validated', true, 'validated', ['approved'], true])
+    await e.api.close()
+  }
+  {
+    const e = await setup({ ttl: 80 })
+    const req = await e.request()
+    const p = await e.post('riskOfficer', 'approve', { vault: 'spare', requestActionId: req, signer: 'browser' })
+    const c = await e.confirm(p.body.actionId)
+    const done = await e.until(p.body.actionId, ['validated', 'failed', 'refused'])
+    eq('no countersignature by expiresAt: failed SIGNATURE_TIMEOUT, logged refused, the request awaiting approval again, nothing submitted',
+      [c.body.state, done.state, done.engineResult, e.s.decisions.entries().map((x) => [x.decision, x.code]), (await e.get(req)).body.state, e.s.submitted.length],
+      ['awaiting-signature', 'failed', 'SIGNATURE_TIMEOUT', [['refused', 'SIGNATURE_TIMEOUT']], 'pending-approval', 0])
+    await e.api.close()
+  }
+  {
+    // rerequest in the browser: the fresh ticket first, then the borrower's signature of the new LoanSet
+    const e = await setup()
+    const req = await e.request()
+    const old = e.engine.loanSetOf(req)
+    const p = await e.post('riskOfficer', 'rerequest', { vault: 'spare', requestActionId: req, signer: 'browser' })
+    const c = await e.confirm(p.body.actionId)
+    const t = c.body.toSign
+    const approveMeanwhile = await e.confirm((await e.post('riskOfficer', 'approve', { vault: 'spare', requestActionId: req })).body.actionId)
+    eq('browser rerequest: the confirm answers 202 awaiting-signature, a LoanSet for the borrower to sign, the same escrow Memo; an approve confirmed meanwhile is 404',
+      [c.status, c.body.state, t?.kind, t?.role, t?.account, t?.txJson?.TransactionType, t?.txJson?.Memos?.[1]?.Memo?.MemoData === old.tx.Memos[1].Memo.MemoData, approveMeanwhile.status],
+      [202, 'awaiting-signature', 'sign', 'borrower', W.borrower.address, 'LoanSet', true, 404])
+    const blob = W.borrower.sign(structuredClone(t.txJson)).tx_blob
+    await e.signature(p.body.actionId, { requestId: t.requestId, txBlob: blob })
+    const done = await e.until(p.body.actionId, ['validated', 'failed'])
+    const ap = await e.post('riskOfficer', 'approve', { vault: 'spare', requestActionId: req })
+    await e.confirm(ap.body.actionId)
+    const approved = await e.until(ap.body.actionId, ['validated', 'failed', 'refused'])
+    eq('... signed in the page: validated, and a server approval then countersigns that very LoanSet',
+      [done.state, done.lastLedgerSequence, approved.state, decode(e.s.submitted.at(-1)).TxnSignature === decode(blob).TxnSignature], ['validated', t.txJson.LastLedgerSequence, 'validated', true])
     await e.api.close()
   }
 }

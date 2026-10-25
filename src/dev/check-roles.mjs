@@ -3,7 +3,7 @@
 // client with a fake simulate and a fake submit. No Devnet.
 //   node src/dev/check-roles.mjs
 import { request } from 'node:http'
-import { Wallet, hashes } from 'xrpl'
+import { Wallet, hashes, decode, encode, deriveAddress } from 'xrpl'
 import { TRANSACTION_TYPES } from 'ripple-binary-codec'
 import { createApi } from '../api.mjs'
 import { createRoleEngine } from '../roles/engine.mjs'
@@ -56,7 +56,7 @@ async function main() {
   })
 
   /** A fake ledger, a fake simulate and a fake submit, an engine on them, and the API around it. */
-  async function setup({ pool = 'free' } = {}) {
+  async function setup({ pool = 'free', ttl } = {}) {
     const w = { L: 1000, accounts: new Map(), simulated: [], submitted: [], gate: null, simResult: () => 'tesSUCCESS', signedLoanSets: 0 }
     w.accounts.set(W.borrower.address, { root: { Account: W.borrower.address, Sequence: 10 }, objects: [], txs: [] })
     for (const a of POOL) if (pool === 'free') w.accounts.set(a, conforming(a))
@@ -100,13 +100,16 @@ async function main() {
         w.simulated.push(tx)
         return { engine_result: w.simResult(tx) }
       },
-      submit: async (tx, wallet) => {
+      submit: async (sent, wallet) => {
         if (w.gate) await w.gate
-        w.submitted.push({ tx, by: wallet.address })
+        // a browser-signed action hands over its verified blob and no wallet: its signer is the blob's key
+        const tx = typeof sent === 'string' ? decode(sent) : sent
+        w.submitted.push({ tx, by: wallet?.address ?? deriveAddress(tx.SigningPubKey), ...(typeof sent === 'string' && { blob: sent }) })
         const acct = w.accounts.get(tx.Account)
         if (acct) acct.root.Sequence++
         return { txHash: String(w.submitted.length).padStart(64, '0'), engineResult: 'tesSUCCESS', ledgerIndex: w.L + 1 }
       },
+      ...(ttl && { signatureTtlMs: ttl }),
     })
     const fakeReader = { serverTime: '2026-10-24T00:00:00Z', ledgerIndex: 1000, snapshots: new Map(), vaultIds: [], missing: new Set(), all: () => [] }
     const demo = { run: async () => engine.newRun(), kill: async () => { engine.kill(); return {} }, unkill: async () => { engine.unkill(); return {} } }
@@ -132,6 +135,7 @@ async function main() {
     const newRun = async () => (await call('POST', '/api/demo/run')).body
     const post = (run, role, action, body, o = {}) => call('POST', `/api/roles/${run.runId}/${role}/${action}`, { token: run.token, body, ...o })
     const confirm = (run, actionId, o = {}) => call('POST', `/api/roles/${run.runId}/actions/${actionId}/confirm`, { token: run.token, ...o })
+    const signature = (run, actionId, body, o = {}) => call('POST', `/api/roles/${run.runId}/actions/${actionId}/signature`, { token: run.token, body, ...o })
     const get = async (run, actionId) => (await call('GET', `/api/roles/${run.runId}/actions/${actionId}`)).body
     /** Waits for a state, never for a delay. Every validated read seen on the way is kept. */
     const waitState = async (run, actionId, states, seen = []) => {
@@ -148,7 +152,7 @@ async function main() {
       w.gate = new Promise((r) => { open = r })
       return () => { w.gate = null; open() }
     }
-    return { w, engine, api, call, newRun, post, confirm, get, waitState, hold }
+    return { w, engine, api, call, newRun, post, confirm, signature, get, waitState, hold }
   }
 
   const ticket = (vaultLabel, share = SHARE['harbor-1'], extra = {}) => ({ vault: vaultLabel, share, ticketId: 'E'.repeat(64), inputsDigest: 'F'.repeat(64), units: PLAN.units, ...extra })
@@ -426,6 +430,140 @@ async function main() {
     const refused = await s.confirm(run1, ap.body.actionId)
     eq('register: a confirm that answers a code is a 409 with its fields, the action refused',
       [ap.status, refused.status, refused.body.error.code, refused.body.error.breaches, (await s.get(run1, ap.body.actionId)).state], [202, 409, 'BREACHED', ['maxLtvBps'], 'refused'])
+    await s.api.close()
+  }
+
+  // --- the demo lab: signatures asked of the browser, verified before use ----------------------------
+  {
+    const s = await setup()
+    const run = await s.newRun()
+    const sign = (wallet, txJson) => wallet.sign(structuredClone(txJson)).tx_blob
+    const before = s.w.simulated.length
+    const refused = [
+      await s.post(run, 'borrower', 'pledgeEscrow', { ...ticket('desk'), signer: 'server' }),
+      await s.post(run, 'holder', 'simulateWithdraw', { vault: 'harbor-1', signer: 'browser' }),
+      await s.post(run, 'broker', 'wait', { vault: 'harbor-1', signer: 'browser' }),
+    ].map((r) => [r.status, r.body?.error?.code])
+    eq('signer: anything but browser, or browser on an action outside the six, is 400 BAD_REQUEST, nothing previewed',
+      [refused, s.w.simulated.length - before], [Array(3).fill([400, 'BAD_REQUEST']), 0])
+
+    const p = await s.post(run, 'borrower', 'pledgeEscrow', { ...ticket('desk'), signer: 'browser' })
+    eq('a browser pledge: its POST answers 202 previewed, SIMULATED, with its state and no signature asked yet',
+      [p.status, p.body.state, p.body.preview.provenance, 'toSign' in p.body, s.w.submitted.length], [202, 'previewed', 'SIMULATED', false, 0])
+    const c = await s.confirm(run, p.body.actionId)
+    const waiting = await s.waitState(run, p.body.actionId, ['awaiting-signature'])
+    const t = waiting.toSign
+    const until = Date.parse(t.expiresAt) - Date.now()
+    eq('its confirm answers 202 at once; then awaiting-signature, toSign of the borrower for the EscrowCreate to the first free account, nothing submitted',
+      [c.status, waiting.state, waiting.signer, /^[0-9a-f]{32}$/.test(t.requestId), t.kind, t.role, t.account, t.txJson.TransactionType, t.txJson.Destination, 'txBlob' in t, s.w.submitted.length],
+      [202, 'awaiting-signature', 'browser', true, 'sign', 'borrower', W.borrower.address, 'EscrowCreate', POOL[0], false, 0])
+    eq('toSign: expiresAt about 180 s ahead, a purpose that names the borrower and the collateral account',
+      [until > 170_000 && until <= 181_000, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(t.expiresAt), t.purpose.includes('Tidewater Payments') && t.purpose.includes(POOL[0])], [true, true, true])
+
+    const wrongKey = await s.signature(run, p.body.actionId, { requestId: t.requestId, txBlob: sign(W.holder, { ...t.txJson, Account: W.holder.address }) })
+    const sameAccountOtherKey = await s.signature(run, p.body.actionId, { requestId: t.requestId, txBlob: sign(W.holder, t.txJson) })
+    eq('a blob signed by another key: 400 SIGNATURE_MISMATCH, not retryable; signed by another key for the same account: the same',
+      [wrongKey.status, wrongKey.body.error.code, wrongKey.body.error.retryable, sameAccountOtherKey.status, sameAccountOtherKey.body.error.code, sameAccountOtherKey.body.error.message.includes(`not by the master key of ${W.borrower.address}`)],
+      [400, 'SIGNATURE_MISMATCH', false, 400, 'SIGNATURE_MISMATCH', true])
+    const changed = await s.signature(run, p.body.actionId, { requestId: t.requestId, txBlob: sign(W.borrower, { ...t.txJson, Destination: POOL[1] }) })
+    eq('a blob with a changed field, by the right key: 400 SIGNATURE_MISMATCH naming the field', [changed.status, changed.body.error.code, changed.body.error.message.includes('Destination')], [400, 'SIGNATURE_MISMATCH', true])
+    const good = sign(W.borrower, t.txJson)
+    const forged = encode({ ...decode(good), TxnSignature: decode(sign(W.borrower, { ...t.txJson, Fee: '13' })).TxnSignature })
+    const badSig = await s.signature(run, p.body.actionId, { requestId: t.requestId, txBlob: forged })
+    eq('the right key and fields, a signature of another transaction: 400 SIGNATURE_MISMATCH, does not verify', [badSig.status, badSig.body.error.code, badSig.body.error.message.includes('does not verify')], [400, 'SIGNATURE_MISMATCH', true])
+    const { TxnSignature: single, ...unsigned } = decode(good)
+    const multi = encode({ ...unsigned, SigningPubKey: '', Signers: [{ Signer: { Account: W.borrower.address, SigningPubKey: W.borrower.publicKey, TxnSignature: single } }] })
+    eq('a multisigned blob: 400 SIGNATURE_MISMATCH', (await s.signature(run, p.body.actionId, { requestId: t.requestId, txBlob: multi })).body?.error?.code, 'SIGNATURE_MISMATCH')
+    const other = await s.signature(run, p.body.actionId, { requestId: 'ab'.repeat(16), txBlob: good })
+    const noToken = await s.signature({ runId: run.runId }, p.body.actionId, { requestId: t.requestId, txBlob: good })
+    const foreign = await s.signature(run, p.body.actionId, { requestId: t.requestId, txBlob: good }, { origin: 'https://evil.example' })
+    const still = await s.get(run, p.body.actionId)
+    eq('another requestId 404, no token 401, a foreign Origin 403; the request stays open, the same, nothing submitted',
+      [other.status, noToken.status, foreign.status, still.state, still.toSign?.requestId === t.requestId, s.w.submitted.length], [404, 401, 403, 'awaiting-signature', true, 0])
+    const ok = await s.signature(run, p.body.actionId, { requestId: t.requestId, txBlob: good.toLowerCase() })
+    const done = await s.waitState(run, p.body.actionId, ['validated', 'failed'])
+    const sent = s.w.submitted.at(-1)
+    eq('the right blob: 202, then submitted through the borrower\'s queue as posted, validated with its escrow, toSign gone',
+      [ok.status, done.state, sent.blob, sent.by, done.escrow?.index, 'toSign' in done, s.w.submitted.length],
+      [202, 'validated', good, W.borrower.address, hashes.hashEscrow(W.borrower.address, t.txJson.Sequence), false, 1])
+    eq('the same blob again: 404, nothing awaited', (await s.signature(run, p.body.actionId, { requestId: t.requestId, txBlob: good })).status, 404)
+
+    // requestLoan: the POST asks the borrower's signature of the LoanSet and answers at once
+    const signedBefore = s.w.signedLoanSets
+    const r = await s.post(run, 'borrower', 'requestLoan', ticket('desk', SHARE['harbor-1'], { pledgeActionId: p.body.actionId, signer: 'browser' }))
+    eq('a browser requestLoan: 202 awaiting-signature with the LoanSet to sign and its money; the server signed nothing, keeps no LoanSet',
+      [r.status, r.body.state, r.body.toSign?.kind, r.body.toSign?.role, r.body.toSign?.txJson?.TransactionType, r.body.toSign?.txJson?.LastLedgerSequence, r.body.preview.money.lastLedgerSequence, s.w.signedLoanSets - signedBefore, s.engine.loanSetOf(r.body.actionId)],
+      [202, 'awaiting-signature', 'sign', 'borrower', 'LoanSet', 1600, 1600, 0, null])
+    const rival = await s.post(run, 'borrower', 'requestLoan', ticket('desk', SHARE['harbor-1'], { pledgeActionId: p.body.actionId }))
+    eq('while it awaits its signature, a second request on the same pledge is 409 ESCROW_POLICY', [rival.status, rival.body.error?.code], [409, 'ESCROW_POLICY'])
+    const loanBlob = sign(W.borrower, r.body.toSign.txJson)
+    const rs = await s.signature(run, r.body.actionId, { requestId: r.body.toSign.requestId, txBlob: loanBlob })
+    eq('its signature: 202 pending-approval at once, the LoanSet kept is the blob posted', [rs.status, rs.body.state, s.engine.loanSetOf(r.body.actionId)?.tx_blob, s.engine.loanSetOf(r.body.actionId)?.tx.Sequence], [202, 'pending-approval', loanBlob, r.body.toSign.txJson.Sequence])
+    await s.api.close()
+  }
+  {
+    // a timeout, a rebuild past LastLedgerSequence, the kill switch
+    const s = await setup({ ttl: 80 })
+    const run = await s.newRun()
+    const d = await s.post(run, 'broker', 'defaultL2', { vault: 'harbor-1', signer: 'browser' })
+    await s.confirm(run, d.body.actionId)
+    const asked = await s.waitState(run, d.body.actionId, ['awaiting-signature'])
+    const timedOut = await s.waitState(run, d.body.actionId, ['failed', 'validated'])
+    eq('no signature by expiresAt: the action fails SIGNATURE_TIMEOUT, toSign gone, nothing submitted',
+      [asked.toSign?.role, asked.toSign?.account, asked.toSign?.purpose.includes('defaults loan L2'), timedOut.state, timedOut.engineResult, 'toSign' in timedOut, s.w.submitted.length],
+      ['broker', W.broker.address, true, 'failed', 'SIGNATURE_TIMEOUT', false, 0])
+    await s.api.close()
+  }
+  {
+    const s = await setup()
+    const run = await s.newRun()
+    const d = await s.post(run, 'broker', 'defaultL2', { vault: 'harbor-2', signer: 'browser' })
+    await s.confirm(run, d.body.actionId)
+    const first = (await s.waitState(run, d.body.actionId, ['awaiting-signature'])).toSign
+    s.w.L = first.txJson.LastLedgerSequence // the window passed while the page was signing
+    const late = await s.signature(run, d.body.actionId, { requestId: first.requestId, txBlob: W.broker.sign(structuredClone(first.txJson)).tx_blob })
+    let second = null
+    for (let i = 0; i < 400 && !(second && second.requestId !== first.requestId); i++) {
+      second = (await s.get(run, d.body.actionId)).toSign ?? null
+      await new Promise((res) => setTimeout(res, 5))
+    }
+    eq('a signature past LastLedgerSequence: accepted, never submitted; the transaction rebuilt and a new requestId asked',
+      [late.status, second?.requestId !== first.requestId, second?.txJson.LastLedgerSequence, s.w.submitted.length], [202, true, first.txJson.LastLedgerSequence + 20, 0])
+    const blob2 = W.broker.sign(structuredClone(second.txJson)).tx_blob
+    await s.signature(run, d.body.actionId, { requestId: second.requestId, txBlob: blob2 })
+    const done = await s.waitState(run, d.body.actionId, ['validated', 'failed'])
+    eq('... the second signature submitted, validated', [done.state, s.w.submitted.at(-1)?.blob, s.w.submitted.at(-1)?.tx.LoanID], ['validated', blob2, VAULTS['harbor-2'].loans.L2])
+
+    const k = await s.post(run, 'broker', 'impairL1', { vault: 'harbor-3', signer: 'browser' })
+    await s.confirm(run, k.body.actionId)
+    const kt = (await s.waitState(run, k.body.actionId, ['awaiting-signature'])).toSign
+    const count = s.w.submitted.length
+    await s.call('POST', '/api/demo/kill')
+    const killed = await s.waitState(run, k.body.actionId, ['failed', 'validated'])
+    await s.call('POST', '/api/demo/unkill')
+    const after = await s.signature(run, k.body.actionId, { requestId: kt.requestId, txBlob: W.broker.sign(structuredClone(kt.txJson)).tx_blob })
+    eq('kill while awaiting a signature: failed LOCKED, the request closed (a later blob is 404), nothing submitted',
+      [kt.purpose.includes('impairs loan L1'), killed.state, killed.engineResult, after.status, s.w.submitted.length - count], [true, 'failed', 'LOCKED', 404, 0])
+    await s.api.close()
+  }
+  {
+    // an exhausted pool: the desk owner's reserve payment, then the borrower's escrow, each its own request
+    const s = await setup({ pool: 'none' })
+    const run = await s.newRun()
+    const p = await s.post(run, 'borrower', 'pledgeEscrow', { ...ticket('desk'), signer: 'browser' })
+    await s.confirm(run, p.body.actionId)
+    const pay = (await s.waitState(run, p.body.actionId, ['awaiting-signature'])).toSign
+    await s.signature(run, p.body.actionId, { requestId: pay.requestId, txBlob: W.deskOwner.sign(structuredClone(pay.txJson)).tx_blob })
+    let esc = null
+    for (let i = 0; i < 400 && !(esc && esc.requestId !== pay.requestId); i++) {
+      esc = (await s.get(run, p.body.actionId)).toSign ?? null
+      await new Promise((res) => setTimeout(res, 5))
+    }
+    await s.signature(run, p.body.actionId, { requestId: esc.requestId, txBlob: W.borrower.sign(structuredClone(esc.txJson)).tx_blob })
+    const done = await s.waitState(run, p.body.actionId, ['validated', 'failed'])
+    eq('exhausted pool in the browser: Payment signed by the desk owner in the page, the account\'s own setup by the server, the EscrowCreate by the borrower in the page',
+      [pay.role, pay.txJson.TransactionType, esc.role, esc.txJson.TransactionType, esc.txJson.Destination === pay.txJson.Destination, s.w.submitted.map((x) => [x.tx.TransactionType, Boolean(x.blob)]), done.state],
+      ['deskOwner', 'Payment', 'borrower', 'EscrowCreate', true, [['Payment', true], ['SignerListSet', false], ['MPTokenAuthorize', false], ['AccountSet', false], ['EscrowCreate', true]], 'validated'])
     await s.api.close()
   }
 

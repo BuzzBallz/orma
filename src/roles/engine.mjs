@@ -7,6 +7,12 @@
  *                                                          a simulated preview is orma.change/1 (src/change/engine.mjs)
  *   POST /api/roles/{runId}/actions/{actionId}/confirm  -> 202, the action queued on its account
  *   GET  /api/roles/{runId}/actions/{actionId}          -> the action, public (no Origin, token or kill check)
+ *   POST /api/roles/{runId}/actions/{actionId}/signature -> 202, a browser signature verified and handed on
+ *
+ * The demo lab (Devnet only): an action whose POST body carries `signer: 'browser'` is built, simulated,
+ * re-read and logged here exactly as any other, but each signature it needs is asked of the page
+ * (src/roles/remote-signer.mjs): the action goes `awaiting-signature` with its `toSign`, and the work goes
+ * on once the posted blob is verified. No HTTP request ever waits for a browser signature.
  */
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
@@ -21,6 +27,7 @@ import { readTicketInputs } from '../ticket/inputs.mjs'
 import { buildTicket } from '../ticket/engine.mjs'
 import { Reader } from '../poll.mjs'
 import { normaliseVault } from '../xrpl.mjs'
+import { createRemoteSigner, signerFor, PARTIES, SignatureCancelled, SignatureRefused, SignatureTimeout, SIGNATURE_TTL_MS } from './remote-signer.mjs'
 
 const log = logger('roles')
 
@@ -44,6 +51,12 @@ const BODY_MAX_BYTES = 64 * 1024
 const RELEASED = ['failed']
 /** A pledge's collateral account, reserved at preview, is free again for another pledge after this long unconfirmed. */
 const RESERVE_TTL_MS = 5 * 60_000
+/** The actions a POST may open to browser signing with `signer: 'browser'` (the demo lab). */
+const BROWSER_SIGNED = ['pledgeEscrow', 'requestLoan', 'approve', 'rerequest', 'defaultL2', 'impairL1']
+/** A browser signature that arrives this close to its LastLedgerSequence is asked again on a rebuilt transaction. */
+const LAPSE_MARGIN = 2
+/** At most this many signatures for one transaction of a browser-signed action; past it, SIGNATURE_TIMEOUT. */
+const MAX_SIGNATURES = 3
 
 const hex = (s) => Buffer.from(s, 'utf8').toString('hex').toUpperCase()
 const sameId = (a, b) => typeof a === 'string' && typeof b === 'string' && a.toUpperCase() === b.toUpperCase()
@@ -74,9 +87,10 @@ const readUsdDeskFile = () => (existsSync(join('demo', 'desk-usd.json')) ? JSON.
 
 /**
  * @param {{ reader: any, xrpl: any, env: Record<string, string | undefined>, accounts: Record<string, any>,
- *   vaults?: Record<string, any>, mandate?: () => any, usdDesk?: () => any|null, submit?: Function, simulate?: Function }} deps
+ *   vaults?: Record<string, any>, mandate?: () => any, usdDesk?: () => any|null, submit?: Function, simulate?: Function,
+ *   signatureTtlMs?: number }} deps
  */
-export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVaults(), mandate = readMandateFile, usdDesk = readUsdDeskFile, submit, simulate }) {
+export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVaults(), mandate = readMandateFile, usdDesk = readUsdDeskFile, submit, simulate, signatureTtlMs = SIGNATURE_TTL_MS }) {
   const allowedOrigins = new Set((env.ALLOWED_WRITE_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean))
   const configured = Boolean(accounts.holder && accounts.borrower && accounts.broker && accounts.deskOwner && Object.keys(vaults).length)
 
@@ -89,6 +103,12 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
   const queues = new Map()
   let killed = false
   const stopped = () => killed
+  const remote = createRemoteSigner({
+    ttlMs: signatureTtlMs,
+    onTimeout: (act, requestId) => log.warn('signature request expired', { runId: act.runId, actionId: act.actionId, requestId, ledgerIndex: xrpl.lastLedger ?? null }),
+  })
+  /** The signer of `role` for `act`: its wallet here, or the page when the action opted in. */
+  const signerOfAct = (act, role) => signerFor({ browser: act.signer === 'browser', act, role, wallet: accounts[role], remote })
 
   submit ??= async (tx, wallet) => {
     if (!xrpl.client.isConnected()) await xrpl.client.connect()
@@ -226,22 +246,86 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
    * for an action with money, the vault are read again at the validation ledger while the action stays
    * `submitted`; then `validated` is published with all of it in one assignment.
    */
-  async function submitRebuilt(act, build, wallet, extra = () => ({}), money = null) {
-    if (stopped()) return locked(act)
-    const tx = await prepare(await build())
-    const { s, change, applied } = await changeOf(tx)
-    // The change the action keeps is the confirm's. A simulation without metadata applied nothing: no row to realise.
-    if (applied) act.change = change
-    else log.warn('confirm simulated without metadata: the action keeps no change', { runId: act.runId, actionId: act.actionId, ledgerIndex: s.ledgerIndex, engineResult: s.simulated?.engine_result ?? null })
-    if (money) act.preview = { ...act.preview, money: { ...act.preview?.money, predicted: await money.at(atOf(s)) } }
-    if (s.simulated?.engine_result !== 'tesSUCCESS') return finish(act, { state: 'failed', engineResult: s.simulated?.engine_result ?? 'not simulated' })
-    if (stopped()) return locked(act)
-    const more = extra(tx) // from the transaction alone, before it is sent: nothing after validation can fail it
-    act.state = 'submitted'
-    const r = await submit(tx, wallet)
-    const outcome = { txHash: r.txHash, engineResult: r.engineResult, ledgerIndex: r.ledgerIndex }
-    if (r.engineResult !== 'tesSUCCESS') return finish(act, { state: 'failed', ...outcome })
-    return finish(act, { state: 'validated', ...outcome, ...more, ...(await afterValidation(act, r, applied ? change : null, money)) })
+  async function submitRebuilt(act, build, wallet, extra = () => ({}), money = null, browser = null) {
+    for (let attempt = 1; ; attempt++) {
+      if (stopped()) return locked(act)
+      const tx = await prepare(await build())
+      const { s, change, applied } = await changeOf(tx)
+      // The change the action keeps is the confirm's. A simulation without metadata applied nothing: no row to realise.
+      if (applied) act.change = change
+      else log.warn('confirm simulated without metadata: the action keeps no change', { runId: act.runId, actionId: act.actionId, ledgerIndex: s.ledgerIndex, engineResult: s.simulated?.engine_result ?? null })
+      if (money) act.preview = { ...act.preview, money: { ...act.preview?.money, predicted: await money.at(atOf(s)) } }
+      if (s.simulated?.engine_result !== 'tesSUCCESS') return finish(act, { state: 'failed', engineResult: s.simulated?.engine_result ?? 'not simulated' })
+      if (stopped()) return locked(act)
+      const more = extra(tx) // from the transaction alone, before it is sent: nothing after validation can fail it
+      let blob = null
+      if (browser) {
+        // the demo lab: the page signs the transaction built and simulated above, verified before it is used
+        const signed = await signedByPage(act, browser, tx)
+        if (!signed) return
+        if (stopped()) return locked(act)
+        if (await lapsed(act, tx, attempt)) {
+          if (attempt < MAX_SIGNATURES) continue // rebuilt, re-simulated, and a new signature asked
+          return finish(act, { state: 'failed', engineResult: 'SIGNATURE_TIMEOUT' })
+        }
+        blob = signed.tx_blob
+      }
+      act.state = 'submitted'
+      const r = blob ? await submit(blob, null) : await submit(tx, wallet)
+      const outcome = { txHash: r.txHash, engineResult: r.engineResult, ledgerIndex: r.ledgerIndex }
+      if (r.engineResult !== 'tesSUCCESS') return finish(act, { state: 'failed', ...outcome })
+      return finish(act, { state: 'validated', ...outcome, ...more, ...(await afterValidation(act, r, applied ? change : null, money)) })
+    }
+  }
+
+  /**
+   * One signature of the page for `tx`, or null once the action is finished: SIGNATURE_TIMEOUT when no
+   * signature arrived by its expiresAt, LOCKED when the kill switch closed the request.
+   */
+  async function signedByPage(act, browser, tx) {
+    try {
+      return await browser.sign(tx, purposeOf(act, tx))
+    } catch (e) {
+      if (e instanceof SignatureTimeout) {
+        finish(act, { state: 'failed', engineResult: 'SIGNATURE_TIMEOUT' })
+        return null
+      }
+      if (e instanceof SignatureCancelled) {
+        locked(act)
+        return null
+      }
+      throw e
+    }
+  }
+
+  /** Whether a transaction the page signed can no longer be included: its LastLedgerSequence is (nearly) past. */
+  async function lapsed(act, tx, attempt) {
+    await xrpl.closeTime()
+    const late = xrpl.lastLedger + LAPSE_MARGIN >= tx.LastLedgerSequence
+    if (late) log.warn('browser signature arrived past the window of its transaction', { runId: act.runId, actionId: act.actionId, ledgerIndex: xrpl.lastLedger, lastLedgerSequence: tx.LastLedgerSequence, attempt, asksAgain: attempt < MAX_SIGNATURES })
+    return late
+  }
+
+  /** The one sentence the page shows above a signature: who signs what, for whom. */
+  function purposeOf(act, tx) {
+    const vault = vaults[act.vault]
+    if (tx.TransactionType === 'EscrowCreate') {
+      return `${PARTIES.borrower} pledges ${tx.Amount?.value} share units of ${internals.get(act.actionId)?.harbor ?? 'a Harbor vault'} into escrow toward collateral account ${tx.Destination}.`
+    }
+    if (tx.TransactionType === 'Payment') {
+      return `${PARTIES.deskOwner} pays ${tx.Amount} drops to fund the reserve of the new collateral account ${tx.Destination} for this pledge.`
+    }
+    if (tx.TransactionType === 'LoanManage') {
+      const key = sameId(tx.LoanID, vault?.loans?.L1) ? 'L1' : sameId(tx.LoanID, vault?.loans?.L2) ? 'L2' : 'the loan'
+      return tx.Flags === FLAG.DEFAULT
+        ? `${PARTIES.broker} defaults loan ${key} (${tx.LoanID}) of ${act.vault}; a default cannot be undone.`
+        : `${PARTIES.broker} impairs loan ${key} (${tx.LoanID}) of ${act.vault}.`
+    }
+    if (tx.TransactionType === 'LoanSet') {
+      const amount = act.asset === 'USD' ? `${tx.PrincipalRequested} test dollars` : `${tx.PrincipalRequested} drops of XRP`
+      return `${PARTIES.borrower} signs a request to borrow ${amount} from ${PARTIES.deskOwner}, backed by escrow ${act.escrow?.index ?? 'of its pledge'}.`
+    }
+    return `${PARTIES[act.role] ?? act.role} signs a ${tx.TransactionType} of ${tx.Account}.`
   }
 
   /**
@@ -333,15 +417,35 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
   }
 
   /** One setup transaction of a collateral account created at confirm: true when it validated. */
-  async function setupStep(act, tx, wallet) {
-    if (stopped()) {
-      locked(act)
+  async function setupStep(act, tx, wallet, browser = null) {
+    for (let attempt = 1; ; attempt++) {
+      if (stopped()) {
+        locked(act)
+        return false
+      }
+      let r
+      if (browser) {
+        // the demo lab: the page signs; a signature past the window asks again on a rebuilt transaction
+        const prepared = await prepare(tx)
+        const signed = await signedByPage(act, browser, prepared)
+        if (!signed) return false
+        if (stopped()) {
+          locked(act)
+          return false
+        }
+        if (await lapsed(act, prepared, attempt)) {
+          if (attempt < MAX_SIGNATURES) continue
+          finish(act, { state: 'failed', engineResult: 'SIGNATURE_TIMEOUT' })
+          return false
+        }
+        r = await submit(signed.tx_blob, null)
+      } else {
+        r = await submit(await prepare(tx), wallet)
+      }
+      if (r.engineResult === 'tesSUCCESS') return true
+      finish(act, { state: 'failed', txHash: r.txHash, engineResult: r.engineResult, ledgerIndex: r.ledgerIndex })
       return false
     }
-    const r = await submit(await prepare(tx), wallet)
-    if (r.engineResult === 'tesSUCCESS') return true
-    finish(act, { state: 'failed', txHash: r.txHash, engineResult: r.engineResult, ledgerIndex: r.ledgerIndex })
-    return false
   }
 
   /**
@@ -352,6 +456,9 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
    */
   async function confirmPledge(act) {
     const borrower = accounts.borrower
+    // the demo lab: the borrower's escrow and the desk owner's reserve payment are signed by the page
+    const browser = act.signer === 'browser'
+    const byBorrower = browser ? signerOfAct(act, 'borrower') : null
     const escrowOf = (tx) => {
       const index = hashes.hashEscrow(tx.Account, tx.Sequence)
       return { escrow: { owner: tx.Account, offerSequence: tx.Sequence, index, destination: tx.Destination } }
@@ -361,12 +468,12 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
         const { tx } = await pledgeTx(act)
         if (!tx.Destination) throw new Error('no free collateral account is left in the pool')
         return tx
-      }, borrower, escrowOf))
+      }, borrower, escrowOf, null, byBorrower))
     }
     const collateral = collateralOf()
     const created = Wallet.generate() // its seed is kept nowhere: the account is governed by its signer list
     const funded = await enqueue(accounts.deskOwner.address, () =>
-      setupStep(act, { TransactionType: 'Payment', Account: accounts.deskOwner.address, Destination: created.address, Amount: RESERVE_DROPS }, accounts.deskOwner))
+      setupStep(act, { TransactionType: 'Payment', Account: accounts.deskOwner.address, Destination: created.address, Amount: RESERVE_DROPS }, accounts.deskOwner, browser ? signerOfAct(act, 'deskOwner') : null))
     if (!funded) return
     const ready = await enqueue(borrower.address, async () => {
       const signers = [collateral.borrower, collateral.desk, collateral.agent]
@@ -378,7 +485,7 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
         && await setupStep(act, { TransactionType: 'AccountSet', Account: created.address, SetFlag: 4 }, created)
     })
     if (!ready) return
-    return enqueue(borrower.address, () => submitRebuilt(act, async () => (await pledgeTx(act, created.address)).tx, borrower, escrowOf))
+    return enqueue(borrower.address, () => submitRebuilt(act, async () => (await pledgeTx(act, created.address)).tx, borrower, escrowOf, null, byBorrower))
   }
 
   /**
@@ -472,6 +579,7 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
           act.escrow = pledge.escrow
           if (usd) act.asset = 'USD'
           const borrower = accounts.borrower
+          const browser = act.signer === 'browser'
           const signed = await enqueue(borrower.address, async () => {
             await xrpl.closeTime()
             const tx = await xrpl.client.autofill({
@@ -484,10 +592,25 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
               ],
             })
             tx.Fee = num(tx.Fee).times(2).toFixed(0) // two signatures on one transaction
-            return { tx, ...borrower.sign(tx) }
+            // the demo lab: the page signs it after this queue entry, as the LoanSet waits for its approval unsent
+            return browser ? { tx } : { tx, ...borrower.sign(tx) }
           })
-          internals.set(act.actionId, { loanSet: signed })
-          act.state = 'pending-approval'
+          if (browser) {
+            // the POST answers now, awaiting-signature; the request is pending-approval once its blob is verified
+            signerOfAct(act, 'borrower').sign(signed.tx, purposeOf(act, signed.tx), {
+              onSigned: (sig) => {
+                internals.set(act.actionId, { ...internals.get(act.actionId), loanSet: { tx: signed.tx, ...sig } })
+                act.state = 'pending-approval'
+                log.info('loan request signed in the browser', { runId: act.runId, actionId: act.actionId, ledgerIndex: xrpl.lastLedger ?? null })
+              },
+            }).catch((e) => finish(act, {
+              state: 'failed',
+              engineResult: e instanceof SignatureTimeout ? 'SIGNATURE_TIMEOUT' : e instanceof SignatureCancelled ? 'LOCKED' : String(e?.message ?? e).slice(0, 120),
+            }))
+          } else {
+            internals.set(act.actionId, { loanSet: signed })
+            act.state = 'pending-approval'
+          }
           return {
             preview: {
               engineResult: 'not-simulated (awaiting countersignature)', provenance: 'DECLARED',
@@ -522,6 +645,8 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
     // step 21: the one optional parameter of requestLoan, the loan's currency
     if ('asset' in body && (action !== 'requestLoan' || !['XRP', 'USD'].includes(body.asset))) throw bad('asset is XRP or USD, on requestLoan only')
     if (body.asset === 'USD' && body.vault !== 'desk') throw bad('a loan in the test dollar is lent by the vault desk')
+    // the demo lab: the one optional parameter that moves an action's signatures to the page
+    if ('signer' in body && (body.signer !== 'browser' || !BROWSER_SIGNED.includes(action))) throw bad(`signer is 'browser', on ${BROWSER_SIGNED.join(', ')} only`)
     if (['approve', 'decline', 'rerequest'].includes(action)) {
       if (typeof body.requestActionId !== 'string') throw bad('requestActionId is required')
       const request = run.actions.get(body.requestActionId)
@@ -540,6 +665,7 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
   }
   function kill() {
     killed = true
+    remote.cancelAll() // an action awaiting a browser signature fails LOCKED, nothing signed
     log.warn('kill switch on: every write refused, queued entries fail')
   }
   function unkill() {
@@ -564,9 +690,10 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
       account: accounts[role]?.address ?? null, state: 'previewing', preview: null, change: null,
     }
     if (body.requestActionId) act.requestActionId = body.requestActionId
+    if (body.signer === 'browser') act.signer = 'browser'
     run.actions.set(act.actionId, act)
     try {
-      const out = await handler.preview({ run, body, vault: vaults[body.vault], enqueue, submit, stopped, action: act })
+      const out = await handler.preview({ run, body, vault: vaults[body.vault], enqueue, submit, stopped, action: act, signerFor: signerOfAct })
       internals.set(act.actionId, { ...internals.get(act.actionId), tx: out.tx })
       act.preview = out.preview
       if (act.state === 'previewing') act.state = 'previewed'
@@ -577,13 +704,17 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
       throw e
     }
     log.info('action previewed', { runId: run.runId, actionId: act.actionId, role, action: name, ledgerIndex: xrpl.lastLedger ?? null })
+    if (act.signer === 'browser') {
+      // the demo lab: the state too, and the signature asked when the POST already needs one (requestLoan)
+      return helpers.send(202, helpers.stamp({ actionId: act.actionId, preview: act.preview, state: act.state, ...(act.toSign && { toSign: act.toSign }) }))
+    }
     helpers.send(202, helpers.stamp({ actionId: act.actionId, preview: act.preview }))
   }
 
   async function confirmAction(run, act, helpers) {
     const handler = handlers[act.role][act.action]
     if (handler.confirm) {
-      const out = await handler.confirm({ run, action: act, enqueue, submit, stopped })
+      const out = await handler.confirm({ run, action: act, enqueue, submit, stopped, signerFor: signerOfAct })
       if (out?.code === 'LOCKED') throw new HttpError(423, 'LOCKED', 'The kill switch is on; nothing was signed')
       if (out?.code) {
         act.state = 'refused'
@@ -597,12 +728,33 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
       log.info('action queued', { runId: run.runId, actionId: act.actionId, ledgerIndex: xrpl.lastLedger ?? null })
       const done = handler.confirmBuiltIn
         ? handler.confirmBuiltIn(act)
-        : enqueue(act.account, () => submitRebuilt(act, async () => tx, accounts[act.role], undefined, handler.money?.(vaults[act.vault]) ?? null))
+        : enqueue(act.account, () => submitRebuilt(act, async () => tx, accounts[act.role], undefined, handler.money?.(vaults[act.vault]) ?? null, act.signer === 'browser' ? signerOfAct(act, act.role) : null))
       done.catch((e) => {
         finish(act, { state: 'failed', engineResult: String(e?.message ?? e).slice(0, 120) })
         log.error('submission threw', { runId: run.runId, actionId: act.actionId, err: String(e).slice(0, 200) })
       })
     }
+    helpers.send(202, helpers.stamp(act))
+  }
+
+  /**
+   * The demo lab: a blob the page signed for the action's open request, verified (src/roles/remote-signer.mjs)
+   * and handed to the work that waits for it; 202 with the action. A blob that is not the transaction asked,
+   * by its account, is 400 SIGNATURE_MISMATCH and the request stays open.
+   */
+  async function acceptSignature(req, run, actionId, helpers) {
+    const act = run.actions.get(actionId)
+    if (!act) throw new HttpError(404, 'NOT_FOUND', 'No such action in this run')
+    const body = await readJson(req)
+    const requestId = act.toSign?.requestId ?? null
+    try {
+      remote.accept(act, body)
+    } catch (e) {
+      if (!(e instanceof SignatureRefused)) throw e
+      log.warn('browser signature refused', { runId: run.runId, actionId, requestId, code: e.code, ledgerIndex: xrpl.lastLedger ?? null })
+      throw new HttpError(e.status, e.code, e.message)
+    }
+    log.info('browser signature accepted', { runId: run.runId, actionId, requestId, ledgerIndex: xrpl.lastLedger ?? null })
     helpers.send(202, helpers.stamp(act))
   }
 
@@ -638,14 +790,17 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
       if (!origin && !(a.includes('127.0.0.1') || a === '::1')) throw new HttpError(403, 'FORBIDDEN', 'A request without Origin must come from loopback')
       if (!configured) throw new HttpError(503, 'NOT_CONFIGURED', 'Writes are not configured on this server: ROLES_FILE, DESK_SEED and the baked demo/ files are required')
       const confirm = /^\/api\/roles\/([^/]+)\/actions\/([^/]+)\/confirm$/.exec(url.pathname)
+      const signature = /^\/api\/roles\/([^/]+)\/actions\/([^/]+)\/signature$/.exec(url.pathname)
       const post = /^\/api\/roles\/([^/]+)\/([^/]+)\/([^/]+)$/.exec(url.pathname)
-      const run = runs.get((confirm ?? post)?.[1])
+      const run = runs.get((confirm ?? signature ?? post)?.[1])
       if (!tokenOk(req, run)) throw new HttpError(401, 'UNAUTHORIZED', 'A valid operator token for this run is required')
       if (stopped()) throw new HttpError(423, 'LOCKED', 'The kill switch is on; nothing was signed')
       if (confirm) {
         const act = run.actions.get(confirm[2])
         if (!act) throw new HttpError(404, 'NOT_FOUND', 'No such action in this run')
         await confirmAction(run, act, helpers)
+      } else if (signature) {
+        await acceptSignature(req, run, signature[2], helpers)
       } else if (post) {
         await postAction(req, run, post[2], post[3], helpers)
       } else {

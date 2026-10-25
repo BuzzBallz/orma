@@ -18,6 +18,7 @@ import { buildTicket } from '../ticket/engine.mjs'
 import { openLog } from './decision-log.mjs'
 import { readXrpUsd, PriceUnavailableError } from '../fx/price.mjs'
 import { sleep } from '../xrpl.mjs'
+import { PARTIES } from '../roles/remote-signer.mjs'
 
 const log = logger('desk:signer')
 const MEMO_ESCROW = Buffer.from('orma.escrow', 'utf8').toString('hex').toUpperCase()
@@ -266,9 +267,13 @@ export function createSigner({ xrpl, reader, wallet, submit, lookupTx, readDesk,
    * The approval: every check again at the ledger of the confirm, then the countersignature and the
    * submission. Resolves to { txHash, engineResult, ledgerIndex, loanId } on a LoanSet that reached the
    * ledger (tesSUCCESS or a tec, both logged approved); throws a DeskError on every refusal, logged first.
-   * @param {{ actionOfRequest: any, ticketId?: string, stopped?: () => boolean }} o
+   * `countersign` (the demo lab): the desk owner's countersignature asked of the page, only once every check
+   * has passed at the logged ledger L (I2); without it the desk wallet countersigns, as always. A request
+   * that expires refuses SIGNATURE_TIMEOUT and the kill switch LOCKED, both logged, nothing submitted.
+   * @param {{ actionOfRequest: any, ticketId?: string, stopped?: () => boolean,
+   *   countersign?: (blob: string, purpose: string) => Promise<{ tx_blob: string }> }} o
    */
-  async function approve({ actionOfRequest: act, stopped = () => false }) {
+  async function approve({ actionOfRequest: act, stopped = () => false, countersign }) {
     let r
     let L = null
     let mandate = null
@@ -310,7 +315,21 @@ export function createSigner({ xrpl, reader, wallet, submit, lookupTx, readDesk,
     if (r.sequence !== 'ok') throw refuse(409, 'SEQUENCE_PASSED', r.sequenceReason)
     if (stopped()) throw refuse(423, 'LOCKED', 'The kill switch is on; nothing was signed.')
 
-    const blob = signLoanSetByCounterparty(wallet, r.signed.tx_blob).tx_blob
+    let blob
+    if (countersign) {
+      const principal = r.ticket.usd ? `${String(r.tx.PrincipalRequested)} test dollars` : `${String(r.tx.PrincipalRequested)} drops of XRP`
+      log.info('mandate passed, countersignature asked of the page', { ticketId: act.ticket.ticketId, actionId: act.actionId, ledgerIndex: r.L.ledgerIndex })
+      try {
+        blob = (await countersign(r.signed.tx_blob, `${PARTIES.deskOwner} countersigns the loan of ${principal} to ${PARTIES.borrower}, backed by escrow ${r.escrowIndex}, after its mandate passed at ledger ${r.L.ledgerIndex}.`)).tx_blob
+      } catch (e) {
+        if (e?.code === 'SIGNATURE_TIMEOUT') throw refuse(409, 'SIGNATURE_TIMEOUT', 'No countersignature of the desk owner arrived before the request expired. Nothing was submitted.')
+        if (e?.code === 'LOCKED') throw refuse(423, 'LOCKED', 'The kill switch is on; nothing was signed.')
+        throw e
+      }
+      if (stopped()) throw refuse(423, 'LOCKED', 'The kill switch is on; nothing was submitted.')
+    } else {
+      blob = signLoanSetByCounterparty(wallet, r.signed.tx_blob).tx_blob
+    }
     const hash = hashes.hashSignedTx(blob)
     let out
     try {
@@ -366,10 +385,13 @@ export function createSigner({ xrpl, reader, wallet, submit, lookupTx, readDesk,
   /**
    * A fresh ticket for the same request, and a LoanSet the borrower signs again at its current Sequence,
    * on the same terms, with a new LastLedgerSequence (ledger now + 600), the new ticket's Memo and the same
-   * escrow Memo. The request stays pending-approval; nothing is approved here.
-   * @param {{ actionOfRequest: any, borrower: any, enqueue: (address: string, fn: () => Promise<any>) => Promise<any> }} o
+   * escrow Memo. The request stays pending-approval; nothing is approved here. `sign` (the demo lab): the
+   * borrower's signature asked of the page, after the fresh ticket is built and outside the borrower's queue,
+   * as the LoanSet waits for its approval unsent; without it the borrower's wallet signs in the queue.
+   * @param {{ actionOfRequest: any, borrower: any, enqueue: (address: string, fn: () => Promise<any>) => Promise<any>,
+   *   sign?: (tx: any, purpose: string) => Promise<{ tx_blob: string, hash: string }> }} o
    */
-  async function rerequest({ actionOfRequest: act, borrower, enqueue }) {
+  async function rerequest({ actionOfRequest: act, borrower, enqueue, sign }) {
     const old = signedOf(act)
     if (!old) throw new DeskError(404, 'NOT_FOUND', 'The loan request keeps no signed LoanSet.')
     let mandate
@@ -389,7 +411,7 @@ export function createSigner({ xrpl, reader, wallet, submit, lookupTx, readDesk,
       throw e
     }
     const ticket = buildTicket(inputs, { op: 'pledge', units: act.ticket.units, mandate, ...loanTerms })
-    const signed = await enqueue(borrower.address, async () => {
+    const built = await enqueue(borrower.address, async () => {
       await xrpl.closeTime()
       const { TxnSignature: _s, SigningPubKey: _k, Sequence: _q, LastLedgerSequence: _l, Fee: _f, Memos: _m, CounterpartySignature: _c, ...terms } = old.tx
       void [_s, _k, _q, _l, _f, _m, _c]
@@ -401,8 +423,12 @@ export function createSigner({ xrpl, reader, wallet, submit, lookupTx, readDesk,
         ],
       })
       tx.Fee = num(tx.Fee).times(2).toFixed(0) // two signatures on one transaction
-      return { tx, ...borrower.sign(tx) }
+      return sign ? { tx } : { tx, ...borrower.sign(tx) }
     })
+    const principal = () => (ticket.usd ? `${String(built.tx.PrincipalRequested)} test dollars` : `${String(built.tx.PrincipalRequested)} drops of XRP`)
+    const signed = sign
+      ? { tx: built.tx, ...(await sign(built.tx, `${PARTIES.borrower} signs its request to borrow ${principal()} from ${PARTIES.deskOwner} again, on a fresh ticket, backed by escrow ${String(act.escrow.index).toUpperCase()}.`)) }
+      : built
     resigned.set(act.actionId, signed)
     act.ticket = { share, ticketId: ticket.ticketId, inputsDigest: ticket.inputsDigest, units: act.ticket.units }
     return { ticket, signed }
@@ -501,7 +527,7 @@ export function registerDeskActions(engine, { signer, deskAddress, borrower }) {
         },
       }
     },
-    async confirm({ run, action: act, enqueue, stopped }) {
+    async confirm({ run, action: act, enqueue, stopped, signerFor }) {
       if (act.state !== 'previewed') return {} // already confirmed: its state, never a second submission
       const req = requestOf(run, act)
       awaiting(req)
@@ -512,8 +538,7 @@ export function registerDeskActions(engine, { signer, deskAddress, borrower }) {
         req.state = 'pending-approval'
         throw new DeskError(503, 'NOT_CONFIGURED', 'DESK_SEED is not set; desk approvals are not configured on this server.')
       }
-      try {
-        const out = await enqueue(desk, () => signer.approve({ actionOfRequest: req, ticketId: req.ticket.ticketId, stopped }))
+      const settle = (out) => {
         if (out.engineResult === 'tesSUCCESS') {
           done(req, { state: 'validated', txHash: out.txHash, engineResult: out.engineResult, ledgerIndex: out.ledgerIndex })
           done(act, { state: 'validated', txHash: out.txHash, engineResult: out.engineResult, ledgerIndex: out.ledgerIndex })
@@ -521,10 +546,30 @@ export function registerDeskActions(engine, { signer, deskAddress, borrower }) {
           req.state = 'pending-approval'
           done(act, { state: 'failed', txHash: out.txHash, engineResult: out.engineResult, ledgerIndex: out.ledgerIndex })
         }
+      }
+      const fail = (e) => {
+        if (req.state === 'approving') req.state = 'pending-approval'
+        done(act, e instanceof DeskError && ['LOCKED', 'SIGNATURE_TIMEOUT'].includes(e.code) ? { state: 'failed', engineResult: e.code } : { state: 'refused', engineResult: e?.code ?? 'error' })
+      }
+      // the demo lab: the desk owner's countersignature is asked of the page once the review has passed
+      const page = act.signer === 'browser' && signerFor ? signerFor(act, 'deskOwner') : null
+      try {
+        const work = enqueue(desk, () => signer.approve({ actionOfRequest: req, ticketId: req.ticket.ticketId, stopped, ...(page && { countersign: page.countersign }) }))
+        if (page) {
+          // a refusal of the review answers this confirm, as without the page; a countersignature asked answers 202
+          const first = await Promise.race([work.then(() => 'settled', () => 'settled'), page.requested.then(() => 'asked')])
+          if (first === 'asked') {
+            work.then(settle, (e) => {
+              fail(e)
+              log.info('approval ended after its countersignature was asked', { actionId: act.actionId, ticketId: req.ticket?.ticketId ?? null, code: e?.code ?? null })
+            })
+            return {}
+          }
+        }
+        settle(await work)
         return {}
       } catch (e) {
-        if (req.state === 'approving') req.state = 'pending-approval'
-        done(act, e instanceof DeskError && e.code === 'LOCKED' ? { state: 'failed', engineResult: 'LOCKED' } : { state: 'refused', engineResult: e?.code ?? 'error' })
+        fail(e)
         throw e
       }
     },
@@ -557,13 +602,37 @@ export function registerDeskActions(engine, { signer, deskAddress, borrower }) {
       const req = requestOf(run, act)
       return { preview: { engineResult: 'not-simulated (signed again at confirm)', provenance: 'DECLARED', money: { requestActionId: req.actionId } } }
     },
-    async confirm({ run, action: act, enqueue }) {
+    async confirm({ run, action: act, enqueue, signerFor }) {
       if (act.state !== 'previewed') return {}
       const req = requestOf(run, act)
       awaiting(req)
       const who = borrower()
       if (!who) throw new DeskError(503, 'NOT_CONFIGURED', 'The borrower account is not configured on this server.')
       busy.add(req) // before the first await: an approve, a decline or a second rerequest confirm now answers 404
+      const resigned = ({ signed }) => done(act, { state: 'validated', engineResult: 'signed again (no transaction)', ledgerIndex: null, lastLedgerSequence: signed.tx.LastLedgerSequence })
+      // the demo lab: the borrower signs the fresh LoanSet in the page, after the new ticket is built
+      const page = act.signer === 'browser' && signerFor ? signerFor(act, 'borrower') : null
+      if (page) {
+        act.state = 'queued' // on the borrower's account; awaiting-signature while the page signs
+        const work = signer.rerequest({ actionOfRequest: req, borrower: who, enqueue, sign: page.sign })
+        const first = await Promise.race([work.then(() => 'settled', () => 'settled'), page.requested.then(() => 'asked')])
+        if (first === 'asked') {
+          work.then(resigned, (e) => {
+            done(act, { state: 'failed', engineResult: e?.code ?? String(e?.message ?? e).slice(0, 120) })
+            log.info('rerequest ended after its signature was asked', { actionId: act.actionId, code: e?.code ?? null })
+          }).finally(() => busy.delete(req))
+          return {}
+        }
+        try {
+          resigned(await work)
+        } catch (e) {
+          act.state = 'previewed' // nothing was asked of the page: as a server-signed rerequest that threw
+          throw e
+        } finally {
+          busy.delete(req)
+        }
+        return {}
+      }
       let signed
       try {
         ;({ signed } = await signer.rerequest({ actionOfRequest: req, borrower: who, enqueue }))
