@@ -17,6 +17,8 @@
  * Fields may be added. Nothing here may ever be renamed, retyped or removed.
  */
 import { lookup } from 'node:dns/promises'
+import { request as httpRequest } from 'node:http'
+import { request as httpsRequest } from 'node:https'
 import { BlockList, isIP } from 'node:net'
 import { num, wholeShares, amountStr } from './num.mjs'
 import { parseShareMetadata, navPointerFrom, xls89Report } from './metadata.mjs'
@@ -30,18 +32,66 @@ export const NAV_SCHEMA = 'orma.nav/1'
 // Anyone can mint a share whose pointer names a host inside our network. The resolver
 // follows only hosts every address of which is public, and reads at most this much.
 const NOT_PUBLIC = new BlockList()
-for (const [net, bits] of [['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16], ['172.16.0.0', 12], ['192.168.0.0', 16]]) NOT_PUBLIC.addSubnet(net, bits, 'ipv4')
+for (const [net, bits] of [
+  ['0.0.0.0', 8], ['10.0.0.0', 8], ['100.64.0.0', 10], ['127.0.0.0', 8], ['169.254.0.0', 16], ['172.16.0.0', 12],
+  ['192.0.0.0', 24], ['192.168.0.0', 16], ['198.18.0.0', 15], ['224.0.0.0', 4], ['240.0.0.0', 4],
+]) NOT_PUBLIC.addSubnet(net, bits, 'ipv4')
 // No ::ffff:0:0/96 rule: BlockList already checks an IPv4-mapped address against the IPv4
-// rules, and such a rule would match every IPv4 address.
-for (const [net, bits] of [['::', 127], ['fc00::', 7], ['fe80::', 10]]) NOT_PUBLIC.addSubnet(net, bits, 'ipv6')
+// rules, and such a rule would match every IPv4 address. NAT64 (64:ff9b::/96) and 6to4
+// (2002::/16) embed an IPv4 address the rules above would not see, so both are refused whole.
+for (const [net, bits] of [['::', 127], ['64:ff9b::', 96], ['2002::', 16], ['fc00::', 7], ['fe80::', 10], ['ff00::', 8]]) NOT_PUBLIC.addSubnet(net, bits, 'ipv6')
 const MAX_POINTER_BYTES = 64 * 1024
 
-// shortcut: the address is checked, then fetch resolves the name again, so a DNS rebinding
-// in between gets through; pin the checked address in an http agent if that matters.
-async function isPublicHost(hostname) {
+const familyOf = (a) => (a.family === 6 || a.family === 'IPv6' ? 6 : 4)
+const isPublicAddress = (a) => !NOT_PUBLIC.check(a.address, familyOf(a) === 6 ? 'ipv6' : 'ipv4')
+
+/** Every address of the host, an IP literal being its own. */
+async function addressesOf(hostname, lookupImpl = lookup) {
   const host = hostname.replace(/^\[|\]$/g, '')
-  const addrs = isIP(host) ? [{ address: host, family: isIP(host) }] : await lookup(host, { all: true })
-  return addrs.length > 0 && addrs.every((a) => !NOT_PUBLIC.check(a.address, a.family === 6 ? 'ipv6' : 'ipv4'))
+  return isIP(host) ? [{ address: host, family: isIP(host) }] : await lookupImpl(host, { all: true })
+}
+
+async function isPublicHost(hostname, lookupImpl) {
+  const addrs = await addressesOf(hostname, lookupImpl)
+  return addrs.length > 0 && addrs.every(isPublicAddress)
+}
+
+/** Raised by the connection's own lookup when the name now answers an address that is not public. */
+class NotPublicError extends Error {
+  constructor() {
+    super('the host resolved to an address that is not public')
+    this.name = 'NotPublicError'
+  }
+}
+
+/**
+ * GET a pointer, connecting only to an address checked at connection time. The check before the
+ * request is not enough: a name with a zero TTL can answer a public address to it and a private
+ * one to the connection's own lookup (DNS rebinding). Here the connection resolves through a
+ * lookup that refuses unless every address is public, and connects to an address it checked.
+ * Answers what the resolver reads of a fetch Response: status, ok, and the body as chunks.
+ * @param {string} pointer
+ * @param {{ signal?: AbortSignal, headers?: object, lookupImpl?: Function }} [o]
+ */
+function pinnedFetch(pointer, o = {}) {
+  const u = new URL(pointer)
+  const request = u.protocol === 'https:' ? httpsRequest : u.protocol === 'http:' ? httpRequest : null
+  if (!request) return Promise.reject(new TypeError(`unsupported protocol ${u.protocol}`))
+  const pinned = (hostname, options, cb) => {
+    addressesOf(hostname, o.lookupImpl).then((addrs) => {
+      if (addrs.length === 0 || !addrs.every(isPublicAddress)) return cb(new NotPublicError())
+      if (options?.all) return cb(null, addrs.map((a) => ({ address: a.address, family: familyOf(a) })))
+      cb(null, addrs[0].address, familyOf(addrs[0]))
+    }, cb)
+  }
+  return new Promise((resolve, reject) => {
+    const req = request(u, { method: 'GET', headers: o.headers, signal: o.signal, lookup: pinned }, (res) => {
+      const status = res.statusCode ?? 0
+      resolve({ status, ok: status >= 200 && status < 300, body: res })
+    })
+    req.on('error', reject)
+    req.end()
+  })
 }
 
 async function readCapped(res) {
@@ -238,8 +288,9 @@ export function valuePledge(nav, units) {
  *
  * @param {import('./xrpl.mjs').Xrpl} xrpl
  * @param {string} issuanceId
- * @param {{resolve?: boolean, fetchImpl?: Function, localBase?: string, allowPrivate?: boolean}} [opts]
+ * @param {{resolve?: boolean, fetchImpl?: Function, localBase?: string, allowPrivate?: boolean, lookupImpl?: Function}} [opts]
  *   allowPrivate: follow a pointer to a private host. For the operator's own bake, never the API.
+ *   lookupImpl: the name resolver, `lookup` of node:dns/promises by default (a check passes a stub).
  */
 export async function resolveFromIssuance(xrpl, issuanceId, opts = {}) {
   const steps = []
@@ -305,15 +356,19 @@ export async function resolveFromIssuance(xrpl, issuanceId, opts = {}) {
   // is a URL written by a third party, so it is bounded and its failure is data.
   // Its failures are reported in fixed words: a detail that echoes the error or the body
   // tells the caller what answers inside our network.
-  const fetchImpl = opts.fetchImpl ?? globalThis.fetch
+  // By default the connection goes only to an address checked as it connects. allowPrivate (the
+  // operator's bake) keeps the plain fetch: it may reach a private host anyway.
+  const fetchImpl = opts.fetchImpl
+    ?? (opts.allowPrivate ? globalThis.fetch : (u, o) => pinnedFetch(u, { ...o, lookupImpl: opts.lookupImpl }))
   const ctl = new AbortController()
   const timer = setTimeout(() => ctl.abort(), 2500)
+  let res = null
   try {
-    if (!opts.allowPrivate && !(await isPublicHost(new URL(pointer).hostname))) {
+    if (!opts.allowPrivate && !(await isPublicHost(new URL(pointer).hostname, opts.lookupImpl))) {
       step('follow pointer', false, 'not followed: the host is not a public address')
       return out
     }
-    const res = await fetchImpl(pointer, { signal: ctl.signal, redirect: 'manual', headers: { accept: 'application/json' } })
+    res = await fetchImpl(pointer, { signal: ctl.signal, redirect: 'manual', headers: { accept: 'application/json' } })
     if (res.status >= 300 && res.status < 400) {
       step('follow pointer', false, `HTTP ${res.status}, redirect not followed`)
       return out
@@ -343,10 +398,16 @@ export async function resolveFromIssuance(xrpl, issuanceId, opts = {}) {
       }
     }
   } catch (e) {
-    step('follow pointer', false, e?.name === 'AbortError' ? 'timeout' : 'no answer')
-    log.warn('nav pointer did not answer', { pointer, err: String(e).slice(0, 80) })
+    if (e?.name === 'NotPublicError') {
+      step('follow pointer', false, 'not followed: the host is not a public address')
+    } else {
+      step('follow pointer', false, e?.name === 'AbortError' ? 'timeout' : 'no answer')
+      log.warn('nav pointer did not answer', { pointer, err: String(e).slice(0, 80) })
+    }
   } finally {
     clearTimeout(timer)
+    // A body left unread (a redirect, an error status) would hold its socket open.
+    if (typeof res?.body?.destroy === 'function' && !res.body.readableEnded) res.body.destroy()
   }
   return out
 }
