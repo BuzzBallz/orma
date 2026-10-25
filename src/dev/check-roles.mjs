@@ -6,7 +6,8 @@ import { request } from 'node:http'
 import { Wallet, hashes, decode, encode, deriveAddress } from 'xrpl'
 import { TRANSACTION_TYPES } from 'ripple-binary-codec'
 import { createApi } from '../api.mjs'
-import { createRoleEngine } from '../roles/engine.mjs'
+import { createRoleEngine, browserWindow } from '../roles/engine.mjs'
+import { SIGNATURE_TTL_MS } from '../roles/remote-signer.mjs'
 
 let bad = 0
 const eq = (name, got, want) => {
@@ -528,7 +529,7 @@ async function main() {
       await new Promise((res) => setTimeout(res, 5))
     }
     eq('a signature past LastLedgerSequence: accepted, never submitted; the transaction rebuilt and a new requestId asked',
-      [late.status, second?.requestId !== first.requestId, second?.txJson.LastLedgerSequence, s.w.submitted.length], [202, true, first.txJson.LastLedgerSequence + 20, 0])
+      [late.status, second?.requestId !== first.requestId, second?.txJson.LastLedgerSequence, s.w.submitted.length], [202, true, first.txJson.LastLedgerSequence + browserWindow(SIGNATURE_TTL_MS), 0])
     const blob2 = W.broker.sign(structuredClone(second.txJson)).tx_blob
     await s.signature(run, d.body.actionId, { requestId: second.requestId, txBlob: blob2 })
     const done = await s.waitState(run, d.body.actionId, ['validated', 'failed'])

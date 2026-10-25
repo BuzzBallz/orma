@@ -40,6 +40,11 @@ const UNITS = /^[0-9]{1,30}$/
 const MAX_PAGES = 50
 /** A rebuilt transaction expires about a minute after it is prepared, as xrpl.js would set it. */
 const SUBMIT_WINDOW = 20
+/**
+ * A transaction the page signs stays includable for the whole life of its signature card (a ledger is about
+ * 3.5 s on Devnet), plus the server's own minute: a presenter who talks before clicking Sign is not asked again.
+ */
+export const browserWindow = (ttlMs) => SUBMIT_WINDOW + Math.ceil(ttlMs / 3500)
 /** The borrower-signed LoanSet waits for a human approval: about 30 to 40 minutes. */
 const LOANSET_WINDOW = 600
 /** Base reserve plus a signer list and an MPToken, paid by the desk for a collateral account it creates. */
@@ -249,7 +254,7 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
   async function submitRebuilt(act, build, wallet, extra = () => ({}), money = null, browser = null) {
     for (let attempt = 1; ; attempt++) {
       if (stopped()) return locked(act)
-      const tx = await prepare(await build())
+      const tx = await prepare(await build(), browser ? browserWindow(signatureTtlMs) : SUBMIT_WINDOW)
       const { s, change, applied } = await changeOf(tx)
       // The change the action keeps is the confirm's. A simulation without metadata applied nothing: no row to realise.
       if (applied) act.change = change
@@ -426,7 +431,7 @@ export function createRoleEngine({ reader, xrpl, env, accounts, vaults = loadVau
       let r
       if (browser) {
         // the demo lab: the page signs; a signature past the window asks again on a rebuilt transaction
-        const prepared = await prepare(tx)
+        const prepared = await prepare(tx, browserWindow(signatureTtlMs))
         const signed = await signedByPage(act, browser, prepared)
         if (!signed) return false
         if (stopped()) {
