@@ -14,7 +14,8 @@
  *
  * Run:  node --env-file-if-exists=.env src/demo/bake-nyc.mjs [--dry-run] [--public-base <url>]
  * Exit: 0 baked (or, with --dry-run, preflight passed), 2 preflight refused, 64 bad usage, 1 any other
- *       failure. A script that opened a socket sets process.exitCode and lets the process end.
+ *       failure. A script that opened a socket sets process.exitCode and lets the process end. --dry-run
+ *       judges the pointer base only: it names each output already in demo/, which the real run refuses.
  * Out:  demo/{harbor-1,harbor-2,harbor-3,desk,spare,mandate-desk-1}.json (committed),
  *       .demo/roles.json and .demo/bake-nyc-receipt.json (never committed)
  */
@@ -109,12 +110,17 @@ async function main() {
     return 2
   }
   console.log('    ok    https, public, served by Orma')
-  if (opts.dryRun) return 0
-
-  for (const f of Object.values(OUT)) if (existsSync(f)) throw new BakeError(`${f} already exists: the NYC bake runs once, and its outputs are never overwritten`)
   if (DESK_REDEMPTION < LATEST_DESK_LOANSET + DESK_LOAN.paymentInterval * 1 + LOAN_REDEMPTION_BUFFER) {
     throw new BakeError(`desk and spare RedemptionDate ${DESK_REDEMPTION} is under ${LATEST_DESK_LOANSET} + ${DESK_LOAN.paymentInterval} + ${LOAN_REDEMPTION_BUFFER}: the last demo LoanSet would be refused`)
   }
+  const existing = Object.values(OUT).filter((f) => existsSync(f))
+  if (opts.dryRun) {
+    // The dry run stays a pointer-base check (exit 0), but never reads as a go for a bake that would refuse.
+    for (const f of existing) console.log(`    note  ${f} already exists: a real run refuses, the NYC bake runs once`)
+    return 0
+  }
+
+  if (existing.length) throw new BakeError(`${existing[0]} already exists: the NYC bake runs once, and its outputs are never overwritten`)
   receipt.publicBase = base
   mkdirSync('.demo', { recursive: true })
   // A run that died earlier left its seeds and receipt: keep them aside, its accounts still exist.
