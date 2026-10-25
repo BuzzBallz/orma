@@ -445,11 +445,13 @@ export function releasesPathOf(env = process.env) {
 /**
  * The public files the agent and the auditor read: desk, spare, the mandate, the share of each pool of
  * collateral.accounts, and a reader-like lookup share → vault over every demo/*.json that carries both.
+ * The dollar pool (step 21) is optional, as the signer reads it: null on a server without desk-usd.json.
  */
 export function demoFromFiles(dir = 'demo') {
   const desk = readDemo('desk', dir)
   const spare = readDemo('spare', dir)
   const mandate = readDemo('mandate-desk-1', dir)
+  const usd = existsSync(join(dir, 'desk-usd.json')) ? readDemo('desk-usd', dir) : null
   const shares = {}
   for (const key of Object.keys(desk.collateral?.accounts ?? {})) shares[key] = upper(readDemo(key, dir).shareMptId)
   const vaults = new Map()
@@ -461,11 +463,12 @@ export function demoFromFiles(dir = 'demo') {
       // a demo file that is not JSON names no vault
     }
   }
-  return { desk, spare, mandate, shares, reader: { getByShareMpt: (id) => (vaults.has(upper(id)) ? { vaultId: vaults.get(upper(id)) } : null) } }
+  return { desk, spare, mandate, usd, shares, reader: { getByShareMpt: (id) => (vaults.has(upper(id)) ? { vaultId: vaults.get(upper(id)) } : null) } }
 }
 
 const rolesOf = (demo) => ({ borrower: demo.desk.collateral?.borrower, desk: demo.desk.owner, agent: demo.desk.collateral?.agent })
-const deskBrokersOf = (demo) => [demo.desk.loanBrokerId, demo.spare.loanBrokerId].filter(Boolean)
+/** Every LoanBroker the desk lends from: desk, spare and, when it is baked, the dollar pool (the signer's set). */
+const deskBrokersOf = (demo) => [demo.desk.loanBrokerId, demo.spare.loanBrokerId, demo.usd?.loanBrokerId].filter(Boolean)
 
 /** readTicketInputs reads conduct through accountTxWindow; a bare { req } client gets it here, through req. */
 function asXrpl(client) {
@@ -664,7 +667,7 @@ export async function audit({ client, fetchJson = fetchJsonDefault, demo, apiBas
     cannot('decision log', new Unreadable(`GET ${base}/api/desk/decisions did not return { entries }`))
     return finish()
   }
-  const { desk, spare, mandate, shares, reader } = demo
+  const { desk, spare, mandate, shares, reader, usd = null } = demo
   if (mandateHash(mandate) !== mandate.hash) {
     cannot('mandate', new Unreadable(`the mandate ${mandate.id} does not hash to its own hash; no ticket can be recomputed against it`))
     return finish()
@@ -753,6 +756,12 @@ export async function audit({ client, fetchJson = fetchJsonDefault, demo, apiBas
     const mptoken = await entryAt(client, { mptoken: { mpt_issuance_id: share, account: tx.Account } }, L)
     const eligible = judgeCollateralShare({ vault, issuance, mptoken })
     if (!eligible.eligible) violate('shareEligible', 'I2', object, L, `the pledged share is not eligible as collateral: ${eligible.reasons.join('; ')}`)
+    // step 21: a dollar loan's PrincipalRequested is dollars, not drops; this auditor reads no XRP/USD oracle,
+    // so it says the dollar ticket was not recomputed rather than pass it on a figure in the wrong unit
+    if (usd?.loanBrokerId && same(tx.LoanBrokerID, usd.loanBrokerId)) {
+      note(object, L, `USD loan on the dollar pool's LoanBroker ${upper(usd.loanBrokerId)}: its dollar ticket is not recomputed by this auditor (no XRP/USD oracle read), so ticketPass is not judged`)
+      return
+    }
     try {
       const inputs = await readTicketInputs(asXrpl(client), { shareMptId: share, reader, at: h })
       const ticket = buildTicket(inputs, { op: 'pledge', units, mandate, principalDrops: String(tx.PrincipalRequested) })
@@ -796,7 +805,7 @@ export async function audit({ client, fetchJson = fetchJsonDefault, demo, apiBas
     const to = Math.max(...judged.map((j) => j.validatedAt).filter(Number.isSafeInteger))
     const ticketIds = new Set(entries.filter((x) => x?.decision === 'approved').map((x) => upper(x.ticketId)).concat(judged.map((j) => j.ticketId)))
     const txHashes = new Set(entries.filter((x) => x?.decision === 'approved').map((x) => upper(x.txHash)).concat(judged.map((j) => j.txHash)))
-    const ownerOf = new Map([[upper(desk.loanBrokerId), desk.owner], [upper(spare.loanBrokerId), spare.owner]])
+    const ownerOf = new Map([[upper(desk.loanBrokerId), desk.owner], [upper(spare.loanBrokerId), spare.owner], ...(usd?.loanBrokerId && usd.owner ? [[upper(usd.loanBrokerId), usd.owner]] : [])])
     for (const broker of new Set(judged.map((j) => j.broker).filter(Boolean))) {
       try {
         let owner = ownerOf.get(broker)
@@ -1284,6 +1293,14 @@ async function selfTest(argv) {
       [decideRelease(state.args).decision, state.collateral.conforming, state.collateral.sharesHeld, state.collateral.escrowCount, read.includes('account_info') && read.includes('account_objects')], ['to-desk', true, UNITS, 0, true])
   }
   eq('   a recipient with lsfDepositAuth and no DepositPreauth of the account → none; with it → to-desk', [decide({ recipient: recipientOf(A.deskOwner, { depositAuth: true }) }), decide({ recipient: recipientOf(A.deskOwner, { depositAuth: true, preauth: true }) })], ['none', 'to-desk'])
+  {
+    // step 21: a loan in the test dollar is lent from the dollar pool's own LoanBroker (demo/desk-usd.json)
+    const USD_BROKER = hex64('C')
+    const withUsd = { desk: { loanBrokerId: T.DESK_BROKER }, spare: { loanBrokerId: T.SPARE_BROKER }, usd: { loanBrokerId: USD_BROKER } }
+    const onUsd = { ...args({ loanSets: [loanSetEntry({ broker: USD_BROKER })] }), deskBrokers: deskBrokersOf(withUsd) }
+    eq("   a defaulted loan lent on the dollar pool's LoanBroker → to-desk (the dollar pool is a desk LoanBroker); without desk-usd.json → none",
+      [deskBrokersOf(withUsd).includes(USD_BROKER), decideRelease(onUsd).decision, decideRelease({ ...onUsd, deskBrokers: deskBrokersOf({ ...withUsd, usd: null }) }).decision], [true, 'to-desk', 'none'])
+  }
   eq('   an incomplete history → none, whatever the loan', decideRelease({ ...args(), incomplete: 'the history runs past 50 pages' }).decision, 'none')
   {
     const other = { loan: loanNode({ id: T.LOAN_Z }) } // defaulted, but not the loan the Memo names
@@ -1337,6 +1354,14 @@ async function selfTest(argv) {
     eq('an intact, conforming log; pool accounts never used (free), an account after EscrowFinish holding its shares (structural) → 0 (M1)',
       [r.code, r.stages[A.F1], r.stages[A.F2], r.stages[A.S], r.stages[A.P], r.stages[A.R]], [0, 'free', 'free', 'structural', 'pledged', 'structural'])
     if (r.code !== 0) console.log(`         ${r.lines.join('\n         ')}`)
+  }
+  {
+    // step 21: an approved entry on the dollar pool's LoanBroker; its PrincipalRequested is dollars, never drops
+    const w = world(T)
+    w.demo.usd = { owner: A.deskOwner, loanBrokerId: T.DESK_BROKER }
+    const r = await w.audit()
+    eq("an approved entry on the dollar pool's LoanBroker → its dollar ticket is named as not recomputed, never passed on drops",
+      [r.code, r.notes.some((n) => n.sentence.includes('its dollar ticket is not recomputed by this auditor'))], [0, true])
   }
   {
     const w = world(T)
@@ -1626,6 +1651,11 @@ async function selfTest(argv) {
   for (const [name, prop] of props) {
     count++
     if (!forAll({ name, seed, cases: 2000, gen, prop })) bad++
+  }
+  {
+    // R3 holds while the destination rule names one party; without that rule it goes red
+    const both = (internal) => guardCosign(release(), ctxDesk, internal).ok && guardCosign(release({ Destination: A.borrower }), ctxDesk, internal).ok
+    eq('   R3 red without its rule (destination off): a payment to the desk and one to the borrower both accepted', [both(), both({ disable: new Set(['destination']) })], [false, true])
   }
 
   // --- the auditor never signs nor submits ---------------------------------------------------------------------
