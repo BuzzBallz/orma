@@ -115,12 +115,11 @@ export function encodeShareMetadata(meta) {
  */
 export function parseShareMetadata(hex) {
   if (!hex) return { present: false, reason: 'no metadata on the issuance', meta: null }
-  let text
-  try {
-    text = fromHex(hex)
-  } catch {
+  // Buffer.from(h, 'hex') never throws: it stops at the first non-hex pair, so the check is explicit.
+  if (!/^(?:0[xX])?(?:[0-9A-Fa-f]{2})*$/.test(String(hex))) {
     return { present: true, reason: 'metadata is not valid hex', meta: null, raw: String(hex).slice(0, 64) }
   }
+  const text = fromHex(hex)
   try {
     const meta = JSON.parse(text)
     if (meta === null || typeof meta !== 'object') {
