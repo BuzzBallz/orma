@@ -23,9 +23,15 @@
  * seconds, and a rate-limited faucet mid-bake leaves a half-built vault whose dates
  * cannot be corrected.
  *
- * Run: node src/demo/rebake-all.mjs [--hours 18]
+ * COMMITTED EVIDENCE. Each output below is tracked: README links, the evidence/devnet-tx coverage and the
+ * vault ids the API serves all point at the vaults in them, and a rebake replaces those vaults. So it
+ * refuses (exit 2, nothing spawned) while any output exists, unless --force says the replacement is meant.
+ * bake-metadata.mjs keeps its own refusal: it never overwrites demo/metadata-vault.json.
+ *
+ * Run: node src/demo/rebake-all.mjs [--hours 18] [--force]
  */
 import { spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
 
 const arg = (n, d) => { const i = process.argv.indexOf('--' + n); return i > -1 && process.argv[i + 1] ? process.argv[i + 1] : d }
 const HOURS = Number(arg('hours', 18))
@@ -36,18 +42,21 @@ const JOBS = [
     name: 'Meridian Trade Finance I',
     why: 'the impairment capture, Demo 1',
     script: 'src/demo/capture-impair.mjs',
+    out: 'demo/indexer-race.json',
     args: ['--window', String(SECONDS)],
   },
   {
     name: 'Kestrel Bridge Financing II',
     why: 'the default ordering measurement, Exhibit 3 and Slide 7',
     script: 'src/demo/bake-ordering.mjs',
+    out: 'demo/ordering-vault.json',
     args: ['--window', String(SECONDS)],
   },
   {
     name: 'Calder Structured Credit III',
     why: 'the share token that resolves to its own valuation, Exhibit 5',
     script: 'src/demo/bake-metadata.mjs',
+    out: 'demo/metadata-vault.json',
     args: ['--window', String(SECONDS)],
   },
   {
@@ -58,6 +67,7 @@ const JOBS = [
     name: 'Thorne Senior Secured I',
     why: 'the admission gate, Demo 3, must stay in Subscription for live deposits',
     script: 'src/demo/bake-gate.mjs',
+    out: 'demo/gate-vault.json',
     args: ['--window', String(SECONDS)],
     subscriptionSeconds: SECONDS,
   },
@@ -74,6 +84,14 @@ const run = (job) => new Promise((resolve) => {
   p.stderr.on('data', keep)
   p.on('close', (code) => resolve({ code, tail }))
 })
+
+const present = JOBS.filter((job) => existsSync(job.out))
+if (present.length && !process.argv.includes('--force')) {
+  console.log('\n  refused: these outputs are committed evidence, and a rebake replaces the vaults they record:')
+  for (const job of present) console.log(`    ${job.out.padEnd(28)} ${job.name}`)
+  console.log('  Nothing was baked. Pass --force to replace them anyway.\n')
+  process.exit(2)
+}
 
 console.log(`\n  Rebaking 4 facilities with a ${HOURS} hour horizon.`)
 console.log('  Sequential on purpose: a rate-limited faucet mid-bake leaves an unfixable vault.\n')
