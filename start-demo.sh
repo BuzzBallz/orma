@@ -4,9 +4,9 @@
 #
 # WHY A SCRIPT. Starting this by hand is three commands, two of which fail silently in
 # ways that only show up on stage: a backend left running from yesterday holds port 8787
-# so the new one dies on EADDRINUSE, and a facility whose window has expired serves
-# negative countdowns that look like a bug. Both happened during the build. This checks
-# for them and refuses to claim success when it should not.
+# so the new one dies on EADDRINUSE, and a New York demo whose Harbor, desk or chain test
+# is not ready looks like a bug. Both happened during the build. This checks for them and
+# refuses to claim success when it should not.
 #
 # Run: bash start-demo.sh
 set -uo pipefail
@@ -47,7 +47,9 @@ fi
 # --- backend -----------------------------------------------------------------
 echo ""
 echo "  starting the reader"
-LOG_PRETTY=1 nohup node src/index.mjs > .demo-backend.log 2>&1 &
+# PUBLISH_SEED and PUBLISH are blanked, never removed: src/index.mjs fills an undefined key from
+# .env, and a second process publishing from the server's account steals its sequence numbers (I4).
+PUBLISH_SEED= PUBLISH= LOG_PRETTY=1 nohup node src/index.mjs > .demo-backend.log 2>&1 &
 for _ in $(seq 1 40); do
   curl -s -m 2 -o /dev/null http://localhost:8787/api/health 2>/dev/null && break
   sleep 2
@@ -59,9 +61,9 @@ if ! curl -s -m 3 -o /dev/null http://localhost:8787/api/health 2>/dev/null; the
 fi
 ok "backend on :8787"
 
-# --- the facilities, and whether their phases still work ---------------------
+# --- the New York demo, read on Devnet: Harbors, desk, chain test, mandate ---
 echo ""
-node src/dev/check-demo-ready.mjs
+node --env-file-if-exists=.env src/dev/check-demo-ready.mjs --nyc
 FACILITIES=$?
 
 # --- frontend ----------------------------------------------------------------
@@ -84,8 +86,6 @@ echo "  ------------------------------------------------------------"
 echo "  interface     http://localhost:5173"
 echo "  deck          deck/index.html          S notes, T timer, P print"
 echo "  documentation https://buzzballz.github.io/orma/"
-echo "  run of show   docs/45-RUNSHEET.md"
-echo "  hard questions docs/46-QA-CAVEATS.md"
 echo ""
-[ "${FACILITIES:-0}" -eq 2 ] && echo "  ${RED}A facility needs rebaking before you present. See above.${OFF}" && echo ""
+[ "${FACILITIES:-0}" -eq 2 ] && echo "  ${RED}The New York demo is not ready. See above.${OFF}" && echo ""
 exit 0
