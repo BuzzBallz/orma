@@ -13,11 +13,16 @@ import { decodeAccountID, hashes } from 'xrpl'
 import { num } from '../num.mjs'
 import { normaliseBroker, normaliseVault } from '../xrpl.mjs'
 import { readBrokerHistory, analyseOrdering } from '../history.mjs'
-import { judgeCollateralAccount, SCHEMAS, usdTermsHash } from '../nyc/contracts.mjs'
+import { judgeCollateralAccount, judgeCollateralShare, SCHEMAS, usdTermsHash } from '../nyc/contracts.mjs'
 import { readXrpUsd, PriceUnavailableError } from '../fx/price.mjs'
+import { logger } from '../log.mjs'
 
 /** A paged read follows marker at one ledger for at most this many pages, then refuses. */
 export const MAX_PAGES = 50
+/** The cure escrows read per loan, the most recent first: a borrower's Memos never make a positions read unbounded. */
+export const MAX_CURES_PER_LOAN = 8
+
+const positionsLog = logger('ticket:positions')
 
 const LSF_DISABLE_MASTER = 0x00100000
 const LSF_DEPOSIT_AUTH = 0x01000000
@@ -376,6 +381,14 @@ export async function readPositions(xrpl, { reader, demoDir = 'demo', at: pinned
     }
   }
   const out = []
+  // one ticket read per pledged share and per call: two escrows of the same share share the vault read
+  const inputsByShare = new Map()
+  const inputsOf = (shareMptId) => {
+    if (!inputsByShare.has(shareMptId)) inputsByShare.set(shareMptId, readTicketInputs(xrpl, { shareMptId, reader, at }))
+    return inputsByShare.get(shareMptId)
+  }
+  // an escrow counts once, on one loan: the LoanSet-named escrows first, a cure Memo never counts them again
+  const counted = new Set([...createdBy.values()].map((made) => made.escrowIndex).filter(Boolean))
   for (const { loan, vaultId, currency } of loans) {
     const made = createdBy.get(String(loan.index).toUpperCase()) ?? null
     const collateral = []
@@ -384,18 +397,43 @@ export async function readPositions(xrpl, { reader, demoDir = 'demo', at: pinned
       if (escrow && escrow.Amount?.mpt_issuance_id) {
         const shareMptId = String(escrow.Amount.mpt_issuance_id).toUpperCase()
         const account = await readCollateralAccount(xrpl, { address: escrow.Destination, shareMptId, at, namedEscrow: made.escrowIndex, demoDir })
-        const ticketInputs = await readTicketInputs(xrpl, { shareMptId, reader, at })
+        const ticketInputs = await inputsOf(shareMptId)
         collateral.push({ escrowId: made.escrowIndex, shareMptId, units: String(escrow.Amount.value), account, ticketInputs })
       }
     }
-    // step 20: every live cure escrow of the borrower that names this loan, each in its own 2-of-3 account
+    // step 20: every live cure escrow of the borrower that names this loan, each in its own 2-of-3 account.
+    // The Memo is the borrower's own words: a cure counts only when its share is a tracked vault share
+    // eligible as collateral (I4) and its account is a conforming 2-of-3 account (I3), at most
+    // MAX_CURES_PER_LOAN of them, the most recent first; any other is left out and the log says why.
+    let cureReads = 0
     for (const c of made ? cures.get(String(loan.index).toUpperCase()) ?? [] : []) {
-      if (c.borrower !== loan.Borrower) continue
+      if (c.borrower !== loan.Borrower || counted.has(c.index)) continue
+      if (cureReads >= MAX_CURES_PER_LOAN) {
+        positionsLog.warn('cure escrows past the cap left out', { loanId: loan.index, ledgerIndex: L, cap: MAX_CURES_PER_LOAN })
+        break
+      }
+      cureReads++
       const escrow = await entryAt(xrpl, { index: c.index }, L)
       if (!escrow?.Amount?.mpt_issuance_id || escrow.Account !== loan.Borrower) continue
       const shareMptId = String(escrow.Amount.mpt_issuance_id).toUpperCase()
+      const skip = (why) => positionsLog.warn('cure escrow not counted', { loanId: loan.index, escrowId: c.index, ledgerIndex: L, why })
+      if (!reader.getByShareMpt(shareMptId)) {
+        skip(`no tracked vault issues the share ${shareMptId}`)
+        continue
+      }
+      // an inconsistent snapshot of a tracked vault still refuses every figure (I7)
+      const ticketInputs = await inputsOf(shareMptId)
+      const share = judgeCollateralShare({ vault: ticketInputs.vault.raw, issuance: ticketInputs.issuance.raw, mptoken: null })
+      if (!share.eligible) {
+        skip(`the share is not eligible as collateral: ${share.reasons.join('; ')}`)
+        continue
+      }
       const account = await readCollateralAccount(xrpl, { address: escrow.Destination, shareMptId, at, namedEscrow: c.index, demoDir })
-      const ticketInputs = await readTicketInputs(xrpl, { shareMptId, reader, at })
+      if (!account.conforming || escrow.Condition) {
+        skip(escrow.Condition ? 'the escrow carries a Condition' : `its account is not a conforming 2-of-3 account: ${account.reasons.join('; ')}`)
+        continue
+      }
+      counted.add(c.index)
       collateral.push({ escrowId: c.index, shareMptId, units: String(escrow.Amount.value), account, ticketInputs, cure: true })
     }
     out.push({
