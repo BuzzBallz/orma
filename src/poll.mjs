@@ -12,7 +12,7 @@
  * guesswork and is trivial at the loan counts this protocol produces.
  */
 import { Xrpl, sleep, normaliseVault, normaliseBroker, normaliseLoan, PHASE } from './xrpl.mjs'
-import { num, str, ratio, bps, Decimal, wholeShares } from './num.mjs'
+import { num, str, ratio, bps, Decimal, wholeShares, rippleToIso } from './num.mjs'
 import { logger } from './log.mjs'
 
 const log = logger('poll')
@@ -160,7 +160,7 @@ export class Reader {
       // 80 XRP of AssetsAvailable present. It is a phase predicate, not a liquidity check.
       canWithdraw: !inInvestment,
       withdrawBlockedReason: inInvestment ? 'tecTOO_SOON' : null,
-      nextBoundaryAt: boundaryRipple === null ? null : new Date((Number(boundaryRipple) + 946684800) * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z'),
+      nextBoundaryAt: boundaryRipple === null ? null : rippleToIso(boundaryRipple),
       secondsToNextBoundary: boundaryRipple === null ? 0 : Number(boundaryRipple) - closeTime,
     }
   }
@@ -179,7 +179,7 @@ export class Reader {
     this.ledgerHash = this.xrpl.lastLedgerHash ?? null
     const L = this.ledgerIndex
     const H = this.ledgerHash
-    this.serverTime = new Date((closeTime + 946684800) * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z')
+    this.serverTime = rippleToIso(closeTime)
 
     let failed = false
     for (const id of this.vaultIds) {

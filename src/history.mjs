@@ -37,12 +37,11 @@
  * difference is depositor money. Nothing about that required privileged access:
  * it is all public ledger state.
  */
-import { num, Decimal, amountText } from './num.mjs'
+import { num, Decimal, amountText, rippleToIso } from './num.mjs'
 import { logger } from './log.mjs'
 import { readHistory, creates } from './archive.mjs'
 
 const log = logger('history')
-const RIPPLE_EPOCH = 946684800
 
 export const FLAG = { IMPAIR: 0x20000, UNIMPAIR: 0x40000, DEFAULT: 0x10000 }
 
@@ -88,7 +87,7 @@ export function brokerEvents(txs, brokerId) {
     const prev = brokerNode?.PreviousFields ?? {}
     const fin = brokerNode?.FinalFields ?? {}
     const at = entry.close_time_iso
-      ?? (entry.tx_json?.date ? new Date((entry.tx_json.date + RIPPLE_EPOCH) * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z') : null)
+      ?? (entry.tx_json?.date ? rippleToIso(entry.tx_json.date) : null)
 
     // When the broker object was not touched -- an impairment -- its cover and book are
     // genuinely unchanged, but this transaction does not say what they were. Report that

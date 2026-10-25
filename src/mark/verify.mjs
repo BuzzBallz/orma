@@ -9,7 +9,7 @@
  */
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
-import { num, Decimal } from '../num.mjs'
+import { num, Decimal, RIPPLE_EPOCH } from '../num.mjs'
 import { Reader } from '../poll.mjs'
 import { Xrpl, normaliseVault, DEVNET_WS } from '../xrpl.mjs'
 import { parseShareMetadata, navPointerFrom } from '../metadata.mjs'
@@ -18,7 +18,6 @@ import { oracleDocId, decodePrice } from '../oracle.mjs'
 import { MARK_STEPS } from '../nyc/contracts.mjs'
 
 const MAX_BODY = 64 * 1024
-const RIPPLE_TO_UNIX = 946684800
 const HEX48 = /^[A-Fa-f0-9]{48}$/
 
 /** A step that ends the chain: the reason the verdict is disagree, and what to tell the reader. */
@@ -172,7 +171,7 @@ export async function verify(mptId, { xrpl, fetchImpl = globalThis.fetch, overri
     const changed = vaultRaw.PreviousTxnLgrSeq
     if (Number.isInteger(changed) && changed > 1) {
       const closed = Number((await xrpl.req({ command: 'ledger', ledger_index: changed })).result.ledger.close_time)
-      if (Number(oracle.LastUpdateTime) < closed + RIPPLE_TO_UNIX) {
+      if (Number(oracle.LastUpdateTime) < closed + RIPPLE_EPOCH) {
         const before = Reader.nav(normaliseVault({ ...(await xrpl.vaultInfo(vaultId, changed - 1)), index: vaultId }, 0)).navCorrect
         if (withinTolerance(nav, before, tolerance)) return 'oracle pending: last publish precedes this ledger'
       }
