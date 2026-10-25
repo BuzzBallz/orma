@@ -2,7 +2,7 @@
  * A read-only MCP server over the public API, so an agent can read a facility's credit without
  * integration code. It holds no key and signs nothing: every tool is a GET against ORMA_API.
  *
- *   ORMA_API=https://orma-api.onrender.com node src/mcp.mjs
+ *   ORMA_API=https://ormaprotocol.com node src/mcp.mjs   (the default)
  *
  * MCP over stdio is JSON-RPC 2.0, one message per line. This answers the four methods a tools-only
  * server needs (initialize, ping, tools/list, tools/call), in a few dozen lines rather than through
@@ -11,7 +11,8 @@
 import { createInterface } from 'node:readline'
 import { pathToFileURL } from 'node:url'
 
-const API = (process.env.ORMA_API ?? 'https://orma-api.onrender.com').replace(/\/+$/, '')
+// The app's origin relays /api/* to the API, so this default survives a change of API host.
+const API = (process.env.ORMA_API ?? 'https://ormaprotocol.com').replace(/\/+$/, '')
 const VAULT = /^[A-Fa-f0-9]{64}$/
 const MPT = /^[A-Fa-f0-9]{48}$/
 const UNITS = /^[0-9]{1,30}$/
@@ -71,7 +72,7 @@ async function callTool(name, args = {}) {
   if (!tool) return { isError: true, content: [{ type: 'text', text: `no tool ${name}` }] }
   const bad = checkArgs(tool, args)
   if (bad) return { isError: true, content: [{ type: 'text', text: bad }] }
-  // 30 s: the API sleeps when idle and takes about 22 s to wake.
+  // 30 s: a bound, so a host that never answers is reported rather than waited on.
   const res = await fetch(API + tool.path(args), { signal: AbortSignal.timeout(30_000), headers: { accept: 'application/json' } })
   const text = await res.text()
   return { isError: !res.ok, content: [{ type: 'text', text }] }
@@ -94,7 +95,8 @@ async function handle(msg) {
       return { tools: TOOLS.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })) }
     case 'tools/call':
       try {
-        return await callTool(params?.name, params?.arguments)
+        // `arguments: null` is no arguments, not a request that failed to leave.
+        return await callTool(params?.name, params?.arguments ?? {})
       } catch (e) {
         return { isError: true, content: [{ type: 'text', text: e?.name === 'TimeoutError' ? 'the API did not answer within 30 s' : 'the API could not be reached' }] }
       }
@@ -109,6 +111,10 @@ export function serve(input = process.stdin, output = process.stdout) {
     if (!line.trim()) return
     let msg
     try { msg = JSON.parse(line) } catch { return write({ jsonrpc: '2.0', id: null, error: { code: -32700, message: 'parse error' } }) }
+    // `null`, a number or a batch array is not a request object: answered, never thrown on.
+    if (msg === null || typeof msg !== 'object' || Array.isArray(msg)) {
+      return write({ jsonrpc: '2.0', id: null, error: { code: -32600, message: 'invalid request' } })
+    }
     if (msg.id === undefined) return // a notification, such as notifications/initialized: no answer
     try {
       write({ jsonrpc: '2.0', id: msg.id, result: await handle(msg) })
