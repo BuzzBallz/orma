@@ -53,8 +53,13 @@ export async function findShareEscrows(xrpl, shareMptId, accounts, ledgerIndex =
       // a fresh connection discovered its ledger on the first read: the next accounts are read there too
       ledgerIndex ??= xrpl.lastLedger ?? undefined
     } catch (e) {
-      log.debug('escrow scan failed', { account, err: (e?.data?.error ?? String(e)).slice(0, 60) })
-      continue
+      // an account that does not exist owns no escrow; any other failure is not "nothing pledged"
+      if (e?.data?.error === 'actNotFound') {
+        log.debug('escrow scan: no such account', { account })
+        continue
+      }
+      log.warn('escrow scan failed, no collateral total is given', { account, ledgerIndex: ledgerIndex ?? null, err: (e?.data?.error ?? String(e)).slice(0, 60) })
+      throw new Error(`the escrows of ${account} could not be read: ${(e?.data?.error ?? String(e?.message ?? e)).slice(0, 60)}`, { cause: e })
     }
     for (const o of objects) {
       const amt = o.Amount
