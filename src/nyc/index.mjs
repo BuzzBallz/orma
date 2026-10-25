@@ -119,7 +119,9 @@ export function createNyc({ reader, env, fetchImpl = fetch }) {
     }
     try {
       send(200, stamp(await hit.result))
-    } catch {
+    } catch (e) {
+      // the cause is logged: an unreachable node and a fault of verify answer the same 503, never silently
+      logger('mark').warn('verification failed', { mptId, err: String(e?.message ?? e).slice(0, 160) })
       fail(503, 'BUSY', 'The ledger node could not be reached for this verification; retry shortly', true)
     }
     return true
@@ -164,15 +166,24 @@ export function createNyc({ reader, env, fetchImpl = fetch }) {
   }
   const lastLedger = () => reader.xrpl?.lastLedger
   const firstPassDone = () => (reader.passes === undefined ? reader.snapshots.size > 0 : reader.passes > 0)
-  /** The mandate on file, its hash recomputed; null for an unknown id. Read on each request. */
-  function mandateOf(id) {
+  /**
+   * The mandate on file, its hash recomputed; null for an unknown id. Read on each request. A mandate whose
+   * content no longer hashes to its anchored hash is never used: it throws, and the route answers 500 INTERNAL
+   * (the mandate route, `verify: false`, says so in its own sentence).
+   */
+  function mandateOf(id, { verify = true } = {}) {
     let m
     try {
       m = readDemo('mandate-desk-1', TICKET_DEMO)
     } catch {
       return null
     }
-    return m.id === id ? m : null
+    if (m.id !== id) return null
+    if (verify && mandateHash(m) !== m.hash) {
+      ticketLog.error('mandate hash mismatch: the mandate is not used', { id, hash: m.hash })
+      throw new Error(`The hash of mandate ${id} does not match its content`)
+    }
+    return m
   }
   function refuseSnapshot(e, fail) {
     ticketLog.error('inconsistent snapshot', { code: e.code, vaultId: e.vaultId, ledgerIndex: e.ledgerIndex, ledgerHash: e.ledgerHash, violations: e.violations })
@@ -185,8 +196,15 @@ export function createNyc({ reader, env, fetchImpl = fetch }) {
     if (path !== '/api/tickets' && path !== '/api/desk/positions' && !mandateRoute) return false
 
     if (mandateRoute) {
-      const id = decodeURIComponent(mandateRoute[1])
-      const m = mandateOf(id)
+      // a malformed percent-escape names no mandate: 404, never a URIError's 500
+      let id
+      try {
+        id = decodeURIComponent(mandateRoute[1])
+      } catch {
+        fail(404, 'MANDATE_NOT_FOUND', 'No mandate with that id on this server.', false)
+        return true
+      }
+      const m = mandateOf(id, { verify: false })
       if (!m) {
         fail(404, 'MANDATE_NOT_FOUND', `No mandate ${JSON.stringify(id)} on this server.`, false)
         return true
@@ -285,7 +303,9 @@ export function createNyc({ reader, env, fetchImpl = fetch }) {
     const L = lastLedger()
     const keep = typeof L === 'number'
     try {
-      const ticket = await deskFlight(`ticket:${share}:${op}:${units}:${m.id}@${L}`, keep, async () => {
+      // the ticket itself is single-flight only (buildTicket is pure): the free-form units never fill the cache kept
+      // for the ledger walks, whose inputs stay kept 15 s
+      const ticket = await deskFlight(`ticket:${share}:${op}:${units}:${m.id}@${L}`, false, async () => {
         const inputs = await deskFlight(`inputs:${share}@${L}`, keep, () => walk(() => readTicketInputs(reader.xrpl, { shareMptId: share, reader })))
         return buildTicket(inputs, { op, units, mandate: m, principalDrops })
       })
@@ -399,6 +419,9 @@ export function createNyc({ reader, env, fetchImpl = fetch }) {
       res.end()
       return true
     }
+    // the headers and a first comment go out now: the client sees the stream open, not at the first heartbeat
+    res.flushHeaders()
+    res.write(': connected\n\n')
     const stream = { end: null }
     streams.add(stream)
     // A write the socket cannot take ends the stream: a slow reader never makes the server buffer for it.
@@ -544,8 +567,9 @@ export function createNyc({ reader, env, fetchImpl = fetch }) {
             marginLog.warn('margin call not logged: the re-read at the same ledger disagrees', { loanId: j.id, ledgerIndex: p.ledgerIndex, first: call.status, second: again?.call.status ?? null })
             // nothing decided: the status as it stood, or none, saying why
             const why = `A second read of ledger ${p.ledgerIndex} disagreed with the first: no margin-call decision was taken.`
+            // the status kept is served at this ledger, as SCHEMAS.marginCalls requires of every call of the document
             marginCalls.set(j.id, before
-              ? { ...before, reasons: [...before.reasons.filter((x) => !x.startsWith('A second read of ledger')), why] }
+              ? { ...before, ledgerIndex: p.ledgerIndex, ledgerHash: p.ledgerHash, reasons: [...before.reasons.filter((x) => !x.startsWith('A second read of ledger')), why] }
               : { ...call, status: 'NONE', issuedLedger: null, issuedAt: null, cureBy: null, shortfall: null, reasons: [...call.reasons.slice(0, 2), why] })
             continue
           }
@@ -723,7 +747,8 @@ export function createNyc({ reader, env, fetchImpl = fetch }) {
     const L = lastLedger()
     const keep = typeof L === 'number'
     try {
-      const ticket = await deskFlight(`ticket:${share}:pledge:${units}:${m.id}:USD:${usd.terms.hash}@${L}`, keep, async () => {
+      // single-flight only, as step 7: the units never evict the kept ledger walks
+      const ticket = await deskFlight(`ticket:${share}:pledge:${units}:${m.id}:USD:${usd.terms.hash}@${L}`, false, async () => {
         const inputs = await deskFlight(`inputs:${share}@${L}`, keep, () => walk(() => readTicketInputs(reader.xrpl, { shareMptId: share, reader })))
         const price = await readXrpUsd(reader.xrpl, usd.terms, { ledgerIndex: inputs.ledgerIndex, ledgerHash: inputs.ledgerHash, closeTime: inputs.closeTime })
         return buildTicket(inputs, { op: 'pledge', units, mandate: m, usd: { terms: usd.terms, principalUsd: usd.pool.plannedLoan.principalUsd, price } })
@@ -783,13 +808,27 @@ export async function readAmendments({ fetchImpl = fetch, now = () => new Date()
   }
 }
 
-/** One read at a time, kept `ttlMs` whatever it answered: xrpscan sees at most one request a minute. */
+/**
+ * One read at a time, kept `ttlMs` whatever it answered: xrpscan sees at most one request a minute. Once a
+ * read has settled, a get never waits: past `ttlMs` it answers the last value and refreshes behind it, so a
+ * slow xrpscan never holds the Feed; only the very first get waits for its read.
+ */
 export function createAmendmentsCache({ read, ttlMs = 60_000, now = Date.now }) {
-  let held = null
+  let startedAt = -Infinity
+  let pending = null
+  let settled = null
   return {
     get() {
-      if (!held || now() - held.at >= ttlMs) held = { at: now(), value: read() }
-      return held.value
+      if (!pending && now() - startedAt >= ttlMs) {
+        startedAt = now()
+        pending = Promise.resolve(read())
+          .then((value) => { settled = { value } }, (e) => {
+            amendmentsLog.warn('amendment votes not refreshed', { err: String(e?.message ?? e).slice(0, 120) })
+            settled ??= { value: { source: 'xrpscan', fetchedAt: new Date(now()).toISOString(), status: 'unavailable', items: [] } }
+          })
+          .finally(() => { pending = null })
+      }
+      return settled ? Promise.resolve(settled.value) : pending.then(() => settled.value)
     },
   }
 }
