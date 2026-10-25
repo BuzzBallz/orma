@@ -288,7 +288,8 @@ wherever it is read by diffing.
 </Note>
 
 All arithmetic here is string in, string out, at 40 significant digits with `decimal.js`.
-No monetary value in Orma passes through `Number()` or `parseFloat`.
+No monetary value in Orma is computed through `Number()` or `parseFloat`. The app converts a
+value to a float only to place a point on a chart or to compare a figure for display.
 
 ## When the loop fails, and what the lender is told
 

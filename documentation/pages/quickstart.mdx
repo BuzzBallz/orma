@@ -1,13 +1,13 @@
 ---
 title: "Quickstart"
-description: "Clone, install and check, start the reader against four live Devnet facilities, run the frontend, then bake your own."
+description: "Clone, install and check, start the reader against nine live Devnet facilities, run the frontend, then bake your own."
 ---
 
 Orma is two processes. A Node reader that polls XLS-65 vaults on XRPL Devnet, scores them and
 serves a frozen JSON contract on port 8787, and a Vite frontend that consumes it. Neither needs a
 database. The reader holds its state in memory and re-reads the ledger every four seconds.
 
-This page gets both running against four facilities that already exist on Devnet, then shows you
+This page gets both running against nine facilities that already exist on Devnet, then shows you
 how to build your own.
 
 ## What you need
@@ -19,7 +19,7 @@ how to build your own.
 | pnpm | any recent | Only for `app/`, which has its own `pnpm-lock.yaml`. |
 | Network | outbound wss | `wss://s.devnet.rippletest.net:51233`, network id 2. |
 
-Two runtime dependencies, both pinned exactly: `xrpl` at `5.2.0` and `decimal.js` at `10.6.0`.
+Two runtime dependencies, both pinned exactly: `xrpl` at `5.3.0` and `decimal.js` at `10.6.0`.
 
 <Warning>
 Install the repository root with `npm ci`, not `npm install`. `npm ci` installs the committed
@@ -30,7 +30,7 @@ serialises closed-ended vaults. The frontend is separate: `app/` is its own tree
 
 ## Why the xrpl pin is exact
 
-`xrpl@5.2.0` was published on 2026-09-11 at 22:20 UTC, eight hours and forty minutes before the
+The Paris build pinned `xrpl@5.2.0`; the October merge raised the pin to `5.3.0`. `xrpl@5.2.0` was published on 2026-09-11 at 22:20 UTC, eight hours and forty minutes before the
 hackathon opened. It matters more than a version number usually does.
 
 Every lending vault on XRPL must be closed-ended. `LoanBrokerSet` returns `tecNO_PERMISSION`
@@ -92,12 +92,13 @@ node src/index.mjs
 
 There are no arguments in the common case. On startup the entrypoint reads every `demo/*.json`,
 keeps any file carrying a 64-hex `vaultId`, and serves it under the `label` in the same file.
-Those four files are tracked in git, so a clean clone already knows what to watch.
+Those files are tracked in git, so a clean clone already knows what to watch. A file marked
+`retired` is skipped, and a vault named by two files is served once.
 
 ```
-  serving 4 facility(ies) baked into demo/
+[22:20:18] INFO  [main] serving the facilities baked into demo/ {"vaults":9}
 [22:20:18] INFO  [api] api listening {"port":8787,"source":"devnet"}
-[22:20:22] INFO  [main] up {"vaults":4,"api":"http://localhost:8787","publishing":false}
+[22:20:22] INFO  [main] up {"vaults":9,"api":"http://localhost:8787","publishing":false}
 ```
 
 `publishing` is `false` here because publication is off until a seed is given. Step 3 turns it on.
@@ -110,7 +111,8 @@ Logs go to **stderr**, as JSON lines by default, so stdout stays clean during a 
 From anywhere else it finds no baked facility and exits with the usage message.
 </Warning>
 
-The four facilities it picks up:
+The nine facilities it picks up, the four of the Paris event and the five the desk of the New York
+event reads:
 
 | File | Label | Vault id | What it demonstrates |
 |---|---|---|---|
@@ -118,6 +120,11 @@ The four facilities it picks up:
 | `demo/ordering-vault.json` | Kestrel Bridge Financing II | `24EAA01A…1E5810089` | Two defaults declared largest first, conduct grade E |
 | `demo/showcase-vault.json` | Halden Structured Credit IV | `DAB9E1EE…5A602B245` | A share token whose own metadata points at its valuation |
 | `demo/gate-vault.json` | Thorne Senior Secured I | `4A5A8E37…5B00190DF5` | XLS-70 credential plus permissioned domain, entry refused on-ledger |
+| `demo/harbor-1.json` | harbor-1 | `E216E96D…4D2CFA352` | A fictional credit facility whose shares are pledged to the desk; L1 impaired |
+| `demo/harbor-2.json` | harbor-2 | `1F50CE2B…BD988F7DE` | The same, a second facility |
+| `demo/harbor-3.json` | harbor-3 | `0BAC80C3…EC93F3144` | The same, a third facility |
+| `demo/desk.json` | desk | `3422A5AD…20AF7928E` | The vault the desk lends from |
+| `demo/spare.json` | spare | `88849E4F…7171887B6` | The desk's second lending vault |
 
 Explicit arguments win outright over the baked set:
 
