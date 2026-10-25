@@ -25,6 +25,8 @@ import { BORROWER_NAME, LENDER_NAME, secondsText } from './Desk'
  */
 
 const EXPLORER_TX = 'https://devnet.xrpl.org/transactions/'
+/** The borrower's LoanSet signature: the ledger only ever sees the blob Harbor countersigns, under its own hash. */
+const COUNTERSIGNED_LATER = "reaches the ledger with Harbor’s countersignature, under the hash shown at approval"
 const RUN_HEX = /^[0-9a-f]{32}$/
 const DEC = /^-?\d+(\.\d+)?$/
 const LAB_KEY = 'orma.demo.lab'
@@ -311,7 +313,9 @@ function useLabAction({ session, role, action, id, setId, onSigned, initial }: F
       if (a.status >= 200 && a.status < 300) {
         setSent((s) => [...s, t.requestId])
         const txType = t.kind === 'countersign' ? 'LoanSet' : text(t.txJson?.TransactionType)
-        onSigned({ requestId: t.requestId, role: t.role, purpose: t.purpose, hash, txType })
+        // the borrower's own LoanSet signature never reaches the ledger as signed here: the countersigned blob does
+        const onLedger = !(t.kind === 'sign' && t.txJson?.TransactionType === 'LoanSet')
+        onSigned({ requestId: t.requestId, role: t.role, purpose: t.purpose, hash: onLedger ? hash : '', txType })
         keep(a, act?.state ?? 'submitted')
         setKick((k) => k + 1)
         return
@@ -661,14 +665,14 @@ export function KeysPanel({ keys }: { keys: LoadedKey[] }) {
       <p className="t-body-m">Devnet test keys of the three parties: Tidewater (the borrower), the vault manager (role broker, who defaults L2) and the desk owner (Harbor Credit Desk&apos;s countersigning key). They stay in this tab&apos;s memory and are never sent anywhere; only signed transactions leave the browser.</p>
       <div style={row}>
         <label className="t-label-m" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-          Load the roles file (JSON: accounts.borrower.seed, accounts.broker.seed)
+          Load the roles file (JSON: accounts.borrower, accounts.broker and accounts.deskOwner seeds)
           <input type="file" accept="application/json,.json" onChange={(e) => { void fromFile(e.currentTarget) }} style={{ minHeight: 'var(--size-control)' }} />
         </label>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: 'var(--space-3)' }}>
         {KEY_ROLES.map((role) => (
           <label key={role} className="t-label-m" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', minWidth: 0 }}>
-            {`${KEY_LABEL[role].role} seed${role === 'deskOwner' ? ' (its own field: never read from the roles file)' : ''}`}
+            {`${KEY_LABEL[role].role} seed${role === 'deskOwner' ? ' (read from the roles file too; a seed pasted here wins)' : ''}`}
             <input ref={fieldOf(role)} type="password" autoComplete="off" spellCheck={false} placeholder="s…" style={{ minHeight: 'var(--size-control)', padding: '0 var(--space-3)', border: '1px solid var(--color-line)', borderRadius: 'var(--radius-sm)', background: 'var(--color-bg)', color: 'var(--color-text)', font: 'inherit', minWidth: 0 }} />
           </label>
         ))}
@@ -730,7 +734,7 @@ function PartyCard({ p, keys, open, signed }: { p: typeof PARTIES[number]; keys:
         <div>
           <p className="t-label-m">Signed in this browser</p>
           <ul className="t-body-s" style={{ margin: 0, paddingLeft: 'var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-1, 4px)' }}>
-            {done.map((s) => <li key={s.requestId} style={{ overflowWrap: 'anywhere' }}>{`${s.txType}: `}<HashLink hash={s.hash} /></li>)}
+            {done.map((s) => <li key={s.requestId} style={{ overflowWrap: 'anywhere' }}>{`${s.txType}: `}{s.hash ? <HashLink hash={s.hash} /> : <span className="caption">{COUNTERSIGNED_LATER}</span>}</li>)}
           </ul>
         </div>
       )}
@@ -1056,7 +1060,7 @@ export function DemoLab() {
               <p className="t-label-m">{`Signed in this browser for ${hname}`}</p>
               {signed.length === 0 ? <p className="caption">Nothing signed yet.</p> : (
                 <ul className="t-body-s" style={{ margin: 0, paddingLeft: 'var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                  {signed.map((s) => <li key={s.requestId} style={{ overflowWrap: 'anywhere' }}>{`${s.txType}, signed by ${roleName(s.role)}: ${s.purpose} `}<TxLink hash={s.hash} /></li>)}
+                  {signed.map((s) => <li key={s.requestId} style={{ overflowWrap: 'anywhere' }}>{`${s.txType}, signed by ${roleName(s.role)}: ${s.purpose} `}{s.hash ? <TxLink hash={s.hash} /> : <span className="caption">{COUNTERSIGNED_LATER}</span>}</li>)}
                 </ul>
               )}
             </div>

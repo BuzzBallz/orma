@@ -77,8 +77,9 @@ export class KeyError extends Error {
 const isSeedLike = (s: unknown): s is string => typeof s === 'string' && s.trim().length > 0
 
 /**
- * The roles file shape, { accounts: { borrower: { seed }, broker: { seed } } }. The desk owner's seed is never read
- * from it: as on the server, the roles file alone never configures the desk, its seed comes from its own field.
+ * The roles file shape, { accounts: { borrower: { seed }, broker: { seed }, deskOwner: { seed } } }, as the bake
+ * writes it: one file loads the three keys of the demo. The desk owner's own field still overrides it, and the
+ * page refuses a key whose address is not the account the server asks a signature from.
  * Pure: it never echoes the file's content in an error.
  */
 export function parseRolesFile(text: string): Seeds {
@@ -91,7 +92,7 @@ export function parseRolesFile(text: string): Seeds {
   const accounts = (doc as { accounts?: unknown } | null)?.accounts
   if (!accounts || typeof accounts !== 'object') throw new KeyError('BAD_FILE', 'The file carries no "accounts" object.')
   const out: Seeds = {}
-  for (const role of ['borrower', 'broker'] as const) {
+  for (const role of ['borrower', 'broker', 'deskOwner'] as const) {
     const seed = (accounts as Record<string, { seed?: unknown } | undefined>)[role]?.seed
     if (isSeedLike(seed)) out[role] = seed.trim()
   }
