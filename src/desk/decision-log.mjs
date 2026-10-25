@@ -8,10 +8,12 @@
  * ledgerIndex and ledgerHash being the validated ledger the decision read (I2), and
  * hash = sha256Hex(canonical(entry without hash)).
  */
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, truncateSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { canonical, sha256Hex } from '../nyc/contracts.mjs'
+import { logger } from '../log.mjs'
 
+const log = logger('desk:decision-log')
 const GENESIS = '0'.repeat(64)
 
 /**
@@ -33,6 +35,19 @@ export function openLog(path = process.env.DESK_LOG_PATH ?? '.demo/decisions.jso
     })
   }
 
+  /**
+   * A last line without its newline is an append cut short (a crash, a full disk): it was never acknowledged,
+   * so it is cut off before the next append, which would otherwise fuse with it and break the chain for good.
+   */
+  function cutTornTail() {
+    if (!existsSync(path)) return
+    const buf = readFileSync(path)
+    if (!buf.length || buf[buf.length - 1] === 0x0a) return
+    const keep = buf.lastIndexOf(0x0a) + 1
+    log.warn('torn last line of the decision log cut before the append', { path, bytesCut: buf.length - keep })
+    truncateSync(path, keep)
+  }
+
   function verifyChain() {
     let prev = GENESIS
     const all = lines()
@@ -51,6 +66,7 @@ export function openLog(path = process.env.DESK_LOG_PATH ?? '.demo/decisions.jso
    * @param {{ ticketId: string, mandateHash: string, decision: 'approved'|'refused'|'declined', code?: string, txHash?: string|null, ledgerIndex: number, ledgerHash: string }} entry
    */
   function append({ ticketId, mandateHash, decision, code, txHash, ledgerIndex, ledgerHash }) {
+    cutTornTail()
     const all = lines()
     const last = all.at(-1)
     const body = {
@@ -74,6 +90,7 @@ export function openLog(path = process.env.DESK_LOG_PATH ?? '.demo/decisions.jso
    * @param {{ status: 'ISSUED'|'CURED'|'EXPIRED', loanId: string, mandateHash: string, policyHash: string, issuedLedger: number, issuedAt: string, cureBy: string, ltvHeldBps: number|null, maxLtvBps: number, ledgerIndex: number, ledgerHash: string, shortfall?: object|null }} entry
    */
   function appendMarginCall({ status, loanId, mandateHash, policyHash, issuedLedger, issuedAt, cureBy, ltvHeldBps, maxLtvBps, ledgerIndex, ledgerHash, shortfall = null }) {
+    cutTornTail()
     const all = lines()
     const last = all.at(-1)
     const body = {
