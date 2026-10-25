@@ -61,7 +61,8 @@ export function tabHref(search: string, id: string): string {
 
 /** The address a desk link points at: the same one `navigate` pushes. */
 export function hrefFor(path: RoutePath, vaultId: string | null): string {
-  return path + (vaultId && path !== '/' ? '?facility=' + vaultId : '')
+  // Encoded: readId() hands back the decoded value, and a raw `&` or `#` in it split the address.
+  return path + (vaultId && path !== '/' ? '?facility=' + encodeURIComponent(vaultId) : '')
 }
 
 /**
