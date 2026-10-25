@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import Decimal from 'decimal.js'
-import type { FeedEvent, NavPoint } from '../lib/types'
+import type { FeedEvent } from '../lib/types'
 import { formatXrp } from './Ledger'
 
 // Inline SVG, no chart library. Amounts stay decimal strings; `num` is used for geometry only, never for a value shown.
@@ -230,56 +230,6 @@ export function LockBar({ seconds, maxDays }: { seconds: string; maxDays?: numbe
   )
 }
 
-// --- the two readings of one share through time ---------------------------------------------
-
-const EVENT_NAME: Record<string, string> = { impair: 'Loss recognised', unimpair: 'Loss reversed', default: 'Default', clawback: 'Clawback' }
-
-export function TwoReadings({ points }: { points: NavPoint[] }) {
-  const n = points.length
-  const vals = points.flatMap((p) => [D(p.navNaive), D(p.navCorrect)])
-  const lo = n ? Decimal.min(...vals).minus('0.03').toDecimalPlaces(2, Decimal.ROUND_FLOOR) : D(0)
-  const hi = n ? Decimal.max(...vals).plus('0.03').toDecimalPlaces(2, Decimal.ROUND_CEIL) : D(1)
-  const last = points[n - 1]
-  const label = last
-    ? `Value of one share through ${n} ledger events. Latest: value read by all ${last.navNaive}, withdrawal value ${last.navCorrect}.`
-    : 'No history.'
-  return (
-    <Chart label={label} height={252}>
-      {(w, hatch) => {
-        const x0 = 52, x1 = w - 150, y0 = 18, y1 = 190
-        const px = (i: number) => x0 + (n < 2 ? 0 : ((x1 - x0) * i) / (n - 1))
-        const py = (v: Decimal.Value) => y1 - (y1 - y0) * frac(v, lo, hi)
-        // A value holds until the next event, then jumps: horizontal to the next x, then vertical to the new value.
-        const step = (key: 'navNaive' | 'navCorrect') => points.map((p, i) => (i === 0 ? `M${px(0)} ${py(p[key])}` : `H${px(i)} V${py(p[key])}`)).join(' ')
-        const ticks = [lo, lo.plus(hi.minus(lo).div(2)), hi]
-        const events = points.map((p, i) => ({ p, i })).filter(({ p }) => EVENT_NAME[p.kind])
-        return (
-          <g className="ch">
-            {ticks.map((t) => <g key={t.toString()}><line x1={x0} x2={x1} y1={py(t)} y2={py(t)} className="ch-grid" /><text x={x0 - 8} y={py(t) + 5} textAnchor="end" className="ch-tick">{t.toFixed(2)}</text></g>)}
-            {n > 1 && <path d={`${step('navNaive')} V${py(points[n - 1].navCorrect)} ${points.slice(1).map((_, k) => { const i = n - 1 - k; return `V${py(points[i - 1].navCorrect)} H${px(i - 1)}` }).join(' ')} Z`} style={{ fill: `url(#${hatch})` }} className="ch-gap-fill" />}
-            {n > 1 && <path d={step('navNaive')} className="ch-line-dash" fill="none" />}
-            {n > 1 && <path d={step('navCorrect')} className="ch-line" fill="none" />}
-            {events.map(({ p, i }) => (
-              <g key={i}>
-                <line x1={px(i)} x2={px(i)} y1={y0} y2={y1} className="ch-limit" />
-                <text x={px(i)} y={y1 + 22} textAnchor="middle" className="ch-note">{EVENT_NAME[p.kind]}</text>
-              </g>
-            ))}
-            {last && <>
-              <text x={x1 + 10} y={py(last.navNaive) + 5} className="ch-value">{last.navNaive}</text>
-              <text x={x1 + 10} y={py(last.navNaive) + 22} className="ch-note">read by all</text>
-              <text x={x1 + 10} y={py(last.navCorrect) + 5} className="ch-value">{last.navCorrect}</text>
-              <text x={x1 + 10} y={py(last.navCorrect) + 22} className="ch-note">withdrawal</text>
-            </>}
-            <text x={x0} y={246} className="ch-tick">{`earliest of ${n} events`}</text>
-            <text x={x1} y={246} textAnchor="end" className="ch-tick">latest</text>
-          </g>
-        )
-      }}
-    </Chart>
-  )
-}
-
 // --- one row per vault: the two readings, joined ---------------------------------------------
 
 export function Dumbbell({ rows }: { rows: { label: string; held: string; naive: string }[] }) {
@@ -351,16 +301,3 @@ export function EventTimeline({ events }: { events: FeedEvent[] }) {
   )
 }
 
-// --- a tiny trend line for a tile ------------------------------------------------------------
-
-export function Sparkline({ values, label }: { values: string[]; label: string }) {
-  if (values.length < 2) return null
-  const lo = Decimal.min(...values.map(D)), hi = Decimal.max(...values.map(D))
-  const W = 260, H = 34
-  const pts = values.map((v, i) => `${(W * i) / (values.length - 1)},${H - 3 - (H - 6) * frac(v, lo, hi)}`).join(' ')
-  return (
-    <svg className="spark" width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label}>
-      <polyline points={pts} fill="none" className="ch-line" />
-    </svg>
-  )
-}

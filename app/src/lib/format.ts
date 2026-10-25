@@ -108,8 +108,6 @@ export function duration(absSeconds: number): string {
   return `${m}m ${p2(sec)}s`
 }
 
-/** A boundary already behind us. NOT contract §6 — do not use it for loan due dates. */
-export function formatElapsed(seconds: number): string { return 'passed ' + duration(seconds) + ' ago' }
 
 /** a percentage already, as the API sends shortfallPct -> 2dp. "12.5" -> "12.50%" */
 export function percent(p: string): string { return unreadable(p) ? UNREADABLE : padDp(p, 2) + '%' }
