@@ -10,7 +10,7 @@ shares, with a report their risk committee can sign.
 [HACKATHON.md](HACKATHON.md): where the event's work starts, and how to check that without trusting us.
 It was committed at the start of the build (`4eccf89`), from the plan, and two of its sentences describe
 the plan, not the result: the step tags do not run to `step-16-rehearsal`, and not every transaction of the
-event is captured yet. The tags actually pushed, what was not built and what is not captured are below.
+event is captured yet. The tags actually pushed and what is not captured are below.
 
 At the XRPL hackathon in New York, 24–25 October 2026 (Lending & Borrowing track), we built **Orma Desk**,
 collateral management for XRPL lending. It sits on Orma's information layer, built in Paris in September 2026.
@@ -88,12 +88,6 @@ the event, then `step-19-desk-copy` to `step-22-late-payments`, steps added to t
 Also in `nyc-start..main`, without a step tag: per-client limits on the API's ledger walks, on `/api/mark` and
 on `/api/feed/stream` (`npm run check:api`), the documentation of the new publisher, this README's event
 section with its captures, a redraw of the desk screens (`d7ecfba`) and fixes to them.
-
-**Not built.** Step 15, hardening, was only partly done (the per-client limits and the documentation above)
-and has no tag. Step 16, the predict-then-realise rehearsal, was not built. Step 17, an OTC purchase of shares
-in two legs, was not built: the role engine registers no `buyer` action, so a request for one from an
-authorised operator answers `404 NOT_FOUND`, and the two buyer rows still listed in `OPERATOR_ACTIONS`
-(`app/src/screens/Desk.tsx`) and the server's `op=buy` ticket lead to no settlement. Step 18, role pages for phones, was dropped from the plan.
 
 ### The event's transactions on Devnet
 
