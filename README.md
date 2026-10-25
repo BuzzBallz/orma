@@ -27,7 +27,7 @@ recorded 10 XRP of loss. One share unit then has two prices:
 
 | Reading | Formula | One share unit of Harbor-1 |
 |---|---|---|
-| Assets divided by shares, the obvious reading | `AssetsTotal / shares` | 1.000000 drop |
+| The value everyone reads: assets divided by shares | `AssetsTotal / shares` | 1.000000 drop |
 | The withdrawal value, XLS-65's withdraw rate | `(AssetsTotal − LossUnrealized) / shares` | 0.800000 drop |
 
 Orma Desk lends only against the second: what the vault would pay at redemption if no further loss is recorded.
