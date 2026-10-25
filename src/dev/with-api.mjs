@@ -1,5 +1,6 @@
 /**
- * Runs a command against a local API on :8788 that never publishes and never signs.
+ * Runs a command against a local API on :8788 that never publishes. The API signs role actions only
+ * when DESK_SEED and ROLES_FILE are set (the live desk checks need that); the command itself gets no seed.
  *
  *   node --env-file-if-exists=.env src/dev/with-api.mjs -- <cmd> [args...]
  *   node --env-file-if-exists=.env src/dev/with-api.mjs --self-test
@@ -63,8 +64,16 @@ async function waitReady(api, ms = 90_000) {
   return false
 }
 
+/**
+ * The wrapped command talks to the API and needs no key: every seed and the roles file are blanked, so a
+ * tool it downloads (npx) never sees them. Blanked, not removed, for the reason given above startApi.
+ */
+export function commandEnv(env = process.env) {
+  return { ...env, API_BASE: BASE, PUBLISH_SEED: '', PUBLISH: '', DESK_SEED: '', ROLES_FILE: '', OWNER_SEED: '', FX_RELAY_SEED: '' }
+}
+
 function runCommand(cmd, args) {
-  const env = { ...process.env, API_BASE: BASE }
+  const env = commandEnv()
   // Windows refuses a bare .cmd without a shell, and a shell splits a quoted path at its spaces.
   const useShell = process.platform === 'win32' && !isAbsolute(cmd) && !/\.exe$/i.test(cmd)
   const child = useShell
@@ -158,10 +167,12 @@ function probeProcessGuards() {
 }
 
 function probeReceipt() {
-  const script = "process.exit(process.env.API_BASE === 'http://127.0.0.1:8788' ? 3 : 9)"
+  const script = "process.exit(process.env.API_BASE === 'http://127.0.0.1:8788' && !process.env.PUBLISH_SEED && !process.env.OWNER_SEED ? 3 : 9)"
   const argv = [process.execPath, '-e', script]
   const t0 = new Date().toISOString()
-  const r = spawnSync(process.execPath, [SELF, '--', ...argv], { stdio: 'inherit', timeout: 150_000 })
+  // The API never reads either key (startApi blanks PUBLISH_SEED), so only the command's env is under test.
+  const env = { ...process.env, PUBLISH_SEED: 'sProbeNotARealSeed', OWNER_SEED: 'sProbeNotARealSeed' }
+  const r = spawnSync(process.execPath, [SELF, '--', ...argv], { stdio: 'inherit', timeout: 150_000, env })
   assert.equal(r.status, 3, `probe 3: exit ${r.status}`)
   const receipt = readdirSync(RECEIPTS)
     .map((f) => JSON.parse(readFileSync(join(RECEIPTS, f), 'utf8')))
@@ -171,7 +182,7 @@ function probeReceipt() {
   assert.equal(receipt.apiBase, BASE)
   assert.ok(Number.isFinite(Date.parse(receipt.finishedAt)))
   assert.ok(Date.parse(receipt.finishedAt) >= Date.parse(receipt.startedAt))
-  console.log('ok 3: -- mode returns the exit code and leaves a receipt')
+  console.log('ok 3: -- mode returns the exit code, leaves a receipt and hands the command no seed')
 }
 
 async function probePopulatedEnv(vaultId) {
@@ -189,7 +200,7 @@ async function probePopulatedEnv(vaultId) {
     await stopApi(api)
     rmSync(dir, { recursive: true, force: true })
   }
-  console.log('ok 4: a populated .env neither publishes nor signs')
+  console.log('ok 4: a populated .env does not publish (roles blanked here, so writes answer 503)')
 }
 
 async function selfTest() {
