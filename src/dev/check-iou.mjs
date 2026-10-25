@@ -26,7 +26,7 @@ eq('an XRP vault, Scale 0, unchanged', Reader.nav(xrp), { navNaive: '1.000000', 
 
 const args = deriveScoreInputs({ ...usd, broker, loans: [], phase: 'Open' }).scoreArgs
 eq('and it has destroyed none of its capital', args.realisedLossPct.toFixed(2), '0.00')
-eq('so it is not graded as a total loss', buildScore(args).grade === 'B', false)
+eq('so it is not graded as a total loss', buildScore(args).grade, 'AAA')
 
 const nav = { unitValue: { held: '0.9', reported: '1' }, provenance: { scale: 6 } }
 eq('a pledge of 2,000,000 share units of a USD vault is 2 shares', valuePledge(nav, '2000000'),
