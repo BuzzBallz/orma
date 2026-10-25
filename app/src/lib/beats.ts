@@ -1,3 +1,4 @@
+import Decimal from 'decimal.js'
 import type { Loan, VaultDetail } from './types'
 import { facilityName } from './credit'
 
@@ -56,7 +57,7 @@ function redemptionBeat(d: VaultDetail, inSeconds: number): Beat {
     when: v.redemptionAt, inSeconds,
     what: matured ? 'Matured' : 'Redemption date', who: facilityName(v),
     amount: d.phaseInfo.claimsAtRedemption,
-    tone: Number(d.phaseInfo.projectedShortfall) > 0 ? '--bad' : '--fg-dim',
+    tone: new Decimal(d.phaseInfo.projectedShortfall).gt(0) ? '--bad' : '--fg-dim',
     matured,
   }
 }

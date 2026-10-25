@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import Decimal from 'decimal.js'
 import type { BrokerHistory, Collateral, Dimension, Gate, NavHistory, OracleContest, Resolution, VaultDetail } from '../lib/types'
 import { GradeLetter } from '../components/GradeLetter'
 import { Scale } from '../components/Scale'
@@ -115,7 +116,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
   // With no gap the two figures agree: there is no recognised loss to describe.
   const hasGap = v.navDivergenceBps > 0
   const largest = d.loans.length
-    ? d.loans.reduce((a, b) => (Number(a.shareOfDebtTotal) > Number(b.shareOfDebtTotal) ? a : b))
+    ? d.loans.reduce((a, b) => (new Decimal(a.shareOfDebtTotal).gt(b.shareOfDebtTotal) ? a : b))
     : null
   const overdue = d.loans.filter(l => l.secondsUntilDue < 0).length
   const redemptionShortfall = d.phaseInfo.projectedShortfall
@@ -362,7 +363,7 @@ export function Facility({ d, history, collateral, resolution, gate, contest, na
               <Amount drops={v.assetsAvailable} /> available of <Amount drops={v.assetsTotal} />.
               Redemption {fmtIso(v.redemptionAt)}
               {v.secondsToRedemption !== null && v.secondsToRedemption > 0 ? `, in ${duration(v.secondsToRedemption)}` : ''}.
-              {Number(redemptionShortfall) > 0
+              {new Decimal(redemptionShortfall).gt(0)
                 ? <> Claims exceed projected liquidity by <Amount drops={redemptionShortfall} />.</>
                 : ' Claims are covered by projected liquidity.'}
             </p>

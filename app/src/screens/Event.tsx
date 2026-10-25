@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import Decimal from 'decimal.js'
 import type { VaultDetail } from '../lib/types'
 import { beatRows, nextBeat, type Beat } from '../lib/beats'
 import { duration, fmtIso, percent } from '../lib/format'
@@ -76,7 +77,7 @@ export function Event({ d, picker }: { d: VaultDetail; picker?: ReactNode }) {
   const v = d.vault
   const rows: Beat[] = beatRows(d)
   const next = nextBeat(d)
-  const shortfall = Number(d.phaseInfo.projectedShortfall) > 0
+  const shortfall = new Decimal(d.phaseInfo.projectedShortfall).gt(0)
 
   return (
     <AmountAsset.Provider value={d.vault.asset}>
