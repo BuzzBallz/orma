@@ -7,35 +7,25 @@
  * Env: PORT (8787), XRPL_WS, POLL_MS (4000), LOG_PRETTY=1, LOG_LEVEL, DEMO_KEY
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
-
-// Node 20 has --env-file, but running the demo must not depend on remembering a flag,
-// and this is ten lines with no dependency. Existing environment always wins, so a
-// shell override still works. Written without regexes on purpose: the escaping is a
-// liability in a file that gets patched, and indexOf says what it means.
-if (existsSync('.env')) {
-  // The last occurrence of a key in the file wins, as with `node --env-file`.
-  const fromFile = new Map()
-  for (const raw of readFileSync('.env', 'utf8').split(String.fromCharCode(10))) {
-    const line = raw.trim()
-    if (!line || line.startsWith('#')) continue
-    const eq = line.indexOf('=')
-    if (eq < 1) continue
-    const k = line.slice(0, eq).trim()
-    const v = line.slice(eq + 1).trim().replace(/^["']|["']$/g, '')
-    fromFile.set(k, v)
-  }
-  for (const [k, v] of fromFile) if (process.env[k] === undefined) process.env[k] = v
-}
 import { join } from 'node:path'
-import { Client, Wallet } from 'xrpl'
-import { Reader } from './poll.mjs'
-import { createApi } from './api.mjs'
-import { setLabel } from './present.mjs'
-import { OraclePublisher } from './oracle.mjs'
-import { PublishLoop } from './publish-loop.mjs'
-import { archive } from './archive.mjs'
-import { logger, installProcessGuards } from './log.mjs'
-import { createNyc } from './nyc/index.mjs'
+
+// Running the demo must not depend on remembering --env-file. Node's own parser, so a value
+// reads as it would under that flag; a variable already in the environment wins, so a shell
+// override (even to empty, as in `PUBLISH_SEED= npm start`) still works.
+if (existsSync('.env')) process.loadEnvFile('.env')
+
+// Imported only now: log.mjs, xrpl.mjs, poll.mjs and publish-loop.mjs read LOG_*, XRPL_WS,
+// POLL_MS and PUBLISH_HEARTBEAT_MS when they load, and a static import would load them
+// before the line above, so those keys in .env would be ignored.
+const { Client, Wallet } = await import('xrpl')
+const { Reader } = await import('./poll.mjs')
+const { createApi } = await import('./api.mjs')
+const { setLabel } = await import('./present.mjs')
+const { OraclePublisher } = await import('./oracle.mjs')
+const { PublishLoop } = await import('./publish-loop.mjs')
+const { archive } = await import('./archive.mjs')
+const { logger, installProcessGuards } = await import('./log.mjs')
+const { createNyc } = await import('./nyc/index.mjs')
 
 const log = logger('main')
 installProcessGuards()
@@ -104,7 +94,7 @@ if (vaults.length === 0) {
   process.exit(1)
 }
 if (!cli.vaults.length) {
-  console.log(`  serving ${vaults.length} facility(ies) baked into demo/`)
+  log.info('serving the facilities baked into demo/', { vaults: vaults.length })
 }
 
 for (const [id, label] of Object.entries(labels)) setLabel(id, label)
@@ -182,12 +172,23 @@ log.info('up', {
   publishing: Boolean(publishLoop),
 })
 
+// Once: a second signal during the shutdown is ignored rather than running it again. Each step
+// is tried on its own, so one that throws does not leave the others undone.
+let closing = false
 const shutdown = async (sig) => {
+  if (closing) return
+  closing = true
   log.info('shutting down', { sig })
-  await reader.stop()
-  await nyc.close?.()
-  await api.close()
-  process.exit(0)
+  let failed = false
+  for (const [name, step] of [['reader', () => reader.stop()], ['nyc', () => nyc.close?.()], ['api', () => api.close()]]) {
+    try {
+      await step()
+    } catch (e) {
+      failed = true
+      log.error('shutdown step failed', { step: name, err: String(e).slice(0, 120) })
+    }
+  }
+  process.exit(failed ? 1 : 0)
 }
 process.on('SIGINT', () => shutdown('SIGINT'))
 process.on('SIGTERM', () => shutdown('SIGTERM'))
