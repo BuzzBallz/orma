@@ -369,6 +369,7 @@ async function offline() {
     eq('the dollar plan is the XRP plan in dollars at 1.29, less the haircut', [pool.plannedLoan.principalUsd, new Decimal(planned).toFixed(), pool.plannedLoan.units], ['2.322', '2.322', desk.plannedLoan.units])
     const ledger = readFileSync('app/src/components/Ledger.tsx', 'utf8')
     eq('every dollar Figure in the browser carries the label (Ledger.tsx formats unit usd with USD_LABEL)', (ledger.match(/case 'usd':[^\n]*USD_LABEL/g) ?? []).length, 2)
+    eq('a dollar input in the Ledger field tables carries the label', /principalUsd: `USD \(\$\{USD_LABEL\}\)`/.test(ledger) && /xrpUsd: `USD per XRP \(\$\{USD_LABEL\}\)`/.test(ledger), true)
     const deskTsx = readFileSync('app/src/screens/Desk.tsx', 'utf8')
     eq('the desk screen names the dollar with USD_LABEL', deskTsx.includes('USD_LABEL'), true)
     const loose = []

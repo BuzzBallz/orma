@@ -24,20 +24,13 @@ export function formatXrp(drops: string): string {
   return D(drops).div(1_000_000).toFixed(6)
 }
 
-function formatDuration(seconds: string): string {
-  const s = D(seconds)
-  const days = s.div(86400).floor()
-  const hours = s.minus(days.mul(86400)).div(3600).floor()
-  // under a day, to the minute or the second (a loan 1000 s past due is not "0 h")
-  return days.isZero() ? durationText(seconds) : `${days.toFixed(0)} days ${hours.toFixed(0)} h`
-}
-
 export function figureParts(f: Pick<FigureDoc, 'value' | 'unit'>): { text: string; unit: string } {
   switch (f.unit) {
     case 'drops': return { text: formatXrp(f.value), unit: 'XRP' }
     case 'bps': return { text: formatBps(f.value), unit: '' }
     case 'ratio': return { text: D(f.value).mul(100).toFixed(2) + '%', unit: 'of par' }
-    case 'seconds': return { text: formatDuration(f.value), unit: '' }
+    // one duration formatter for every surface, signed, to the second under a minute
+    case 'seconds': return { text: durationText(f.value), unit: '' }
     case 'share-units': return { text: D(f.value).toFixed(0), unit: 'shares' }
     // step 21: every dollar figure carries the stand-in label, whole
     case 'usd': return { text: D(f.value).toFixed(), unit: `USD (${USD_LABEL})` }
@@ -45,25 +38,9 @@ export function figureParts(f: Pick<FigureDoc, 'value' | 'unit'>): { text: strin
 }
 
 
-/** A money effect names its own unit (drops for XRP, share-units for shares). */
-export function formatEffect(e: { value: string; unit: string }): string {
-  if (e.unit === 'drops') return `${formatXrp(e.value)} XRP`
-  if (e.unit === 'share-units') return `${D(e.value).toFixed(0)} shares`
-  return `${e.value} ${e.unit}`
-}
-
-
 /** 5345 bps -> "53.45%", divided by 100 with decimal.js, never multiplied. */
 export function formatBps(bps: string): string {
   return new Decimal(bps).div(100).toFixed(2) + '%'
-}
-
-function formatSeconds(seconds: string): string {
-  const s = new Decimal(seconds).abs()
-  const days = s.div(86400).floor()
-  const hours = s.mod(86400).div(3600).floor()
-  if (days.gt(0)) return `${days.toFixed(0)} days ${hours.toFixed(0)} h`
-  return durationText(s.toFixed(0))
 }
 
 /** Share units at the vault's scale, with their XRP equivalent at the withdrawal value when the inputs carry it. */
@@ -83,7 +60,7 @@ function formatFigure(figure: FigureDoc): string {
     case 'drops': return `${dropsToXrp(figure.value)} XRP`
     case 'bps': return formatBps(figure.value)
     case 'ratio': return ratioToPct(figure.value)
-    case 'seconds': return formatSeconds(figure.value)
+    case 'seconds': return durationText(figure.value)
     case 'share-units': return formatShareUnits(figure)
     case 'usd': return `${D(figure.value).toFixed()} USD (${USD_LABEL})`
   }
@@ -105,7 +82,7 @@ export function Figure({ label, meaning, figure }: { label: string; meaning: str
               {figure.inputs.map((i) => (
                 <tr key={i.name}>
                   <td><b>{i.object}.{i.field}</b></td>
-                  <td className="num">{i.value}</td>
+                  <td className="num">{i.value}{inputGloss(i.name, i.value) !== null && <span className="block t-fig-s dim">{inputGloss(i.name, i.value)}</span>}</td>
                   <td className="mute">{i.id} · ledger {i.ledgerIndex} · {i.ledgerHash}</td>
                 </tr>
               ))}
@@ -288,8 +265,17 @@ const FRIENDLY: Record<string, string> = {
   CoverAvailable: 'First-loss cover available', LEVersion: 'Loan engine version', PrincipalOutstanding: 'Loan principal outstanding',
   TotalValueOutstanding: 'Loan total value outstanding', ManagementFeeOutstanding: 'Management fee outstanding', Flags: 'Loan flags',
   RedemptionDate: 'Redemption date', close_time: 'Ledger close time', maxLtvBps: 'Mandate: max LTV', maxSingleLoanDrops: 'Mandate: max single loan', principalDrops: 'Planned loan principal',
+  principalUsd: 'Planned loan principal', xrpUsd: 'XRP/USD reference price, USD per XRP',
 }
 const DROP_FIELDS = new Set(['AssetsTotal', 'LossUnrealized', 'AssetsAvailable', 'DebtTotal', 'CoverAvailable', 'PrincipalOutstanding', 'TotalValueOutstanding', 'ManagementFeeOutstanding', 'maxSingleLoanDrops', 'principalDrops'])
+// step 21: a dollar input carries the stand-in label whole, as a dollar figure does; the reference price is dollars per XRP
+const USD_FIELDS: Record<string, string> = { principalUsd: `USD (${USD_LABEL})`, xrpUsd: `USD per XRP (${USD_LABEL})` }
+
+/** The reading under an input's verbatim value: XRP for drops, the labelled dollar for a dollar input, else null. */
+export function inputGloss(name: string, value: string): string | null {
+  if (DROP_FIELDS.has(name)) return `${formatXrp(value)} XRP`
+  return Object.hasOwn(USD_FIELDS, name) ? `${value} ${USD_FIELDS[name]}` : null
+}
 
 /** One figure's trace, readable in a full-width row: what it means, how it is computed, and each ledger value it used. */
 export function LedgerDetail({ figure }: { figure: FigureDoc }) {
@@ -308,7 +294,7 @@ export function LedgerDetail({ figure }: { figure: FigureDoc }) {
             {figure.inputs.map((x) => (
               <tr key={x.name + x.id}>
                 <td><span className="block">{FRIENDLY[x.name] ?? x.name}</span><span className="t-fig-s dim">{`${x.object}.${x.field}`}</span></td>
-                <td className="t-fig-m num">{x.value}{DROP_FIELDS.has(x.name) && <span className="block t-fig-s dim">{`${formatXrp(x.value)} XRP`}</span>}</td>
+                <td className="t-fig-m num">{x.value}{inputGloss(x.name, x.value) !== null && <span className="block t-fig-s dim">{inputGloss(x.name, x.value)}</span>}</td>
                 <td className="t-fig-s" title={x.id}>{x.id.length > 16 ? `${x.id.slice(0, 8)}…${x.id.slice(-6)}` : x.id}</td>
                 <td className="t-fig-s">{`ledger ${x.ledgerIndex}`}<span className="block dim" title={x.ledgerHash}>{`${x.ledgerHash.slice(0, 8)}…`}</span></td>
               </tr>
