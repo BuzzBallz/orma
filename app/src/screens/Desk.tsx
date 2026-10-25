@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import Decimal from 'decimal.js'
-import { USD_COLLATERAL_RULE, USD_LABEL, type ChangeRow, type CollateralAccount, type FeedEvent, type Figure as FigureDoc, type LoanAsset, type Mandate, type MarginCall, type Mark, type PaymentEntry, type PaymentStatus, type PaymentSummary, type PositionUsd, type Ticket, type TicketUsd, type UsdReference, type UsdTerms } from '../lib/types'
+import { USD_COLLATERAL_RULE, USD_LABEL, type ChangeRow, type CollateralAccount, type FeedEvent, type Figure as FigureDoc, type LoanAsset, type Mandate, type MarginCall, type Mark, type OracleRead, type PaymentEntry, type PaymentStatus, type PaymentSummary, type PositionUsd, type Ticket, type TicketUsd, type UsdReference, type UsdTerms } from '../lib/types'
 import { AuditTable, FigureValue, HashLink, Panel, ProvenanceKey, ReadAt, Recompute, ShowWork, TestNetBanner, Verdict, Figure, formatBps, formatWhen, formatXrp, type VerdictStatus } from '../components/Ledger'
 import { BalanceBar, DefaultDots, LockBar, LtvGauge, PriceBars } from '../components/Charts'
 import {
@@ -13,7 +13,7 @@ import { follow, tabHref } from '../lib/useRoute'
 import { dropsToXrp, inUnit } from '../lib/format'
 import { durationText } from '../lib/duration'
 import { DeskUniverse } from './DeskUniverse'
-import { DeskFeed, FEED_POLL_MS, type FeedDoc } from './DeskFeed'
+import { DeskFeed, FEED_POLL_MS, consistencyLine, type FeedDoc } from './DeskFeed'
 
 /**
  * Orma Desk: the ticket (the risk report, the default tab and the central screen), the desk's positions
@@ -230,10 +230,13 @@ const LIMIT_LABEL: Record<string, string> = {
   // step 21: the row of a loan in the test dollar
   maxSingleLoanUsd: 'Max single loan',
 }
-/** A limit's value in its unit; a value the server could not state (null) is a dash, never a zero. */
+/**
+ * A limit's value in its unit; a value the server could not state (null) is a dash, never a zero. The mandate
+ * states the lock-up in days, but the server measures the positions and the breaches in seconds: a duration here.
+ */
 const limitValue = (limit: string, x: string | null | undefined) => (x === null || x === undefined ? '—'
   : limit === 'maxSingleLoanUsd' ? dollars(x)
-    : limit.endsWith('Bps') ? formatBps(x) : limit.endsWith('Days') ? `${x} days` : `${formatXrp(x)} XRP`)
+    : limit.endsWith('Bps') ? formatBps(x) : limit.endsWith('Days') ? secondsText(x) : `${formatXrp(x)} XRP`)
 /** The limit of step 21, in its unit on the mandate panel; the XRP rows keep the raw line they always had. */
 const USD_LIMITS = new Set(['maxSingleLoanUsd'])
 const breachLine = (b: { limit: string; value: string; threshold: string }) => (USD_LIMITS.has(b.limit)
@@ -245,11 +248,7 @@ const ltvLimit = (ticket: Ticket) => ticket.verdict.breaches.find((b) => b.limit
 function Statement({ t, txHash }: { t: Ticket; txHash?: string | null }) {
   const s = t.statement
   if (!s) return null
-  const c = s.consistency
-  const line = c.status === 'CONSISTENT' ? `Consistent with the ledger at ${c.ledgerIndex}`
-    : c.status === 'INCONSISTENT' ? `Not consistent with the ledger at ${c.ledgerIndex}: ${c.detail}`
-    : c.status === 'NOT_CHECKABLE' ? `Not checkable against the ledger: ${c.detail}`
-    : 'Unreadable statement in Vault.Data'
+  const line = consistencyLine(s.consistency)
   return (
     <div>
       <dt>Curator statement <span className="prov" data-prov="DECLARED">DECLARED</span></dt>
@@ -320,6 +319,13 @@ export function recomputeReference(r: Pick<UsdReference, 'value' | 'spreadBps' |
   return median.eq(r.value) && spread.eq(r.spreadBps) ? 'MATCH' : 'MISMATCH'
 }
 
+/** A source whose document is dated after the ledger's close: XLS-47 allows it, the server never uses it. Its age is negative. */
+const ahead = (s: OracleRead) => s.ageSeconds !== null && s.ageSeconds.startsWith('-')
+/** A source's age at the ledger: old, past the allowed age, or ahead of the ledger, never a negative age. */
+const sourceAge = (s: OracleRead, maxAgeSeconds: number) => (s.ageSeconds === null ? 'never updated'
+  : ahead(s) ? `dated ${secondsText(s.ageSeconds.slice(1))} after this ledger's close`
+    : `${secondsText(s.ageSeconds)} old${s.fresh ? '' : `, past the ${secondsText(String(maxAgeSeconds))} allowed`}`)
+
 function ReferencePrice({ r, ledgerIndex }: { r: UsdReference; ledgerIndex: number }) {
   const used = r.sources.filter((s) => s.used).length
   return (
@@ -335,8 +341,8 @@ function ReferencePrice({ r, ledgerIndex }: { r: UsdReference; ledgerIndex: numb
               <tr key={`${s.account}-${s.documentId}`}>
                 <td>{s.provider}<span className="t-body-s dim block"><HashLink hash={s.account} kind="accounts" />{` · document ${s.documentId}`}</span></td>
                 <td className="t-fig-m num">{s.price === null ? 'no price at this ledger' : perXrp(s.price)}</td>
-                <td className="t-body-s">{s.ageSeconds === null ? 'never updated' : `${secondsText(s.ageSeconds)} old${s.fresh ? '' : `, past the ${secondsText(String(r.maxAgeSeconds))} allowed`}`}{s.lastUpdateTime && <span className="dim block">{s.lastUpdateTime}</span>}</td>
-                <td className="t-body-s">{s.used ? 'used in the median' : s.fresh ? 'not used' : 'not used: not fresh'}</td>
+                <td className="t-body-s">{sourceAge(s, r.maxAgeSeconds)}{s.lastUpdateTime && <span className="dim block">{s.lastUpdateTime}</span>}</td>
+                <td className="t-body-s">{s.used ? 'used in the median' : s.fresh ? 'not used' : ahead(s) ? 'not used: dated after this ledger' : 'not used: not fresh'}</td>
               </tr>
             ))}
           </tbody>
@@ -737,7 +743,8 @@ function TicketTab({ ticket, mark, error, errorMessage, buyTicket, deskPlan, pos
   const choice = deskPlan?.usd ? <CurrencyChoice asset={currency} facility={facility} /> : null
   const said = errorMessage ?? undefined
   if (!own) return error ? <>{choice}<ErrorBlock code={error} message={said} /></> : <>{choice}<Loading /></>
-  const loan = deskPlan ? demoLoanFor(positions, deskPlan, facility, currency === 'USD' ? 'USD' : undefined) : null
+  // The ticket's demo loan is one in the ticket's own currency: a position without `currency` is an XRP one.
+  const loan = deskPlan ? demoLoanFor(positions, deskPlan, facility, currency) : null
   return (
     <>
       {error && <ErrorBlock code={error} message={said} />}
@@ -788,6 +795,8 @@ export function DeskScreen({ ticket, mark, tab, data, error = null, buyTicket = 
   buyTicket?: Ticket | null; deskPlan?: DeskPlan; positions?: Positions | null; facility?: string; asset?: LoanCurrency
 }) {
   const current = DESK_TABS.find((t) => t.id === tab) ?? DESK_TABS[0]
+  // The operator link's token leaves the address bar on any tab, before a ticket arrives; the panels read it from sessionStorage.
+  useEffect(() => { adoptOperatorFragment() }, [])
   const fromUrl = useUrlAsset()
   const currency: LoanCurrency = deskPlan?.usd && (asset ?? fromUrl) === 'USD' ? 'USD' : 'XRP'
   const usdPath = asset === undefined && currency === 'USD' && current.id === 'ticket' ? DESK_TABS[0].source({ deskPlan, facility, asset: 'USD' }) : null
@@ -867,7 +876,10 @@ export function rememberOperator(session: OperatorSession, patch: { pledgeAction
 
 interface RoleAction { actionId: string; state: string; engineResult?: string; txHash?: string; preview?: ActionPreview | null }
 type Phase = 'idle' | 'previewing' | 'previewed' | 'confirming' | 'validated' | 'failed' | 'refused' | 'pending-approval' | 'done'
-export interface RowState { phase: Phase; actionId?: string; preview?: ActionPreview; action?: RoleAction; error?: ActionError; accepted?: boolean }
+export interface RowState { phase: Phase; actionId?: string; preview?: ActionPreview; action?: RoleAction; error?: ActionError; accepted?: boolean
+  /** A cure pledge: the shares it was played for, so a call re-read ISSUED for another shortfall offers the cure again. */
+  units?: string
+}
 
 const money = (p?: ActionPreview | null) => (p?.money ?? {}) as Record<string, unknown>
 const text = (v: unknown) => (v === undefined || v === null ? '—' : String(v))
@@ -1065,6 +1077,21 @@ function ActionRow({ entry, ctx, session, remember, onChange, units, initial }: 
   )
 }
 
+/** The run and the token of an operator link: each the 32 hex characters the server draws, or the fragment is refused. */
+const RUN_HEX = /^[0-9a-f]{32}$/
+function operatorFragment(hash: string): OperatorSession | null {
+  const s = sessionFromFragment(hash)
+  return s?.runId && s.token && RUN_HEX.test(s.runId) && RUN_HEX.test(s.token) ? s : null
+}
+/** The operator link's run, written to sessionStorage and wiped from the address bar, so the token never stays on screen. */
+function adoptOperatorFragment(): OperatorSession | null {
+  const s = operatorFragment(location.hash)
+  if (!s) return null
+  writeOperatorSession(s)
+  history.replaceState(null, '', location.pathname + location.search)
+  return s
+}
+
 /**
  * The operator's run: read from sessionStorage, adopted once from the operator link's fragment (then wiped from
  * the address bar), and the memory of a validated pledge or a requested loan. One per screen: the ticket's
@@ -1073,11 +1100,8 @@ function ActionRow({ entry, ctx, session, remember, onChange, units, initial }: 
 function useOperatorSession(): [OperatorSession, Remember] {
   const [session, setSession] = useState<OperatorSession>(readOperatorSession)
   useEffect(() => {
-    const s = sessionFromFragment(location.hash)
-    if (!s) return
-    writeOperatorSession(s)
-    setSession(s)
-    history.replaceState(null, '', location.pathname + location.search)
+    const s = adoptOperatorFragment()
+    if (s) setSession(s)
   }, [])
   const remember = useCallback((patch: { pledgeActionId: string } | { requestActionId: string }) => {
     setSession((s) => {
@@ -1186,6 +1210,9 @@ function CureAction({ position, call, deskPlan, session, primary, initial }: {
 }) {
   const { row, result, preview, confirm } = useActionFlow({ role: 'borrower', action: 'pledgeEscrow', session, initial })
   const units = call.shortfall?.sharesToAdd ?? null
+  // The shares the last pledge was played for: validated for another shortfall, the call is still open and the cure comes back.
+  const [playedFor, setPlayedFor] = useState<string | null>(initial?.units ?? null)
+  const again = row.phase === 'validated' && playedFor !== null && units !== null && playedFor !== units
   const share = position.collateral[0]?.shareMptId ?? null
   const lending = deskPlan ? lendingVaultOf(deskPlan, position.vaultId) : null
   if (!units || !share) return null
@@ -1194,17 +1221,19 @@ function CureAction({ position, call, deskPlan, session, primary, initial }: {
   const cls = primary ? 'btn btn-primary' : 'btn btn-secondary'
   const start = () => preview(() => {
     if (!lending) return null
+    setPlayedFor(units)
     const vault = lending
     return getJson<Ticket>(cureTicketPath(share, units)).then((t) => cureBody({ lending: vault, share, ticketId: t.ticketId, inputsDigest: t.inputsDigest, units, loanId: call.loanId }))
   })
   return (
     <div style={{ borderTop: '1px solid var(--color-line)', paddingTop: 'var(--space-2)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+      {again && <p className="caption">{`${CURE_VERB} — validated on the ledger${row.action?.txHash ? `, transaction ${row.action.txHash}` : ''}, for ${playedFor} shares. The call is still open for ${units} more shares.`}</p>}
       <p className="caption">{`Pledges ${units} more shares of ${facility ? cap(harborName(facility.label)) : 'the pledged vault'} into escrow for loan ${call.loanId.slice(0, 8)}, from the ${lending ?? 'unknown'} lending vault. The escrow names the loan it cures.`}</p>
-      <ActionStatus action="pledgeEscrow" verb={CURE_VERB} row={row} units={units} focus={result} />
-      {row.phase === 'validated' && <p className="caption">The desk re-reads the loan at the next ledger: the call is cured once the LTV at withdrawal value is back within the mandate&apos;s limit.</p>}
+      {!again && <ActionStatus action="pledgeEscrow" verb={CURE_VERB} row={row} units={units} focus={result} />}
+      {row.phase === 'validated' && !again && <p className="caption">The desk re-reads the loan at the next ledger: the call is cured once the LTV at withdrawal value is back within the mandate&apos;s limit.</p>}
       {row.phase === 'previewed'
         ? <div><button type="button" className={cls} onClick={confirm}>{cureConfirmVerb(units)}</button></div>
-        : row.phase !== 'confirming' && row.phase !== 'validated' && (
+        : row.phase !== 'confirming' && (row.phase !== 'validated' || again) && (
           <div><button type="button" className={cls} disabled={blocked !== null || row.phase === 'previewing'} onClick={start}>{row.phase === 'previewing' ? 'Previewing…' : CURE_VERB}</button></div>
         )}
       {blocked && <p className="t-body-s">{blocked}</p>}
@@ -1715,9 +1744,11 @@ export const SMOKE_CASES: SmokeCase[] = [
       USD_ISSUED_LINE, `Shortfall: 0.141815 XRP of withdrawal value, worth 0.164647 ${L_USD} at the reference price less the haircut.`,
       `The LTV at withdrawal value, in USD (${USD_LABEL}), is 55.55 %, above that limit.`,
       'Pledges 196965 more shares of Harbor-1 into escrow for loan C1C1C1C1, from the desk lending vault.', CURE_VERB, NEEDS_RUN,
+      // the lock-up usage is in seconds on the wire: a duration on screen, never seconds called days
+      'lock-up</dt><dd class="t-fig-s">16 days 9 h 7 min of 30 days 0 h 0 min',
     ],
     before: [USD_ISSUED_LINE, 'Shortfall:', 'Time left to cure', CURE_VERB],
-    mustNotContain: [...NEVER_SAID, 'Loan in XRP', NOT_A_LENDER, '2.322000 XRP', '0.000002 XRP', 'reference price</dt>'],
+    mustNotContain: [...NEVER_SAID, 'Loan in XRP', NOT_A_LENDER, '2.322000 XRP', '0.000002 XRP', 'reference price</dt>', '1415248 days'],
   },
   {
     name: 'positions with a USD loan and no usable price: no dollar figure, the reason, the LTV a dash',
@@ -1779,5 +1810,46 @@ export const SMOKE_CASES: SmokeCase[] = [
   {
     name: 'duration formatter: the four ranges, their edges, never a fractional day', element: <p>{DURATION_SAMPLES.map(durationText).join(' | ')}</p>,
     mustContain: [DURATION_SHOWN], mustNotContain: ['1.5', 'NaN'],
+  },
+  // The lock-up limit: the mandate states days, the server measures the positions and the breaches in seconds.
+  {
+    name: 'a lock-up breach on the approval reads as a duration, never seconds called days',
+    element: <DeskScreen ticket={{ ...FIX_TICKET, verdict: { status: 'BREACHED', breaches: [{ limit: 'maxLockupDays', value: '2600000', threshold: '2592000' }] } }} mark={null} tab="ticket" />,
+    mustContain: ['Max lock-up: 30 days 2 h 13 min of 30 days 0 h 0 min, over the limit.'], mustNotContain: ['2600000 days', '2592000 days'],
+  },
+  // An oracle document dated after the ledger's close is ahead of it, not old.
+  {
+    name: 'reference with a source dated after the ledger close: ahead, never old',
+    element: <ReferencePrice r={{ ...FIX_USD_REF, sources: [...FIX_USD_REF.sources.slice(0, 2), read(2, '1.2899', '2026-10-25T12:00:03Z', '-3', false, false), FIX_USD_REF.sources[3]] }} ledgerIndex={FIX_L} />,
+    mustContain: ["dated 3 s after this ledger's close", 'not used: dated after this ledger', '2 h 0 min 0 s old, past the 10 min 0 s allowed'],
+    mustNotContain: ['-3 s old', '-3 s'],
+  },
+  // The XRP ticket's demo loan is an XRP loan: a dollar loan on the same shares is never shown under it.
+  {
+    name: 'XRP ticket beside a dollar loan only: no demo loan', element: <DeskScreen ticket={FIX_TICKET} mark={null} tab="ticket" deskPlan={FIX_PLAN_USD} positions={{ ledgerIndex: FIX_L, ledgerHash: FIX_HASH, positions: [FIX_USD_POSITION] }} />,
+    mustContain: ['No demo loan yet for this facility.'], mustNotContain: ['This loan is live on Devnet'],
+  },
+  {
+    name: 'XRP ticket beside an XRP loan: its demo loan', element: <DeskScreen ticket={FIX_TICKET} mark={null} tab="ticket" deskPlan={FIX_PLAN_USD} positions={{ ledgerIndex: FIX_L, ledgerHash: FIX_HASH, positions: [FIX_USD_POSITION, positionWith(FIX_NONE, 'C2'.repeat(32))] }} />,
+    mustContain: ['This loan is live on Devnet'], mustNotContain: ['No demo loan yet for this facility.'],
+  },
+  // The operator link: a run and a token are each the 32 hex characters the server draws, or the fragment is refused.
+  {
+    name: 'operator fragment: adopted only with a hex run and token',
+    element: <p>{[`#run=${'ab'.repeat(16)}&token=${'cd'.repeat(16)}`, `#run=../../demo/x&token=${'cd'.repeat(16)}`, `#run=${'ab'.repeat(16)}&token=t0`, ''].map((h) => operatorFragment(h)?.runId ?? 'refused').join(' | ')}</p>,
+    mustContain: [`${'ab'.repeat(16)} | refused | refused | refused`],
+  },
+  // A cure pledge validated while the call stays ISSUED for a new shortfall: the button comes back for the new units.
+  {
+    name: 'margin call still ISSUED after a validated cure for fewer shares: pledge again',
+    element: <MarginCallBanner position={positionWith(FIX_CALL)} call={{ ...FIX_CALL, shortfall: { ...(FIX_CALL.shortfall as NonNullable<MarginCall['shortfall']>), sharesToAdd: '411189' } }} deskPlan={FIX_PLAN} session={FIX_SESSION} primary
+      initial={{ phase: 'validated', units: '197938', actionId: FIX_ACTION, preview: PREVIEWS.pledgeEscrow, action: { actionId: FIX_ACTION, state: 'validated', txHash: 'AC'.repeat(32) } }} />,
+    before: [`${CURE_VERB} — validated on the ledger, transaction ${'AC'.repeat(32)}`, 'Pledges 411189 more shares', `>${CURE_VERB}</button>`],
+    mustNotContain: ['The desk re-reads the loan at the next ledger'],
+  },
+  {
+    name: 'margin call cure validated for the shares still asked: no second button',
+    element: banner(FIX_SESSION, { phase: 'validated', units: '197938', actionId: FIX_ACTION, preview: PREVIEWS.pledgeEscrow, action: { actionId: FIX_ACTION, state: 'validated', txHash: 'AC'.repeat(32) } }),
+    mustContain: ['The desk re-reads the loan at the next ledger'], mustNotContain: [`>${CURE_VERB}</button>`],
   },
 ]

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import type { FeedEvent } from '../lib/types'
+import type { FeedEvent, StatementCheck, StatementDoc } from '../lib/types'
 import { API_BASE } from '../lib/api'
 import { dropsToXrp } from '../lib/format'
 import { HashLink } from '../components/Ledger'
 import { EventTimeline } from '../components/Charts'
+import type { SmokeCase } from './Desk'
 
 /**
  * The credit events of the desk's vaults, each from two full re-reads of the ledger, never from metadata.
@@ -34,6 +35,17 @@ const sourceOf = (ev: FeedEvent) => (ev.provenance === 'REAL' ? 'REAL · ledger'
 const order = (id: string) => id.split('-').map((x) => x.replace(/^0+(?=\d)/, '').padStart(20, '0')).join('-')
 const effect = (m: FeedEvent['moneyEffect']) => (m === null ? null : m.unit === 'drops' ? `${dropsToXrp(m.value)} XRP` : `${m.value} ${m.unit}`)
 
+/**
+ * A statement's consistency in words, the same on the Feed and on the ticket: only INCONSISTENT says the ledger
+ * contradicts the curator; a note or a deleted loan cannot be checked, and an unreadable Vault.Data says so.
+ */
+export function consistencyLine(c: StatementCheck): string {
+  return c.status === 'CONSISTENT' ? `Consistent with the ledger at ${c.ledgerIndex}`
+    : c.status === 'INCONSISTENT' ? `Not consistent with the ledger at ${c.ledgerIndex}: ${c.detail}`
+    : c.status === 'NOT_CHECKABLE' ? `Not checkable against the ledger: ${c.detail}`
+    : 'Unreadable statement in Vault.Data'
+}
+
 /** A receipt value in words: absent, or a long hex string cut with its length; short strings are quoted. */
 function receiptValue(v: unknown): string {
   if (v === null || v === undefined) return 'absent'
@@ -54,7 +66,7 @@ function EventRow({ ev }: { ev: FeedEvent }) {
         {st && (
           <p className="t-body-s">
             <span className="prov" data-prov="REAL">REAL</span>
-            {` ${st.consistency.status === 'CONSISTENT' ? 'Consistent' : 'Not consistent'} with the ledger at ${st.consistency.ledgerIndex}: ${st.consistency.detail}`}
+            {` ${consistencyLine(st.consistency)}`}
           </p>
         )}
         <details className="fig-ledger">
@@ -138,3 +150,33 @@ export function DeskFeed({ data }: { data: FeedDoc }) {
     </>
   )
 }
+
+// One curator statement per consistency status, on the Feed as on the ticket: only INCONSISTENT says the ledger contradicts it.
+const FIX_L = 6390000
+const FIX_HASH = 'AB'.repeat(32)
+const stmtEvent = (n: number, kind: StatementDoc['kind'], consistency: Pick<StatementCheck, 'status' | 'detail'>, doc = true): FeedEvent => ({
+  id: `${String(FIX_L + n).padStart(19, '0')}-0`, type: 'STATEMENT', provenance: 'DECLARED', vaultId: '22'.repeat(32), ledgerIndex: FIX_L + n, ledgerHash: FIX_HASH,
+  why: 'The vault owner wrote a statement into Vault.Data.', moneyEffect: null, receipts: [],
+  statement: {
+    provenance: 'DECLARED', raw: '7B7D', owner: 'rVaultOwner', doc: doc ? { s: 'orma.stmt/1', kind, text: `A ${kind} statement.`, at: FIX_L + n } : null,
+    consistency: { ...consistency, provenance: 'REAL', ledgerIndex: FIX_L + n, ledgerHash: FIX_HASH },
+  },
+})
+const feedOf = (...events: FeedEvent[]): FeedDoc => ({ ledgerIndex: FIX_L + 100, nextCursor: null, amendments: { source: 'xrpscan', fetchedAt: '2026-10-25T12:00:00Z', status: 'unavailable', items: [] }, events })
+const NOTE_DETAIL = 'a note asserts nothing the ledger can check'
+const REPAID_DETAIL = `loan BBBBBBBB… is no longer on the ledger at ${FIX_L + 2}: a LoanDelete removes repaid and defaulted loans alike`
+
+export const SMOKE_CASES: SmokeCase[] = [
+  {
+    name: 'statements that cannot be checked or read are never called inconsistent',
+    element: <DeskFeed data={feedOf(stmtEvent(1, 'note', { status: 'NOT_CHECKABLE', detail: NOTE_DETAIL }), stmtEvent(2, 'repaid', { status: 'NOT_CHECKABLE', detail: REPAID_DETAIL }), stmtEvent(3, 'note', { status: 'UNPARSEABLE', detail: 'Vault.Data is not a valid orma.stmt/1 document' }, false))} />,
+    mustContain: [`Not checkable against the ledger: ${NOTE_DETAIL}`, `Not checkable against the ledger: ${REPAID_DETAIL}`, 'Unreadable statement in Vault.Data'],
+    mustNotContain: ['Not consistent', 'Consistent with'],
+  },
+  {
+    name: 'statements the ledger confirms or contradicts say so, at their ledger',
+    element: <DeskFeed data={feedOf(stmtEvent(1, 'impaired', { status: 'CONSISTENT', detail: 'L1 carries lsfLoanImpaired' }), stmtEvent(2, 'repaid', { status: 'INCONSISTENT', detail: `L2 carries lsfLoanDefault at ledger ${FIX_L + 2}` }))} />,
+    mustContain: [`Consistent with the ledger at ${FIX_L + 1}`, `Not consistent with the ledger at ${FIX_L + 2}: L2 carries lsfLoanDefault at ledger ${FIX_L + 2}`],
+    mustNotContain: ['Not checkable', 'Unreadable statement'],
+  },
+]
