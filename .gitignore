@@ -119,3 +119,15 @@ documentation/site/
 /.demo-frontend.log
 feedback/print-report.html
 feedback/print-appendix.html
+
+# Planning and working notes, kept on disk, never committed. Listed here and not only
+# in .git/info/exclude, which is local to one clone.
+/blueprints/
+/notes/
+/AGENTS.md
+/pitch/
+/research/
+
+# Role and relay seeds, wherever a script writes them. Private keys, never committed.
+**/roles.json
+**/fx-relay.json
