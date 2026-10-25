@@ -4,12 +4,17 @@ Every file here is committed to the repo and served from the same origin. Nothin
 hotlinked: the venue wifi is a risk and a remote asset that fails on stage is a visible
 failure.
 
+## brand/
+
+- The current identity: the Orma and Orma Desk lockups, in ink for light pages and in
+  colour for dark ones. `src/components/Lockup.tsx` draws them as images, and draws the
+  symbol alone (an eccentric ring, two circles read one inside the other) inline, so it
+  takes the page's text colour in both themes.
+
 ## mark.svg
 
-- The brand sigil. Drawn for this project. The masthead and the footer draw the same
-  paths inline (`src/components/Lockup.tsx`), so the O and the upper current take the
-  page's text colour in both themes; this file stays the reference and the source of the
-  og card.
+- The first sigil, an O over two currents, kept because the og card is composed from it.
+  No page draws it any more.
 - **Deliberately not the XRPL logo.** Using the real trademark is not a call the
   frontend gets to make, and an imitation of it would be worse. This is two readings of
   one quantity — dashed and low, solid and true — which is the product in three strokes.
@@ -20,18 +25,19 @@ failure.
   a blank card in Slack, Discord and WhatsApp, which is the first thing most people see of
   the product.
 - Composed locally from parts already in this folder: `mark.svg` rasterised by rsvg-convert
-  for the sigil, and IBM Plex Mono SemiBold for the type, so it carries the same mark and
-  the same letterforms as the topbar rather than an approximation of them.
+  for the sigil, and IBM Plex Mono SemiBold for the type. It predates the lockups in
+  `brand/` and still carries the first sigil.
 - The strip along the bottom is the twenty-step internal scale the credit opinion now
   draws, marked at the same notch. Same motif, same meaning, two places.
-- Referenced from `index.html` by a **relative** path. Every preview deploy has its own
-  hostname, so an absolute og:image would be right on exactly one of them.
+- Referenced from `index.html` by an **absolute** URL whose origin is stamped at build
+  time (`__SITE_ORIGIN__`, replaced by the plugin in `vite.config.ts`): a scraper has no
+  page to resolve a relative path against, and every preview deploy supplies its own host.
 
 ## fonts/
 
-Self-hosted, committed, served from this origin. **No Google Fonts request at runtime** —
-spec §6.2 bans webfonts because "a missing font on stage is a visible failure", and that
-risk is about the *network*, not about the file. A font that ships in the bundle cannot
+Self-hosted, committed, served from this origin. **No Google Fonts request at runtime**:
+a missing font on stage is a visible failure, and that risk is about the *network*, not
+about the file. A font that ships in the bundle cannot
 fail on venue wifi.
 
 | file | what | size |
@@ -50,7 +56,7 @@ fail on venue wifi.
   Redistribution inside a project is exactly what the OFL is for.
 - Source of these binaries: the latin subsets Google Fonts serves for IBM Plex
   (fonts.gstatic.com), downloaded once and committed. About 107 kB for all six.
-- Since the redesign (direction D2, "Registre") the serif carries the reading: titles,
+- Since the redesign the serif carries the reading: titles,
   facility names, grades and the held figure, with Plex Sans for the interface and Plex
   Mono for tabular figures. Three serif files, latin only — not the family. Georgia is the
   fallback. The two added faces come from the same place as the others (fonts.gstatic.com
