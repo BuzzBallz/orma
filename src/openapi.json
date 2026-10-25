@@ -736,6 +736,13 @@
                       "desk",
                       "spare"
                     ]
+                  },
+                  "signer": {
+                    "type": "string",
+                    "enum": [
+                      "browser"
+                    ],
+                    "description": "Demo lab, Devnet only: on pledgeEscrow, requestLoan, approve, rerequest, defaultL2 and impairL1, every signature the action needs is asked of the page (state awaiting-signature, toSign) instead of a wallet of the server. Absent, nothing changes. On any other action, 400."
                   }
                 }
               }
@@ -850,6 +857,105 @@
             "$ref": "#/components/responses/Error"
           },
           "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "423": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/roles/{runId}/actions/{actionId}/signature": {
+      "parameters": [
+        {
+          "name": "runId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "actionId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "post": {
+        "summary": "Demo lab: hand over the blob the page signed for the action's open signature request",
+        "description": "Same write policy as the other role POSTs (allowed Origin or loopback, the run's Bearer token, the kill switch, 64 KB body). The blob is decoded and compared with toSign before it is used: kind sign, decode(txBlob) equals txJson but SigningPubKey and TxnSignature, single-signed by the master key of toSign.account, and the signature verifies; kind countersign, decode(txBlob) without CounterpartySignature equals the borrower-signed blob, CounterpartySignature single-signed by the master key of toSign.account, and it verifies. Otherwise 400 SIGNATURE_MISMATCH and the request stays open.",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": true,
+            "description": "Bearer <run token>, from POST /api/demo/run.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "requestId",
+                  "txBlob"
+                ],
+                "properties": {
+                  "requestId": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{32}$"
+                  },
+                  "txBlob": {
+                    "type": "string",
+                    "pattern": "^[0-9A-Fa-f]+$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Not used: an accepted signature answers 202.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleAction"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "The signature was verified; the action, its work going on (another signature may be asked next, with a new requestId).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoleAction"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
             "$ref": "#/components/responses/Error"
           },
           "423": {
@@ -1871,7 +1977,7 @@
       },
       "RoleAction": {
         "type": "object",
-        "description": "A role action. previewing is internal and never served; approving is a request while its approve confirms.",
+        "description": "A role action. previewing is internal and never served; approving is a request while its approve confirms; awaiting-signature (demo lab) is a browser-signed action waiting for the blob its toSign asks. A request left unanswered fails the action with engineResult SIGNATURE_TIMEOUT.",
         "required": [
           "actionId",
           "runId",
@@ -1905,8 +2011,19 @@
               "submitted",
               "validated",
               "failed",
-              "refused"
+              "refused",
+              "awaiting-signature"
             ]
+          },
+          "signer": {
+            "type": "string",
+            "enum": [
+              "browser"
+            ],
+            "description": "Present on a browser-signed action (demo lab) only."
+          },
+          "toSign": {
+            "$ref": "#/components/schemas/ToSign"
           },
           "preview": {
             "type": "object"
@@ -1927,7 +2044,7 @@
       },
       "RoleActionCreated": {
         "type": "object",
-        "description": "A created action.",
+        "description": "A created action. A browser-signed one (demo lab) also carries its state and, when its POST already needs a signature (requestLoan), its toSign.",
         "required": [
           "actionId",
           "preview"
@@ -1938,6 +2055,66 @@
           },
           "preview": {
             "type": "object"
+          },
+          "state": {
+            "type": "string"
+          },
+          "toSign": {
+            "$ref": "#/components/schemas/ToSign"
+          }
+        }
+      },
+      "ToSign": {
+        "type": "object",
+        "description": "Demo lab: one signature asked of the page. kind sign: sign txJson as is with the master key of account. kind countersign (deskOwner): countersign the borrower-signed LoanSet txBlob. Each signature asked, a rebuild included, has a new requestId.",
+        "required": [
+          "requestId",
+          "kind",
+          "role",
+          "account",
+          "expiresAt",
+          "purpose"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{32}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "sign",
+              "countersign"
+            ]
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "borrower",
+              "broker",
+              "deskOwner"
+            ]
+          },
+          "account": {
+            "type": "string",
+            "description": "The classic address whose master key must sign."
+          },
+          "txJson": {
+            "type": "object",
+            "description": "kind sign: the autofilled transaction to sign."
+          },
+          "txBlob": {
+            "type": "string",
+            "description": "kind countersign: the borrower-signed LoanSet blob."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "180 s after the request; past it the action fails with engineResult SIGNATURE_TIMEOUT."
+          },
+          "purpose": {
+            "type": "string",
+            "description": "One plain sentence: who signs what, for whom."
           }
         }
       },

@@ -119,6 +119,18 @@ function main() {
   eq('a margin-calls document with a call read at another ledger', SCHEMAS.marginCalls(otherLedger).some((p) => p.includes("document's ledger")), true)
   eq('the hardening values are in the contract', [ACTION_STATES.includes('approving'), DECISION_CODES.includes('SUBMIT_UNCONFIRMED'), NYC_ERRORS.BUSY], [true, true, { status: 503, retryable: true }])
 
+  console.log('browser signatures (the demo lab)')
+  eq('the demo lab values are in the contract: awaiting-signature, SIGNATURE_MISMATCH 400 not retryable, SIGNATURE_TIMEOUT a decision code',
+    [ACTION_STATES.includes('awaiting-signature'), NYC_ERRORS.SIGNATURE_MISMATCH, DECISION_CODES.includes('SIGNATURE_TIMEOUT')], [true, { status: 400, retryable: false }, true])
+  const awaiting = clone(EXAMPLES.actionAwaiting)
+  eq('an action awaiting a signature without its toSign is refused', SCHEMAS.action({ ...awaiting, toSign: undefined }).some((p) => p.startsWith('toSign')), true)
+  eq('a server-signed action awaiting a signature is refused', SCHEMAS.action({ ...awaiting, signer: undefined }).some((p) => p.startsWith('signer')), true)
+  eq('a toSign on an action that awaits none is refused', SCHEMAS.action({ ...clone(EXAMPLES.action), toSign: EXAMPLES.toSign }).some((p) => p.startsWith('toSign')), true)
+  eq('a toSign whose transaction is another account\'s is refused', SCHEMAS.toSign({ ...clone(EXAMPLES.toSign), account: 'rPT1Sjq2YGrBMTttX4GZHjKu9dyfzbpAYe' }).some((p) => p.startsWith('txJson.Account')), true)
+  eq('a countersign by the borrower, or without its blob, is refused',
+    [SCHEMAS.toSign({ ...clone(EXAMPLES.toSign), kind: 'countersign', txJson: undefined, txBlob: 'AB' }).some((p) => p.startsWith('role')), SCHEMAS.toSign({ ...clone(EXAMPLES.toSign), kind: 'countersign', role: 'deskOwner', txJson: undefined }).some((p) => p.startsWith('txBlob'))], [true, true])
+  eq('a requestId that is not 32 hex characters is refused', SCHEMAS.toSign({ ...clone(EXAMPLES.toSign), requestId: 'x' }).some((p) => p.startsWith('requestId')), true)
+
   console.log('loans in the test dollar (step 21)')
   const terms = EXAMPLES.usdTerms
   const oracle = terms.xrpUsdOracle
@@ -180,7 +192,8 @@ function main() {
   eq('twenty-one formulas: fourteen at step 1, six in dollars at step 21, pastDue at step 22', [Object.keys(FORMULAS).length, Object.keys(FORMULAS).slice(14)], [21, ['collateralHeldUsd', 'maxLoanUsd', 'requestedUsd', 'ltvHeldUsd', 'lender1to1Usd', 'priceAge', 'pastDue']])
 
   console.log('routes')
-  eq('sixteen NYC routes: fifteen at step 1, GET /api/desk/margin-calls at step 20', [NYC_ROUTES.length, NYC_ROUTES.at(-1).path], [16, '/api/desk/margin-calls'])
+  eq('seventeen NYC routes: fifteen at step 1, GET /api/desk/margin-calls at step 20, POST …/signature for the demo lab',
+    [NYC_ROUTES.length, NYC_ROUTES.at(-2).path, NYC_ROUTES.at(-1)], [17, '/api/desk/margin-calls', { method: 'POST', path: '/api/roles/{runId}/actions/{actionId}/signature' }])
   const spec = JSON.parse(readFileSync(new URL('../openapi.json', import.meta.url), 'utf8'))
   const doc = readFileSync(new URL('../../documentation/pages/http-api.mdx', import.meta.url), 'utf8')
   eq('every NYC route is in openapi.json, with a summary and a described 200', NYC_ROUTES.filter((r) => {

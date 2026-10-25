@@ -525,9 +525,52 @@ export interface Decision {
   decision: 'approved' | 'refused' | 'declined'; code?: string; txHash?: string; ledgerIndex: number; ledgerHash: string; hash: string
 }
 
-/** A role action's state; `previewing` is internal and never served, `approving` is a request while its approve confirms. */
-export type ActionState = 'previewed' | 'pending-approval' | 'approving' | 'queued' | 'submitted' | 'validated' | 'failed' | 'refused'
-export interface RoleAction { actionId: string; runId: string; role: string; action: string; vault?: string; state: ActionState; txHash?: string; engineResult?: string; ledgerIndex?: number }
+/**
+ * A role action's state; `previewing` is internal and never served, `approving` is a request while its approve confirms.
+ * `awaiting-signature` (addition, demo lab): a browser-signed action waits for the signature its `toSign` names.
+ */
+export type ActionState = 'previewed' | 'pending-approval' | 'approving' | 'queued' | 'submitted' | 'validated' | 'failed' | 'refused' | 'awaiting-signature'
+export interface RoleAction {
+  actionId: string; runId: string; role: string; action: string; vault?: string; state: ActionState; txHash?: string; engineResult?: string; ledgerIndex?: number
+  /** Addition (demo lab): 'browser' on an action whose POST opted into browser signing; absent otherwise. */
+  signer?: SignerMode
+  /** Addition (demo lab): the signature a browser-signed action waits for, while its state is awaiting-signature. */
+  toSign?: ToSign | null
+}
+
+// --- addition, demo lab: the signature of a role action moves to the browser ------------------------------
+// The server still builds every transaction; an action opts in with `signer: 'browser'` in its POST body. Without
+// it nothing changes. Codes: SIGNATURE_MISMATCH (400, not retryable) on a blob that is not the transaction asked
+// for, by its account; SIGNATURE_TIMEOUT as an action's engineResult when no signature arrived by expiresAt.
+
+/** The optional body field of POST /api/roles/{runId}/{role}/{action} that opts an action into browser signing. */
+export type SignerMode = 'browser'
+export interface SignerField { signer?: SignerMode }
+/** `sign`: sign txJson as is. `countersign`: countersign the borrower-signed LoanSet of txBlob. */
+export type SignKind = 'sign' | 'countersign'
+/** Who is asked to sign: SIGN_ROLES of src/nyc/contracts.mjs. A countersign is always the desk owner's. */
+export type SignRole = 'borrower' | 'broker' | 'deskOwner'
+export interface ToSign {
+  /** 32 lowercase hex characters; a new one for each signature asked, a rebuild included. */
+  requestId: string
+  kind: SignKind
+  role: SignRole
+  /** The classic address that must sign: the address of SigningPubKey (or of CounterpartySignature.SigningPubKey). */
+  account: string
+  /** kind sign: the autofilled transaction to sign. */
+  txJson?: Record<string, unknown>
+  /** kind countersign: the borrower-signed LoanSet blob. */
+  txBlob?: string
+  /** ISO time, 180 s after the request; past it the action fails with engineResult SIGNATURE_TIMEOUT. */
+  expiresAt: string
+  /** One plain sentence: who signs what, for whom. */
+  purpose: string
+}
+/** POST /api/roles/{runId}/actions/{actionId}/signature */
+export interface SignatureBody { requestId: string; txBlob: string }
+export const SIGNATURE_ERRORS = ['SIGNATURE_MISMATCH', 'SIGNATURE_TIMEOUT'] as const
+const _signProbe: [SignerField, ToSign, SignatureBody, SignKind] | null = null
+void _signProbe
 
 // Fails tsc -b if any of the twelve is missing: an export that is absent or unused compiles otherwise.
 const _typeProbe: [Ticket, Change, Mandate, Mark, FeedEvent, Universe, Decision, Figure, Provenance, FormulaId, Statement, CollateralAccount] | null = null

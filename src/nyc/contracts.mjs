@@ -100,6 +100,7 @@ export const NYC_ROUTES = Object.freeze([
   { method: 'GET', path: '/api/feed' },
   { method: 'GET', path: '/api/feed/stream' },
   { method: 'GET', path: '/api/desk/margin-calls' }, // step 20, addendum A11
+  { method: 'POST', path: '/api/roles/{runId}/actions/{actionId}/signature' }, // the demo lab: a browser signature
 ].map((r) => Object.freeze(r)))
 
 /**
@@ -121,6 +122,8 @@ export const NYC_ERRORS = Object.freeze({
   SEQUENCE_PASSED: { status: 409, retryable: false },
   INCONSISTENT_SNAPSHOT: { status: 409, retryable: true },
   BUSY: { status: 503, retryable: true },
+  // the demo lab: a posted blob that is not the transaction asked, by its account; the request stays open
+  SIGNATURE_MISMATCH: { status: 400, retryable: false },
 })
 
 /** The codes that existed before NYC, unchanged. */
@@ -143,15 +146,29 @@ export const EXISTING_ERRORS = Object.freeze({
 /**
  * Every state a role action can be in. `previewing` is internal and never served (a requestLoan sits
  * there before its autofill); `approving` is a request during the confirm of its approve.
+ * `awaiting-signature` (the demo lab) is a browser-signed action waiting for the blob its `toSign` asks.
  */
-export const ACTION_STATES = Object.freeze(['previewing', 'previewed', 'pending-approval', 'approving', 'queued', 'submitted', 'validated', 'failed', 'refused'])
+export const ACTION_STATES = Object.freeze(['previewing', 'previewed', 'pending-approval', 'approving', 'queued', 'submitted', 'validated', 'failed', 'refused', 'awaiting-signature'])
+
+/**
+ * The demo lab (Devnet only): the one value of the optional body field `signer` of
+ * POST /api/roles/{runId}/{role}/{action}, the actions that take it, the two kinds of signature asked
+ * in an action's `toSign`, the roles that sign, and the engineResult of a request left unanswered.
+ */
+export const SIGNER_MODES = Object.freeze(['browser'])
+export const BROWSER_SIGNED_ACTIONS = Object.freeze(['pledgeEscrow', 'requestLoan', 'approve', 'rerequest', 'defaultL2', 'impairL1'])
+export const SIGN_KINDS = Object.freeze(['sign', 'countersign'])
+export const SIGN_ROLES = Object.freeze(['borrower', 'broker', 'deskOwner'])
+export const SIGNATURE_TIMEOUT = 'SIGNATURE_TIMEOUT'
+/** Seconds a signature request stays open, from its creation to its expiresAt. */
+export const SIGNATURE_TTL_SECONDS = 180
 
 /**
  * Codes a `refused` decision is known to carry. The set is open (any other refusal keeps its own
  * code); `SUBMIT_UNCONFIRMED` is a submission that threw and that the 60 s re-read did not find, and
  * it always carries the txHash that was sent.
  */
-export const DECISION_CODES = Object.freeze(['ESCROW_POLICY', 'INCONSISTENT_SNAPSHOT', 'STALE', 'BREACHED', 'SEQUENCE_PASSED', 'SUBMIT_UNCONFIRMED'])
+export const DECISION_CODES = Object.freeze(['ESCROW_POLICY', 'INCONSISTENT_SNAPSHOT', 'STALE', 'BREACHED', 'SEQUENCE_PASSED', 'SUBMIT_UNCONFIRMED', 'SIGNATURE_TIMEOUT'])
 
 /** The six steps of an orma.mark/1, in order. A SPOOFED `fetch nav` stops after the first three. */
 export const MARK_STEPS = Object.freeze(['read MPTokenIssuance', 'decode metadata', 'fetch nav', 'anti-spoof', 'recompute', 'oracle cross-check'])
@@ -1442,6 +1459,41 @@ function validateAction(doc) {
   if (a.state === 'previewing') r.fail('state', 'previewing is internal and never served')
   if (a.state === 'validated') for (const k of ['txHash', 'engineResult']) if (!(k in a)) r.fail(k, 'is missing on a validated action')
   if ('txHash' in a) hex64(r, a.txHash, 'txHash')
+  // the demo lab: a toSign exactly while awaiting-signature, and only on a browser-signed action
+  if ('signer' in a) r.oneOf(a.signer, SIGNER_MODES, 'signer')
+  if (a.state === 'awaiting-signature') {
+    if (a.signer !== 'browser') r.fail('signer', "is not 'browser' on an action awaiting a signature")
+    if (!('toSign' in a)) r.fail('toSign', 'is missing on an action awaiting a signature')
+    else for (const p of validateToSign(a.toSign)) out.push(`toSign.${p}`)
+  } else if ('toSign' in a && a.toSign !== null) r.fail('toSign', 'is present on an action that awaits no signature')
+  return out
+}
+
+/** @param {unknown} doc @returns {string[]} */
+function validateToSign(doc) {
+  const out = []
+  deepProblems(doc, '', out)
+  const r = rules(out)
+  if (!r.obj(doc, '')) return out
+  const t = /** @type {any} */ (doc)
+  r.re(t.requestId, /^[0-9a-f]{32}$/, 'requestId', '32 lowercase hex characters')
+  r.oneOf(t.kind, SIGN_KINDS, 'kind')
+  r.oneOf(t.role, SIGN_ROLES, 'role')
+  r.re(t.account, /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/, 'account', 'a classic address')
+  if (t.kind === 'sign') {
+    if (r.obj(t.txJson, 'txJson')) {
+      if (t.txJson.Account !== t.account) r.fail('txJson.Account', 'is not the account asked to sign')
+      for (const k of ['TxnSignature', 'Signers']) if (k in t.txJson) r.fail(`txJson.${k}`, 'is present on a transaction still to sign')
+    }
+    if ('txBlob' in t) r.fail('txBlob', 'is present on a request of kind sign')
+  }
+  if (t.kind === 'countersign') {
+    r.re(t.txBlob, /^[0-9A-F]+$/, 'txBlob', 'an upper-case hex blob')
+    if ('txJson' in t) r.fail('txJson', 'is present on a request of kind countersign')
+    if (t.role !== 'deskOwner') r.fail('role', 'is not deskOwner on a countersign')
+  }
+  r.re(t.expiresAt, ISO, 'expiresAt', 'an ISO time')
+  r.str(t.purpose, 'purpose')
   return out
 }
 
@@ -1479,6 +1531,7 @@ export const SCHEMAS = Object.freeze({
   figure: validateFigure,
   collateralAccount: validateCollateralAccount,
   action: validateAction,
+  toSign: validateToSign, // the demo lab
   error: validateError,
   marginPolicy: validateMarginPolicy, // step 20
   marginCall: validateMarginCall,
@@ -1746,6 +1799,17 @@ function usdTicket(/** @type {any} */ t) {
   }
 }
 
+/** The demo lab: the signature a browser-signed pledge asks of the borrower. */
+const TO_SIGN = {
+  requestId: '3f2a9c0b7d1e4f5a6b8c9d0e1f2a3b4c', kind: 'sign', role: 'borrower', account: BORROWER,
+  txJson: {
+    TransactionType: 'EscrowCreate', Account: BORROWER, Destination: COLLATERAL, Amount: { mpt_issuance_id: SHARE, value: '1000000' },
+    FinishAfter: 846200000, CancelAfter: 846286400, Sequence: 41, Fee: '12', LastLedgerSequence: L + 20,
+  },
+  expiresAt: '2026-10-25T14:13:00Z',
+  purpose: `Tidewater Payments (fictional) pledges 1000000 share units of harbor-2 into escrow toward collateral account ${COLLATERAL}.`,
+}
+
 /** One valid example per shape; the ticket and the feed event have two each. */
 export const EXAMPLES = deepFreeze({
   ticket: TICKET,
@@ -1812,6 +1876,9 @@ export const EXAMPLES = deepFreeze({
     conforming: true, reasons: [], provenance: 'REAL', ledgerIndex: L, ledgerHash: H,
   },
   action: { actionId: 'act-3', runId: 'run-1', role: 'riskOfficer', action: 'approve', vault: 'desk', state: 'approving' },
+  // the demo lab: a browser-signed pledge awaiting the borrower's signature of its EscrowCreate
+  toSign: TO_SIGN,
+  actionAwaiting: { actionId: 'act-4', runId: 'run-1', role: 'borrower', action: 'pledgeEscrow', vault: 'desk', signer: 'browser', state: 'awaiting-signature', toSign: TO_SIGN },
   error: { error: { code: 'BUSY', message: 'Four desk ledger walks are already running; retry shortly.', retryable: true } },
   marginPolicy: MARGIN_POLICY,
   marginCall: MARGIN_CALL,
@@ -1830,7 +1897,7 @@ export const EXAMPLES = deepFreeze({
 })
 
 /** Which schema validates each example (the two tickets share one, as do the three feed events). */
-export const EXAMPLE_SCHEMA = Object.freeze(Object.fromEntries(Object.keys(EXAMPLES).map((k) => [k, ({ feedEventStatement: 'feedEvent', feedEventMarginCall: 'feedEvent', ticketBuy: 'ticket', ticketUsd: 'ticket', marginCallUsd: 'marginCall' })[k] ?? k])))
+export const EXAMPLE_SCHEMA = Object.freeze(Object.fromEntries(Object.keys(EXAMPLES).map((k) => [k, ({ feedEventStatement: 'feedEvent', feedEventMarginCall: 'feedEvent', ticketBuy: 'ticket', ticketUsd: 'ticket', marginCallUsd: 'marginCall', actionAwaiting: 'action' })[k] ?? k])))
 
 /** @template T @param {T} o @returns {T} */
 function deepFreeze(o) {
