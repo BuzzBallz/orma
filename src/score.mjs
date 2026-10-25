@@ -13,10 +13,7 @@
  * Every notch is emitted in notchTrace and rendered in the UI, which is the answer
  * to "how did you choose your weights": we do not weight, we notch.
  */
-import Decimal from 'decimal.js'
-import { wholeShares } from './num.mjs'
-
-Decimal.set({ precision: 40, toExpNeg: -9e15, toExpPos: 9e15 })
+import { wholeShares, Decimal } from './num.mjs'
 
 const D = (x) => new Decimal(x ?? 0)
 
