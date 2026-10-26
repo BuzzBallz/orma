@@ -18,6 +18,11 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      # npm test runs app/tools/check-operator-session.mjs when it is present, and that tool imports vite from app/node_modules.
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 12.11.2
+      - run: pnpm --dir app install --frozen-lockfile
       - run: npm test
       # Offline self-tests that npm test does not reach: the release agent (I3b), the NYC validators' refusals
       # and the demo-readiness judge.
