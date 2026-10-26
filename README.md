@@ -1,5 +1,8 @@
 # Orma
 
+> **Winner, Lending & Borrowing track**, AI & Fintech XRPL Hackathon (XRPL Commons x Ripple), New York, 24–25 October 2026: $6k.
+> Before that, **1st place**, XRPL Lending Hackathon, Paris, September 2026.
+
 ## Built in New York
 
 **Orma Desk lends XRP against XRPL vault shares, and prices each share at what the vault would pay out for it.**
