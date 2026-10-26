@@ -8,7 +8,7 @@
 # .demo/decisions.jsonl under /srv/orma; that directory is created for node below, and a volume
 # mounted over /srv/orma/.demo keeps the log across containers. No key is baked in: PUBLISH_SEED,
 # DESK_SEED and ROLES_FILE, when used, come from the platform's environment.
-FROM node:24.13.0-bookworm-slim@sha256:4660b1ca8b28d6d1906fd644abe34b2ed81d15434d26d845ef0aced307cf4b6f
+FROM node:26.12.1-bookworm-slim@sha256:28147155d47dc31abe0a46e0d12b59b2fb3d0a2dcc5dc65fce76a074180b16fe
 
 WORKDIR /srv/orma
 ENV NODE_ENV=production
